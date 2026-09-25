@@ -1,0 +1,680 @@
+package config_test
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/The-Apranik/Apranik/config"
+	"github.com/The-Apranik/Apranik/core/net/udp/nat"
+	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/The-Apranik/Apranik/module/proxy/socks5"
+	"github.com/The-Apranik/Apranik/spec"
+)
+
+func modules(t *testing.T) *registry.Registry {
+	t.Helper()
+
+	registered, err := registry.Default()
+	if err != nil {
+		t.Fatalf("registry.Default: %v", err)
+	}
+	return registered
+}
+
+// A config file that should load and check cleanly, used as the base for the
+// failure cases below.
+const goodDocument = `{
+  "version": 1,
+  "log": {"level": "info", "outputs": [{"type": "stderr"}]},
+  "inbounds": [{
+    "tag": "socks-in",
+    "listen": "127.0.0.1",
+    "port": 1080,
+    "transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}
+  }],
+  "outbounds": [{
+    "tag": "freedom",
+    "protocol": {"type": "freedom"}
+  }]
+}`
+
+func loadAndCheck(t *testing.T, document string) (config.Diagnostics, bool) {
+	t.Helper()
+
+	registered := modules(t)
+	configuration, diagnostics := config.Parse([]byte(document), registered)
+	if configuration != nil {
+		diagnostics = append(diagnostics, config.Check(configuration)...)
+	}
+	return diagnostics, diagnostics.HasErrors()
+}
+
+func requireNoErrors(t *testing.T, diagnostics config.Diagnostics) {
+	t.Helper()
+
+	if diagnostics.HasErrors() {
+		t.Fatalf("unexpected errors:\n%v", diagnostics.Err())
+	}
+}
+
+// Finds a diagnostic whose path and message both match, so a test cannot pass
+// on an unrelated failure that happens to be present.
+func find(diagnostics config.Diagnostics, path, substring string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Location == path && strings.Contains(diagnostic.Message, substring) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestGoodDocumentLoads(t *testing.T) {
+	registered := modules(t)
+
+	configuration, diagnostics := config.Parse([]byte(goodDocument), registered)
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+
+	if len(configuration.Inbounds) != 1 || len(configuration.Outbounds) != 1 {
+		t.Fatalf("got %d inbounds and %d outbounds, want 1 each",
+			len(configuration.Inbounds), len(configuration.Outbounds))
+	}
+
+	inbound := configuration.Inbounds[0]
+	if inbound.Bind.Port() != 1080 || !inbound.Bind.Addr().IsLoopback() {
+		t.Errorf("bind = %v, want 127.0.0.1:1080", inbound.Bind)
+	}
+	if inbound.Network != spec.NetworkTCP {
+		t.Errorf("network = %q, want tcp by default", inbound.Network)
+	}
+	// Config decides no defaults: an absent timeout stays zero, and the inbound
+	// package applies its own when it is built.
+	if inbound.HandshakeTimeout != 0 {
+		t.Errorf("handshake timeout = %v, want zero left for the inbound to default", inbound.HandshakeTimeout)
+	}
+
+	// The settings really reached the module, through the embedded struct.
+	proxy, ok := inbound.StreamProxy.(*socks5.Proxy)
+	if !ok {
+		t.Fatalf("proxy is %T, want *socks5.Proxy", inbound.StreamProxy)
+	}
+	if proxy.Username != "u" || proxy.Password.Reveal() != "p" {
+		t.Error("proxy settings did not decode into the promoted fields")
+	}
+	if !proxy.UDPRelay {
+		t.Error("udp_relay lost its default; absent keys must not overwrite the constructor")
+	}
+}
+
+// ---------- the envelope ----------
+
+func TestVersionIsRequired(t *testing.T) {
+	diagnostics, failed := loadAndCheck(t, `{"inbounds": []}`)
+	if !failed {
+		t.Fatal("a config file with no version was accepted")
+	}
+	if !find(diagnostics, "version", "schema version") {
+		t.Errorf("diagnostics do not explain the missing version: %v", diagnostics)
+	}
+}
+
+func TestUnsupportedVersionIsNamed(t *testing.T) {
+	diagnostics, failed := loadAndCheck(t, `{"version": 2}`)
+	if !failed {
+		t.Fatal("an unsupported version was accepted")
+	}
+	if !find(diagnostics, "version", "not supported by this core") {
+		t.Errorf("diagnostics do not name the unsupported version: %v", diagnostics)
+	}
+}
+
+// An old core reading a new config file should say exactly that, rather than
+// complaining about a field it has never heard of.
+func TestMinCoreIsCheckedBeforeAnyField(t *testing.T) {
+	document := `{"version": 1, "min_core": "99.0.0", "inbounds": [{"a_field_from_the_future": true}]}`
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a config file requiring a newer core was accepted")
+	}
+	if !find(diagnostics, "min_core", "requires Apranik") {
+		t.Errorf("diagnostics do not explain the version requirement: %v", diagnostics)
+	}
+	for _, diagnostic := range diagnostics {
+		if strings.Contains(diagnostic.Message, "a_field_from_the_future") {
+			t.Error("the unknown field was reported, so min_core was not checked first")
+		}
+	}
+}
+
+func TestSatisfiedMinCorePasses(t *testing.T) {
+	document := strings.Replace(goodDocument, `"version": 1,`, `"version": 1, "min_core": "0.0.1",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("a satisfiable min_core was refused: %v", diagnostics.Err())
+	}
+}
+
+// ---------- strictness ----------
+
+// A silently ignored field ships behaviour the user never asked for: someone
+// who writes "fingerprnt" believes they configured a fingerprint.
+func TestUnknownSettingIsRefusedByDefault(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"settings": {"username": "u", "password": "p"}`,
+		`"settings": {"usernam": "u"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a misspelled setting was accepted under the default strictness")
+	}
+	if !find(diagnostics, "inbounds[0].protocol.settings", "usernam") {
+		t.Errorf("diagnostics do not name the offending field and path: %v", diagnostics)
+	}
+}
+
+func TestStrictFalseAcceptsUnknownSettings(t *testing.T) {
+	document := strings.Replace(goodDocument, `"version": 1,`, `"version": 1, "strict": false,`, 1)
+	document = strings.Replace(document,
+		`"settings": {"username": "u", "password": "p"}`,
+		`"settings": {"username": "u", "password": "p", "usernam": "typo"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("strict:false still refused an unknown field: %v", diagnostics.Err())
+	}
+}
+
+// ---------- kind comes from position ----------
+
+func TestABaseInAnOverlaySlotSaysWhatItActuallyIs(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"transport": [{"type": "tcp"}],
+    "protocol"`,
+		`"transport": [{"type": "tcp"}, {"type": "tcp"}],
+    "protocol"`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a base transport in an overlay slot was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].transport[1]", "base stream transport") {
+		t.Errorf("the error does not say what tcp actually is: %v", diagnostics)
+	}
+}
+
+func TestUnknownTransportIsReportedWithItsPath(t *testing.T) {
+	document := strings.Replace(goodDocument, `"transport": [{"type": "tcp"}],
+    "protocol"`, `"transport": [{"type": "nonesuch"}],
+    "protocol"`, 1)
+
+	diagnostics, _ := loadAndCheck(t, document)
+	if !find(diagnostics, "inbounds[0].transport[0]", "nonesuch") {
+		t.Errorf("diagnostics do not point at the bad transport: %v", diagnostics)
+	}
+}
+
+// One run should surface every problem, not the first.
+func TestDecodingContinuesPastAFailure(t *testing.T) {
+	document := `{
+	  "version": 1,
+	  "inbounds": [
+	    {"tag": "a", "listen": "127.0.0.1", "port": 1080, "transport": [{"type": "nope"}], "protocol": {"type": "socks5"}},
+	    {"tag": "b", "listen": "127.0.0.1", "port": 1081, "transport": [{"type": "tcp"}], "protocol": {"type": "alsonope"}}
+	  ],
+	  "outbounds": [{"tag": "freedom", "transport": [{"type": "tcp"}]}]
+	}`
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("two broken inbounds were accepted")
+	}
+	if !find(diagnostics, "inbounds[0].transport[0]", "nope") {
+		t.Errorf("the first failure was not reported: %v", diagnostics)
+	}
+	if !find(diagnostics, "inbounds[1].protocol", "alsonope") {
+		t.Errorf("decoding stopped at the first failure: %v", diagnostics)
+	}
+}
+
+// ---------- listen and server ----------
+
+func TestListenIsRequiredWithNoDefault(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, "", 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("an inbound with no listen address was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].listen", "no default") {
+		t.Errorf("diagnostics do not explain that listen is required: %v", diagnostics)
+	}
+}
+
+func TestPortInsideListenIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "127.0.0.1:1080",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a host:port listen was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].listen", "own field") {
+		t.Errorf("diagnostics do not explain the separate port field: %v", diagnostics)
+	}
+}
+
+// Separate fields are most of why a bare IPv6 literal needs no brackets.
+// Resolving is I/O, which this package does not do, and a domain that answers
+// with several addresses leaves "which one did it bind?" unanswerable.
+func TestADomainListenAddressIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "localhost",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a domain listen address was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].listen", "cannot be a domain") {
+		t.Errorf("diagnostics do not explain that listen must be an IP: %v", diagnostics)
+	}
+}
+
+// A proxy server, unlike a listen address, may be a domain: it is dialled, not
+// bound, and the transport resolves it.
+func TestADomainServerAddressIsAccepted(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"tag": "freedom",
+    "protocol": {"type": "freedom"}`,
+		`"tag": "proxied",
+    "server": "proxy.example.com",
+    "server_port": 443,
+    "transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("a domain server address was refused: %v", diagnostics.Err())
+	}
+}
+
+func TestBareIPv6Listen(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "::1",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("a bare IPv6 listen address was refused: %v", diagnostics.Err())
+	}
+}
+
+func TestFreedomOutboundMayNotNameAServer(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"tag": "freedom",`,
+		`"tag": "freedom", "server": "example.com", "server_port": 443,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a freedom outbound with a server address was accepted")
+	}
+	if !find(diagnostics, "outbounds[0].server", "takes no server") {
+		t.Errorf("diagnostics do not explain why: %v", diagnostics)
+	}
+}
+
+func TestProxyOutboundNeedsAServer(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"tag": "freedom",
+    "protocol": {"type": "freedom"}`,
+		`"tag": "upstream",
+    "transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a proxy outbound with no server was accepted")
+	}
+	if !find(diagnostics, "outbounds[0].server", "no server address") {
+		t.Errorf("diagnostics do not explain the missing server: %v", diagnostics)
+	}
+}
+
+func TestFreedomTakesNoTransport(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"transport": [{"type": "tcp"}], "protocol": {"type": "freedom"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].transport", "freedom takes no transport") {
+		t.Errorf("a freedom outbound with a transport was not refused: %v", diagnostics)
+	}
+}
+
+func TestTheOldDatagramKeyIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"datagram": [{"type": "udp"}], "protocol": {"type": "freedom"}`, 1)
+
+	if _, failed := loadAndCheck(t, document); !failed {
+		t.Error("an outbound with a datagram key was accepted")
+	}
+}
+
+func TestAnOutboundNeedsAProtocol(t *testing.T) {
+	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"dial_timeout": "5s"`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].protocol", "type") {
+		t.Errorf("an outbound with no protocol was not refused with its path: %v", diagnostics)
+	}
+}
+
+func TestABlockOutboundDecodes(t *testing.T) {
+	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
+
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+
+	outbound := configuration.Outbounds[0]
+	if !outbound.Block || outbound.Freedom != nil || outbound.Proxy != nil {
+		t.Errorf("outbound = %+v, want only Block", outbound)
+	}
+}
+
+func TestBlockTakesNoSettingsServerOrDialTimeout(t *testing.T) {
+	for name, replacement := range map[string]string{
+		"outbounds[0].protocol.settings": `"protocol": {"type": "block", "settings": {"reply": "http"}}`,
+		"outbounds[0].server":            `"server": "example.com", "server_port": 443, "protocol": {"type": "block"}`,
+		"outbounds[0].dial_timeout":      `"dial_timeout": "5s", "protocol": {"type": "block"}`,
+	} {
+		document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, replacement, 1)
+
+		diagnostics, failed := loadAndCheck(t, document)
+		if !failed || !find(diagnostics, name, "") {
+			t.Errorf("%s: not refused at that path: %v", name, diagnostics)
+		}
+	}
+}
+
+func TestDuplicateTagsAreRefused(t *testing.T) {
+	document := `{
+	  "version": 1,
+	  "inbounds": [
+	    {"tag": "same", "listen": "127.0.0.1", "port": 1080, "transport": [{"type": "tcp"}], "protocol": {"type": "socks5"}},
+	    {"tag": "same", "listen": "127.0.0.1", "port": 1081, "transport": [{"type": "tcp"}], "protocol": {"type": "socks5"}}
+	  ],
+	  "outbounds": [{"tag": "freedom", "transport": [{"type": "tcp"}]}]
+	}`
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("two inbounds with the same tag were accepted")
+	}
+	if !find(diagnostics, "inbounds[1].tag", "already used") {
+		t.Errorf("diagnostics do not report the duplicate: %v", diagnostics)
+	}
+}
+
+func TestUDPInboundNeedsADatagramProxy(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "network": "udp",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a udp inbound with a stream proxy was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].protocol", "datagram proxy") {
+		t.Errorf("diagnostics do not explain the datagram proxy requirement: %v", diagnostics)
+	}
+}
+
+func TestUnknownNetworkIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "network": "sctp",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("an unknown network was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].network", "sctp") {
+		t.Errorf("diagnostics do not name the bad network: %v", diagnostics)
+	}
+}
+
+// ---------- warnings ----------
+
+// Each component's advisory findings, prefixed with where it sits.
+func TestComponentWarningsCarryTheirPath(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("an unauthenticated proxy is legal: %v", diagnostics.Err())
+	}
+	if !find(diagnostics, "inbounds[0].protocol.settings", "no username") {
+		t.Errorf("the module's warning did not reach the diagnostics with a path: %v", diagnostics)
+	}
+}
+
+func TestSilentLoggingIsWarnedAbout(t *testing.T) {
+	document := strings.Replace(goodDocument, `"log": {"level": "info", "outputs": [{"type": "stderr"}]},`, "", 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("a config file with no log block is legal: %v", diagnostics.Err())
+	}
+	if !find(diagnostics, "log", "nothing will be logged") {
+		t.Errorf("silent logging produced no warning: %v", diagnostics)
+	}
+}
+
+// ---------- nat ----------
+
+func TestUDPPolicyDecodes(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"nat": {"mapping": "address-dependent", "filtering": "address-dependent", "idle_timeout": "30s"}}}`, 1)
+
+	registered := modules(t)
+	configuration, diagnostics := config.Parse([]byte(document), registered)
+	requireNoErrors(t, diagnostics)
+
+	policy := configuration.Outbounds[0].Freedom.NAT
+	if policy == nil {
+		t.Fatal("the nat settings did not reach the config")
+	}
+	if policy.Mapping() != nat.AddressDependentMapping {
+		t.Errorf("mapping = %v, want address-dependent", policy.Mapping())
+	}
+	if policy.Filtering() != nat.AddressDependentFiltering {
+		t.Errorf("filtering = %v, want address-dependent", policy.Filtering())
+	}
+	if policy.IdleTimeout() != 30*time.Second {
+		t.Errorf("idle timeout = %v, want 30s", policy.IdleTimeout())
+	}
+}
+
+// The least secure filtering mode lets an off-path attacker inject packets.
+func TestEndpointIndependentFilteringIsWarnedAbout(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"nat": {"filtering": "endpoint-independent"}}}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("the mode is legal: %v", diagnostics.Err())
+	}
+	if !find(diagnostics, "outbounds[0].protocol.settings.nat.filtering", "off-path") {
+		t.Errorf("no warning for the weakest filtering mode: %v", diagnostics)
+	}
+}
+
+func TestUnknownUDPBehaviourIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"nat": {"mapping": "whatever"}}}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("an unknown mapping behaviour was accepted")
+	}
+	if !find(diagnostics, "outbounds[0].protocol.settings.nat.mapping", "whatever") {
+		t.Errorf("diagnostics do not name the bad behaviour: %v", diagnostics)
+	}
+}
+
+// ---------- log ----------
+
+func TestLogOutputsBecomeSinks(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"outputs": [{"type": "stderr"}]`,
+		`"outputs": [{"type": "stderr"}, {"type": "memory", "capacity": 64}]`, 1)
+
+	registered := modules(t)
+	configuration, diagnostics := config.Parse([]byte(document), registered)
+	requireNoErrors(t, diagnostics)
+
+	if len(configuration.Log.Outputs) != 2 {
+		t.Errorf("got %d outputs, want 2", len(configuration.Log.Outputs))
+	}
+}
+
+func TestUnknownLogOutputIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `{"type": "stderr"}`, `{"type": "teletype"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("an unknown log output was accepted")
+	}
+	if !find(diagnostics, "log.outputs[0]", "teletype") {
+		t.Errorf("diagnostics do not name the bad output: %v", diagnostics)
+	}
+}
+
+func TestFileOutputNeedsAPath(t *testing.T) {
+	document := strings.Replace(goodDocument, `{"type": "stderr"}`, `{"type": "file"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed {
+		t.Fatal("a file output with no path was accepted")
+	}
+	if !find(diagnostics, "log.outputs[0]", "path") {
+		t.Errorf("diagnostics do not name the missing field: %v", diagnostics)
+	}
+}
+
+// ---------- sniffing ----------
+
+func withSniffing(sniffing string) string {
+	return strings.Replace(goodDocument,
+		`"protocol": {"type": "socks5",`,
+		`"sniffing": `+sniffing+`, "protocol": {"type": "socks5",`, 1)
+}
+
+func TestSniffingIsOffWhenAbsent(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+
+	if configuration.Inbounds[0].Sniffing != nil {
+		t.Errorf("sniffing = %+v, want nil", configuration.Inbounds[0].Sniffing)
+	}
+}
+
+func TestSniffingDecodes(t *testing.T) {
+	document := withSniffing(`{"sniffers": [{"type": "tls"}, {"type": "http"}], "timeout": "250ms"}`)
+
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+
+	sniffing := configuration.Inbounds[0].Sniffing
+	if sniffing == nil || len(sniffing.Sniffers) != 2 || sniffing.Timeout != 250*time.Millisecond {
+		t.Fatalf("sniffing = %+v, want two sniffers and 250ms", sniffing)
+	}
+	if sniffing.Sniffers[0].Info().Name != "tls" || sniffing.Sniffers[1].Info().Name != "http" {
+		t.Errorf("sniffers are %q and %q, want tls then http", sniffing.Sniffers[0].Info().Name, sniffing.Sniffers[1].Info().Name)
+	}
+}
+
+func TestUnknownSnifferIsReportedWithItsPath(t *testing.T) {
+	diagnostics, failed := loadAndCheck(t, withSniffing(`{"sniffers": [{"type": "tls"}, {"type": "bittorrent"}]}`))
+	if !failed {
+		t.Fatal("an unknown sniffer was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].sniffing.sniffers[1]", "bittorrent") {
+		t.Errorf("diagnostics do not name the unknown sniffer: %v", diagnostics)
+	}
+}
+
+func TestSniffingWithoutSniffersIsRefused(t *testing.T) {
+	diagnostics, failed := loadAndCheck(t, withSniffing(`{}`))
+	if !failed {
+		t.Fatal("sniffing with no sniffers was accepted")
+	}
+	if !find(diagnostics, "inbounds[0].sniffing.sniffers", "at least one sniffer") {
+		t.Errorf("diagnostics do not explain the missing sniffers: %v", diagnostics)
+	}
+}
+
+// ---------- timeouts ----------
+
+func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "tcp_idle_timeout": "2m", "udp_session_idle_timeout": "90s",`, 1)
+	document = strings.Replace(document,
+		`"tag": "freedom",`,
+		`"tag": "freedom", "dial_timeout": "7s",`, 1)
+	document = strings.Replace(document,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s", "resolve_cache_ttl": "1m"}}}`, 1)
+
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+
+	inbound, outbound := configuration.Inbounds[0], configuration.Outbounds[0]
+	if inbound.TCPIdleTimeout != 2*time.Minute || inbound.UDPSessionIdleTimeout != 90*time.Second {
+		t.Errorf("inbound timeouts = %s, %s; want 2m, 90s", inbound.TCPIdleTimeout, inbound.UDPSessionIdleTimeout)
+	}
+	if outbound.DialTimeout != 7*time.Second {
+		t.Errorf("dial timeout = %s, want 7s", outbound.DialTimeout)
+	}
+}
+
+func TestANegativeUDPSessionIdleTimeoutIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_idle_timeout": "-1s",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].udp_session_idle_timeout", "never be released") {
+		t.Errorf("a negative UDP session idle timeout was not refused with its path: %v", diagnostics)
+	}
+}
+
+func TestAHandshakeTimeoutOnFreedomIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"tag": "freedom",`,
+		`"tag": "freedom", "handshake_timeout": "5s",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].handshake_timeout", "freedom has no proxy handshake") {
+		t.Errorf("a freedom handshake timeout was not refused with its path: %v", diagnostics)
+	}
+}
+
+func TestANegativeResolveTimeoutIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "-1s"}}}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.udp", "resolve_timeout") {
+		t.Errorf("a negative resolve timeout was not refused with its path: %v", diagnostics)
+	}
+}
