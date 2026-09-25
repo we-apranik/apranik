@@ -1,0 +1,94 @@
+site_name: Apranik
+site_description: An embeddable, open-source proxy core for censorship circumvention.
+repo_url: https://github.com/The-Apranik/Apranik
+repo_name: The-Apranik/Apranik
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+exclude_docs: |
+  _plan.md
+  _report.md
+  context/
+
+theme:
+  name: material
+  icon:
+    logo: material/shield-lock-outline
+    repo: fontawesome/brands/github
+  favicon: assets/favicon.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.footer
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+extra_css:
+  - assets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/The-Apranik/Apranik
+
+plugins:
+  - search
+
+markdown_extensions:
+  - tables
+  - md_in_html
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - github-callouts
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Overview: overview.md
+      - Configuration: configuration.md
+      - Glossary: glossary.md
+  - How it works:
+      - Architecture: architecture.md
+      - Request lifecycle: request-lifecycle.md
+  - Contribute:
+      - Contributing guide: contributing.md
+      - Practices: contributors/practices.md
+      - Good first issues: contributors/good-first-issues.md
+  - Design:
+      - Decisions:
+      - Open questions: design/open-questions.md
+      - Threat model: design/threat-model.md
+      - FAQ: contributors/faq.md
+      - Comparison with other cores: contributors/comparison.md
