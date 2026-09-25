@@ -26,7 +26,17 @@ go.work.sum
 
 # env file
 .env
+.venv/
 
 # Editor/IDE
 # .idea/
 # .vscode/
+
+CLAUDE.md
+# MkDocs build output
+site/
+
+# Internal working notes, never committed
+notes/
+
+.gitconfig
