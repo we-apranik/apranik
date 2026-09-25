@@ -1,0 +1,62 @@
+// Package tcp is the base stream transport: it listens for and dials plain TCP,
+// which every stream stack starts from. Keep-alive and no-delay come from the
+// module's settings.
+package tcp
+
+import (
+	"fmt"
+	"net"
+	"time"
+
+	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/The-Apranik/Apranik/spec"
+)
+
+// One value per configured component, so nothing has to narrow a config.
+type Transport struct{ Settings }
+
+func (*Transport) Info() spec.ModuleInfo {
+	return spec.ModuleInfo{Name: "tcp", Description: "TCP over IPv4/IPv6"}
+}
+
+func (t *Transport) NewStreamDialer() (spec.StreamDialer, error) {
+	return &streamDialer{
+		dialer:  net.Dialer{KeepAlive: time.Duration(t.KeepAlive)},
+		noDelay: t.NoDelay,
+	}, nil
+}
+
+// Binds here rather than on first accept, so a port conflict is a startup
+// error a user can read.
+func (t *Transport) NewStreamListener(bind spec.Endpoint) (spec.StreamListener, error) {
+	address, err := bindTarget(bind)
+	if err != nil {
+		return nil, err
+	}
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, fmt.Errorf("tcp: listen %s: %w", address, err)
+	}
+
+	tcpListener, ok := listener.(*net.TCPListener)
+	if !ok {
+		listener.Close()
+		return nil, fmt.Errorf("tcp: listen %s: got %T, want *net.TCPListener", address, listener)
+	}
+
+	return &streamListener{
+		listener:  tcpListener,
+		keepAlive: time.Duration(t.KeepAlive),
+		noDelay:   t.NoDelay,
+	}, nil
+}
+
+// The return type is the kind declaration: registering this as anything else
+// will not compile.
+func NewBaseStreamTransportModule() spec.BaseStreamTransport {
+	return &Transport{Settings: Settings{
+		KeepAlive: types.Duration(15 * time.Second),
+		NoDelay:   true,
+	}}
+}
