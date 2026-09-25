@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "min_core": "0.1.0",
+
+  "log": {
+    "level": "info",
+    "outputs": [{ "type": "stderr" }]
+  },
+
+  "inbounds": [
+    {
+      "tag": "socks-in",
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "network": "tcp",
+      "handshake_timeout": "10s",
+      "transport": [{ "type": "tcp" }],
+      "protocol": { "type": "socks5", "settings": { "udp_relay": true } }
+    },
+    {
+      "tag": "http-in",
+      "listen": "127.0.0.1",
+      "port": 1081,
+      "network": "tcp",
+      "transport": [{ "type": "tcp" }],
+      "protocol": { "type": "http" }
+    }
+  ],
+
+  "outbounds": [
+    {
+      "tag": "freedom",
+      "protocol": { "type": "freedom" }
+    },
+    {
+      "tag": "block",
+      "protocol": { "type": "block" }
+    }
+  ]
+}
