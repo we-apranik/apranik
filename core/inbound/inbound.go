@@ -1,0 +1,237 @@
+// Package inbound accepts connections and hands each one's payload and
+// metadata to the traffic handler. It runs the accept loop, bounds every
+// handshake with a timeout, and hands a UDP association to the handler as a
+// UDP session when the proxy protocol asks for one.
+package inbound
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"sync"
+	"time"
+
+	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/sniff"
+	"github.com/The-Apranik/Apranik/spec"
+)
+
+// EMFILE is not fatal; a hot loop on it would make a busy server worse.
+const acceptBackoff = 10 * time.Millisecond
+
+// A client that connects and then says nothing would otherwise hold a
+// goroutine and a socket open for as long as it liked.
+const DefaultHandshakeTimeout = 10 * time.Second
+
+// UDPAssociateHandler is the opt-in hook for a stream proxy server that binds
+// a datagram socket mid-handshake -- SOCKS5 UDP ASSOCIATE.
+//
+// AcceptStream's signature is fixed by spec and cannot return a Datagram, so a
+// server signals the handoff by returning ErrUDPAssociationRequested. Associate
+// must open the socket, reply and return rather than block for the session's
+// lifetime; this package owns the session from there.
+type UDPAssociateHandler interface {
+	SetAssociateSocket(spec.UDPAssociateSocketFunc)
+	Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error)
+}
+
+type Sniffing struct {
+	Sniffers []spec.Sniffer
+
+	// Zero means sniff.DefaultTimeout.
+	Timeout time.Duration
+}
+
+type StreamConfig struct {
+	Tag         string
+	Listener    spec.StreamListener
+	ProxyServer spec.StreamProxyServer
+
+	// Nil means this inbound grants no UDP associate socket; a protocol
+	// needing one must refuse.
+	AssociateSocket spec.UDPAssociateSocketFunc
+
+	// Zero means DefaultHandshakeTimeout; negative disables the bound.
+	HandshakeTimeout time.Duration
+
+	// No sniffers means no sniffing.
+	Sniffing Sniffing
+
+	// Nil is allowed: NewStream substitutes a silent logger.
+	Logger *logging.Logger
+}
+
+func NewStream(config StreamConfig) spec.Inbound {
+	logger := config.Logger
+	if logger == nil {
+		logger = logging.Discard()
+	}
+
+	handshakeTimeout := config.HandshakeTimeout
+	if handshakeTimeout == 0 {
+		handshakeTimeout = DefaultHandshakeTimeout
+	}
+
+	return &streamInbound{
+		tag:                config.Tag,
+		listener:           config.Listener,
+		proxyServer:        config.ProxyServer,
+		udpAssociateSocket: config.AssociateSocket,
+		handshakeTimeout:   handshakeTimeout,
+		sniffing:           config.Sniffing,
+		logger:             logger.With("inbound", config.Tag),
+	}
+}
+
+type streamInbound struct {
+	tag                string
+	listener           spec.StreamListener
+	proxyServer        spec.StreamProxyServer
+	udpAssociateSocket spec.UDPAssociateSocketFunc
+	handshakeTimeout   time.Duration
+	sniffing           Sniffing
+	logger             *logging.Logger
+
+	mu             sync.Mutex
+	stopAccepting  context.CancelFunc
+	acceptLoopDone chan struct{}
+
+	liveConnections sync.WaitGroup
+}
+
+func (i *streamInbound) Tag() string { return i.tag }
+
+func (i *streamInbound) Activate(ctx context.Context, handler spec.TrafficHandler) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	if i.acceptLoopDone != nil {
+		return fmt.Errorf("inbound %q already activated", i.tag)
+	}
+
+	// Only when there is a socket to grant: otherwise a proxy handed one that
+	// always fails would answer with a general failure instead of X'07'.
+	if associateHandler, ok := i.proxyServer.(UDPAssociateHandler); ok && i.udpAssociateSocket != nil {
+		associateHandler.SetAssociateSocket(i.udpAssociateSocket)
+	}
+
+	ctx, stopAccepting := context.WithCancel(ctx)
+	i.stopAccepting = stopAccepting
+	i.acceptLoopDone = make(chan struct{})
+
+	go i.acceptLoop(ctx, handler)
+	return nil
+}
+
+// Closing the listener, not just cancelling, is what unblocks AcceptStream.
+func (i *streamInbound) Close() error {
+	i.mu.Lock()
+	stopAccepting, acceptLoopDone := i.stopAccepting, i.acceptLoopDone
+	i.mu.Unlock()
+
+	if stopAccepting != nil {
+		stopAccepting()
+	}
+	err := i.listener.Close()
+	if acceptLoopDone != nil {
+		<-acceptLoopDone
+	}
+	i.liveConnections.Wait()
+	return err
+}
+
+// A shutdown is told apart from a failure by ctx, not the error: Close cancels
+// before closing the listener. Matching net.ErrClosed would be wrong for a
+// gRPC or WebSocket listener.
+func (i *streamInbound) acceptLoop(ctx context.Context, handler spec.TrafficHandler) {
+	defer close(i.acceptLoopDone)
+
+	for {
+		stream, err := i.listener.AcceptStream(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			i.logger.Warn("accept failed", "error", err)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(acceptBackoff):
+			}
+			continue
+		}
+
+		i.liveConnections.Add(1)
+		go func() {
+			defer i.liveConnections.Done()
+			i.handleStream(ctx, handler, stream)
+		}()
+	}
+}
+
+// Covers the handshake only: once a payload carrier comes back, a long-lived
+// tunnel is the normal case rather than a stall.
+func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if i.handshakeTimeout < 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, i.handshakeTimeout)
+}
+
+func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHandler, stream spec.Stream) {
+	handshakeCtx, endHandshake := i.handshakeContext(ctx)
+	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, stream)
+	endHandshake()
+	if errors.Is(err, spec.ErrUDPAssociationRequested) {
+		i.handleUDPAssociate(ctx, handler, stream, metadata)
+		return
+	}
+	if err != nil {
+		stream.Close()
+		i.logger.Warn("handshake failed", "error", err)
+		return
+	}
+
+	metadata.InboundTag = i.tag
+	payload, metadata.Sniffed = sniff.Stream(payload, i.sniffing.Sniffers, i.sniffing.Timeout)
+	if metadata.Sniffed != nil {
+		i.logger.Debug("sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
+	}
+
+	if err := handler.HandleStream(ctx, payload, metadata); err != nil {
+		i.logger.Warn("stream ended in error", "error", err)
+	}
+}
+
+func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler spec.TrafficHandler, controlStream spec.Stream, metadata spec.Metadata) {
+	associateHandler, ok := i.proxyServer.(UDPAssociateHandler)
+	if !ok {
+		controlStream.Close()
+		i.logger.Error("proxy reported a UDP session but does not implement UDPAssociateHandler")
+		return
+	}
+
+	handshakeCtx, endHandshake := i.handshakeContext(ctx)
+	session, err := associateHandler.Associate(handshakeCtx, controlStream, metadata)
+	endHandshake()
+	if err != nil {
+		controlStream.Close()
+		i.logger.Warn("datagram negotiation failed", "error", err)
+		return
+	}
+
+	// The control stream's lifetime bounds the session. spec has no way to say
+	// this, so it is this package's own default.
+	go func() {
+		io.Copy(io.Discard, controlStream)
+		session.Close()
+	}()
+
+	metadata.InboundTag = i.tag
+	if err := handler.HandleDatagram(ctx, session, metadata); err != nil {
+		i.logger.Warn("datagram session ended in error", "error", err)
+	}
+	controlStream.Close()
+}
