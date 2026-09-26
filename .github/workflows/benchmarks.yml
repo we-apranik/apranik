@@ -1,0 +1,69 @@
+name: benchmarks
+
+# Compares every benchmark in the repository between a pull request and its
+# base, and puts benchstat's table in the run summary. It reports and never
+# fails: shared runners are noisy, so timings are directional, while B/op and
+# allocs/op are exact and are what a reviewer should read first.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Benchmark the base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$BASE_SHA"
+          (cd "$RUNNER_TEMP/base" && go test -run '^$' -bench . -benchmem -count 6 ./...) > base.txt || true
+
+      - name: Benchmark this change
+        run: go test -run '^$' -bench . -benchmem -count 6 ./... > head.txt
+
+      - name: Compare
+        run: |
+          if [ -s base.txt ]; then
+            benchstat base.txt head.txt > benchstat.txt
+          else
+            benchstat head.txt > benchstat.txt
+          fi
+          {
+            echo '## Benchmarks'
+            echo
+            echo 'Read B/op and allocs/op first: they are exact. Timings on shared runners are directional.'
+            echo
+            echo '```'
+            cat benchstat.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: |
+            base.txt
+            head.txt
+            benchstat.txt
+          if-no-files-found: ignore

@@ -79,6 +79,7 @@ Every problem is reported at once, each with a location such as
 | `network` | `tcp` (default) or `udp`; `udp` is accepted by the parser but refused by the builder, because no datagram proxy module exists yet |
 | `handshake_timeout` | bound on the proxy handshake; default `10s`, negative disables |
 | `tcp_idle_timeout` | closes a TCP connection silent in both directions; default `5m`, negative disables |
+| `max_connections` | connections held at once; one more is closed as soon as it is accepted, before any handshake, and refusals are logged at most once per 10 seconds; default `0`, no limit; TCP only |
 | `udp_session_idle_timeout` | ends a silent UDP session; default `5m`; must not be negative |
 | `transport` | the stack, base first |
 | `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
@@ -165,7 +166,7 @@ starts with `keep_alive` 15s and `no_delay` true.
 
 | Module | Settings |
 | --- | --- |
-| `tcp` | `keep_alive` (duration, default `15s`), `no_delay` (default `true`) |
+| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`) |
 | `udp` | `resolve_timeout` (default `5s`), `resolve_cache_ttl` (default `30s`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |
 | `http` | `username`, `password` |
@@ -199,6 +200,7 @@ timeouts section.
 | Fallback dial | internal | `10s` |
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
 | TCP keep-alive | `tcp` settings `keep_alive` (for freedom: `settings.tcp.keep_alive`) | `15s` |
+| TCP keep-alive probes | `tcp` settings `keep_alive_interval` and `keep_alive_count` | `15s`, `9` |
 | UDP domain lookup | freedom `settings.udp.resolve_timeout` | `5s` |
 | UDP lookup cache | freedom `settings.udp.resolve_cache_ttl` | `30s` |
 | Remote config file download | `apranik run/check -fetch-timeout` | `30s` |

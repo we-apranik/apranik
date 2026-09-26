@@ -162,6 +162,7 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `network` | `tcp` (default) or `udp` |
 | `handshake_timeout` | how long a client may take to finish the proxy handshake; default `10s`, negative disables |
 | `tcp_idle_timeout` | a TCP connection silent in both directions for this long is closed; default `5m`, negative disables |
+| `max_connections` | connections held at once; one more is closed as soon as it is accepted; default `0`, no limit |
 | `udp_session_idle_timeout` | a UDP session silent for this long is ended; default `5m` |
 | `transport` | the transport stack, base first, e.g. `[{ "type": "tcp" }]` |
 | `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
@@ -243,7 +244,7 @@ anyone who can reach the socket inject packets into a session.
 
 | Module | Settings |
 | --- | --- |
-| `tcp` | `keep_alive` (duration, default `15s`), `no_delay` (default `true`) |
+| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`) |
 | `udp` | `resolve_timeout` (default `5s`): longest a domain lookup may take; `resolve_cache_ttl` (default `30s`): how long a resolved domain is reused |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |
 | `http` | `username`, `password` |

@@ -86,6 +86,7 @@ nav:
   - Contribute:
       - Contributing guide: contributing.md
       - Practices: contributors/practices.md
+      - Performance: contributors/performance.md
       - Good first issues: contributors/good-first-issues.md
   - Design:
       - Decisions:
