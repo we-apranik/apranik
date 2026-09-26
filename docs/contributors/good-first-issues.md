@@ -105,7 +105,7 @@ Seed with a real ClientHello (the existing test helper builds one).
 ## 7. Test that a proxy outbound closes its carrier when the handshake fails
 
 **Description.** `core/outbound` has about 11% statement coverage.
-`streamOutbound.DialStream` closes the carrier when `ConnectStream` fails. Add a
+`streamOutbound.DialStream` closes the carrier when `RequestStream` fails. Add a
 test with a fake dialer and a failing fake proxy client that checks the carrier
 is closed and the error names the outbound's tag.
 

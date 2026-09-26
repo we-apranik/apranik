@@ -48,12 +48,12 @@ WebSocket or a DNS tunnel, and the stack model stops working.
 
 **Good**: `streamOutbound.DialStream` in `core/outbound/proxy.go` dials the
 server through the transport stack, then hands the carrier to
-`proxyClient.ConnectStream`.
+`proxyClient.RequestStream`.
 
 **Bad**:
 
 ```go
-func (c *client) ConnectStream(ctx context.Context, _ spec.Stream, m spec.Metadata) (spec.Stream, error) {
+func (c *client) RequestStream(ctx context.Context, _ spec.Stream, m spec.Metadata) (spec.Stream, error) {
     conn, err := net.Dial("tcp", serverAddress) // bypasses the stack
     ...
 }
@@ -78,7 +78,7 @@ it:
 
 ```go
 carrier, err := dialer.DialStream(ctx, server)
-payload, err := client.ConnectStream(ctx, carrier, m)
+payload, err := client.RequestStream(ctx, carrier, m)
 if err != nil {
     return nil, err // carrier leaks
 }

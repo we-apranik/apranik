@@ -44,7 +44,7 @@ Step by step:
    joins host and port; if the destination is a domain, this is the only place
    it is resolved.
    For a proxy outbound, `streamOutbound.DialStream` instead dials the proxy
-   server and calls the proxy client's `ConnectStream`, bounded by the outbound's
+   server and calls the proxy client's `RequestStream`, bounded by the outbound's
    `handshake_timeout`. This is where the meaning of the address flips from
    "destination" to "proxy server".
 6. **Relay.** `relay.Stream` in `core/relay/stream.go` copies both directions with

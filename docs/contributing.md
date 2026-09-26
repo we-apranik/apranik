@@ -110,7 +110,7 @@ Rules:
   preamble and returns the payload stream plus `spec.Metadata` with the
   destination. Respect the context deadline; the inbound uses it to bound the
   handshake.
-- **Client role:** `ConnectStream(ctx, carrier, metadata)` writes the preamble onto
+- **Client role:** `RequestStream(ctx, carrier, metadata)` writes the preamble onto
   a carrier that already reaches the server. It may write nothing yet if the
   protocol puts its header on the first write.
 - **Never dial.** The carrier is handed to you. If your protocol truly needs a
