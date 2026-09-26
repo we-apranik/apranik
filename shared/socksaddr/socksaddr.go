@@ -82,6 +82,65 @@ func ReadAddress(reader io.Reader) (spec.Destination, error) {
 	return spec.NewDestinationFromIP(ip, binary.BigEndian.Uint16(port[:]))
 }
 
+// ParseAddress decodes one address and its port from the start of encoded and
+// reports how many bytes that took. It copies nothing for an IP, so a caller
+// holding a whole packet parses it without allocating.
+func ParseAddress(encoded []byte) (spec.Destination, int, error) {
+	if len(encoded) == 0 {
+		return spec.Destination{}, 0, fmt.Errorf("socksaddr: reading address type: %w", io.ErrUnexpectedEOF)
+	}
+
+	var (
+		ip     netip.Addr
+		domain string
+		offset int
+	)
+	switch encoded[0] {
+	case AddressIPv4:
+		if len(encoded) < 1+net.IPv4len+2 {
+			return spec.Destination{}, 0, fmt.Errorf("socksaddr: reading address: %w", io.ErrUnexpectedEOF)
+		}
+		ip = netip.AddrFrom4([net.IPv4len]byte(encoded[1:]))
+		offset = 1 + net.IPv4len
+
+	case AddressIPv6:
+		if len(encoded) < 1+net.IPv6len+2 {
+			return spec.Destination{}, 0, fmt.Errorf("socksaddr: reading address: %w", io.ErrUnexpectedEOF)
+		}
+		ip = netip.AddrFrom16([net.IPv6len]byte(encoded[1:])).Unmap()
+		offset = 1 + net.IPv6len
+
+	case AddressDomain:
+		if len(encoded) < 2 {
+			return spec.Destination{}, 0, fmt.Errorf("socksaddr: reading domain length: %w", io.ErrUnexpectedEOF)
+		}
+		length := int(encoded[1])
+		if length == 0 {
+			return spec.Destination{}, 0, ErrEmptyDomain
+		}
+		if len(encoded) < 2+length+2 {
+			return spec.Destination{}, 0, fmt.Errorf("socksaddr: reading domain: %w", io.ErrUnexpectedEOF)
+		}
+		domain = string(encoded[2 : 2+length])
+		offset = 2 + length
+
+	default:
+		return spec.Destination{}, 0, fmt.Errorf("%w: X'%02X'", ErrUnsupportedAddressType, encoded[0])
+	}
+
+	port := binary.BigEndian.Uint16(encoded[offset:])
+	var (
+		destination spec.Destination
+		err         error
+	)
+	if domain != "" {
+		destination, err = spec.NewDestinationFromDomain(domain, port)
+	} else {
+		destination, err = spec.NewDestinationFromIP(ip, port)
+	}
+	return destination, offset + 2, err
+}
+
 func AppendAddress(destination []byte, address spec.Destination) ([]byte, error) {
 	switch domain, isDomain := address.Domain(); {
 	case isDomain:
