@@ -264,9 +264,16 @@ func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHa
 	}
 
 	metadata.InboundTag = i.tag
-	payload, metadata.Sniffed = sniff.Stream(payload, i.sniffing.Sniffers, i.sniffing.Timeout)
-	if metadata.Sniffed != nil {
-		i.logger.Debug("sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
+	if len(i.sniffing.Sniffers) > 0 {
+		peekablePayload, alreadyPeekable := payload.(*peekable.Stream)
+		if !alreadyPeekable {
+			peekablePayload = peekable.NewStream(payload)
+		}
+		payload = peekablePayload
+		metadata.Sniffed = sniff.Recognise(peekablePayload, i.sniffing.Sniffers, i.sniffing.Timeout)
+		if metadata.Sniffed != nil {
+			i.logger.Debug("sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
+		}
 	}
 
 	if err := handler.HandleStream(ctx, payload, metadata); err != nil {

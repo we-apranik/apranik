@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/core/sniff"
 	tlssniffer "github.com/The-Apranik/Apranik/module/sniffer/tls"
 	"github.com/The-Apranik/Apranik/spec"
@@ -36,7 +37,7 @@ func BenchmarkSniffTLSClientHello(b *testing.B) {
 	for b.Loop() {
 		clientSide, inboundSide := net.Pipe()
 		go clientSide.Write(hello)
-		_, result := sniff.Stream(pipeStream{inboundSide}, sniffers, 0)
+		result := sniff.Recognise(peekable.NewStream(pipeStream{inboundSide}), sniffers, 0)
 		if result == nil || result.Domain != "example.com" {
 			b.Fatalf("result = %+v", result)
 		}

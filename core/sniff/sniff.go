@@ -1,7 +1,6 @@
-// Package sniff reads the first bytes a client sends on a stream and asks
-// each configured sniffer what protocol they are, so routing can see a domain
-// the client never named. The bytes are only peeked: the stream it returns
-// replays them, so the outbound receives exactly what the client sent.
+// Package sniff recognises the protocol at the start of a client's stream, so
+// routing can see a domain the client never named. It only peeks: every byte
+// stays in the stream for the outbound.
 package sniff
 
 import (
@@ -16,59 +15,57 @@ import (
 // speaks, so every connection of theirs waits this long. PROVISIONAL.
 const DefaultTimeout = 300 * time.Millisecond
 
-// Stream returns a stream that replays the peeked bytes, and nil when no
-// sniffer recognised them. A stream that cannot take a read deadline is not
-// sniffed, since nothing would bound the wait.
-func Stream(clientStream spec.Stream, sniffers []spec.Sniffer, timeout time.Duration) (spec.Stream, *spec.SniffResult) {
+// Recognise shows the sniffers every byte the client has sent, and waits for
+// more only while one of them still needs it, for at most timeout. Nil when no
+// sniffer recognised the bytes, or when the stream takes no read deadline,
+// since nothing would then bound the wait.
+func Recognise(clientStream *peekable.Stream, sniffers []spec.Sniffer, timeout time.Duration) *spec.SniffResult {
 	if len(sniffers) == 0 {
-		return clientStream, nil
+		return nil
 	}
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
 	if clientStream.SetReadDeadline(time.Now().Add(timeout)) != nil {
-		return clientStream, nil
+		return nil
 	}
+	defer clientStream.SetReadDeadline(time.Time{})
 
-	peekableStream, ok := clientStream.(*peekable.Stream)
-	if !ok {
-		peekableStream = peekable.NewStream(clientStream)
-	}
-	result := peekUntilRecognised(peekableStream, sniffers)
-	clientStream.SetReadDeadline(time.Time{})
-
-	return peekableStream, result
-}
-
-// The sniffers always see every byte already buffered, and the stream waits
-// for the client only when they have seen everything and still need more.
-func peekUntilRecognised(clientStream *peekable.Stream, sniffers []spec.Sniffer) *spec.SniffResult {
 	undecided := sniffers
-	sniffedBytes := 0
-
+	seenBytes := 0
 	for {
-		if buffered := clientStream.Buffered(); buffered > sniffedBytes {
-			peeked, _ := clientStream.Peek(buffered)
-			sniffedBytes = buffered
-
-			var result *spec.SniffResult
-			result, undecided = sniffEach(peeked, undecided)
-			if result != nil || len(undecided) == 0 {
-				return result
-			}
-		}
-
-		if _, err := clientStream.Peek(sniffedBytes + 1); err != nil && clientStream.Buffered() <= sniffedBytes {
+		prefix, err := peekBeyond(clientStream, seenBytes)
+		if err != nil {
 			return nil
 		}
+		seenBytes = len(prefix)
+
+		result, needMoreData := firstRecognised(prefix, undecided)
+		if result != nil || len(needMoreData) == 0 {
+			return result
+		}
+		undecided = needMoreData
 	}
 }
 
-// Returns the first match, or the sniffers still waiting for more bytes.
-func sniffEach(peeked []byte, sniffers []spec.Sniffer) (*spec.SniffResult, []spec.Sniffer) {
+// Returns every buffered byte once there are more than seenBytes, waiting for
+// the client only when there are not. An error means nothing new arrived: the
+// deadline passed, the client closed, or the buffer is full.
+func peekBeyond(clientStream *peekable.Stream, seenBytes int) ([]byte, error) {
+	if clientStream.Buffered() <= seenBytes {
+		if _, err := clientStream.Peek(seenBytes + 1); err != nil {
+			return nil, err
+		}
+	}
+	return clientStream.Peek(clientStream.Buffered())
+}
+
+// Returns the first sniffer's result, or else the sniffers that asked for more
+// data. Any other error means the prefix is not that sniffer's protocol.
+func firstRecognised(prefix []byte, sniffers []spec.Sniffer) (*spec.SniffResult, []spec.Sniffer) {
 	var needMoreData []spec.Sniffer
 	for _, sniffer := range sniffers {
-		result, err := sniffer.Sniff(peeked)
+		result, err := sniffer.Sniff(prefix)
 		switch {
 		case err == nil:
 			return &result, nil
