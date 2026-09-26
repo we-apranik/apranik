@@ -324,3 +324,15 @@ func TestListenerBindsWhereItWasTold(t *testing.T) {
 		t.Error("port 0 after binding, want the port the kernel chose")
 	}
 }
+
+func TestValidateRefusesNegativeKeepAliveIntervalAndCount(t *testing.T) {
+	for name, settings := range map[string]tcp.Settings{
+		"negative interval": {KeepAliveInterval: types.Duration(-time.Second)},
+		"negative count":    {KeepAliveCount: -1},
+		"absurd count":      {KeepAliveCount: 1000},
+	} {
+		if err := settings.Validate(); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}

@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 type streamListener struct {
 	listener  *net.TCPListener
-	keepAlive time.Duration
+	keepAlive net.KeepAliveConfig
 	noDelay   bool
 }
 
@@ -30,10 +29,9 @@ func (l *streamListener) AcceptStream(ctx context.Context) (spec.Stream, error) 
 	// The same settings the dialer applies, so both directions of a relay
 	// behave alike.
 	connection.SetNoDelay(l.noDelay)
-	if l.keepAlive > 0 {
-		connection.SetKeepAlive(true)
-		connection.SetKeepAlivePeriod(l.keepAlive)
-	} else if l.keepAlive < 0 {
+	if l.keepAlive.Enable {
+		connection.SetKeepAliveConfig(l.keepAlive)
+	} else {
 		connection.SetKeepAlive(false)
 	}
 
