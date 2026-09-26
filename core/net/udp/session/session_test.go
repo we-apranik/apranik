@@ -331,7 +331,14 @@ func TestAQuietSessionEndsWithTheIdleReason(t *testing.T) {
 	if !errors.Is(udpSession.Err(), session.ErrIdle) {
 		t.Errorf("Err() = %v, want session.ErrIdle", udpSession.Err())
 	}
-	if !out.carrierAt(t, 0).wasClosed() {
+	// Done closes first and the carriers right after it, so give the close a
+	// moment instead of racing it.
+	carrier := out.carrierAt(t, 0)
+	deadline := time.Now().Add(2 * time.Second)
+	for !carrier.wasClosed() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if !carrier.wasClosed() {
 		t.Error("an idled-out session left its carrier open")
 	}
 }
