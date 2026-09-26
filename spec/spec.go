@@ -73,10 +73,29 @@ func NewEndpoint(ip netip.Addr, port uint16) (Endpoint, error) {
 // carrier with no host-and-port address -- a pipe, a TUN device -- yields a
 // zero Endpoint rather than an error, since having no peer address is normal
 // for those and not a failure.
+//
+// TCP and UDP addresses, which is nearly every call, are read directly; any
+// other kind goes through its string form.
 func NewEndpointFromNetAddr(address net.Addr) Endpoint {
-	if address == nil {
+	var addressAndPort netip.AddrPort
+	switch typed := address.(type) {
+	case nil:
 		return Endpoint{}
+	case *net.TCPAddr:
+		if typed == nil {
+			return Endpoint{}
+		}
+		addressAndPort = typed.AddrPort()
+	case *net.UDPAddr:
+		if typed == nil {
+			return Endpoint{}
+		}
+		addressAndPort = typed.AddrPort()
 	}
+	if addressAndPort.IsValid() {
+		return Endpoint{addr: addressAndPort.Addr().Unmap(), port: addressAndPort.Port()}
+	}
+
 	host, port, err := net.SplitHostPort(address.String())
 	if err != nil {
 		return Endpoint{}
