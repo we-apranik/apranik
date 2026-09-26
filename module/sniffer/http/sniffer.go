@@ -31,7 +31,7 @@ func (*Settings) Warnings() []string { return nil }
 type Sniffer struct{ Settings }
 
 func (*Sniffer) Info() spec.ModuleInfo {
-	return spec.ModuleInfo{Name: "http", Description: "host from an HTTP/1 request's Host header"}
+	return spec.ModuleInfo{Name: "http", Description: "sniff host from an HTTP/1 request's Host header"}
 }
 
 func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {

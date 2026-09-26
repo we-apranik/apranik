@@ -35,7 +35,7 @@ func (*Settings) Warnings() []string { return nil }
 type Sniffer struct{ Settings }
 
 func (*Sniffer) Info() spec.ModuleInfo {
-	return spec.ModuleInfo{Name: "tls", Description: "server name (SNI) from a TLS ClientHello"}
+	return spec.ModuleInfo{Name: "tls", Description: "sniff server name (SNI) from a TLS ClientHello"}
 }
 
 func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {

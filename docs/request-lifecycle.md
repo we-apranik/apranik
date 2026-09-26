@@ -39,10 +39,11 @@ Step by step:
    protocol refuses the request with `spec.ErrFallbackRequested` and the inbound
    has a `fallback`, the inbound replays every byte read so far to that address
    and relays, and the steps below do not happen.
-3. **Sniff (optional).** If the inbound has sniffers, `sniff.Stream` peeks at the
-   first bytes with a read deadline, asks each sniffer, and returns a stream that
-   replays what it read. The result goes into `metadata.Sniffed`; the destination is
-   not changed.
+3. **Sniff (optional).** If the inbound has sniffers, it makes the payload a
+   `peekable.Stream` and `sniff.Recognise` peeks at the first bytes with a read
+   deadline and shows each sniffer everything buffered. Nothing is consumed, so
+   the same stream carries on to the outbound. The result goes into
+   `metadata.Sniffed`; the destination is not changed.
 4. **Route.** `Handler.HandleStream` in `core/route/handler/handler.go` calls
    `router.Route`. Today `Router.Route` returns the default outbound.
 5. **Dial.** `freedomOutbound.DialStream` in `core/outbound/freedom.go` passes the
