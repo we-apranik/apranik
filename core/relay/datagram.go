@@ -87,7 +87,9 @@ func forwardSessionRepliesToClient(config DatagramRelayConfig) error {
 	for {
 		select {
 		case reply := <-config.ClientSession.Replies():
-			if _, err := config.ClientSide.WriteTo(reply.Payload, reply.From); err != nil {
+			_, err := config.ClientSide.WriteTo(reply.Payload, reply.From)
+			reply.Release()
+			if err != nil {
 				if errors.Is(err, spec.ErrMessageTooLong) {
 					config.Logger.Debug("reply dropped on write", "bytes", len(reply.Payload), "error", err)
 					continue

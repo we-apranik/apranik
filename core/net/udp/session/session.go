@@ -9,7 +9,6 @@
 package session
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -32,9 +31,22 @@ var (
 	ErrIdle   = errors.New("session: idle timeout")
 )
 
+// Payload is valid until Release, which the receiver calls exactly once when
+// it has finished with it.
 type Reply struct {
 	Payload []byte
 	From    spec.Destination
+
+	buffer *[]byte
+}
+
+// Release hands the payload's buffer back for the next reply. A receiver that
+// never calls it only costs an allocation later; one that reads Payload after
+// it would see another reply's bytes.
+func (r Reply) Release() {
+	if r.buffer != nil {
+		udp.ReleaseDatagramBuffer(r.buffer)
+	}
 }
 
 type Config struct {
@@ -139,9 +151,6 @@ func (s *Session) Send(payload []byte, to spec.Destination, via spec.Outbound) e
 	if via == nil {
 		return errors.New("session: no outbound to send through")
 	}
-	if !slices.Contains(via.Networks(), spec.NetworkUDP) {
-		return fmt.Errorf("session: outbound %q cannot carry udp: %w", via.Tag(), spec.ErrUnsupportedNetwork)
-	}
 
 	outboundDatagram, err := s.openOrReuseOutboundDatagram(via)
 	if err != nil {
@@ -169,6 +178,13 @@ func (s *Session) openOrReuseOutboundDatagram(via spec.Outbound) (*outboundDatag
 		return existing, nil
 	}
 	s.mu.Unlock()
+
+	// Checked only here, when the outbound datagram is first opened: an
+	// outbound's networks never change, and Networks() may allocate, which
+	// would cost every packet.
+	if !slices.Contains(via.Networks(), spec.NetworkUDP) {
+		return nil, fmt.Errorf("session: outbound %q cannot carry udp: %w", tag, spec.ErrUnsupportedNetwork)
+	}
 
 	// Created outside the lock so a slow outbound does not stall sends heading
 	// for a different one.
@@ -202,9 +218,12 @@ func (s *Session) forwardRepliesFrom(outboundDatagram *outboundDatagram) {
 	// Send through that outbound opens a new one instead of finding a dead one.
 	defer s.forgetAndCloseOutboundDatagram(outboundDatagram)
 
-	replyBuffer := make([]byte, udp.MaxDatagramSize)
+	// Each reply is read straight into its own pooled buffer, which travels
+	// with it to the receiver; the next read takes a fresh one.
+	replyBuffer := udp.AcquireDatagramBuffer()
+	defer func() { udp.ReleaseDatagramBuffer(replyBuffer) }()
 	for {
-		replySize, replySender, err := outboundDatagram.datagram.ReadFrom(replyBuffer)
+		replySize, replySender, err := outboundDatagram.datagram.ReadFrom(*replyBuffer)
 		if err != nil {
 			if errors.Is(err, spec.ErrMessageTooLong) {
 				s.logger.Debug("reply dropped", "outbound", outboundDatagram.outboundTag, "error", err)
@@ -216,7 +235,8 @@ func (s *Session) forwardRepliesFrom(outboundDatagram *outboundDatagram) {
 		s.markActive()
 
 		select {
-		case s.replies <- Reply{Payload: bytes.Clone(replyBuffer[:replySize]), From: replySender}:
+		case s.replies <- Reply{Payload: (*replyBuffer)[:replySize], From: replySender, buffer: replyBuffer}:
+			replyBuffer = udp.AcquireDatagramBuffer()
 		case <-outboundDatagram.stopForwardingReplies:
 			return
 		case <-s.done:

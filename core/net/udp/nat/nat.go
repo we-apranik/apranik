@@ -7,7 +7,6 @@
 package nat
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -309,8 +308,13 @@ func mappingKeyFor(destination spec.Destination, mapping MappingBehavior) mappin
 
 var ErrClosed = errors.New("nat: datagram is closed")
 
+// PROVISIONAL: one rejection notice per UDP session per 10 seconds.
+const rejectedLogInterval = 10 * time.Second
+
+// buffer is pooled: ReadFrom copies payload out and releases it.
 type receivedPacket struct {
 	payload []byte
+	buffer  *[]byte
 	from    spec.Destination
 }
 
@@ -321,6 +325,10 @@ type Datagram struct {
 	createDatagram CreateDatagramFunc
 	policy         Policy
 	logger         *logging.Logger
+
+	// Rejections are what a sprayer causes, so they are logged at most once
+	// per interval with a count, not once per packet.
+	rejectedLogSampler *logging.Sampler
 
 	mu       sync.Mutex
 	mappings map[mappingKey]*mapping
@@ -347,8 +355,10 @@ func New(ctx context.Context, createDatagram CreateDatagramFunc, policy Policy, 
 		policy:         policy,
 		logger:         logger,
 		mappings:       make(map[mappingKey]*mapping),
-		received:       make(chan receivedPacket),
-		done:           make(chan struct{}),
+
+		rejectedLogSampler: logging.NewSampler(rejectedLogInterval),
+		received:           make(chan receivedPacket),
+		done:               make(chan struct{}),
 	}, nil
 }
 
@@ -442,6 +452,7 @@ func (d *Datagram) insert(key mappingKey, datagram spec.Datagram) (*mapping, err
 func (d *Datagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 	select {
 	case packet := <-d.received:
+		defer udp.ReleaseDatagramBuffer(packet.buffer)
 		if len(buffer) < len(packet.payload) {
 			return 0, packet.from, fmt.Errorf("nat: %d byte datagram into a %d byte buffer: %w",
 				len(packet.payload), len(buffer), spec.ErrMessageTooLong)
@@ -455,9 +466,13 @@ func (d *Datagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 	defer d.remove(key, mapped)
 
-	buffer := make([]byte, udp.MaxDatagramSize)
+	// Each packet is read straight into its own pooled buffer, which travels
+	// with it to ReadFrom; the next read takes a fresh one. That replaces a
+	// per-packet copy and allocation.
+	buffer := udp.AcquireDatagramBuffer()
+	defer func() { udp.ReleaseDatagramBuffer(buffer) }()
 	for {
-		size, sender, err := mapped.datagram.ReadFrom(buffer)
+		size, sender, err := mapped.datagram.ReadFrom(*buffer)
 		if err != nil {
 			return
 		}
@@ -465,19 +480,20 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 		if !mapped.allows(sender, d.policy.filtering) {
 			// Notice, not Debug: under the default filtering this is the
 			// spoofing case the policy exists to stop.
-			// TODO: rate-limit; a sprayer can otherwise flood the log.
-			d.logger.Notice("inbound datagram rejected by filtering policy",
-				"filtering", d.policy.filtering)
+			if allowed, alsoRejected := d.rejectedLogSampler.Allow(); allowed {
+				d.logger.Notice("inbound datagram rejected by filtering policy",
+					"filtering", d.policy.filtering, "also_rejected_since_last_notice", alsoRejected)
+			}
 			continue
 		}
 
 		mapped.touch()
 
-		// buffer is reused on the next read, so the packet needs its own copy.
-		packet := receivedPacket{payload: bytes.Clone(buffer[:size]), from: mapped.reportedSender(sender)}
+		packet := receivedPacket{payload: (*buffer)[:size], buffer: buffer, from: mapped.reportedSender(sender)}
 
 		select {
 		case d.received <- packet:
+			buffer = udp.AcquireDatagramBuffer()
 		case <-mapped.stop:
 			return
 		case <-d.done:

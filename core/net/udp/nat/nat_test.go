@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -837,5 +838,44 @@ func TestALiteralDestinationIsNeverRelabelled(t *testing.T) {
 
 	if from := requireArrival(t, arrivals, shortWait); from != literal {
 		t.Errorf("reply reported as %s, want the literal %s we contacted directly", from, literal)
+	}
+}
+
+// A sprayer sending many packets that filtering rejects must not produce one
+// log line per packet.
+func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
+	sink := logging.NewMemorySink(64, logging.LevelDebug)
+	system, err := logging.New(logging.Config{Level: logging.LevelDebug, Outputs: []logging.Output{logging.HandlerOutput{Handler: sink}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dial, _ := countingDialer(t)
+	natDatagram, err := nat.New(context.Background(), dial, policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering), system.Logger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer natDatagram.Close()
+
+	contacted, contactedAddr := destination(t, "127.0.0.1")
+	sprayer, _ := destination(t, "127.0.0.2")
+	arrivals := startReading(t, natDatagram)
+	if _, err := natDatagram.WriteTo([]byte("hello"), contactedAddr); err != nil {
+		t.Fatal(err)
+	}
+	tableAddr := sourceSeenBy(t, contacted)
+
+	for range 20 {
+		mustSend(t, sprayer, "spray", tableAddr)
+	}
+	expectNothing(t, arrivals, shortWait)
+
+	notices := 0
+	for _, record := range sink.Records() {
+		if record.Message == "inbound datagram rejected by filtering policy" {
+			notices++
+		}
+	}
+	if notices != 1 {
+		t.Errorf("%d rejection notices for 20 sprayed packets, want 1", notices)
 	}
 }
