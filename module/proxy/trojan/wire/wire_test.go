@@ -1,6 +1,7 @@
 package wire_test
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -216,7 +217,7 @@ func TestUDPFrameRoundTrip(t *testing.T) {
 			}
 			// Two frames back to back, one byte per Read: the second must
 			// start exactly where the first ended.
-			stream := iotest.OneByteReader(bytes.NewReader(append(frame, frame...)))
+			stream := bufio.NewReader(iotest.OneByteReader(bytes.NewReader(append(frame, frame...))))
 
 			buffer := make([]byte, wire.MaxUDPPayload)
 			for range 2 {
@@ -245,7 +246,7 @@ func TestUDPFrameTooLargeForTheBufferKeepsTheStreamAligned(t *testing.T) {
 	destination := ipDestination(t, "8.8.8.8", 53)
 	big, _ := wire.AppendUDPFrame(nil, destination, make([]byte, 100))
 	small, _ := wire.AppendUDPFrame(nil, destination, []byte("next"))
-	stream := bytes.NewReader(append(big, small...))
+	stream := bufio.NewReader(bytes.NewReader(append(big, small...)))
 
 	buffer := make([]byte, 10)
 	if _, _, err := wire.ReadUDPFrame(stream, buffer); !errors.Is(err, spec.ErrMessageTooLong) {
@@ -269,7 +270,7 @@ func TestMalformedUDPFramesAreRefused(t *testing.T) {
 		{"payload shorter than its length", []byte{0x01, 1, 1, 1, 1, 0, 53, 0, 9, '\r', '\n', 'a'}, io.ErrUnexpectedEOF},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := wire.ReadUDPFrame(bytes.NewReader(tc.frame), make([]byte, 64))
+			_, _, err := wire.ReadUDPFrame(bufio.NewReader(bytes.NewReader(tc.frame)), make([]byte, 64))
 			if !errors.Is(err, tc.want) {
 				t.Errorf("ReadUDPFrame = %v, want %v", err, tc.want)
 			}

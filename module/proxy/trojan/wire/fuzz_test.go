@@ -1,6 +1,7 @@
 package wire_test
 
 import (
+	"bufio"
 	"bytes"
 	"testing"
 
@@ -42,12 +43,13 @@ func FuzzReadUDPFrame(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		buffer := make([]byte, wire.MaxUDPPayload)
-		reader := bytes.NewReader(input)
+		source := bytes.NewReader(input)
+		reader := bufio.NewReader(source)
 		n, from, err := wire.ReadUDPFrame(reader, buffer)
 		if err != nil {
 			return
 		}
-		consumed := input[:len(input)-reader.Len()]
+		consumed := input[:len(input)-source.Len()-reader.Buffered()]
 
 		encoded, err := wire.AppendUDPFrame(nil, from, buffer[:n])
 		if err != nil {

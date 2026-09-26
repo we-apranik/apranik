@@ -444,8 +444,9 @@ func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
 		t.Errorf("request = command X'%02X' to %s, want UDP to %s", request.Command, request.Destination, dns)
 	}
 	buffer := make([]byte, 64)
-	n, to, err := wire.ReadUDPFrame(first, buffer)
-	if err != nil || to != dns || string(buffer[:n]) != "query" || first.Len() != 0 {
+	frames := bufio.NewReader(first)
+	n, to, err := wire.ReadUDPFrame(frames, buffer)
+	if err != nil || to != dns || string(buffer[:n]) != "query" || first.Len()+frames.Buffered() != 0 {
 		t.Errorf("frame after the request = %q to %s, %v", buffer[:n], to, err)
 	}
 

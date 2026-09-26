@@ -9,6 +9,7 @@
 package wire
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -149,21 +150,32 @@ func AppendUDPFrame(destination []byte, address spec.Destination, payload []byte
 // ReadUDPFrame reads one frame into payload. A frame larger than payload is
 // read to its end and dropped, so the stream stays aligned on the next frame,
 // and reported as spec.ErrMessageTooLong.
-func ReadUDPFrame(reader io.Reader, payload []byte) (int, spec.Destination, error) {
-	address, err := socksaddr.ReadAddress(reader)
+//
+// The header is peeked whole and parsed in place, so a frame costs no
+// allocation beyond a domain name.
+func ReadUDPFrame(reader *bufio.Reader, payload []byte) (int, spec.Destination, error) {
+	typeAndDomainLength, err := peekFrameHeader(reader, 2)
+	if err != nil {
+		return 0, spec.Destination{}, err
+	}
+	addressLength, err := encodedAddressLength(typeAndDomainLength)
 	if err != nil {
 		return 0, spec.Destination{}, err
 	}
 
-	var length [2]byte
-	if _, err := io.ReadFull(reader, length[:]); err != nil {
-		return 0, spec.Destination{}, fmt.Errorf("trojan: reading datagram length: %w", err)
-	}
-	size := int(binary.BigEndian.Uint16(length[:]))
-
-	if err := readCRLF(reader); err != nil {
+	header, err := peekFrameHeader(reader, addressLength+2+len(crlf))
+	if err != nil {
 		return 0, spec.Destination{}, err
 	}
+	address, _, err := socksaddr.ParseAddress(header)
+	if err != nil {
+		return 0, spec.Destination{}, err
+	}
+	size := int(binary.BigEndian.Uint16(header[addressLength:]))
+	if [2]byte(header[addressLength+2:]) != crlf {
+		return 0, spec.Destination{}, ErrMissingCRLF
+	}
+	reader.Discard(len(header))
 
 	if size > len(payload) {
 		if _, err := io.CopyN(io.Discard, reader, int64(size)); err != nil {
@@ -175,6 +187,19 @@ func ReadUDPFrame(reader io.Reader, payload []byte) (int, spec.Destination, erro
 		return 0, spec.Destination{}, fmt.Errorf("trojan: reading datagram: %w", err)
 	}
 	return size, address, nil
+}
+
+// A stream that ends before a frame starts ends cleanly with io.EOF; one that
+// ends inside a header is io.ErrUnexpectedEOF.
+func peekFrameHeader(reader *bufio.Reader, size int) ([]byte, error) {
+	header, err := reader.Peek(size)
+	if err == nil {
+		return header, nil
+	}
+	if errors.Is(err, io.EOF) && len(header) > 0 {
+		err = io.ErrUnexpectedEOF
+	}
+	return nil, fmt.Errorf("trojan: reading datagram header: %w", err)
 }
 
 func readCRLF(reader io.Reader) error {

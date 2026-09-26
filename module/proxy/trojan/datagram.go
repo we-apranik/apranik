@@ -20,6 +20,10 @@ type streamDatagram struct {
 
 	writeMutex sync.Mutex
 
+	// Reused for every frame, since writes are serialised anyway. Guarded by
+	// writeMutex.
+	frameBuffer []byte
+
 	// Set on the client until the first WriteTo sends the request with it.
 	// Guarded by writeMutex.
 	unsentRequestPasswordHash *wire.PasswordHash
@@ -46,9 +50,9 @@ func (d *streamDatagram) WriteTo(payload []byte, destination spec.Destination) (
 	d.writeMutex.Lock()
 	defer d.writeMutex.Unlock()
 
-	var message []byte
+	message := d.frameBuffer[:0]
 	if d.unsentRequestPasswordHash != nil {
-		request, err := wire.AppendRequest(nil, wire.Request{
+		request, err := wire.AppendRequest(message, wire.Request{
 			PasswordHash: *d.unsentRequestPasswordHash,
 			Command:      wire.CommandUDPAssociate,
 			Destination:  destination,
@@ -62,6 +66,7 @@ func (d *streamDatagram) WriteTo(payload []byte, destination spec.Destination) (
 	if err != nil {
 		return 0, err
 	}
+	d.frameBuffer = message
 	if _, err := d.stream.Write(message); err != nil {
 		return 0, err
 	}
