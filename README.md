@@ -3,9 +3,9 @@
 An open-source proxy core for censorship circumvention, written in Go.
 
 Apranik is a **core, not a GUI**. Its main product is the `apranik` binary, which
-client apps (Hiddify, v2rayNG, NekoBox, v2box) and server panels run the way they
-run Xray-core or sing-box: they write a config file and start the core. Its Go
-packages can also be used directly as a library.
+client apps (Hiddify, v2rayNG, NekoBox, v2box) and server panels run as they run
+any proxy core: they write a config file and start the binary. Its Go packages
+can also be used directly as a library.
 
 ## Why it exists
 
@@ -18,8 +18,36 @@ technique can ship it as one module, without touching anything else.** Adding a
 module means a new folder and one line in the registry. If a change needs edits
 to the contract, to another module, or to the builder, the design has failed.
 
-Xray, sing-box and mihomo are mature and useful. The claim here is narrower:
-their architecture is not optimised for rapid, Iran-specific adaptation.
+[![From a technique to a deployed module: a researcher finds a technique, writes one folder under module/ implementing one spec kind, tests it without core, adds one line to core/registry/default.go, names it by "type" in a config file that apranik check validates, and ships it in a release of the apranik binary that clients and panels pick up (planned). spec, the builder, core's inbound and outbound, every other module and the config parser stay untouched.](docs/assets/diagrams/research-to-deployment.excalidraw.svg)](docs/assets/diagrams/research-to-deployment.excalidraw.svg)
+
+Existing proxy cores are mature and useful. The claim here is narrower: their
+architecture is not optimised for rapid, Iran-specific adaptation.
+
+## Principles
+
+- **One technique, one module.** A new technique is a new folder under
+  `module/` plus one line in the registry. Nothing else changes.
+- **A small, fixed contract.** `spec` holds every interface and imports nothing
+  from the project. Modules import `spec`, never core and never each other, so a
+  module could live in someone else's repository.
+- **Protocols and transports stay apart.** A proxy protocol never opens a
+  connection; it is handed one. Transports compose as stacks, base first, each
+  overlay wrapping the one below.
+- **Explicit, not magic.** Modules are registered by name in one file; no
+  `init()`, no globals. A Go program can register modules core has never seen.
+- **Refuse bad config at startup.** Every problem is reported at once, with its
+  location, before anything listens. Unknown keys are refused by default.
+- **Safe defaults.** A listen address is required, sniffing is off until asked
+  for, an inbound without credentials is warned about, and secrets never appear
+  in error text.
+- **Standard library first.** No third-party dependencies today; each one must
+  be justified.
+- **A core, not an app.** Apranik ships a binary and a library; the user
+  interface belongs to the clients and panels that run it.
+
+## At a glance
+
+[![System overview: a JSON config file is parsed and checked into a blueprint, which the builder turns into inbounds and outbounds. At run time a client connects to an inbound (a transport stack plus a proxy server: socks5, http, trojan or mixed, with optional sniffing), the handler asks the router for an outbound and the relay copies traffic to the destination.](docs/assets/diagrams/system-overview.excalidraw.svg)](docs/assets/diagrams/system-overview.excalidraw.svg)
 
 ## Status
 
@@ -329,7 +357,8 @@ python3 -m venv .venv
 ```
 
 `mkdocs build --strict` fails on any broken link or warning; it is what CI runs
-before publishing to GitHub Pages. See `docs/contributing.md` for how to edit the
+before publishing to GitHub Pages (started by hand while the repository is
+private). See `docs/contributing.md` for how to edit the
 pages and the diagrams.
 
 ## Licence
