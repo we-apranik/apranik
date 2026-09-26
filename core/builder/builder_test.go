@@ -269,3 +269,37 @@ func TestAMixedInboundServesSOCKS5UDPAndHTTP(t *testing.T) {
 		connection.Close()
 	}
 }
+
+// A blueprint written in Go skips config.Check, so the builder must refuse the
+// pieces Check would have caught instead of dereferencing nil.
+func TestAnIncompleteBlueprintIsAnErrorNotAPanic(t *testing.T) {
+	built, err := builder.New(blueprint.Log{})
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	defer built.Close()
+
+	tcpStack := blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()}
+	for name, inboundBlueprint := range map[string]blueprint.Inbound{
+		"no protocol":       {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamTransport: tcpStack},
+		"half of mixed":     {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamTransport: tcpStack, Mixed: &blueprint.Mixed{SOCKS5: socks5.NewStreamProxyModule()}},
+		"no base transport": {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamProxy: passthroughProxy{}},
+	} {
+		if _, err := built.BuildInbound(inboundBlueprint); err == nil {
+			t.Errorf("inbound with %s was built", name)
+		}
+	}
+
+	if _, err := built.BuildOutbound(blueprint.Outbound{Tag: "out", Server: destination(t), Proxy: passthroughProxy{}}); err == nil {
+		t.Error("a proxy outbound with no transport stack was built")
+	}
+}
+
+func destination(t *testing.T) spec.Destination {
+	t.Helper()
+	server, err := spec.NewDestinationFromDomain("example.com", 1080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return server
+}

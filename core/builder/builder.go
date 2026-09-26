@@ -5,6 +5,7 @@ package builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
@@ -16,6 +17,13 @@ import (
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 	"github.com/The-Apranik/Apranik/spec"
+)
+
+// A blueprint written in Go need not have passed config.Check, so a missing
+// piece is an error here rather than a nil dereference.
+var (
+	errNoInboundProtocol = errors.New("no proxy protocol")
+	errNoBaseTransport   = errors.New("the transport stack has no base transport")
 )
 
 // Builder holds no registry: every module in a Config is already constructed
@@ -64,6 +72,8 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		}
 	}
 
+	// Always plain TCP, straight to the fallback: never the inbound's
+	// own stack, and no lookup by name.
 	var fallback *inbound.Fallback
 	if inboundBlueprint.Fallback.IsValid() {
 		dialer, err := buildStreamDialer(blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()})
@@ -100,6 +110,12 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 }
 
 func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamProxyServer, error) {
+	if inboundBlueprint.Mixed == nil && inboundBlueprint.StreamProxy == nil {
+		return nil, errNoInboundProtocol
+	}
+	if inboundBlueprint.Mixed != nil && (inboundBlueprint.Mixed.SOCKS5 == nil || inboundBlueprint.Mixed.HTTP == nil) {
+		return nil, fmt.Errorf("mixed: %w: it needs both socks5 and http", errNoInboundProtocol)
+	}
 	if inboundBlueprint.Mixed == nil {
 		server, err := inboundBlueprint.StreamProxy.NewStreamServer()
 		if err != nil {
@@ -233,6 +249,9 @@ func (b *Builder) buildUDPAssociateSocket(bindAddr spec.Endpoint) spec.UDPAssoci
 }
 
 func buildStreamDialer(stack blueprint.StreamTransportStack) (spec.StreamDialer, error) {
+	if stack.Base == nil {
+		return nil, errNoBaseTransport
+	}
 	dialer, err := stack.Base.NewStreamDialer()
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
@@ -252,6 +271,9 @@ func buildStreamDialer(stack blueprint.StreamTransportStack) (spec.StreamDialer,
 // Binds here, not at activation: LocalAddr must return a real address, and a
 // port conflict should be a startup error a user can read.
 func buildStreamListener(stack blueprint.StreamTransportStack, bind spec.Endpoint) (spec.StreamListener, error) {
+	if stack.Base == nil {
+		return nil, errNoBaseTransport
+	}
 	listener, err := stack.Base.NewStreamListener(bind)
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
@@ -269,6 +291,9 @@ func buildStreamListener(stack blueprint.StreamTransportStack, bind spec.Endpoin
 }
 
 func buildDatagramDialer(stack blueprint.DatagramTransportStack) (spec.DatagramDialer, error) {
+	if stack.Base == nil {
+		return nil, errNoBaseTransport
+	}
 	dialer, err := stack.Base.NewDatagramDialer()
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
@@ -286,6 +311,9 @@ func buildDatagramDialer(stack blueprint.DatagramTransportStack) (spec.DatagramD
 }
 
 func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.Endpoint) (spec.DatagramListener, error) {
+	if stack.Base == nil {
+		return nil, errNoBaseTransport
+	}
 	listener, err := stack.Base.NewDatagramListener(bind)
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
