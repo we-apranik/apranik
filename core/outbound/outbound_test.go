@@ -207,3 +207,131 @@ func TestBlockRefusesBothNetworks(t *testing.T) {
 		t.Errorf("CreateDatagram: %v, want ErrBlocked", err)
 	}
 }
+
+// recordingDialer hands out one carrier and remembers where it was asked to go.
+type recordingDialer struct {
+	carrier spec.Stream
+	dialed  chan spec.Destination
+}
+
+func (d recordingDialer) DialStream(_ context.Context, destination spec.Destination) (spec.Stream, error) {
+	d.dialed <- destination
+	return d.carrier, nil
+}
+
+func (recordingDialer) Close() error { return nil }
+
+type fakeDatagram struct{ spec.Datagram }
+
+type fakeDatagramOverStreamClient struct {
+	requested chan spec.Stream
+	err       error
+}
+
+func (c fakeDatagramOverStreamClient) RequestDatagramOverStream(ctx context.Context, carrier spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
+	c.requested <- carrier
+	if c.err != nil {
+		return nil, c.err
+	}
+	return fakeDatagram{}, nil
+}
+
+// closeRecordingStream reports whether the outbound closed its carrier.
+type closeRecordingStream struct {
+	pipeStream
+	closed chan struct{}
+}
+
+func (s closeRecordingStream) Close() error { close(s.closed); return nil }
+
+func proxyServer(t *testing.T) spec.Destination {
+	t.Helper()
+	server, err := spec.NewDestinationFromDomain("proxy.example", 443)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return server
+}
+
+// With a datagram-over-stream client, the proxy outbound declares UDP before
+// any packet, dials the proxy server -- never the packet's destination -- and
+// hands that carrier to the client.
+func TestStreamOutboundCarriesUDPInsideAStream(t *testing.T) {
+	carrier := pipeStream{}
+	dialer := recordingDialer{carrier: carrier, dialed: make(chan spec.Destination, 1)}
+	client := fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 1)}
+	server := proxyServer(t)
+
+	proxy := outbound.NewStream(outbound.StreamConfig{
+		Tag: "proxy", ServerAddr: server, Dialer: dialer, DatagramOverStreamClient: client,
+	})
+
+	networks := proxy.Networks()
+	if len(networks) != 2 || networks[0] != spec.NetworkTCP || networks[1] != spec.NetworkUDP {
+		t.Errorf("Networks() = %v, want [tcp udp]", networks)
+	}
+
+	datagram, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := datagram.(fakeDatagram); !ok {
+		t.Errorf("CreateDatagram returned %T, want the client's datagram", datagram)
+	}
+	if dialed := <-dialer.dialed; dialed != server {
+		t.Errorf("dialed %s, want the proxy server %s", dialed, server)
+	}
+	if handed := <-client.requested; handed != carrier {
+		t.Error("the client was not handed the dialed carrier")
+	}
+}
+
+// A refused request must not leak the connection to the server.
+func TestAFailedDatagramRequestClosesTheCarrier(t *testing.T) {
+	carrier := closeRecordingStream{closed: make(chan struct{})}
+	refusal := errors.New("refused")
+	proxy := outbound.NewStream(outbound.StreamConfig{
+		Tag:                      "proxy",
+		ServerAddr:               proxyServer(t),
+		Dialer:                   recordingDialer{carrier: carrier, dialed: make(chan spec.Destination, 1)},
+		DatagramOverStreamClient: fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 1), err: refusal},
+	})
+
+	_, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
+	if !errors.Is(err, refusal) {
+		t.Errorf("CreateDatagram = %v, want the client's error", err)
+	}
+	select {
+	case <-carrier.closed:
+	default:
+		t.Error("the carrier to the server was left open")
+	}
+}
+
+type silentDatagramClient struct{}
+
+func (silentDatagramClient) RequestDatagramOverStream(ctx context.Context, _ spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestADatagramRequestIsBoundedByTheHandshakeTimeout(t *testing.T) {
+	outboundSide, serverSide := net.Pipe()
+	defer serverSide.Close()
+	proxy := outbound.NewStream(outbound.StreamConfig{
+		Tag:                      "proxy",
+		ServerAddr:               proxyServer(t),
+		Dialer:                   recordingDialer{carrier: pipeStream{outboundSide}, dialed: make(chan spec.Destination, 1)},
+		DatagramOverStreamClient: silentDatagramClient{},
+		HandshakeTimeout:         100 * time.Millisecond,
+	})
+
+	started := time.Now()
+	_, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("CreateDatagram = %v, want a deadline error", err)
+	}
+	if waited := time.Since(started); waited > time.Second {
+		t.Errorf("waited %s, want about the 100ms handshake timeout", waited)
+	}
+}
