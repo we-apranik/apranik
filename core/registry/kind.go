@@ -31,7 +31,7 @@ func (k Kind) String() string {
 	case KindStreamProxy:
 		return "stream proxy"
 	case KindDatagramOverStreamProxy:
-		return "datagram-over-stream proxy"
+		return "datagram over stream proxy"
 	case KindDatagramProxy:
 		return "datagram proxy"
 	case KindSniffer:
