@@ -678,3 +678,51 @@ func TestANegativeResolveTimeoutIsRefused(t *testing.T) {
 		t.Errorf("a negative resolve timeout was not refused with its path: %v", diagnostics)
 	}
 }
+
+// Trojan registers a stream kind and a datagram-over-stream kind under one
+// name; one protocol block fills both, on either side.
+func TestTrojanFillsBothKindsAndTakesAFallback(t *testing.T) {
+	registered := modules(t)
+	configuration, diagnostics := config.Parse([]byte(`{
+  "version": 1,
+  "inbounds": [{
+    "tag": "trojan-in", "listen": "127.0.0.1", "port": 443,
+    "transport": [{"type": "tcp"}],
+    "protocol": {"type": "trojan", "settings": {"users": [{"name": "alice", "password": "p"}]}},
+    "fallback": {"server": "127.0.0.1", "server_port": 8080}
+  }],
+  "outbounds": [{
+    "tag": "trojan-out", "server": "example.com", "server_port": 443,
+    "transport": [{"type": "tcp"}],
+    "protocol": {"type": "trojan", "settings": {"password": "p"}}
+  }]
+}`), registered)
+	requireNoErrors(t, diagnostics)
+
+	in, out := configuration.Inbounds[0], configuration.Outbounds[0]
+	if in.StreamProxy == nil || in.DatagramOverStreamProxy == nil {
+		t.Error("the inbound is missing one of trojan's kinds")
+	}
+	if out.Proxy == nil || out.DatagramOverStreamProxy == nil {
+		t.Error("the outbound is missing one of trojan's kinds")
+	}
+	if in.Fallback.String() != "127.0.0.1:8080" {
+		t.Errorf("Fallback = %s", in.Fallback)
+	}
+}
+
+func TestAStreamOnlyProtocolHasNoDatagramOverStreamKind(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	if configuration.Inbounds[0].DatagramOverStreamProxy != nil {
+		t.Error("socks5 was given a datagram-over-stream kind it never registered")
+	}
+}
+
+func TestAFallbackNeedsAPort(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "fallback": {"server": "127.0.0.1"},`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !strings.Contains(diagnostics.Err().Error(), "fallback") {
+		t.Errorf("a fallback without a port was accepted: %v", diagnostics.Err())
+	}
+}

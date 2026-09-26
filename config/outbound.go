@@ -48,6 +48,9 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		outbound.Block = true
 	default:
 		outbound.Proxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
+		if outbound.Proxy != nil {
+			outbound.DatagramOverStreamProxy = b.buildDatagramOverStreamProxy(raw.Protocol, protocolLoc)
+		}
 	}
 
 	return outbound

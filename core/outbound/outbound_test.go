@@ -159,7 +159,7 @@ func (connectedDialer) Close() error { return nil }
 
 type silentServerClient struct{}
 
-func (silentServerClient) ConnectStream(ctx context.Context, carrier spec.Stream, _ spec.Metadata) (spec.Stream, error) {
+func (silentServerClient) RequestStream(ctx context.Context, carrier spec.Stream, _ spec.Metadata) (spec.Stream, error) {
 	<-ctx.Done()
 	return nil, ctx.Err()
 }

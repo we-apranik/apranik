@@ -35,6 +35,18 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 	default:
 		inbound.StreamTransport = b.buildStreamTransportStack(raw.Transport, transportLoc)
 		inbound.StreamProxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
+		if inbound.StreamProxy != nil {
+			inbound.DatagramOverStreamProxy = b.buildDatagramOverStreamProxy(raw.Protocol, protocolLoc)
+		}
+	}
+
+	if raw.Fallback != nil {
+		fallback, err := parseServerAddr(raw.Fallback.Server, raw.Fallback.ServerPort)
+		if err != nil {
+			b.diagnostics.report(fieldLocation(loc, "fallback", "server"), err)
+		} else {
+			inbound.Fallback = fallback
+		}
 	}
 
 	if raw.Sniffing != nil {

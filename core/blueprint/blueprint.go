@@ -58,6 +58,14 @@ type Inbound struct {
 	StreamProxy   spec.StreamProxy
 	DatagramProxy spec.DatagramProxy
 
+	// Set when the stream proxy's module also registered the
+	// datagram-over-stream kind: one handshake may then ask for either.
+	DatagramOverStreamProxy spec.DatagramOverStreamProxy
+
+	// Where a stream goes when the proxy answers spec.ErrFallbackRequested.
+	// Zero means close it instead.
+	Fallback spec.Destination
+
 	// Bounds the proxy handshake, so a client that connects and says nothing
 	// cannot hold a goroutine open indefinitely. Zero leaves the inbound's own
 	// default in force.
@@ -94,7 +102,12 @@ type Outbound struct {
 	// Only with Proxy: freedom and block reach no server.
 	StreamTransport StreamTransportStack
 
-	Proxy   spec.StreamProxy
+	Proxy spec.StreamProxy
+
+	// Only with Proxy, and only when its module also registered the
+	// datagram-over-stream kind: then this outbound carries UDP too.
+	DatagramOverStreamProxy spec.DatagramOverStreamProxy
+
 	Freedom *Freedom
 	Block   bool
 

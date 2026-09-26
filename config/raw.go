@@ -52,6 +52,16 @@ type rawInbound struct {
 
 	// Absent means no sniffing.
 	Sniffing *rawSniffing `json:"sniffing"`
+
+	// Absent means a request the proxy refuses is closed.
+	Fallback *rawFallback `json:"fallback"`
+}
+
+// Where refused streams go, dialed straight over TCP: typically a local web
+// server, so a probe sees an ordinary site.
+type rawFallback struct {
+	Server     string `json:"server"`
+	ServerPort uint16 `json:"server_port"`
 }
 
 type rawSniffing struct {

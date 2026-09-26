@@ -188,6 +188,6 @@ func (passthroughServer) AcceptStream(ctx context.Context, carrier spec.Stream) 
 
 type passthroughClient struct{}
 
-func (passthroughClient) ConnectStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+func (passthroughClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	return carrier, nil
 }

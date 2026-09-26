@@ -23,6 +23,23 @@ func (b *configBuilder) buildStreamProxy(proxy rawModule, loc string) spec.Strea
 	return built
 }
 
+// Nil when the protocol has no datagram-over-stream kind, which is not an
+// error: that protocol simply carries no UDP inside its streams. Called only
+// after buildStreamProxy accepted the same settings, so decoding them again
+// reports nothing new.
+func (b *configBuilder) buildDatagramOverStreamProxy(proxy rawModule, loc string) spec.DatagramOverStreamProxy {
+	newModule, err := b.modules.ProxyProtocols().LookupDatagramOverStream(proxy.Type)
+	if err != nil {
+		return nil
+	}
+
+	built := newModule()
+	if !b.decodeSettings(built, proxy.Settings, fieldLocation(loc, "settings")) {
+		return nil
+	}
+	return built
+}
+
 func (b *configBuilder) buildDatagramProxy(proxy rawModule, loc string) spec.DatagramProxy {
 	if proxy.Type == "" {
 		b.diagnostics.report(loc, errMissingField("type", "protocol"))

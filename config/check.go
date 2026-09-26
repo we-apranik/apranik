@@ -130,6 +130,15 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 			"must not be negative: a UDP session has no other end, so it would never be released")
 	}
 
+	if inbound.Fallback.IsValid() {
+		if inbound.Network == spec.NetworkUDP {
+			diagnostics.errorf(fieldLocation(loc, "fallback"), "a fallback takes a refused stream; a udp inbound has none")
+		}
+		if inbound.Fallback.Port() == 0 {
+			diagnostics.errorf(fieldLocation(loc, "fallback", "server_port"), "a fallback needs a port")
+		}
+	}
+
 	if inbound.Sniffing != nil {
 		checkSniffing(diagnostics, *inbound.Sniffing, inbound.Network, fieldLocation(loc, "sniffing"))
 	}

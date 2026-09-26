@@ -11,6 +11,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -53,8 +54,30 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.StreamProxy.Info().Name, err)
 	}
 
+	var datagramServer spec.DatagramOverStreamProxyServer
+	if inboundBlueprint.DatagramOverStreamProxy != nil {
+		if datagramServer, err = inboundBlueprint.DatagramOverStreamProxy.NewDatagramOverStreamServer(); err != nil {
+			listener.Close()
+			return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.StreamProxy.Info().Name, err)
+		}
+	}
+
+	var fallback *inbound.Fallback
+	if inboundBlueprint.Fallback.IsValid() {
+		dialer, err := buildStreamDialer(blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()})
+		if err != nil {
+			listener.Close()
+			return nil, fmt.Errorf("inbound %q: fallback: %w", inboundBlueprint.Tag, err)
+		}
+		fallback = &inbound.Fallback{
+			Dialer:      dialer,
+			Destination: inboundBlueprint.Fallback,
+			IdleTimeout: inboundBlueprint.TCPIdleTimeout,
+		}
+	}
+
 	b.logger.With("module", inboundBlueprint.StreamProxy.Info().Name).
-		Debug("stream proxy server built", "inbound", inboundBlueprint.Tag)
+		Debug("stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
 
 	var sniffing inbound.Sniffing
 	if inboundBlueprint.Sniffing != nil {
@@ -62,13 +85,15 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 	}
 
 	return inbound.NewStream(inbound.StreamConfig{
-		Tag:              inboundBlueprint.Tag,
-		Sniffing:         sniffing,
-		Listener:         listener,
-		ProxyServer:      proxyServer,
-		AssociateSocket:  b.buildUDPAssociateSocket(inboundBlueprint.Bind),
-		HandshakeTimeout: inboundBlueprint.HandshakeTimeout,
-		Logger:           b.logger,
+		Tag:                      inboundBlueprint.Tag,
+		Sniffing:                 sniffing,
+		Listener:                 listener,
+		ProxyServer:              proxyServer,
+		DatagramOverStreamServer: datagramServer,
+		Fallback:                 fallback,
+		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
+		HandshakeTimeout:         inboundBlueprint.HandshakeTimeout,
+		Logger:                   b.logger,
 	}), nil
 }
 
@@ -129,17 +154,26 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (spec
 		return nil, fmt.Errorf("outbound %q: proxy %q: %w", outboundBlueprint.Tag, outboundBlueprint.Proxy.Info().Name, err)
 	}
 
+	var datagramClient spec.DatagramOverStreamProxyClient
+	if outboundBlueprint.DatagramOverStreamProxy != nil {
+		if datagramClient, err = outboundBlueprint.DatagramOverStreamProxy.NewDatagramOverStreamClient(); err != nil {
+			dialer.Close()
+			return nil, fmt.Errorf("outbound %q: proxy %q: %w", outboundBlueprint.Tag, outboundBlueprint.Proxy.Info().Name, err)
+		}
+	}
+
 	b.logger.With("module", outboundBlueprint.Proxy.Info().Name).
-		Debug("stream proxy client built", "outbound", outboundBlueprint.Tag)
+		Debug("stream proxy client built", "outbound", outboundBlueprint.Tag, "udp", datagramClient != nil)
 
 	return outbound.NewStream(outbound.StreamConfig{
-		Tag:              outboundBlueprint.Tag,
-		ServerAddr:       outboundBlueprint.Server,
-		Dialer:           dialer,
-		ProxyClient:      proxyClient,
-		DialTimeout:      outboundBlueprint.DialTimeout,
-		HandshakeTimeout: outboundBlueprint.HandshakeTimeout,
-		Logger:           b.logger,
+		Tag:                      outboundBlueprint.Tag,
+		ServerAddr:               outboundBlueprint.Server,
+		Dialer:                   dialer,
+		ProxyClient:              proxyClient,
+		DatagramOverStreamClient: datagramClient,
+		DialTimeout:              outboundBlueprint.DialTimeout,
+		HandshakeTimeout:         outboundBlueprint.HandshakeTimeout,
+		Logger:                   b.logger,
 	}), nil
 }
 

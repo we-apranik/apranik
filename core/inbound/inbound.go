@@ -1,7 +1,8 @@
 // Package inbound accepts connections and hands each one's payload and
 // metadata to the traffic handler. It runs the accept loop, bounds every
-// handshake with a timeout, and hands a UDP association to the handler as a
-// UDP session when the proxy protocol asks for one.
+// handshake with a timeout, asks a protocol that can frame datagrams in a
+// stream which payload each request wants, hands a UDP association to the
+// handler as a UDP session, and replays a refused stream to the fallback.
 package inbound
 
 import (
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/net/peekable"
+	"github.com/The-Apranik/Apranik/core/relay"
 	"github.com/The-Apranik/Apranik/core/sniff"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -23,6 +26,9 @@ const acceptBackoff = 10 * time.Millisecond
 // A client that connects and then says nothing would otherwise hold a
 // goroutine and a socket open for as long as it liked.
 const DefaultHandshakeTimeout = 10 * time.Second
+
+// PROVISIONAL: 10 seconds, as for an outbound's dial.
+const fallbackDialTimeout = 10 * time.Second
 
 // UDPAssociateHandler is the opt-in hook for a stream proxy server that binds
 // a datagram socket mid-handshake -- SOCKS5 UDP ASSOCIATE.
@@ -43,10 +49,27 @@ type Sniffing struct {
 	Timeout time.Duration
 }
 
+// Fallback is where a stream goes when the proxy refuses it with
+// spec.ErrFallbackRequested: every byte the handshake read is replayed there.
+type Fallback struct {
+	Dialer      spec.StreamDialer
+	Destination spec.Destination
+
+	// Zero means relay.DefaultStreamIdleTimeout; negative means no bound.
+	IdleTimeout time.Duration
+}
+
 type StreamConfig struct {
 	Tag         string
 	Listener    spec.StreamListener
 	ProxyServer spec.StreamProxyServer
+
+	// Nil unless the protocol also frames datagrams in its streams. Then each
+	// request is identified first and sent to the matching accept.
+	DatagramOverStreamServer spec.DatagramOverStreamProxyServer
+
+	// Nil means a refused stream is closed.
+	Fallback *Fallback
 
 	// Nil means this inbound grants no UDP associate socket; a protocol
 	// needing one must refuse.
@@ -73,10 +96,18 @@ func NewStream(config StreamConfig) spec.Inbound {
 		handshakeTimeout = DefaultHandshakeTimeout
 	}
 
+	if config.Fallback != nil && config.Fallback.IdleTimeout == 0 {
+		fallback := *config.Fallback
+		fallback.IdleTimeout = relay.DefaultStreamIdleTimeout
+		config.Fallback = &fallback
+	}
+
 	return &streamInbound{
 		tag:                config.Tag,
 		listener:           config.Listener,
 		proxyServer:        config.ProxyServer,
+		datagramServer:     config.DatagramOverStreamServer,
+		fallback:           config.Fallback,
 		udpAssociateSocket: config.AssociateSocket,
 		handshakeTimeout:   handshakeTimeout,
 		sniffing:           config.Sniffing,
@@ -88,6 +119,8 @@ type streamInbound struct {
 	tag                string
 	listener           spec.StreamListener
 	proxyServer        spec.StreamProxyServer
+	datagramServer     spec.DatagramOverStreamProxyServer
+	fallback           *Fallback
 	udpAssociateSocket spec.UDPAssociateSocketFunc
 	handshakeTimeout   time.Duration
 	sniffing           Sniffing
@@ -138,6 +171,9 @@ func (i *streamInbound) Close() error {
 		<-acceptLoopDone
 	}
 	i.liveConnections.Wait()
+	if i.fallback != nil {
+		err = errors.Join(err, i.fallback.Dialer.Close())
+	}
 	return err
 }
 
@@ -180,17 +216,50 @@ func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, 
 	return context.WithTimeout(ctx, i.handshakeTimeout)
 }
 
+// Recording only when something may need it: identifying peeks, and a
+// fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHandler, stream spec.Stream) {
+	carrier := stream
+	var recording *peekable.Stream
+	if i.datagramServer != nil || i.fallback != nil {
+		recording = peekable.NewRecordingStream(stream)
+		carrier = recording
+	}
+
 	handshakeCtx, endHandshake := i.handshakeContext(ctx)
-	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, stream)
+	defer endHandshake()
+
+	if i.datagramServer != nil {
+		isDatagram, err := i.datagramServer.IsDatagramOverStream(handshakeCtx, recording)
+		if err != nil {
+			stream.Close()
+			i.logger.Warn("handshake failed", "error", err)
+			return
+		}
+		if isDatagram {
+			datagram, metadata, err := i.datagramServer.AcceptDatagramOverStream(handshakeCtx, recording)
+			endHandshake()
+			if err != nil {
+				i.refuse(ctx, recording, stream, err)
+				return
+			}
+			recording.StopRecording()
+			i.handleDatagramOverStream(ctx, handler, datagram, metadata)
+			return
+		}
+	}
+
+	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, carrier)
 	endHandshake()
+	if err == nil || errors.Is(err, spec.ErrUDPAssociationRequested) {
+		stopRecording(recording)
+	}
 	if errors.Is(err, spec.ErrUDPAssociationRequested) {
-		i.handleUDPAssociate(ctx, handler, stream, metadata)
+		i.handleUDPAssociate(ctx, handler, carrier, metadata)
 		return
 	}
 	if err != nil {
-		stream.Close()
-		i.logger.Warn("handshake failed", "error", err)
+		i.refuse(ctx, recording, stream, err)
 		return
 	}
 
@@ -202,6 +271,48 @@ func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHa
 
 	if err := handler.HandleStream(ctx, payload, metadata); err != nil {
 		i.logger.Warn("stream ended in error", "error", err)
+	}
+}
+
+func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler spec.TrafficHandler, datagram spec.Datagram, metadata spec.Metadata) {
+	// The stream is the session: closing it, from either end, ends both, so
+	// its end of file is the normal way a session finishes.
+	metadata.InboundTag = i.tag
+	if err := handler.HandleDatagram(ctx, datagram, metadata); err != nil && !errors.Is(err, io.EOF) {
+		i.logger.Warn("datagram session ended in error", "error", err)
+	}
+	datagram.Close()
+}
+
+// A refusal goes to the fallback only when the protocol asked for it, one is
+// configured, and every byte read so far was kept. Anything else is closed.
+func (i *streamInbound) refuse(ctx context.Context, recording *peekable.Stream, stream spec.Stream, err error) {
+	if !errors.Is(err, spec.ErrFallbackRequested) || i.fallback == nil || recording.Rewind() != nil {
+		stream.Close()
+		i.logger.Warn("handshake failed", "error", err)
+		return
+	}
+	recording.StopRecording()
+
+	i.logger.Debug("stream handed to the fallback", "reason", err)
+	dialCtx, endDial := context.WithTimeout(ctx, fallbackDialTimeout)
+	fallbackStream, dialErr := i.fallback.Dialer.DialStream(dialCtx, i.fallback.Destination)
+	endDial()
+	if dialErr != nil {
+		recording.Close()
+		i.logger.Warn("fallback unreachable", "fallback", i.fallback.Destination, "error", dialErr)
+		return
+	}
+
+	relayErr := relay.Stream(ctx, recording, fallbackStream, i.fallback.IdleTimeout)
+	if relayErr != nil && !errors.Is(relayErr, relay.ErrStreamIdle) {
+		i.logger.Debug("fallback stream ended in error", "error", relayErr)
+	}
+}
+
+func stopRecording(recording *peekable.Stream) {
+	if recording != nil {
+		recording.StopRecording()
 	}
 }
 
