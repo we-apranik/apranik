@@ -28,7 +28,7 @@ type resolverPolicy struct {
 }
 
 type resolvedAddress struct {
-	address *net.UDPAddr
+	address netip.AddrPort
 	expires time.Time
 }
 
@@ -106,9 +106,12 @@ func (s *socket) WriteToResolved(payload []byte, to spec.Destination) (int, spec
 		return 0, spec.Endpoint{}, err
 	}
 
-	sentTo := spec.NewEndpointFromNetAddr(target)
+	sentTo, err := spec.NewEndpoint(target.Addr(), target.Port())
+	if err != nil {
+		return 0, spec.Endpoint{}, err
+	}
 
-	size, err := s.connection.WriteToUDP(payload, target)
+	size, err := s.connection.WriteToUDPAddrPort(payload, target)
 	if errors.Is(err, syscall.EMSGSIZE) {
 		return size, sentTo, fmt.Errorf("udp: %d bytes to %s: %w", len(payload), target, spec.ErrMessageTooLong)
 	}
@@ -121,16 +124,18 @@ func (s *socket) LocalAddr() net.Addr { return s.connection.LocalAddr() }
 
 // An IP needs no lookup at all; only a domain reaches the resolver, and its
 // result is cached briefly because a session usually revisits the same few.
-func (s *socket) resolve(to spec.Destination) (*net.UDPAddr, error) {
+// A netip.AddrPort, unlike a *net.UDPAddr, is a value, so sending to one
+// allocates nothing.
+func (s *socket) resolve(to spec.Destination) (netip.AddrPort, error) {
 	if !to.IsValid() {
-		return nil, errors.New("udp: address has neither domain nor IP")
+		return netip.AddrPort{}, errors.New("udp: address has neither domain nor IP")
 	}
 	if to.Port() == 0 {
-		return nil, errors.New("udp: address has no port")
+		return netip.AddrPort{}, errors.New("udp: address has no port")
 	}
 
 	if ip, ok := to.IP(); ok {
-		return net.UDPAddrFromAddrPort(netip.AddrPortFrom(ip, to.Port())), nil
+		return netip.AddrPortFrom(ip, to.Port()), nil
 	}
 
 	domain, _ := to.Domain()
@@ -143,37 +148,37 @@ func (s *socket) resolve(to spec.Destination) (*net.UDPAddr, error) {
 
 	addresses, err := net.DefaultResolver.LookupNetIP(ctx, "ip", domain)
 	if err != nil {
-		return nil, fmt.Errorf("udp: resolve %s: %w", domain, err)
+		return netip.AddrPort{}, fmt.Errorf("udp: resolve %s: %w", domain, err)
 	}
 
 	chosen, err := reachable(addresses, s.network)
 	if err != nil {
-		return nil, fmt.Errorf("udp: resolve %s: %w", domain, err)
+		return netip.AddrPort{}, fmt.Errorf("udp: resolve %s: %w", domain, err)
 	}
 
-	target := net.UDPAddrFromAddrPort(netip.AddrPortFrom(chosen, to.Port()))
+	target := netip.AddrPortFrom(chosen, to.Port())
 	s.cache(domain, target)
 	return target, nil
 }
 
-func (s *socket) cached(domain string) (*net.UDPAddr, bool) {
+func (s *socket) cached(domain string) (netip.AddrPort, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	entry, found := s.resolved[domain]
 	if !found {
-		return nil, false
+		return netip.AddrPort{}, false
 	}
 	if time.Now().After(entry.expires) {
 		delete(s.resolved, domain)
-		return nil, false
+		return netip.AddrPort{}, false
 	}
 	return entry.address, true
 }
 
 // Expired entries are swept before anything live is dropped, so a session that
 // revisits the same handful of domains never loses one of them to a burst.
-func (s *socket) cache(domain string, target *net.UDPAddr) {
+func (s *socket) cache(domain string, target netip.AddrPort) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
