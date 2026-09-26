@@ -8,15 +8,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // Server-first protocols such as SSH and SMTP send nothing until the server
 // speaks, so every connection of theirs waits this long. PROVISIONAL.
 const DefaultTimeout = 300 * time.Millisecond
-
-// Large enough for a post-quantum TLS ClientHello split across records.
-const maxPeekedBytes = 16 << 10
 
 // Stream returns a stream that replays the peeked bytes, and nil when no
 // sniffer recognised them. A stream that cannot take a read deadline is not
@@ -32,33 +30,34 @@ func Stream(clientStream spec.Stream, sniffers []spec.Sniffer, timeout time.Dura
 		return clientStream, nil
 	}
 
-	peeked, result := peekUntilRecognised(clientStream, sniffers)
+	peekableStream, ok := clientStream.(*peekable.Stream)
+	if !ok {
+		peekableStream = peekable.NewStream(clientStream)
+	}
+	result := peekUntilRecognised(peekableStream, sniffers)
 	clientStream.SetReadDeadline(time.Time{})
 
-	return &replayingStream{Stream: clientStream, unread: peeked}, result
+	return peekableStream, result
 }
 
-func peekUntilRecognised(clientStream spec.Stream, sniffers []spec.Sniffer) ([]byte, *spec.SniffResult) {
-	buffer := make([]byte, maxPeekedBytes)
-	peekedSize := 0
+// Each round asks for one byte more than is already buffered, so it waits for
+// the client only when the sniffers have seen everything so far.
+func peekUntilRecognised(clientStream *peekable.Stream, sniffers []spec.Sniffer) *spec.SniffResult {
 	undecided := sniffers
 
-	for peekedSize < len(buffer) {
-		readSize, err := clientStream.Read(buffer[peekedSize:])
-		peekedSize += readSize
-
-		if readSize > 0 {
+	for {
+		peeked, err := clientStream.Peek(clientStream.Buffered() + 1)
+		if len(peeked) > 0 {
 			var result *spec.SniffResult
-			result, undecided = sniffEach(buffer[:peekedSize], undecided)
+			result, undecided = sniffEach(peeked, undecided)
 			if result != nil || len(undecided) == 0 {
-				return buffer[:peekedSize], result
+				return result
 			}
 		}
 		if err != nil {
-			break
+			return nil
 		}
 	}
-	return buffer[:peekedSize], nil
 }
 
 // Returns the first match, or the sniffers still waiting for more bytes.
@@ -74,18 +73,4 @@ func sniffEach(peeked []byte, sniffers []spec.Sniffer) (*spec.SniffResult, []spe
 		}
 	}
 	return nil, needMoreData
-}
-
-type replayingStream struct {
-	spec.Stream
-	unread []byte
-}
-
-func (s *replayingStream) Read(buffer []byte) (int, error) {
-	if len(s.unread) > 0 {
-		copied := copy(buffer, s.unread)
-		s.unread = s.unread[copied:]
-		return copied, nil
-	}
-	return s.Stream.Read(buffer)
 }
