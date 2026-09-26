@@ -24,6 +24,20 @@
       "network": "tcp",
       "transport": [{ "type": "tcp" }],
       "protocol": { "type": "http" }
+    },
+    {
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "port": 1082,
+      "network": "tcp",
+      "transport": [{ "type": "tcp" }],
+      "protocol": {
+        "type": "mixed",
+        "settings": {
+          "socks5": { "udp_relay": true },
+          "http": {}
+        }
+      }
     }
   ],
 
