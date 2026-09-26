@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -89,10 +90,23 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 // Stream ends the connection instead, and any other failure means the carrier
 // is already gone.
 func forwardStream(destination spec.Stream, source io.Reader) error {
-	_, err := io.Copy(destination, source)
+	copyBuffer := streamCopyBuffers.Get().(*[]byte)
+	defer streamCopyBuffers.Put(copyBuffer)
+
+	_, err := io.CopyBuffer(destination, source, *copyBuffer)
 	_ = destination.CloseWrite()
 	return err
 }
+
+// Every connection copies in both directions, and io.Copy would allocate a
+// fresh buffer for each; reusing them keeps short connections off the heap.
+// The size is io.Copy's own. Pointers, so Put does not allocate.
+const streamCopyBufferSize = 32 << 10
+
+var streamCopyBuffers = sync.Pool{New: func() any {
+	buffer := make([]byte, streamCopyBufferSize)
+	return &buffer
+}}
 
 type streamActivity struct{ lastActiveUnixNano atomic.Int64 }
 
