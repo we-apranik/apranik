@@ -32,19 +32,11 @@ func Datagrams(ctx context.Context, config DatagramRelayConfig) error {
 	defer config.ClientSide.Close()
 	defer config.ClientSession.Close()
 
-	relayEnded := make(chan struct{})
-	defer close(relayEnded)
-
-	if ctx.Done() != nil {
-		go func() {
-			select {
-			case <-ctx.Done():
-				config.ClientSide.Close()
-				config.ClientSession.Close()
-			case <-relayEnded:
-			}
-		}()
-	}
+	stopClosingOnCancel := context.AfterFunc(ctx, func() {
+		config.ClientSide.Close()
+		config.ClientSession.Close()
+	})
+	defer stopClosingOnCancel()
 
 	directionEnded := make(chan error, 2)
 	go func() { directionEnded <- forwardClientDatagramsToSession(ctx, config) }()

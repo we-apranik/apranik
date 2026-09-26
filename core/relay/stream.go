@@ -32,18 +32,8 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 		remoteSide.Close()
 	}
 
-	if ctx.Done() != nil {
-		finished := make(chan struct{})
-		defer close(finished)
-
-		go func() {
-			select {
-			case <-ctx.Done():
-				closeBoth()
-			case <-finished:
-			}
-		}()
-	}
+	stopClosingOnCancel := context.AfterFunc(ctx, closeBoth)
+	defer stopClosingOnCancel()
 
 	var clientSource, remoteSource io.Reader = clientSide, remoteSide
 	var idled atomic.Bool
@@ -65,9 +55,11 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 		defer idleTimer.Stop()
 	}
 
+	// Buffered for both, and the caller copies one direction itself, so the
+	// errors still arrive in the order the directions ended.
 	copyErrors := make(chan error, 2)
 	go func() { copyErrors <- forwardStream(remoteSide, clientSource) }()
-	go func() { copyErrors <- forwardStream(clientSide, remoteSource) }()
+	copyErrors <- forwardStream(clientSide, remoteSource)
 
 	var firstError error
 	for range 2 {
