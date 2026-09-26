@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"testing/iotest"
 
@@ -36,6 +37,47 @@ func TestPeekDoesNotConsume(t *testing.T) {
 	all, err := io.ReadAll(stream)
 	if err != nil || string(all) != "hello world" {
 		t.Errorf("ReadAll after Peek = %q, %v", all, err)
+	}
+}
+
+func TestPeekExactlyTakesNoMoreThanItWasAskedFor(t *testing.T) {
+	for _, n := range []int{1, 2, 7, 100} {
+		stream := peekable.NewStream(readerStream{reader: bytes.NewReader(make([]byte, 4096))})
+		peeked, err := stream.PeekExactly(n)
+		if err != nil || len(peeked) != n {
+			t.Fatalf("PeekExactly(%d) = %d bytes, %v", n, len(peeked), err)
+		}
+		if buffered := stream.Buffered(); buffered != n {
+			t.Errorf("PeekExactly(%d) took %d bytes", n, buffered)
+		}
+	}
+}
+
+func TestPeekExactlyAfterReadingTakesNoMore(t *testing.T) {
+	for _, stream := range []*peekable.Stream{
+		peekable.NewStream(readerStream{reader: strings.NewReader("abcdefgh")}),
+		peekable.NewRecordingStream(readerStream{reader: strings.NewReader("abcdefgh")}),
+	} {
+		if _, err := stream.PeekExactly(2); err != nil {
+			t.Fatal(err)
+		}
+		io.ReadFull(stream, make([]byte, 2))
+		peeked, err := stream.PeekExactly(3)
+		if err != nil || string(peeked) != "cde" || stream.Buffered() != 3 {
+			t.Errorf("PeekExactly(3) after reading 2 = %q, %v, %d buffered", peeked, err, stream.Buffered())
+		}
+		rest, _ := io.ReadAll(stream)
+		if string(rest) != "cdefgh" {
+			t.Errorf("rest = %q", rest)
+		}
+	}
+}
+
+func TestPeekExactlyShortStreamReturnsWhatThereIsWithTheError(t *testing.T) {
+	stream := peekable.NewStream(streamOf([]byte("abc")))
+	peeked, err := stream.PeekExactly(10)
+	if string(peeked) != "abc" || !errors.Is(err, io.EOF) {
+		t.Errorf("PeekExactly(10) = %q, %v; want \"abc\", io.EOF", peeked, err)
 	}
 }
 

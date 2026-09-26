@@ -31,9 +31,13 @@ type bufferedStream struct {
 	reader *bufio.Reader
 }
 
-func (s bufferedStream) Read(p []byte) (int, error)  { return s.reader.Read(p) }
-func (s bufferedStream) Peek(n int) ([]byte, error)  { return s.reader.Peek(n) }
-func newBufferedStream(s spec.Stream) bufferedStream { return bufferedStream{s, bufio.NewReader(s)} }
+func (s bufferedStream) Read(p []byte) (int, error) { return s.reader.Read(p) }
+func (s bufferedStream) Peek(n int) ([]byte, error) { return s.reader.Peek(n) }
+
+// A bufio.Reader always reads ahead, so this stand-in cannot keep the promise;
+// Trojan never asks for it.
+func (bufferedStream) PeekExactly(int) ([]byte, error) { panic("trojan does not use PeekExactly") }
+func newBufferedStream(s spec.Stream) bufferedStream   { return bufferedStream{s, bufio.NewReader(s)} }
 
 func pipe(t *testing.T) (clientSide, serverSide spec.Stream) {
 	t.Helper()

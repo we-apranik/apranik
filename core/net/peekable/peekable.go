@@ -48,7 +48,11 @@ func NewRecordingStream(inner spec.Stream) *Stream {
 	return &Stream{Stream: inner, recording: true}
 }
 
-func (s *Stream) Peek(n int) ([]byte, error) {
+func (s *Stream) Peek(n int) ([]byte, error) { return s.peek(n, true) }
+
+func (s *Stream) PeekExactly(n int) ([]byte, error) { return s.peek(n, false) }
+
+func (s *Stream) peek(n int, readAhead bool) ([]byte, error) {
 	if !s.recording {
 		s.dropReadBytes()
 	}
@@ -58,7 +62,7 @@ func (s *Stream) Peek(n int) ([]byte, error) {
 
 	var err error
 	for len(s.buffered)-s.readOffset < n && err == nil {
-		err = s.fill(s.readOffset + n)
+		err = s.fill(s.readOffset+n, readAhead)
 	}
 
 	available := s.buffered[s.readOffset:]
@@ -120,10 +124,14 @@ func (s *Stream) dropReadBytes() {
 	}
 }
 
-// Reads at least one byte more, never past the buffer's limit.
-func (s *Stream) fill(wanted int) error {
-	room := max(wanted, min(MaxBufferedBytes, 2*wanted)) - len(s.buffered)
-	chunk := make([]byte, room)
+// Reads at least one byte more; with read-ahead up to twice wanted, never past
+// the buffer's limit, and without it never past wanted.
+func (s *Stream) fill(wanted int, readAhead bool) error {
+	target := wanted
+	if readAhead {
+		target = max(wanted, min(MaxBufferedBytes, 2*wanted))
+	}
+	chunk := make([]byte, target-len(s.buffered))
 	size, err := s.Stream.Read(chunk)
 	s.buffered = append(s.buffered, chunk[:size]...)
 	return err

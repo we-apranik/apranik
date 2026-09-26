@@ -184,11 +184,14 @@ type Stream interface {
 type PeekableStream interface {
 	Stream
 
-	// Peek returns the next n bytes without advancing, with bufio.Reader
-	// semantics: fewer than n only alongside an error. It blocks until n bytes
-	// arrive, bounded only by the stream's read deadline. An n beyond the
-	// implementation's buffer is an error, never a partial wait.
+	// Peek returns the next n bytes without consuming them; fewer only with an
+	// error. It blocks until they arrive or the read deadline passes, may read
+	// ahead of n, and refuses an n larger than the implementation's buffer.
 	Peek(n int) ([]byte, error)
+
+	// PeekExactly is Peek that never reads past n, so once those bytes are
+	// read nothing stays buffered and the inner stream can be handed on.
+	PeekExactly(n int) ([]byte, error)
 }
 
 // Datagram is messages with boundaries. Unordered, unreliable.
