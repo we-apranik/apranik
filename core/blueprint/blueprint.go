@@ -41,8 +41,8 @@ type DatagramTransportStack struct {
 func (s StreamTransportStack) IsZero() bool   { return s.Base == nil }
 func (s DatagramTransportStack) IsZero() bool { return s.Base == nil }
 
-// Network says which of the two stacks and which of the two proxy fields are
-// in use; config.Check verifies they agree.
+// Network says which of the two stacks and which protocol field (StreamProxy,
+// Mixed or DatagramProxy) are in use; config.Check verifies they agree.
 type Inbound struct {
 	Tag string
 
@@ -57,6 +57,9 @@ type Inbound struct {
 
 	StreamProxy   spec.StreamProxy
 	DatagramProxy spec.DatagramProxy
+
+	// The special protocol mixed, in place of StreamProxy.
+	Mixed *Mixed
 
 	// Set when the stream proxy's module also registered the
 	// datagram-over-stream kind: one handshake may then ask for either.
@@ -118,6 +121,13 @@ type Outbound struct {
 	// The proxy handshake with the server; only with Proxy. Zero means
 	// outbound.DefaultHandshakeTimeout; negative means no bound.
 	HandshakeTimeout time.Duration
+}
+
+// Mixed serves SOCKS5 and HTTP on one port; core picks one per connection
+// from its first byte.
+type Mixed struct {
+	SOCKS5 spec.StreamProxy
+	HTTP   spec.StreamProxy
 }
 
 // Freedom sends straight to each destination, so its transports are always

@@ -93,6 +93,13 @@ type rawFreedomSettings struct {
 	UDP json.RawMessage `json:"udp"`
 }
 
+// Mixed's halves are always the socks5 and http modules, so only their
+// settings are given.
+type rawMixedSettings struct {
+	SOCKS5 json.RawMessage `json:"socks5"`
+	HTTP   json.RawMessage `json:"http"`
+}
+
 // The RFC 4787 vocabulary, spelled the way nat's String writes it.
 type rawNAT struct {
 	Mapping     string         `json:"mapping"`

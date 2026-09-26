@@ -31,9 +31,17 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 	switch inbound.Network {
 	case spec.NetworkUDP:
 		inbound.DatagramTransport = b.buildDatagramTransportStack(raw.Transport, transportLoc)
+		if raw.Protocol.Type == mixedProtocol {
+			b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed serves SOCKS5 and HTTP over streams; a udp inbound cannot use it")
+			break
+		}
 		inbound.DatagramProxy = b.buildDatagramProxy(raw.Protocol, protocolLoc)
 	default:
 		inbound.StreamTransport = b.buildStreamTransportStack(raw.Transport, transportLoc)
+		if raw.Protocol.Type == mixedProtocol {
+			inbound.Mixed = b.buildMixed(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"))
+			break
+		}
 		inbound.StreamProxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
 		if inbound.StreamProxy != nil {
 			inbound.DatagramOverStreamProxy = b.buildDatagramOverStreamProxy(raw.Protocol, protocolLoc)

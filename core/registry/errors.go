@@ -19,10 +19,11 @@ func (e *DuplicateModuleError) Error() string {
 	return fmt.Sprintf("registry: %s %q is already registered", e.Kind, e.Name)
 }
 
-// Special outbound protocols built by core; a proxy module may not take their names.
+// Special protocols built by core; a proxy module may not take their names.
 const (
 	FreedomProtocolName = "freedom"
 	BlockProtocolName   = "block"
+	MixedProtocolName   = "mixed"
 )
 
 type ReservedNameError struct {
@@ -31,7 +32,7 @@ type ReservedNameError struct {
 }
 
 func (e *ReservedNameError) Error() string {
-	return fmt.Sprintf("registry: %s name %q is reserved for the special outbound protocol", e.Kind, e.Name)
+	return fmt.Sprintf("registry: %s name %q is reserved for the special protocol built by core", e.Kind, e.Name)
 }
 
 // KindConflictError is the transport keyspace rule: one name may be a base and

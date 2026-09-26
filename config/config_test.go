@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
+	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -724,5 +726,102 @@ func TestAFallbackNeedsAPort(t *testing.T) {
 	diagnostics, failed := loadAndCheck(t, document)
 	if !failed || !strings.Contains(diagnostics.Err().Error(), "fallback") {
 		t.Errorf("a fallback without a port was accepted: %v", diagnostics.Err())
+	}
+}
+
+// ---------- the special inbound protocol mixed ----------
+
+const mixedProtocol = `"protocol": {"type": "mixed", "settings": {"socks5": {"username": "u", "password": "p"}, "http": {"username": "u", "password": "p"}}}`
+
+func mixedDocument(protocol string) string {
+	return strings.Replace(goodDocument,
+		`"protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}`, protocol, 1)
+}
+
+func TestAMixedInboundDecodesBothHalves(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(mixedDocument(mixedProtocol)), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+
+	inbound := configuration.Inbounds[0]
+	if inbound.Mixed == nil || inbound.StreamProxy != nil {
+		t.Fatalf("inbound = %+v, want only Mixed", inbound)
+	}
+	if inbound.Mixed.SOCKS5.Info().Name != "socks5" || inbound.Mixed.HTTP.Info().Name != "http" {
+		t.Errorf("halves = %q and %q", inbound.Mixed.SOCKS5.Info().Name, inbound.Mixed.HTTP.Info().Name)
+	}
+	if socks5Half := inbound.Mixed.SOCKS5.(*socks5.Proxy); socks5Half.Username != "u" || !socks5Half.UDPRelay {
+		t.Errorf("socks5 half = %+v, want its settings over the module's defaults", socks5Half.Settings)
+	}
+}
+
+func TestAMixedInboundWithoutSettingsUsesTheModulesDefaults(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(mixedDocument(`"protocol": {"type": "mixed"}`)), modules(t))
+	requireNoErrors(t, diagnostics)
+	checked := config.Check(configuration)
+	requireNoErrors(t, checked)
+
+	for _, path := range []string{"inbounds[0].protocol.settings.socks5", "inbounds[0].protocol.settings.http"} {
+		if !find(checked, path, "no username set") {
+			t.Errorf("no warning about the open half at %s: %v", path, checked)
+		}
+	}
+}
+
+func TestAMixedHalfsErrorIsReportedAtItsPath(t *testing.T) {
+	for path, protocol := range map[string]string{
+		"inbounds[0].protocol.settings":        `"protocol": {"type": "mixed", "settings": {"socks": {}}}`,
+		"inbounds[0].protocol.settings.socks5": `"protocol": {"type": "mixed", "settings": {"socks5": {"usernam": "u"}}}`,
+		"inbounds[0].protocol.settings.http":   `"protocol": {"type": "mixed", "settings": {"http": {"username": "u"}}}`,
+	} {
+		diagnostics, failed := loadAndCheck(t, mixedDocument(protocol))
+		if !failed || !find(diagnostics, path, "") {
+			t.Errorf("%s: not refused at that path: %v", path, diagnostics)
+		}
+	}
+}
+
+func TestStrictFalseAcceptsUnknownMixedSettings(t *testing.T) {
+	document := strings.Replace(mixedDocument(`"protocol": {"type": "mixed", "settings": {"socks": {}, "http": {"usernam": "u"}}}`),
+		`"version": 1,`, `"version": 1, "strict": false,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("strict:false still refused an unknown field: %v", diagnostics.Err())
+	}
+}
+
+func TestAUDPInboundCannotBeMixed(t *testing.T) {
+	document := mixedDocument(`"network": "udp", "protocol": {"type": "mixed"}`)
+	document = strings.Replace(document, `"transport": [{"type": "tcp"}]`, `"transport": [{"type": "udp"}]`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].protocol.type", "mixed") {
+		t.Errorf("mixed on a udp inbound was not refused at protocol.type: %v", diagnostics)
+	}
+}
+
+func TestAMixedInboundNeedsBothModulesRegistered(t *testing.T) {
+	withoutHTTP := registry.New()
+	if err := errors.Join(
+		withoutHTTP.Transports().RegisterBaseStream(tcp.NewBaseStreamTransportModule),
+		withoutHTTP.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
+	); err != nil {
+		t.Fatal(err)
+	}
+	document := strings.Replace(mixedDocument(`"protocol": {"type": "mixed"}`), `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
+
+	_, diagnostics := config.Parse([]byte(document), withoutHTTP)
+	if !diagnostics.HasErrors() || !find(diagnostics, "inbounds[0].protocol.settings.http", "http") {
+		t.Errorf("a registry without http was not reported at the http half: %v", diagnostics)
+	}
+}
+
+func TestAnOutboundCannotBeMixed(t *testing.T) {
+	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "mixed"}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].protocol.type", "inbound protocol") {
+		t.Errorf("mixed on an outbound was not refused at protocol.type: %v", diagnostics)
 	}
 }

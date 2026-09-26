@@ -464,7 +464,7 @@ func TestASnifferIsRegisteredOnceAndLookedUpByName(t *testing.T) {
 }
 
 func TestProxyProtocolRegistryRefusesReservedNames(t *testing.T) {
-	for _, name := range []string{registry.FreedomProtocolName, registry.BlockProtocolName} {
+	for _, name := range []string{registry.FreedomProtocolName, registry.BlockProtocolName, registry.MixedProtocolName} {
 		err := registry.New().ProxyProtocols().RegisterStream(newStreamProxy(name))
 		var reserved *registry.ReservedNameError
 		if !errors.As(err, &reserved) {

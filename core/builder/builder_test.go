@@ -3,12 +3,16 @@ package builder_test
 import (
 	"context"
 	"io"
+	"net"
 	"net/netip"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
+	proxyhttp "github.com/The-Apranik/Apranik/module/proxy/http"
+	"github.com/The-Apranik/Apranik/module/proxy/socks5"
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -190,4 +194,78 @@ type passthroughClient struct{}
 
 func (passthroughClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	return carrier, nil
+}
+
+type dispatchedNetworks chan spec.Network
+
+func (d dispatchedNetworks) HandleStream(_ context.Context, c spec.Stream, _ spec.Metadata) error {
+	d <- spec.NetworkTCP
+	return c.Close()
+}
+
+func (d dispatchedNetworks) HandleDatagram(_ context.Context, c spec.Datagram, _ spec.Metadata) error {
+	d <- spec.NetworkUDP
+	return c.Close()
+}
+
+func freeLoopbackPort(t *testing.T) uint16 {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	return uint16(listener.Addr().(*net.TCPAddr).Port)
+}
+
+// The builder must hand the associate socket through the mixed server to its
+// SOCKS5 half, or UDP ASSOCIATE is refused with X'07'.
+func TestAMixedInboundServesSOCKS5UDPAndHTTP(t *testing.T) {
+	built, err := builder.New(blueprint.Log{})
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	defer built.Close()
+
+	port := freeLoopbackPort(t)
+	in, err := built.BuildInbound(blueprint.Inbound{
+		Tag:             "mixed-in",
+		Bind:            endpoint("127.0.0.1", port),
+		Network:         spec.NetworkTCP,
+		StreamTransport: blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()},
+		Mixed:           &blueprint.Mixed{SOCKS5: socks5.NewStreamProxyModule(), HTTP: proxyhttp.NewStreamProxyModule()},
+	})
+	if err != nil {
+		t.Fatalf("BuildInbound: %v", err)
+	}
+	handler := make(dispatchedNetworks, 1)
+	if err := in.Activate(context.Background(), handler); err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+
+	for _, tc := range []struct {
+		name    string
+		request []byte
+		want    spec.Network
+	}{
+		{"socks5 udp associate", []byte{0x05, 0x01, 0x00, 0x05, 0x03, 0x00, 0x01, 0, 0, 0, 0, 0, 0}, spec.NetworkUDP},
+		{"http connect", []byte("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n"), spec.NetworkTCP},
+	} {
+		connection, err := net.Dial("tcp", netip.AddrPortFrom(netip.MustParseAddr("127.0.0.1"), port).String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		connection.Write(tc.request)
+
+		select {
+		case got := <-handler:
+			if got != tc.want {
+				t.Errorf("%s: dispatched as %s, want %s", tc.name, got, tc.want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Errorf("%s: never reached the handler", tc.name)
+		}
+		connection.Close()
+	}
 }

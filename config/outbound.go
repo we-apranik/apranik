@@ -41,6 +41,8 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		b.diagnostics.report(protocolLoc, errMissingField("type", "protocol"))
 	case freedomProtocol:
 		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"))
+	case mixedProtocol:
+		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol, freedom or block")
 	case blockProtocol:
 		if hasSettings(raw.Protocol.Settings) {
 			b.diagnostics.errorf(fieldLocation(protocolLoc, "settings"), "block takes no settings")

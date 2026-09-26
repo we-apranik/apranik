@@ -102,7 +102,7 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		if inbound.DatagramProxy == nil {
 			diagnostics.errorf(fieldLocation(loc, "protocol"), "a udp inbound needs a datagram proxy protocol")
 		}
-		if !inbound.StreamTransport.IsZero() || inbound.StreamProxy != nil {
+		if !inbound.StreamTransport.IsZero() || inbound.StreamProxy != nil || inbound.Mixed != nil {
 			diagnostics.errorf(fieldLocation(loc, "network"), "network is udp but a stream transport or proxy was configured")
 		}
 
@@ -110,8 +110,11 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		if inbound.StreamTransport.IsZero() {
 			diagnostics.errorf(fieldLocation(loc, "transport"), "an inbound needs a base stream transport first in its stack")
 		}
-		if inbound.StreamProxy == nil {
+		if inbound.StreamProxy == nil && inbound.Mixed == nil {
 			diagnostics.errorf(fieldLocation(loc, "protocol"), "an inbound needs a proxy protocol")
+		}
+		if inbound.StreamProxy != nil && inbound.Mixed != nil {
+			diagnostics.errorf(fieldLocation(loc, "protocol"), "an inbound has one protocol: a proxy protocol or mixed, not both")
 		}
 		if !inbound.DatagramTransport.IsZero() || inbound.DatagramProxy != nil {
 			diagnostics.errorf(fieldLocation(loc, "network"), "network is tcp but a datagram transport or proxy was configured")
@@ -124,6 +127,10 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 
 	collectWarnings(diagnostics, inbound.StreamProxy, fieldLocation(loc, "protocol", "settings"))
 	collectWarnings(diagnostics, inbound.DatagramProxy, fieldLocation(loc, "protocol", "settings"))
+	if inbound.Mixed != nil {
+		collectWarnings(diagnostics, inbound.Mixed.SOCKS5, fieldLocation(loc, "protocol", "settings", mixedSOCKS5Module))
+		collectWarnings(diagnostics, inbound.Mixed.HTTP, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
+	}
 
 	if inbound.UDPSessionIdleTimeout < 0 {
 		diagnostics.errorf(fieldLocation(loc, "udp_session_idle_timeout"),

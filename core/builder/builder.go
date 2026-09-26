@@ -9,8 +9,10 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/inbound"
+	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -48,17 +50,17 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
 	}
 
-	proxyServer, err := inboundBlueprint.StreamProxy.NewStreamServer()
+	proxyServer, err := buildInboundProxyServer(inboundBlueprint)
 	if err != nil {
 		listener.Close()
-		return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.StreamProxy.Info().Name, err)
+		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
 	}
 
 	var datagramServer spec.DatagramOverStreamProxyServer
 	if inboundBlueprint.DatagramOverStreamProxy != nil {
 		if datagramServer, err = inboundBlueprint.DatagramOverStreamProxy.NewDatagramOverStreamServer(); err != nil {
 			listener.Close()
-			return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.StreamProxy.Info().Name, err)
+			return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.DatagramOverStreamProxy.Info().Name, err)
 		}
 	}
 
@@ -76,7 +78,7 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		}
 	}
 
-	b.logger.With("module", inboundBlueprint.StreamProxy.Info().Name).
+	b.logger.With("module", inboundProtocolName(inboundBlueprint)).
 		Debug("stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
 
 	var sniffing inbound.Sniffing
@@ -95,6 +97,33 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		HandshakeTimeout:         inboundBlueprint.HandshakeTimeout,
 		Logger:                   b.logger,
 	}), nil
+}
+
+func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamProxyServer, error) {
+	if inboundBlueprint.Mixed == nil {
+		server, err := inboundBlueprint.StreamProxy.NewStreamServer()
+		if err != nil {
+			return nil, fmt.Errorf("proxy %q: %w", inboundBlueprint.StreamProxy.Info().Name, err)
+		}
+		return server, nil
+	}
+
+	socks5Server, err := inboundBlueprint.Mixed.SOCKS5.NewStreamServer()
+	if err != nil {
+		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.SOCKS5.Info().Name, err)
+	}
+	httpServer, err := inboundBlueprint.Mixed.HTTP.NewStreamServer()
+	if err != nil {
+		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.HTTP.Info().Name, err)
+	}
+	return mixed.NewStreamServer(socks5Server, httpServer), nil
+}
+
+func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
+	if inboundBlueprint.Mixed != nil {
+		return registry.MixedProtocolName
+	}
+	return inboundBlueprint.StreamProxy.Info().Name
 }
 
 func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (spec.Outbound, error) {
