@@ -26,7 +26,7 @@ Every problem is reported at once, each with a location such as
 
 ## Config file shape
 
-[![Shape of a config file: top level version, min_core and strict; log; inbounds, each with tag, listen, port, network, transport, protocol, optional sniffing and timeouts; outbounds, each one of a proxy protocol (server, transport, protocol, timeouts), freedom (settings tcp, udp, nat) or block (nothing else).](assets/diagrams/config-shape.excalidraw.svg)](assets/diagrams/config-shape.excalidraw.svg)
+[![Shape of a config file: top level version, min_core and strict; log; inbounds, each with tag, listen, port, network, transport, protocol (socks5, http or trojan, or the special protocol mixed with settings.socks5 and settings.http), optional sniffing and timeouts; outbounds, each one of a proxy protocol (socks5, http or trojan: server, transport, protocol, timeouts), freedom (settings tcp, udp, nat) or block (nothing else). freedom, block and mixed are built by core.](assets/diagrams/config-shape.excalidraw.svg)](assets/diagrams/config-shape.excalidraw.svg)
 
 ```json
 {
@@ -81,7 +81,7 @@ Every problem is reported at once, each with a location such as
 | `tcp_idle_timeout` | closes a TCP connection silent in both directions; default `5m`, negative disables |
 | `udp_session_idle_timeout` | ends a silent UDP session; default `5m`; must not be negative |
 | `transport` | the stack, base first |
-| `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }` |
+| `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
 | `sniffing` | absent means off; `sniffers` (at least one) and `timeout` (default `300ms`); TCP only |
 | `fallback` | `{ "server": ..., "server_port": ... }`: where a request the proxy refuses is replayed, over plain TCP, from its first byte; absent means such a request is closed. TCP only. Today only `trojan` refuses into it |
 
@@ -106,6 +106,36 @@ The two special outbound protocols take no server and no transport:
   settings and no `dial_timeout`.
 
 [![RFC 4787 in freedom's NAT. Mapping: endpoint-independent (default) uses one socket for every destination, address-dependent one per destination IP, address-and-port-dependent one per IP and port. Filtering on a socket that sent to 1.1.1.1:53: endpoint-independent accepts anyone, address-dependent accepts any port of 1.1.1.1, address-and-port-dependent (default) accepts only 1.1.1.1:53.](assets/diagrams/nat-behaviours.excalidraw.svg)](assets/diagrams/nat-behaviours.excalidraw.svg)
+
+### The special inbound protocol `mixed`
+
+`mixed` serves SOCKS5 and HTTP on one port. Core reads the first byte of each
+connection: `0x05` goes to SOCKS5, anything else to HTTP. Its `settings` hold
+`socks5` and `http`, each that module's own settings; an absent key means the
+module's defaults. SOCKS5 UDP ASSOCIATE works as on a `socks5` inbound.
+
+```json
+{
+  "tag": "mixed-in",
+  "listen": "127.0.0.1",
+  "port": 1082,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "mixed",
+    "settings": {
+      "socks5": { "username": "u", "password": "p", "udp_relay": true },
+      "http":   { "username": "u", "password": "p" }
+    }
+  }
+}
+```
+
+[![How mixed dispatches a connection: the client reaches the inbound's accept loop (handshake timeout, recording for fallback, sniffing after the handshake), which hands the stream to core/inbound/mixed. Mixed peeks exactly one byte: 0x05 goes to the socks5 module, anything else to the http module, and either returns a payload stream to the handler. For UDP ASSOCIATE the socks5 module returns ErrUDPAssociationRequested and core calls Associate, forwarded by mixed, on core's own carrier; PeekExactly leaves nothing buffered in mixed's wrapper, so no byte of the SOCKS5 request is lost.](assets/diagrams/mixed-dispatch.excalidraw.svg)](assets/diagrams/mixed-dispatch.excalidraw.svg)
+
+Each half keeps its own credentials, and a half without a username is warned
+about at its own path (`protocol.settings.socks5` or `protocol.settings.http`).
+`mixed` is refused on a `udp` inbound and on an outbound. See
+a design note.
 
 ### Trojan with a fallback
 

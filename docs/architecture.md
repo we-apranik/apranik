@@ -117,6 +117,7 @@ a design note.
 | `core/blueprint` | a validated description of every inbound and outbound; nothing is opened |
 | `core/builder` | blueprint → `spec.Inbound` / `spec.Outbound`; folds stacks; grants the UDP associate socket |
 | `core/inbound` | accept loop, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
+| `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
 | `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
 | `core/route/router` | `spec.Router`; with no rules yet, always the default outbound |

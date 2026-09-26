@@ -28,7 +28,8 @@ Early and working. Standard library only; no third-party dependencies.
 | Area | Available |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; plaintext until TLS exists) |
+| Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
 | Outbounds | proxy outbounds over any stream transport, `freedom` (straight to the destination) and `block` (refuses everything) |
 | Sniffers | `tls` (SNI from a ClientHello), `http` (Host header), per inbound, off by default |
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
@@ -78,6 +79,7 @@ A config file has a log section, inbounds (how traffic arrives) and outbounds (h
 it leaves). Inbounds and outbounds share one shape: a `transport` stack and a
 `protocol`, each written as `{ "type": ..., "settings": {...} }`. Two outbound
 protocols are special: `freedom` and `block` take no server and no transport.
+One inbound protocol is special: `mixed` serves SOCKS5 and HTTP on one port.
 
 ```json
 {
@@ -134,7 +136,7 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `tcp_idle_timeout` | a TCP connection silent in both directions for this long is closed; default `5m`, negative disables |
 | `udp_session_idle_timeout` | a UDP session silent for this long is ended; default `5m` |
 | `transport` | the transport stack, base first, e.g. `[{ "type": "tcp" }]` |
-| `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }` |
+| `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
 | `sniffing` | absent means off; see below |
 
 ### Sniffing (`inbounds[].sniffing`)
@@ -161,6 +163,24 @@ inbounds only, for now.
 | `transport` | the transport stack used to reach the server; proxy protocols only |
 | `dial_timeout` | how long to wait for a connection to the server (or, for freedom, the destination); default `10s`, negative disables; not with `block` |
 | `handshake_timeout` | how long the proxy handshake with the server may take; proxy protocols only; default `10s`, negative disables |
+
+### Special inbound protocol
+
+**`mixed`** serves SOCKS5 and HTTP on one port, choosing per connection from
+the first byte. Its settings are the two modules' own settings, and either may
+be left out for that module's defaults:
+
+```json
+{ "tag": "mixed-in", "listen": "127.0.0.1", "port": 1082,
+  "transport": [{ "type": "tcp" }],
+  "protocol": { "type": "mixed", "settings": {
+    "socks5": { "username": "u", "password": "p", "udp_relay": true },
+    "http":   { "username": "u", "password": "p" }
+} } }
+```
+
+Each half keeps its own credentials; a half without a username is warned about
+at its own path, such as `protocol.settings.http`. TCP inbounds only.
 
 ### Special outbound protocols
 
