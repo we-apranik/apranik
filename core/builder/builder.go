@@ -105,6 +105,7 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 		Fallback:                 fallback,
 		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
 		HandshakeTimeout:         inboundBlueprint.HandshakeTimeout,
+		MaxConnections:           inboundBlueprint.MaxConnections,
 		Logger:                   b.logger,
 	}), nil
 }

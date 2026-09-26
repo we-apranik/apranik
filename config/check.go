@@ -132,6 +132,13 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		collectWarnings(diagnostics, inbound.Mixed.HTTP, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
 	}
 
+	if inbound.MaxConnections < 0 {
+		diagnostics.errorf(fieldLocation(loc, "max_connections"), "must not be negative; 0 means no limit")
+	}
+	if inbound.MaxConnections > 0 && inbound.Network == spec.NetworkUDP {
+		diagnostics.errorf(fieldLocation(loc, "max_connections"), "limits TCP connections; a udp inbound has none")
+	}
+
 	if inbound.UDPSessionIdleTimeout < 0 {
 		diagnostics.errorf(fieldLocation(loc, "udp_session_idle_timeout"),
 			"must not be negative: a UDP session has no other end, so it would never be released")

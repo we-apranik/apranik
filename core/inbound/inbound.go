@@ -30,6 +30,9 @@ const DefaultHandshakeTimeout = 10 * time.Second
 // PROVISIONAL: 10 seconds, as for an outbound's dial.
 const fallbackDialTimeout = 10 * time.Second
 
+// PROVISIONAL: a flood of refused connections is one warning per 10 seconds.
+const refusedConnectionLogInterval = 10 * time.Second
+
 // UDPAssociateHandler is the opt-in hook for a stream proxy server that binds
 // a datagram socket mid-handshake -- SOCKS5 UDP ASSOCIATE.
 //
@@ -78,6 +81,11 @@ type StreamConfig struct {
 	// Zero means DefaultHandshakeTimeout; negative disables the bound.
 	HandshakeTimeout time.Duration
 
+	// Connections held at once. One accepted beyond it is closed at once,
+	// before any handshake: refusing early is cheaper than queueing. Zero
+	// means no limit.
+	MaxConnections int
+
 	// No sniffers means no sniffing.
 	Sniffing Sniffing
 
@@ -102,7 +110,14 @@ func NewStream(config StreamConfig) spec.Inbound {
 		config.Fallback = &fallback
 	}
 
+	var connectionSlots chan struct{}
+	if config.MaxConnections > 0 {
+		connectionSlots = make(chan struct{}, config.MaxConnections)
+	}
+
 	return &streamInbound{
+		connectionSlots:    connectionSlots,
+		refusedLogSampler:  logging.NewSampler(refusedConnectionLogInterval),
 		tag:                config.Tag,
 		listener:           config.Listener,
 		proxyServer:        config.ProxyServer,
@@ -125,6 +140,10 @@ type streamInbound struct {
 	handshakeTimeout   time.Duration
 	sniffing           Sniffing
 	logger             *logging.Logger
+
+	// Nil means no limit. Full means the next connection is refused.
+	connectionSlots   chan struct{}
+	refusedLogSampler *logging.Sampler
 
 	mu             sync.Mutex
 	stopAccepting  context.CancelFunc
@@ -199,11 +218,39 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler spec.TrafficHand
 			continue
 		}
 
+		if !i.takeConnectionSlot() {
+			stream.Close()
+			if allowed, alsoRefused := i.refusedLogSampler.Allow(); allowed {
+				i.logger.Warn("connection refused: max_connections reached",
+					"max_connections", cap(i.connectionSlots), "also_refused_since_last_warning", alsoRefused)
+			}
+			continue
+		}
+
 		i.liveConnections.Add(1)
 		go func() {
 			defer i.liveConnections.Done()
+			defer i.releaseConnectionSlot()
 			i.handleStream(ctx, handler, stream)
 		}()
+	}
+}
+
+func (i *streamInbound) takeConnectionSlot() bool {
+	if i.connectionSlots == nil {
+		return true
+	}
+	select {
+	case i.connectionSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (i *streamInbound) releaseConnectionSlot() {
+	if i.connectionSlots != nil {
+		<-i.connectionSlots
 	}
 }
 

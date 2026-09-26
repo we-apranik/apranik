@@ -14,6 +14,7 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 		HandshakeTimeout:      time.Duration(raw.HandshakeTimeout),
 		TCPIdleTimeout:        time.Duration(raw.TCPIdleTimeout),
 		UDPSessionIdleTimeout: time.Duration(raw.UDPSessionIdleTimeout),
+		MaxConnections:        raw.MaxConnections,
 	}
 
 	if raw.Listen != "" {

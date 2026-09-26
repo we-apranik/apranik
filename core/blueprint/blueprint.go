@@ -81,6 +81,10 @@ type Inbound struct {
 	// Silence ends a UDP session. Zero means session.DefaultIdleTimeout.
 	UDPSessionIdleTimeout time.Duration
 
+	// Connections held at once; one more is closed as soon as it is accepted.
+	// Zero means no limit.
+	MaxConnections int
+
 	// Nil means no sniffing, the default.
 	Sniffing *Sniffing
 }

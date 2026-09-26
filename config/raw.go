@@ -47,6 +47,9 @@ type rawInbound struct {
 	TCPIdleTimeout        types.Duration `json:"tcp_idle_timeout"`
 	UDPSessionIdleTimeout types.Duration `json:"udp_session_idle_timeout"`
 
+	// Zero, the default, means no limit.
+	MaxConnections int `json:"max_connections"`
+
 	Transport []rawModule `json:"transport"`
 	Protocol  rawModule   `json:"protocol"`
 

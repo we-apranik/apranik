@@ -825,3 +825,34 @@ func TestAnOutboundCannotBeMixed(t *testing.T) {
 		t.Errorf("mixed on an outbound was not refused at protocol.type: %v", diagnostics)
 	}
 }
+
+// ---------- max_connections ----------
+
+func TestMaxConnectionsIsDecoded(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": 500,`, 1)
+
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+	if got := configuration.Inbounds[0].MaxConnections; got != 500 {
+		t.Errorf("MaxConnections = %d, want 500", got)
+	}
+}
+
+func TestNegativeMaxConnectionsIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": -1,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].max_connections", "negative") {
+		t.Errorf("a negative max_connections was not refused at its path: %v", diagnostics)
+	}
+}
+
+func TestMaxConnectionsOnAUDPInboundIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "network": "udp", "max_connections": 5,`, 1)
+
+	diagnostics, _ := loadAndCheck(t, document)
+	if !find(diagnostics, "inbounds[0].max_connections", "udp") {
+		t.Errorf("max_connections on a udp inbound was not refused at its path: %v", diagnostics)
+	}
+}
