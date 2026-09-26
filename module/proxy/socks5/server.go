@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
+	"github.com/The-Apranik/Apranik/shared/socksaddr"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -58,7 +59,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (s
 
 	switch {
 	case command == wire.CommandConnect:
-		destination, err := wire.ReadAddress(carrier)
+		destination, err := socksaddr.ReadAddress(carrier)
 		if err != nil {
 			wire.WriteReply(carrier, wire.ReplyAddressNotSupported, spec.Endpoint{})
 			return nil, spec.Metadata{}, err
@@ -90,7 +91,7 @@ func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream,
 		defer controlStream.SetDeadline(time.Time{})
 	}
 
-	declaredClient, err := wire.ReadAddress(controlStream)
+	declaredClient, err := socksaddr.ReadAddress(controlStream)
 	if err != nil {
 		wire.WriteReply(controlStream, wire.ReplyAddressNotSupported, spec.Endpoint{})
 		return nil, err

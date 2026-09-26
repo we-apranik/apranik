@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
+	"github.com/The-Apranik/Apranik/shared/socksaddr"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -15,17 +16,17 @@ type streamClient struct {
 	password string
 }
 
-// ConnectStream speaks the client half of the handshake over a carrier that
+// RequestStream speaks the client half of the handshake over a carrier that
 // already reaches the server. SOCKS5 round-trips, so an auth failure or a
 // refused destination surfaces here rather than on the first read.
-func (c *streamClient) ConnectStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("socks5: %w: this client speaks CONNECT only", spec.ErrUnsupportedNetwork)
 	}
 
 	// Encoded first so a destination this protocol cannot express fails before
 	// anything reaches the wire.
-	request, err := wire.AppendAddress([]byte{wire.Version5, wire.CommandConnect, 0x00}, metadata.Destination)
+	request, err := socksaddr.AppendAddress([]byte{wire.Version5, wire.CommandConnect, 0x00}, metadata.Destination)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func (c *streamClient) ConnectStream(ctx context.Context, carrier spec.Stream, m
 		return nil, &wire.ReplyError{Code: reply[1]}
 	}
 	// The bound address: read to keep the stream aligned, then discarded.
-	if _, err := wire.ReadAddress(carrier); err != nil {
+	if _, err := socksaddr.ReadAddress(carrier); err != nil {
 		return nil, fmt.Errorf("socks5: reading bound address: %w", err)
 	}
 

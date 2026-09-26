@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
+	"github.com/The-Apranik/Apranik/shared/socksaddr"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -57,7 +57,7 @@ func (a *association) ReadFrom(payload []byte) (int, spec.Destination, error) {
 		}
 
 		body := bytes.NewReader(packet[3:])
-		destination, err := wire.ReadAddress(body)
+		destination, err := socksaddr.ReadAddress(body)
 		if err != nil {
 			continue
 		}
@@ -79,7 +79,7 @@ func (a *association) WriteTo(payload []byte, source spec.Destination) (int, err
 		return 0, errors.New("socks5: the client has not sent a datagram yet, so there is nowhere to reply")
 	}
 
-	packet, err := wire.AppendAddress([]byte{0, 0, 0}, source)
+	packet, err := socksaddr.AppendAddress([]byte{0, 0, 0}, source)
 	if err != nil {
 		return 0, err
 	}

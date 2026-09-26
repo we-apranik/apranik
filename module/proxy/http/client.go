@@ -18,10 +18,10 @@ type streamClient struct {
 	password string
 }
 
-// ConnectStream issues CONNECT and nothing else. Forwarding an absolute-form
+// RequestStream issues CONNECT and nothing else. Forwarding an absolute-form
 // request would mean parsing and rewriting the payload, which an outbound that
 // is handed an opaque carrier has no business doing.
-func (c *streamClient) ConnectStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("http: %w: CONNECT carries TCP only", spec.ErrUnsupportedNetwork)
 	}

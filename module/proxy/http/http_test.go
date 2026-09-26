@@ -95,12 +95,12 @@ func TestConnectRoundTrip(t *testing.T) {
 				t.Fatalf("NewStreamClient: %v", err)
 			}
 
-			up, err := cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+			up, err := cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 				Network:     spec.NetworkTCP,
 				Destination: tc.dst,
 			})
 			if err != nil {
-				t.Fatalf("ConnectStream: %v", err)
+				t.Fatalf("RequestStream: %v", err)
 			}
 
 			got := <-results
@@ -203,11 +203,11 @@ func TestProxyAuthentication(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewStreamClient: %v", err)
 		}
-		if _, err := cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+		if _, err := cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 			Network:     spec.NetworkTCP,
 			Destination: domainDst("example.com", 443),
 		}); err != nil {
-			t.Fatalf("ConnectStream: %v", err)
+			t.Fatalf("RequestStream: %v", err)
 		}
 
 		got := <-results
@@ -256,14 +256,14 @@ func TestProxyAuthentication(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewStreamClient: %v", err)
 		}
-		_, err = cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+		_, err = cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 			Network:     spec.NetworkTCP,
 			Destination: domainDst("example.com", 443),
 		})
 
 		var status *wire.StatusError
 		if !errors.As(err, &status) {
-			t.Fatalf("ConnectStream error is %v, want *wire.StatusError", err)
+			t.Fatalf("RequestStream error is %v, want *wire.StatusError", err)
 		}
 		if status.Code != 403 {
 			t.Errorf("Code = %d, want 403", status.Code)
@@ -298,12 +298,12 @@ func TestClientRefusesUDPMetadata(t *testing.T) {
 		t.Fatalf("NewStreamClient: %v", err)
 	}
 
-	_, err = cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+	_, err = cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 		Network:     spec.NetworkUDP,
 		Destination: domainDst("example.com", 53),
 	})
 	if !errors.Is(err, spec.ErrUnsupportedNetwork) {
-		t.Errorf("ConnectStream with UDP metadata: %v, want spec.ErrUnsupportedNetwork", err)
+		t.Errorf("RequestStream with UDP metadata: %v, want spec.ErrUnsupportedNetwork", err)
 	}
 }
 

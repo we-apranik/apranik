@@ -102,12 +102,12 @@ func TestClientAndServerAgreeOnTheDestination(t *testing.T) {
 				t.Fatalf("NewStreamClient: %v", err)
 			}
 
-			up, err := cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+			up, err := cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 				Network:     spec.NetworkTCP,
 				Destination: tc.dst,
 			})
 			if err != nil {
-				t.Fatalf("ConnectStream: %v", err)
+				t.Fatalf("RequestStream: %v", err)
 			}
 
 			got := <-results
@@ -199,12 +199,12 @@ func TestClientRefusesUDPMetadata(t *testing.T) {
 		t.Fatalf("NewStreamClient: %v", err)
 	}
 
-	_, err = cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+	_, err = cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 		Network:     spec.NetworkUDP,
 		Destination: domainDst("example.com", 53),
 	})
 	if !errors.Is(err, spec.ErrUnsupportedNetwork) {
-		t.Errorf("ConnectStream with UDP metadata: %v, want spec.ErrUnsupportedNetwork", err)
+		t.Errorf("RequestStream with UDP metadata: %v, want spec.ErrUnsupportedNetwork", err)
 	}
 }
 
@@ -220,11 +220,11 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 			t.Fatalf("NewStreamClient: %v", err)
 		}
 
-		if _, err := cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+		if _, err := cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 			Network:     spec.NetworkTCP,
 			Destination: domainDst("example.com", 443),
 		}); err != nil {
-			t.Fatalf("ConnectStream: %v", err)
+			t.Fatalf("RequestStream: %v", err)
 		}
 
 		got := <-results
@@ -245,11 +245,11 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 			t.Fatalf("NewStreamClient: %v", err)
 		}
 
-		if _, err := cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+		if _, err := cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 			Network:     spec.NetworkTCP,
 			Destination: domainDst("example.com", 443),
 		}); err == nil {
-			t.Fatal("ConnectStream with a wrong password succeeded")
+			t.Fatal("RequestStream with a wrong password succeeded")
 		}
 		if got := <-results; got.err == nil {
 			t.Fatal("AcceptStream accepted a wrong password")
@@ -388,7 +388,7 @@ func TestDomainTooLongForTheWire(t *testing.T) {
 		t.Fatalf("NewStreamClient: %v", err)
 	}
 
-	_, err = cl.ConnectStream(context.Background(), clientSide, spec.Metadata{
+	_, err = cl.RequestStream(context.Background(), clientSide, spec.Metadata{
 		Network:     spec.NetworkTCP,
 		Destination: domainDst(strings.Repeat("a", 256), 80),
 	})
