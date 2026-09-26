@@ -179,6 +179,18 @@ type Stream interface {
 	SetWriteDeadline(t time.Time) error
 }
 
+// PeekableStream is a Stream whose next bytes can be looked at without
+// consuming them. Core implements it; modules receive it.
+type PeekableStream interface {
+	Stream
+
+	// Peek returns the next n bytes without advancing, with bufio.Reader
+	// semantics: fewer than n only alongside an error. It blocks until n bytes
+	// arrive, bounded only by the stream's read deadline. An n beyond the
+	// implementation's buffer is an error, never a partial wait.
+	Peek(n int) ([]byte, error)
+}
+
 // Datagram is messages with boundaries. Unordered, unreliable.
 type Datagram interface {
 	ReadFrom(p []byte) (n int, from Destination, err error)
@@ -206,6 +218,12 @@ var (
 	ErrUnsupportedNetwork      = errors.New("spec: network not supported here")
 	ErrUDPAssociationRequested = errors.New("spec: hand off to a UDP associate handler")
 	ErrSniffNeedMoreData       = errors.New("spec: sniffer needs more data")
+
+	// ErrFallbackRequested is returned by Accept* for a request that is not
+	// valid for this protocol. Core replays every byte the handshake read, and
+	// the rest of the stream, to the inbound's fallback. Return it only before
+	// writing anything to the carrier.
+	ErrFallbackRequested = errors.New("spec: not this protocol's request; hand the stream to the fallback")
 )
 
 // Transports make and wrap carriers. They know nothing about proxying.
@@ -362,8 +380,9 @@ type SniffResult struct {
 //
 // Accept* = inbound side: read and strip the request preamble, report where
 // the client wants to go.
-// Connect* = outbound side: write the preamble onto a carrier that already
-// reaches the server.
+// Request* = outbound side: request a payload from the server over a carrier
+// that already reaches it. It connects nothing, and may put nothing on the
+// wire until the first write; the server Accepts or refuses the request.
 //
 // Three shapes, because carrier and payload are independent:
 //
@@ -381,18 +400,25 @@ type StreamProxyServer interface {
 }
 
 type StreamProxyClient interface {
-	// May do nothing on the wire yet: VLESS puts its header on the first write,
-	// so auth failure can surface on the first read instead.
-	ConnectStream(ctx context.Context, c Stream, m Metadata) (Stream, error)
+	// May do nothing on the wire yet: Trojan and VLESS put their request on the
+	// first write, so auth failure can surface on the first read instead.
+	RequestStream(ctx context.Context, c Stream, m Metadata) (Stream, error)
 }
 
 type DatagramOverStreamProxyServer interface {
+	// IsDatagramOverStream peeks at the request and never consumes it. On a
+	// stream inbound one handshake can ask for either payload, so core asks
+	// this first: true, it calls AcceptDatagramOverStream; false, the same
+	// module's AcceptStream. A request it cannot classify is false, left for
+	// AcceptStream to refuse. An error means close.
+	IsDatagramOverStream(ctx context.Context, c PeekableStream) (bool, error)
+
 	// Returns a Datagram whose messages are framed inside c.
 	AcceptDatagramOverStream(ctx context.Context, c Stream) (Datagram, Metadata, error)
 }
 
 type DatagramOverStreamProxyClient interface {
-	ConnectDatagramOverStream(ctx context.Context, c Stream, m Metadata) (Datagram, error)
+	RequestDatagramOverStream(ctx context.Context, c Stream, m Metadata) (Datagram, error)
 }
 
 type DatagramProxyServer interface {
@@ -402,7 +428,7 @@ type DatagramProxyServer interface {
 }
 
 type DatagramProxyClient interface {
-	ConnectDatagram(ctx context.Context, c Datagram, m Metadata) (Datagram, error)
+	RequestDatagram(ctx context.Context, c Datagram, m Metadata) (Datagram, error)
 }
 
 // A module fills the kinds its protocol supports and no more. Core checks the
