@@ -4,7 +4,6 @@
 package http
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -33,7 +32,8 @@ func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (s
 		defer carrier.SetDeadline(time.Time{})
 	}
 
-	reader := bufio.NewReaderSize(carrier, wire.BufferSize)
+	reader := wire.AcquireHeadReader(carrier)
+	defer wire.ReleaseHeadReader(reader)
 	requestLine, headers, err := wire.ReadHead(reader)
 	if err != nil {
 		return nil, spec.Metadata{}, err

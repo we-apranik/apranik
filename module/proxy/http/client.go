@@ -1,7 +1,6 @@
 package http
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -47,7 +46,8 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 		return nil, fmt.Errorf("http: sending CONNECT: %w", err)
 	}
 
-	reader := bufio.NewReaderSize(carrier, wire.BufferSize)
+	reader := wire.AcquireHeadReader(carrier)
+	defer wire.ReleaseHeadReader(reader)
 	statusLine, _, err := wire.ReadHead(reader)
 	if err != nil {
 		return nil, err

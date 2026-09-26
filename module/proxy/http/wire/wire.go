@@ -14,6 +14,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -26,6 +27,26 @@ const (
 	maxHeadSize = 64 << 10
 	maxHeaders  = 128
 )
+
+// Every connection reads its head through one of these and PrefixStream copies
+// out whatever is left, so the reader can serve the next connection instead of
+// becoming garbage.
+var headReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, BufferSize) }}
+
+// AcquireHeadReader returns a pooled reader over carrier. The caller must
+// ReleaseHeadReader it once the head is read and PrefixStream has been called.
+func AcquireHeadReader(carrier io.Reader) *bufio.Reader {
+	reader := headReaders.Get().(*bufio.Reader)
+	reader.Reset(carrier)
+	return reader
+}
+
+// ReleaseHeadReader drops the reader's carrier and any bytes it still holds,
+// so a pooled reader never keeps a connection alive.
+func ReleaseHeadReader(reader *bufio.Reader) {
+	reader.Reset(nil)
+	headReaders.Put(reader)
+}
 
 type StatusError struct {
 	Code   int
@@ -47,7 +68,8 @@ type prefixStream struct {
 func (s *prefixStream) Read(buffer []byte) (int, error) { return s.reader.Read(buffer) }
 
 // PrefixStream returns a stream that yields head, then whatever the reader
-// buffered, then the carrier itself.
+// buffered, then the carrier itself. The buffered bytes are copied, so the
+// reader can be released and reused.
 func PrefixStream(carrier spec.Stream, head []byte, buffered *bufio.Reader) spec.Stream {
 	var readers []io.Reader
 	if len(head) > 0 {
