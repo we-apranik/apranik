@@ -40,21 +40,25 @@ func Stream(clientStream spec.Stream, sniffers []spec.Sniffer, timeout time.Dura
 	return peekableStream, result
 }
 
-// Each round asks for one byte more than is already buffered, so it waits for
-// the client only when the sniffers have seen everything so far.
+// The sniffers always see every byte already buffered, and the stream waits
+// for the client only when they have seen everything and still need more.
 func peekUntilRecognised(clientStream *peekable.Stream, sniffers []spec.Sniffer) *spec.SniffResult {
 	undecided := sniffers
+	sniffedBytes := 0
 
 	for {
-		peeked, err := clientStream.Peek(clientStream.Buffered() + 1)
-		if len(peeked) > 0 {
+		if buffered := clientStream.Buffered(); buffered > sniffedBytes {
+			peeked, _ := clientStream.Peek(buffered)
+			sniffedBytes = buffered
+
 			var result *spec.SniffResult
 			result, undecided = sniffEach(peeked, undecided)
 			if result != nil || len(undecided) == 0 {
 				return result
 			}
 		}
-		if err != nil {
+
+		if _, err := clientStream.Peek(sniffedBytes + 1); err != nil && clientStream.Buffered() <= sniffedBytes {
 			return nil
 		}
 	}

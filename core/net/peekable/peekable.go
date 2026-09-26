@@ -124,15 +124,25 @@ func (s *Stream) dropReadBytes() {
 	}
 }
 
-// Reads at least one byte more; with read-ahead up to twice wanted, never past
-// the buffer's limit, and without it never past wanted.
+// A read returns what has already arrived without waiting to fill the room, so
+// offering this much lets a whole first message, such as a TLS ClientHello,
+// land in one read instead of a round per doubling.
+const readAheadFloor = 4 << 10
+
+// Reads at least one byte more, straight into the buffer's spare capacity. With
+// read-ahead it offers room for at least readAheadFloor or twice wanted, never
+// past the buffer's limit; without it, never past wanted.
 func (s *Stream) fill(wanted int, readAhead bool) error {
 	target := wanted
 	if readAhead {
-		target = max(wanted, min(MaxBufferedBytes, 2*wanted))
+		target = max(wanted, min(MaxBufferedBytes, max(2*wanted, readAheadFloor)))
 	}
-	chunk := make([]byte, target-len(s.buffered))
-	size, err := s.Stream.Read(chunk)
-	s.buffered = append(s.buffered, chunk[:size]...)
+	if cap(s.buffered) < target {
+		grown := make([]byte, len(s.buffered), target)
+		copy(grown, s.buffered)
+		s.buffered = grown
+	}
+	size, err := s.Stream.Read(s.buffered[len(s.buffered):target])
+	s.buffered = s.buffered[:len(s.buffered)+size]
 	return err
 }

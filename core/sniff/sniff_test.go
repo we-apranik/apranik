@@ -86,3 +86,26 @@ func TestNoSniffersLeavesTheStreamUntouched(t *testing.T) {
 		t.Errorf("got %v, %+v; want the same stream and no result", sniffed, result)
 	}
 }
+
+// A client that sends its first message in pieces and then waits for the
+// server, as every TLS and HTTP client does, must be recognised as soon as the
+// last piece arrives, not when the timeout gives up waiting for a byte that
+// will never come.
+func TestAMessageInPiecesIsRecognisedWithoutWaitingForTheTimeout(t *testing.T) {
+	clientSide, inboundSide := newPipe(t)
+	request := "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: test\r\n\r\n"
+	go func() {
+		for _, piece := range []string{request[:5], request[5:20], request[20:]} {
+			clientSide.Write([]byte(piece))
+		}
+	}()
+
+	started := time.Now()
+	_, result := sniff.Stream(inboundSide, []spec.Sniffer{httpsniffer.NewSnifferModule()}, 5*time.Second)
+	if result == nil || result.Domain != "example.com" {
+		t.Fatalf("result = %+v", result)
+	}
+	if waited := time.Since(started); waited > time.Second {
+		t.Errorf("sniffing waited %v for bytes the client never sends", waited)
+	}
+}
