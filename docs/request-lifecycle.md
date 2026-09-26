@@ -33,6 +33,12 @@ Step by step:
    this is `streamServer.AcceptStream` in `module/proxy/socks5/server.go`: it
    authenticates, reads the CONNECT request, replies, and returns the same stream
    as the payload plus a `Metadata` with the destination.
+   If the protocol can also frame datagrams in the stream, as Trojan can, the
+   inbound first asks `IsDatagramOverStream`, which only peeks, and calls
+   `AcceptDatagramOverStream` instead when the request asks for UDP. If the
+   protocol refuses the request with `spec.ErrFallbackRequested` and the inbound
+   has a `fallback`, the inbound replays every byte read so far to that address
+   and relays, and the steps below do not happen.
 3. **Sniff (optional).** If the inbound has sniffers, `sniff.Stream` peeks at the
    first bytes with a read deadline, asks each sniffer, and returns a stream that
    replays what it read. The result goes into `metadata.Sniffed`; the destination is

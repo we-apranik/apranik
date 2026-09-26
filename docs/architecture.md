@@ -49,11 +49,11 @@ base transport, which is the only layer that resolves.
 
 | Kind | Below (carrier) | Above (payload) | Example |
 | --- | --- | --- | --- |
-| `StreamProxy` | `Stream` | `Stream` | SOCKS5 and HTTP CONNECT (implemented) |
-| `DatagramOverStreamProxy` | `Stream` | `Datagram` | VLESS or Trojan UDP (none implemented) |
+| `StreamProxy` | `Stream` | `Stream` | SOCKS5, HTTP and Trojan CONNECT (implemented) |
+| `DatagramOverStreamProxy` | `Stream` | `Datagram` | Trojan UDP (implemented); VLESS planned |
 | `DatagramProxy` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
 
-[![The three proxy shapes: StreamProxy takes a Stream carrier and returns a Stream payload (SOCKS5, HTTP); DatagramOverStreamProxy takes a Stream and returns a Datagram (VLESS or Trojan UDP, none yet); DatagramProxy takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
+[![The three proxy shapes: StreamProxy takes a Stream carrier and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxy takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxy takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
 
 A proxy protocol never opens a connection. It is handed a carrier and returns a
 carrier ("wrapper, not pump"); core runs the copy loop.
@@ -101,6 +101,14 @@ layer is.
 > No overlay transport exists yet, so today every stack is a single base
 > transport and `Wrap*` is never called. TLS is planned as the first real test.
 
+## Shared helper packages
+
+Code several modules need that is not part of the contract lives under
+`shared/`, one concept per package. Modules may import these, `spec` and
+`config/types`, and never another module. Today there is one:
+`shared/socksaddr`, the RFC 1928 address codec used by SOCKS5 and Trojan. See
+a design note.
+
 ## Core packages
 
 | Package | Responsibility |
@@ -108,12 +116,13 @@ layer is.
 | `core/registry` | name → module constructor, per kind, with clear errors for a name used in the wrong position |
 | `core/blueprint` | a validated description of every inbound and outbound; nothing is opened |
 | `core/builder` | blueprint → `spec.Inbound` / `spec.Outbound`; folds stacks; grants the UDP associate socket |
-| `core/inbound` | accept loop, handshake timeout, sniffing, handing a UDP association to the handler |
-| `core/sniff` | peeks the start of a stream, runs sniffers, returns a stream that replays what it read |
+| `core/inbound` | accept loop, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
+| `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers |
+| `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
 | `core/route/router` | `spec.Router`; with no rules yet, always the default outbound |
 | `core/route/handler` | `spec.TrafficHandler`: asks the router, dials, relays; owns each UDP session and its routing cache |
 | `core/relay` | `relay.Stream` copies both ways and carries half-close; `relay.Datagrams` moves packets between a client and its UDP session |
-| `core/outbound` | the proxy outbound (dialer stack + proxy client) and freedom |
+| `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams), freedom and block |
 | `core/net/udp/session` | one UDP session: one datagram per outbound, replies merged, closed on silence |
 | `core/net/udp/nat` | freedom's UDP: which local socket carries each destination, and which senders may reply (RFC 4787) |
 | `core/logging` | eight RFC 5424 levels over `log/slog`, fanned out to stderr, file, memory or syslog |

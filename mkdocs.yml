@@ -9,6 +9,7 @@ exclude_docs: |
   _plan.md
   _report.md
   context/
+  plans/
 
 theme:
   name: material

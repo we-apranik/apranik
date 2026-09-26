@@ -83,6 +83,7 @@ Every problem is reported at once, each with a location such as
 | `transport` | the stack, base first |
 | `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }` |
 | `sniffing` | absent means off; `sniffers` (at least one) and `timeout` (default `300ms`); TCP only |
+| `fallback` | `{ "server": ..., "server_port": ... }`: where a request the proxy refuses is replayed, over plain TCP, from its first byte; absent means such a request is closed. TCP only. Today only `trojan` refuses into it |
 
 ### Outbound
 
@@ -106,6 +107,25 @@ The two special outbound protocols take no server and no transport:
 
 [![RFC 4787 in freedom's NAT. Mapping: endpoint-independent (default) uses one socket for every destination, address-dependent one per destination IP, address-and-port-dependent one per IP and port. Filtering on a socket that sent to 1.1.1.1:53: endpoint-independent accepts anyone, address-dependent accepts any port of 1.1.1.1, address-and-port-dependent (default) accepts only 1.1.1.1:53.](assets/diagrams/nat-behaviours.excalidraw.svg)](assets/diagrams/nat-behaviours.excalidraw.svg)
 
+### Trojan with a fallback
+
+```json
+{
+  "tag": "trojan-in",
+  "listen": "0.0.0.0",
+  "port": 443,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "trojan",
+    "settings": { "users": [{ "name": "alice", "password": "correct horse" }] }
+  },
+  "fallback": { "server": "127.0.0.1", "server_port": 8080 }
+}
+```
+
+A Trojan outbound carries both TCP and UDP; its UDP travels framed inside the
+stream to the server.
+
 ## Module settings and defaults
 
 A module's `settings` object is decoded straight into the module value that its
@@ -119,6 +139,7 @@ starts with `keep_alive` 15s and `no_delay` true.
 | `udp` | `resolve_timeout` (default `5s`), `resolve_cache_ttl` (default `30s`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |
 | `http` | `username`, `password` |
+| `trojan` | inbound: `users`, a list of `{ "name", "password" }`, names and passwords unique, the matched name reported as the user; outbound: `password` |
 | sniffers `tls`, `http` | none yet |
 
 Credentials use `types.Secret`, which never prints its value.
@@ -144,6 +165,8 @@ timeouts section.
 | UDP session idle | `inbounds[].udp_session_idle_timeout` | `5m` |
 | Dial | `outbounds[].dial_timeout` | `10s` |
 | Server handshake | `outbounds[].handshake_timeout` | `10s` |
+| Trojan request wait for the first payload | internal | `100ms` |
+| Fallback dial | internal | `10s` |
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
 | TCP keep-alive | `tcp` settings `keep_alive` (for freedom: `settings.tcp.keep_alive`) | `15s` |
 | UDP domain lookup | freedom `settings.udp.resolve_timeout` | `5s` |
@@ -161,6 +184,8 @@ example:
 - an inbound proxy with no username: anyone who can reach it may use it;
 - `endpoint-independent` UDP filtering: lets an off-path sender inject packets;
 - a sniffing timeout over 5 seconds;
+- note that Trojan has no encryption of its own and no TLS overlay exists yet, so
+  a Trojan stack today sends its password hash and payload in the clear;
 - no log outputs;
 - only the first outbound is used, because there are no routing rules yet
   (logged by `apranik run`).

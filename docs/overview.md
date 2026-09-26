@@ -17,8 +17,8 @@ functionality is available as Go packages for programs that want to link it in.
 
 - **Not a GUI or client application.** There is no user interface, and one is not
   planned.
-- **Not a protocol collection.** Protocol count is not the goal. Today it ships two
-  proxy protocols (SOCKS5 and HTTP) and two base transports (TCP and UDP), because
+- **Not a protocol collection.** Protocol count is not the goal. Today it ships three
+  proxy protocols (SOCKS5, HTTP and Trojan) and two base transports (TCP and UDP), because
   those are enough to prove the architecture.
 - **Not a replacement narrative.** Xray-core, sing-box and mihomo are mature and
   useful. The claim is narrower: their architecture is not optimised for rapid,

@@ -66,7 +66,7 @@ and one registry line) without touching anything else.
 | Area | Implemented today |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP in the stream, named users, fallback for refused requests; plaintext until TLS exists) |
 | Outbounds | proxy outbound over a stream transport stack; `freedom` (straight to the destination, TCP and UDP); `block` (refuses everything) |
 | Sniffers | `tls` (SNI), `http` (Host and port); per inbound, off by default |
 | Routing | the interface and the call sites exist; there are no rules yet, so every request takes the first outbound |

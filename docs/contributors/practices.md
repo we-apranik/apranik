@@ -6,14 +6,16 @@ Counter-examples are illustrative unless they name a file.
 
 ## Layering and coupling
 
-### A module imports only `spec` and `config/types`
+### A module imports only `spec`, `config/types` and `shared/`
 
 **Why.** The project's claim is that a new technique is one folder. A module that
 imports `core/` can no longer be reviewed, tested or moved on its own, and every
 change to core becomes a change to it.
 
 **Good**: `module/transport/tcp/transport.go` imports `config/types` and `spec`,
-and nothing else from the project.
+and nothing else from the project. `module/proxy/trojan` also imports
+`shared/socksaddr`, the address codec it shares with SOCKS5, never
+`module/proxy/socks5`.
 
 **Bad** (illustrative):
 
