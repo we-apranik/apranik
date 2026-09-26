@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -20,6 +19,11 @@ const maxDatagram = 65507
 type association struct {
 	socket     spec.Datagram
 	readBuffer []byte
+
+	// Reused for every reply. Guarded by writeMutex, which also keeps two
+	// replies from interleaving in it.
+	writeMutex  sync.Mutex
+	writeBuffer []byte
 
 	mu            sync.Mutex
 	clientAddress spec.Destination
@@ -56,13 +60,12 @@ func (a *association) ReadFrom(payload []byte) (int, spec.Destination, error) {
 			continue
 		}
 
-		body := bytes.NewReader(packet[3:])
-		destination, err := socksaddr.ReadAddress(body)
+		destination, addressLength, err := socksaddr.ParseAddress(packet[3:])
 		if err != nil {
 			continue
 		}
 
-		message := packet[len(packet)-body.Len():]
+		message := packet[3+addressLength:]
 		if len(message) > len(payload) {
 			return 0, destination, fmt.Errorf("socks5: %d byte payload into a %d byte buffer: %w", len(message), len(payload), spec.ErrMessageTooLong)
 		}
@@ -79,11 +82,15 @@ func (a *association) WriteTo(payload []byte, source spec.Destination) (int, err
 		return 0, errors.New("socks5: the client has not sent a datagram yet, so there is nowhere to reply")
 	}
 
-	packet, err := socksaddr.AppendAddress([]byte{0, 0, 0}, source)
+	a.writeMutex.Lock()
+	defer a.writeMutex.Unlock()
+
+	packet, err := socksaddr.AppendAddress(append(a.writeBuffer[:0], 0, 0, 0), source)
 	if err != nil {
 		return 0, err
 	}
 	packet = append(packet, payload...)
+	a.writeBuffer = packet
 
 	if _, err := a.socket.WriteTo(packet, client); err != nil {
 		return 0, err
