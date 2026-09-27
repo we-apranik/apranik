@@ -260,6 +260,16 @@ may use it.
 `capacity`), or `syslog` (with `network`, `address`, `tag`). An empty list is
 silent.
 
+`stderr` and `file` take a `format`: `logfmt`, `json`, or `human` (aligned
+columns for a person at a terminal). `stderr` defaults to `logfmt`, because
+the programs that run Apranik usually capture it; `file` defaults to `json`.
+With `human`, `stderr` also takes `"color": true`; setting the `NO_COLOR`
+environment variable turns color off regardless.
+
+```json
+"outputs": [{ "type": "stderr", "format": "human", "color": true }]
+```
+
 ## How it works
 
 ### Layers
