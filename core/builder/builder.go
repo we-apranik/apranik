@@ -89,7 +89,7 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound
 	}
 
 	b.logger.With("module", inboundProtocolName(inboundBlueprint)).
-		Debug("stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
+		Debug("Stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
 
 	var sniffing inbound.Sniffing
 	if inboundBlueprint.Sniffing != nil {
@@ -209,7 +209,7 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (spec
 	}
 
 	b.logger.With("module", outboundBlueprint.Proxy.Info().Name).
-		Debug("stream proxy client built", "outbound", outboundBlueprint.Tag, "udp", datagramClient != nil)
+		Debug("Stream proxy client built", "outbound", outboundBlueprint.Tag, "udp", datagramClient != nil)
 
 	return outbound.NewStream(outbound.StreamConfig{
 		Tag:                      outboundBlueprint.Tag,

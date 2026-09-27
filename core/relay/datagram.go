@@ -64,7 +64,7 @@ func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayCo
 		packetSize, destination, err := config.ClientSide.ReadFrom(clientPacket)
 		if err != nil {
 			if errors.Is(err, spec.ErrMessageTooLong) {
-				config.Logger.Debug("datagram dropped on read", "error", err)
+				config.Logger.Debug("Datagram dropped on read", "error", err)
 				continue
 			}
 			return err
@@ -72,12 +72,12 @@ func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayCo
 
 		outbound, err := config.OutboundForDestination(ctx, destination)
 		if err != nil {
-			config.Logger.Debug("datagram dropped, no outbound", "destination", destination, "error", err)
+			config.Logger.Debug("Datagram dropped, no outbound", "destination", destination, "error", err)
 			continue
 		}
 
 		if err := config.ClientSession.Send(clientPacket[:packetSize], destination, outbound); err != nil {
-			config.Logger.Debug("datagram dropped on send", "destination", destination, "error", err)
+			config.Logger.Debug("Datagram dropped on send", "destination", destination, "error", err)
 			continue
 		}
 	}
@@ -91,7 +91,7 @@ func forwardSessionRepliesToClient(config DatagramRelayConfig) error {
 			reply.Release()
 			if err != nil {
 				if errors.Is(err, spec.ErrMessageTooLong) {
-					config.Logger.Debug("reply dropped on write", "bytes", len(reply.Payload), "error", err)
+					config.Logger.Debug("Reply dropped on write", "bytes", len(reply.Payload), "error", err)
 					continue
 				}
 				return err

@@ -208,7 +208,7 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler spec.TrafficHand
 			if ctx.Err() != nil {
 				return
 			}
-			i.logger.Warn("accept failed", "error", err)
+			i.logger.Warn("Accept failed", "error", err)
 
 			select {
 			case <-ctx.Done():
@@ -221,7 +221,7 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler spec.TrafficHand
 		if !i.takeConnectionSlot() {
 			stream.Close()
 			if allowed, alsoRefused := i.refusedLogSampler.Allow(); allowed {
-				i.logger.Warn("connection refused: max_connections reached",
+				i.logger.Warn("Connection refused: max_connections reached",
 					"max_connections", cap(i.connectionSlots), "also_refused_since_last_warning", alsoRefused)
 			}
 			continue
@@ -280,7 +280,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHa
 		isDatagram, err := i.datagramServer.IsDatagramOverStream(handshakeCtx, recording)
 		if err != nil {
 			stream.Close()
-			i.logger.Warn("handshake failed", "error", err)
+			i.logger.Warn("Handshake failed", "error", err)
 			return
 		}
 		if isDatagram {
@@ -319,12 +319,12 @@ func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHa
 		payload = peekablePayload
 		metadata.Sniffed = sniff.Recognise(peekablePayload, i.sniffing.Sniffers, i.sniffing.Timeout)
 		if metadata.Sniffed != nil {
-			i.logger.Debug("sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
+			i.logger.Debug("Sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
 		}
 	}
 
 	if err := handler.HandleStream(ctx, payload, metadata); err != nil {
-		i.logger.Warn("stream ended in error", "error", err)
+		i.logger.Warn("Stream ended in error", "error", err)
 	}
 }
 
@@ -333,7 +333,7 @@ func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler sp
 	// its end of file is the normal way a session finishes.
 	metadata.InboundTag = i.tag
 	if err := handler.HandleDatagram(ctx, datagram, metadata); err != nil && !errors.Is(err, io.EOF) {
-		i.logger.Warn("datagram session ended in error", "error", err)
+		i.logger.Warn("Datagram session ended in error", "error", err)
 	}
 	datagram.Close()
 }
@@ -343,24 +343,24 @@ func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler sp
 func (i *streamInbound) refuse(ctx context.Context, recording *peekable.Stream, stream spec.Stream, err error) {
 	if !errors.Is(err, spec.ErrFallbackRequested) || i.fallback == nil || recording.Rewind() != nil {
 		stream.Close()
-		i.logger.Warn("handshake failed", "error", err)
+		i.logger.Warn("Handshake failed", "error", err)
 		return
 	}
 	recording.StopRecording()
 
-	i.logger.Debug("stream handed to the fallback", "reason", err)
+	i.logger.Debug("Stream handed to the fallback", "reason", err)
 	dialCtx, endDial := context.WithTimeout(ctx, fallbackDialTimeout)
 	fallbackStream, dialErr := i.fallback.Dialer.DialStream(dialCtx, i.fallback.Destination)
 	endDial()
 	if dialErr != nil {
 		recording.Close()
-		i.logger.Warn("fallback unreachable", "fallback", i.fallback.Destination, "error", dialErr)
+		i.logger.Warn("Fallback unreachable", "fallback", i.fallback.Destination, "error", dialErr)
 		return
 	}
 
 	relayErr := relay.Stream(ctx, recording, fallbackStream, i.fallback.IdleTimeout)
 	if relayErr != nil && !errors.Is(relayErr, relay.ErrStreamIdle) {
-		i.logger.Debug("fallback stream ended in error", "error", relayErr)
+		i.logger.Debug("Fallback stream ended in error", "error", relayErr)
 	}
 }
 
@@ -374,7 +374,7 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler spec.Tra
 	associateHandler, ok := i.proxyServer.(UDPAssociateHandler)
 	if !ok {
 		controlStream.Close()
-		i.logger.Error("proxy reported a UDP session but does not implement UDPAssociateHandler")
+		i.logger.Error("Proxy reported a UDP session but does not implement UDPAssociateHandler")
 		return
 	}
 
@@ -383,7 +383,7 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler spec.Tra
 	endHandshake()
 	if err != nil {
 		controlStream.Close()
-		i.logger.Warn("datagram negotiation failed", "error", err)
+		i.logger.Warn("Datagram negotiation failed", "error", err)
 		return
 	}
 
@@ -396,7 +396,7 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler spec.Tra
 
 	metadata.InboundTag = i.tag
 	if err := handler.HandleDatagram(ctx, session, metadata); err != nil {
-		i.logger.Warn("datagram session ended in error", "error", err)
+		i.logger.Warn("Datagram session ended in error", "error", err)
 	}
 	controlStream.Close()
 }

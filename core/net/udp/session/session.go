@@ -226,7 +226,7 @@ func (s *Session) forwardRepliesFrom(outboundDatagram *outboundDatagram) {
 		replySize, replySender, err := outboundDatagram.datagram.ReadFrom(*replyBuffer)
 		if err != nil {
 			if errors.Is(err, spec.ErrMessageTooLong) {
-				s.logger.Debug("reply dropped", "outbound", outboundDatagram.outboundTag, "error", err)
+				s.logger.Debug("Reply dropped", "outbound", outboundDatagram.outboundTag, "error", err)
 				continue
 			}
 			return
@@ -257,7 +257,7 @@ func (s *Session) forgetAndCloseOutboundDatagram(outboundDatagram *outboundDatag
 	s.mu.Unlock()
 
 	outboundDatagram.stopForwardingAndClose()
-	s.logger.Debug("udp outbound datagram released", "outbound", outboundDatagram.outboundTag)
+	s.logger.Debug("UDP outbound datagram released", "outbound", outboundDatagram.outboundTag)
 }
 
 // Activity only records a timestamp, so a sender never races the timer; the
@@ -272,7 +272,7 @@ func (s *Session) endIfIdle() {
 		return
 	}
 
-	s.logger.Debug("udp session idle", "timeout", s.idleTimeout)
+	s.logger.Debug("UDP session idle", "timeout", s.idleTimeout)
 	s.endWithReason(ErrIdle)
 }
 

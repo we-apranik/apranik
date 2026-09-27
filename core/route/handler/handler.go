@@ -65,7 +65,7 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 	outboundStream, err := selected.DialStream(ctx, metadata)
 	if errors.Is(err, outbound.ErrBlocked) {
 		clientStream.Close()
-		h.logger.Debug("stream blocked", "inbound", metadata.InboundTag, "outbound", selected.Tag())
+		h.logger.Debug("Stream blocked", "inbound", metadata.InboundTag, "outbound", selected.Tag())
 		return nil
 	}
 	if err != nil {
@@ -73,7 +73,7 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
 	}
 
-	h.logger.Debug("relaying stream", "inbound", metadata.InboundTag, "outbound", selected.Tag())
+	h.logger.Debug("Relaying stream", "inbound", metadata.InboundTag, "outbound", selected.Tag())
 	relayErr := relay.Stream(ctx, clientStream, outboundStream, h.streamIdleTimeout)
 	if errors.Is(relayErr, relay.ErrStreamIdle) {
 		return nil
@@ -92,7 +92,7 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	}, cachedRouteIdleTimeout)
 	defer routingCache.close()
 
-	h.logger.Debug("relaying datagrams", "inbound", metadata.InboundTag)
+	h.logger.Debug("Relaying datagrams", "inbound", metadata.InboundTag)
 
 	relayErr := relay.Datagrams(ctx, relay.DatagramRelayConfig{
 		ClientSide:             clientDatagram,

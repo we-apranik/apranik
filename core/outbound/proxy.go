@@ -90,7 +90,7 @@ func (o *streamOutbound) DialStream(ctx context.Context, metadata spec.Metadata)
 	endHandshake()
 	if err != nil {
 		carrier.Close()
-		o.logger.Debug("proxy handshake failed", "error", err)
+		o.logger.Debug("Proxy handshake failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
 	return payload, nil
@@ -113,7 +113,7 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 	endHandshake()
 	if err != nil {
 		carrier.Close()
-		o.logger.Debug("proxy handshake failed", "error", err)
+		o.logger.Debug("Proxy handshake failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
 	return datagram, nil
@@ -124,7 +124,7 @@ func (o *streamOutbound) dialServer(ctx context.Context) (spec.Stream, error) {
 	carrier, err := o.dialer.DialStream(dialCtx, o.serverAddr)
 	endDial()
 	if err != nil {
-		o.logger.Debug("dial to proxy server failed", "error", err)
+		o.logger.Debug("Dial to proxy server failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: reaching %s: %w", o.tag, o.serverAddr, err)
 	}
 	return carrier, nil

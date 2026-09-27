@@ -871,7 +871,7 @@ func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
 
 	notices := 0
 	for _, record := range sink.Records() {
-		if record.Message == "inbound datagram rejected by filtering policy" {
+		if record.Message == "Inbound datagram rejected by filtering policy" {
 			notices++
 		}
 	}

@@ -79,7 +79,7 @@ func (o *freedomOutbound) DialStream(ctx context.Context, metadata spec.Metadata
 	carrier, err := o.streamDialer.DialStream(dialCtx, metadata.Destination)
 	endDial()
 	if err != nil {
-		o.logger.Debug("dial failed", "error", err)
+		o.logger.Debug("Dial failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
 	return carrier, nil
@@ -97,7 +97,7 @@ func (o *freedomOutbound) CreateDatagram(ctx context.Context, metadata spec.Meta
 		policy = *o.datagramPolicy
 	}
 
-	o.logger.Debug("nat datagram created",
+	o.logger.Debug("NAT datagram created",
 		"mapping", policy.Mapping(), "filtering", policy.Filtering())
 
 	// Zero local address: any address, any free port. A source address, if

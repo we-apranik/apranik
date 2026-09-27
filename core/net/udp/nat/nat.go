@@ -481,7 +481,7 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 			// Notice, not Debug: under the default filtering this is the
 			// spoofing case the policy exists to stop.
 			if allowed, alsoRejected := d.rejectedLogSampler.Allow(); allowed {
-				d.logger.Notice("inbound datagram rejected by filtering policy",
+				d.logger.Notice("Inbound datagram rejected by filtering policy",
 					"filtering", d.policy.filtering, "also_rejected_since_last_notice", alsoRejected)
 			}
 			continue
@@ -530,7 +530,7 @@ func (d *Datagram) remove(key mappingKey, mapped *mapping) {
 	d.mu.Unlock()
 
 	mapped.shutdown()
-	d.logger.Debug("mapping reaped", "mapping", d.policy.mapping)
+	d.logger.Debug("Mapping reaped", "mapping", d.policy.mapping)
 }
 
 func (d *Datagram) Close() error {
