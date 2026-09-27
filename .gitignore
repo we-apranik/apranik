@@ -41,3 +41,6 @@ site/
 notes/
 
 .gitconfig
+
+cmd/apranik/main
+cmd/apranik/apranik
