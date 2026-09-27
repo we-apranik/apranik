@@ -72,3 +72,35 @@ func TestParseAddressUnmapsIPv4InIPv6(t *testing.T) {
 		t.Errorf("ParseAddress = %s, %v; want an IPv4 address", parsed, err)
 	}
 }
+
+func BenchmarkReadAddressIPv4(b *testing.B) {
+	destination, _ := spec.NewDestinationFromIP(netip.MustParseAddr("1.1.1.1"), 53)
+	encoded, err := socksaddr.AppendAddress(nil, destination)
+	if err != nil {
+		b.Fatal(err)
+	}
+	reader := bytes.NewReader(encoded)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		reader.Reset(encoded)
+		if _, err := socksaddr.ReadAddress(reader); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkParseAddressIPv4(b *testing.B) {
+	destination, _ := spec.NewDestinationFromIP(netip.MustParseAddr("1.1.1.1"), 53)
+	encoded, err := socksaddr.AppendAddress(nil, destination)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, _, err := socksaddr.ParseAddress(encoded); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

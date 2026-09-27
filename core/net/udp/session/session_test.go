@@ -33,10 +33,12 @@ func destinationOf(t *testing.T, host string, port uint16) spec.Destination {
 }
 
 type fakeDatagram struct {
-	mu       sync.Mutex
-	written  []spec.Destination
-	closed   bool
-	readFail error
+	mu      sync.Mutex
+	written []spec.Destination
+	// Set by benchmarks, whose millions of writes must not pile up here.
+	forgetWrites bool
+	closed       bool
+	readFail     error
 
 	incoming chan spec.Destination
 	done     chan struct{}
@@ -52,7 +54,9 @@ func (f *fakeDatagram) WriteTo(payload []byte, to spec.Destination) (int, error)
 	if f.closed {
 		return 0, errors.New("fake: closed")
 	}
-	f.written = append(f.written, to)
+	if !f.forgetWrites {
+		f.written = append(f.written, to)
+	}
 	return len(payload), nil
 }
 
@@ -445,4 +449,51 @@ func readSource(t *testing.T, peer *net.UDPConn) *net.UDPAddr {
 		t.Fatalf("reading what the session sent: %v", err)
 	}
 	return from
+}
+
+// openBenchmarkSession sends once, so the outbound datagram exists before the
+// timer starts, and stops its carrier recording what it is sent.
+func openBenchmarkSession(b *testing.B) (*session.Session, *fakeOutbound, *fakeDatagram, spec.Destination) {
+	b.Helper()
+	destination, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
+	if err != nil {
+		b.Fatal(err)
+	}
+	out := newFakeOutbound("freedom")
+	udpSession := session.New(context.Background(), session.Config{})
+	b.Cleanup(func() { udpSession.Close() })
+	if err := udpSession.Send([]byte("open"), destination, out); err != nil {
+		b.Fatal(err)
+	}
+
+	out.mu.Lock()
+	carrier := out.carriers[0]
+	out.mu.Unlock()
+	carrier.mu.Lock()
+	carrier.forgetWrites = true
+	carrier.mu.Unlock()
+	return udpSession, out, carrier, destination
+}
+
+func BenchmarkSessionSend(b *testing.B) {
+	udpSession, out, _, destination := openBenchmarkSession(b)
+	payload := make([]byte, 512)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := udpSession.Send(payload, destination, out); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSessionReply(b *testing.B) {
+	udpSession, _, carrier, destination := openBenchmarkSession(b)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		carrier.incoming <- destination
+		reply := <-udpSession.Replies()
+		reply.Release()
+	}
 }
