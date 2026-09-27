@@ -35,9 +35,9 @@ func (b *configBuilder) buildLog(raw rawLog, loc string) blueprint.Log {
 func buildOutput(raw rawOutput) (logging.Output, error) {
 	switch raw.Type {
 	case "stderr":
-		return logging.StderrOutput{}, nil
+		return logging.StderrOutput{Format: logging.Format(raw.Format), Color: raw.Color}, nil
 	case "file":
-		return logging.FileOutput{Path: raw.Path}, nil
+		return logging.FileOutput{Path: raw.Path, Format: logging.Format(raw.Format)}, nil
 	case "memory":
 		return logging.MemoryOutput{Capacity: raw.Capacity}, nil
 	case "syslog":

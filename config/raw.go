@@ -122,7 +122,10 @@ type rawLog struct {
 type rawOutput struct {
 	Type string `json:"type"`
 
-	// Per type: file wants a path, memory a capacity, syslog a destination.
+	// Per type: stderr may take a format and color, file wants a path and may
+	// take a format, memory a capacity, syslog a destination.
+	Format   string `json:"format"`
+	Color    bool   `json:"color"`
 	Path     string `json:"path"`
 	Capacity int    `json:"capacity"`
 	Network  string `json:"network"`
