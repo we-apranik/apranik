@@ -14,6 +14,7 @@ import (
 	"github.com/The-Apranik/Apranik/config"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
+	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
@@ -53,12 +54,16 @@ func runRun(args []string) error {
 		return err
 	}
 
-	report(diagnostics)
+	logger := newBootstrapLogger(coreBlueprint)
+	report(logger, diagnostics)
 	if diagnostics.HasErrors() {
-		return fmt.Errorf("%s has errors", *source)
+		return logFailure(logger, "Config has errors", "source", *source)
 	}
 
-	return serve(coreBlueprint)
+	if err := serve(coreBlueprint); err != nil {
+		return logFailure(logger, "Could not start", "error", err)
+	}
+	return nil
 }
 
 func serve(coreBlueprint *blueprint.Blueprint) error {
@@ -86,7 +91,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 	// The router has no rules yet: every inbound uses the first outbound.
 	defaultOutbound := outbounds[0]
 	if len(outbounds) > 1 {
-		logger.Warn("this build has no router, so only the first outbound is used",
+		logger.Warn("This build has no router, so only the first outbound is used",
 			"using", defaultOutbound.Tag(), "configured", len(outbounds))
 	}
 
@@ -108,12 +113,12 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		if err := built.Activate(ctx, trafficHandler); err != nil {
 			return err
 		}
-		logger.Info("inbound active", "tag", inboundBlueprint.Tag, "network", inboundBlueprint.Network)
+		logger.Info("Inbound active", "tag", inboundBlueprint.Tag, "network", inboundBlueprint.Network)
 	}
 
-	logger.Info("apranik is running", "version", blueprint.Version, "inbounds", len(coreBlueprint.Inbounds))
+	logger.Info("Apranik is running", "version", blueprint.Version, "inbounds", len(coreBlueprint.Inbounds))
 	<-ctx.Done()
-	logger.Info("shutting down")
+	logger.Info("Shutting down")
 	return nil
 }
 
@@ -135,16 +140,54 @@ func load(source string, fetchTimeout time.Duration) (*blueprint.Blueprint, conf
 	return coreBlueprint, diagnostics, nil
 }
 
+// newBootstrapLogger logs until the configured logger exists: always to
+// stderr, since the config may be unreadable or silence the log, and in the
+// format of the config's stderr output when it has a valid one.
+func newBootstrapLogger(coreBlueprint *blueprint.Blueprint) *logging.Logger {
+	var stderr logging.StderrOutput
+	if coreBlueprint != nil {
+		for _, output := range coreBlueprint.Log.Outputs {
+			if configured, ok := output.(logging.StderrOutput); ok && configured.Validate() == nil {
+				stderr = configured
+			}
+		}
+	}
+	system, err := logging.New(logging.Config{
+		Level:   logging.LevelDebug,
+		Outputs: []logging.Output{stderr},
+	})
+	if err != nil {
+		return logging.Discard()
+	}
+	return system.Logger()
+}
+
+// ErrReported means the command has already logged why it failed, so main
+// only sets the exit status.
+var ErrReported = errors.New("failure already reported")
+
+func logFailure(logger *logging.Logger, message string, attributes ...any) error {
+	logger.Error(message, attributes...)
+	return ErrReported
+}
+
 // Warnings first, so the last line is what stopped the run.
-func report(diagnostics config.Diagnostics) {
+func report(logger *logging.Logger, diagnostics config.Diagnostics) {
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Severity == config.SeverityWarning {
-			fmt.Fprintln(os.Stderr, diagnostic)
+			logger.Warn("Config warning", diagnosticAttributes(diagnostic)...)
 		}
 	}
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Severity == config.SeverityError {
-			fmt.Fprintln(os.Stderr, diagnostic)
+			logger.Error("Config error", diagnosticAttributes(diagnostic)...)
 		}
 	}
+}
+
+func diagnosticAttributes(diagnostic config.Diagnostic) []any {
+	if diagnostic.Location == "" {
+		return []any{"problem", diagnostic.Message}
+	}
+	return []any{"location", diagnostic.Location, "problem", diagnostic.Message}
 }

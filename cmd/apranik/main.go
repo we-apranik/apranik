@@ -41,6 +41,9 @@ func main() {
 		if errors.Is(err, flag.ErrHelp) {
 			os.Exit(exitSuccess)
 		}
+		if errors.Is(err, cli.ErrReported) {
+			os.Exit(exitFailure)
+		}
 		fmt.Fprintln(os.Stderr, "apranik:", err)
 		os.Exit(exitFailure)
 	}

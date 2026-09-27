@@ -4,8 +4,8 @@ import (
 	"flag"
 
 	"fmt"
+
 	"github.com/The-Apranik/Apranik/config"
-	"os"
 )
 
 var cmdCheck = &Command{
@@ -35,16 +35,17 @@ func runCheck(args []string) error {
 		return fmt.Errorf("unexpected argument %q; name the config file with -config", flags.Arg(0))
 	}
 
-	_, diagnostics, err := load(*source, *fetchTimeout)
+	coreBlueprint, diagnostics, err := load(*source, *fetchTimeout)
 	if err != nil {
 		return err
 	}
 
-	report(diagnostics)
+	logger := newBootstrapLogger(coreBlueprint)
+	report(logger, diagnostics)
 	if diagnostics.HasErrors() {
-		return fmt.Errorf("%s has errors", *source)
+		return logFailure(logger, "Config has errors", "source", *source)
 	}
 
-	fmt.Fprintf(os.Stderr, "%s is valid\n", *source)
+	logger.Info("Config is valid", "source", *source)
 	return nil
 }
