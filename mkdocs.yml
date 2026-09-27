@@ -72,14 +72,35 @@ markdown_extensions:
       permalink: true
   - pymdownx.highlight
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
   - github-callouts
 
 nav:
   - Home: index.md
   - Get started:
       - Overview: overview.md
-      - Configuration: configuration.md
       - Glossary: glossary.md
+  - Configuration:
+      - configuration/index.md
+      - Log: configuration/log.md
+      - Inbound:
+          - configuration/inbound/index.md
+          - "mixed": configuration/inbound/mixed.md
+      - Outbound:
+          - configuration/outbound/index.md
+          - "freedom": configuration/outbound/freedom.md
+          - "block": configuration/outbound/block.md
+      - Protocols:
+          - "socks5": configuration/protocol/socks5.md
+          - "http": configuration/protocol/http.md
+          - "trojan": configuration/protocol/trojan.md
+      - Transport:
+          - configuration/transport/index.md
+          - "tcp": configuration/transport/tcp.md
+          - "udp": configuration/transport/udp.md
+      - Sniffing: configuration/sniffing.md
+      - Timeouts: configuration/timeouts.md
   - How it works:
       - Architecture: architecture.md
       - Request lifecycle: request-lifecycle.md

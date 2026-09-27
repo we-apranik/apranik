@@ -26,7 +26,7 @@ and one registry line) without touching anything else.
     What Apranik is, and how to write a config file for it.
 
     [:octicons-arrow-right-24: Overview](overview.md) ·
-    [Configuration](configuration.md)
+    [Configuration](configuration/index.md)
 
 -   :material-sitemap-outline:{ .lg .middle } **How it works**
 
