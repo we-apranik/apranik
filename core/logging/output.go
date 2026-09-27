@@ -2,6 +2,7 @@ package logging
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 )
 
@@ -19,27 +20,59 @@ type Output interface {
 	open(level Level) (slog.Handler, error)
 }
 
-type StderrOutput struct{}
+type StderrOutput struct {
+	// Empty means FormatLogfmt: programs that run Apranik capture and parse
+	// its stderr more often than a person reads it.
+	Format Format
 
-func (StderrOutput) Validate() error { return nil }
+	// Only with FormatHuman.
+	Color bool
+}
 
-func (StderrOutput) open(level Level) (slog.Handler, error) {
-	return NewStderrSink(level), nil
+func (o StderrOutput) format() Format {
+	if o.Format == "" {
+		return FormatLogfmt
+	}
+	return o.Format
+}
+
+func (o StderrOutput) Validate() error {
+	if err := o.format().validate(); err != nil {
+		return err
+	}
+	if o.Color && o.format() != FormatHuman {
+		return fmt.Errorf(`logging: color needs the %q format`, string(FormatHuman))
+	}
+	return nil
+}
+
+func (o StderrOutput) open(level Level) (slog.Handler, error) {
+	return NewStderrSink(level, o.format(), o.Color), nil
 }
 
 type FileOutput struct {
 	Path string
+
+	// Empty means FormatJSON.
+	Format Format
+}
+
+func (o FileOutput) format() Format {
+	if o.Format == "" {
+		return FormatJSON
+	}
+	return o.Format
 }
 
 func (o FileOutput) Validate() error {
 	if o.Path == "" {
 		return errors.New("logging: a file output needs a path")
 	}
-	return nil
+	return o.format().validate()
 }
 
 func (o FileOutput) open(level Level) (slog.Handler, error) {
-	return NewFileSink(o.Path, level)
+	return NewFileSink(o.Path, level, o.format())
 }
 
 type MemoryOutput struct {

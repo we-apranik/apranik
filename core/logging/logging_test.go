@@ -69,7 +69,7 @@ func TestLevelFilters(t *testing.T) {
 // nothing.
 func TestCloseReleasesFileSinks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "apranik.log")
-	file, err := NewFileSink(path, LevelDebug)
+	file, err := NewFileSink(path, LevelDebug, FormatJSON)
 	if err != nil {
 		t.Fatalf("File: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestFileSinkAppendsAcrossReopen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "apranik.log")
 
 	for _, message := range []string{"first run", "second run"} {
-		sink, err := NewFileSink(path, LevelDebug)
+		sink, err := NewFileSink(path, LevelDebug, FormatJSON)
 		if err != nil {
 			t.Fatalf("File: %v", err)
 		}
