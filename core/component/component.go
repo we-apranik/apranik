@@ -13,23 +13,23 @@ import (
 // metadata always yields the same answer and a caller may cache it. Streams
 // ask once per connection; datagrams ask once per new destination.
 type Router interface {
-	Route(ctx context.Context, m spec.Metadata) (Outbound, error)
+	Route(ctx context.Context, metadata spec.Metadata) (Outbound, error)
 }
 
 // TrafficHandler receives what an inbound accepted: routes it and relays it.
 type TrafficHandler interface {
-	HandleStream(ctx context.Context, c spec.Stream, m spec.Metadata) error
+	HandleStream(ctx context.Context, clientStream spec.Stream, metadata spec.Metadata) error
 
 	// A UDP session has no natural end, so core owns the session table
 	// and the idle timeout, not the inbound.
-	HandleDatagram(ctx context.Context, c spec.Datagram, m spec.Metadata) error
+	HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error
 }
 
 // Inbound = listener stack + proxy server.
 // Not Listen: a TUN inbound reads packets off a device and accepts nothing.
 type Inbound interface {
 	Tag() string
-	Activate(ctx context.Context, h TrafficHandler) error // returns once ready
+	Activate(ctx context.Context, handler TrafficHandler) error // returns once ready
 	Close() error
 }
 
@@ -48,7 +48,7 @@ type Inbound interface {
 type Outbound interface {
 	Tag() string
 	Networks() []spec.Network
-	DialStream(ctx context.Context, m spec.Metadata) (spec.Stream, error)
-	CreateDatagram(ctx context.Context, m spec.Metadata) (spec.Datagram, error)
+	DialStream(ctx context.Context, metadata spec.Metadata) (spec.Stream, error)
+	CreateDatagram(ctx context.Context, metadata spec.Metadata) (spec.Datagram, error)
 	Close() error
 }

@@ -447,13 +447,13 @@ type SniffResult struct {
 
 type StreamProxyServer interface {
 	// Returns the payload stream with the request framing already consumed.
-	AcceptStream(ctx context.Context, c Stream) (Stream, Metadata, error)
+	AcceptStream(ctx context.Context, underlyingStream Stream) (Stream, Metadata, error)
 }
 
 type StreamProxyClient interface {
 	// May do nothing on the wire yet: Trojan and VLESS put their request on the
 	// first write, so auth failure can surface on the first read instead.
-	RequestStream(ctx context.Context, c Stream, m Metadata) (Stream, error)
+	RequestStream(ctx context.Context, underlyingStream Stream, metadata Metadata) (Stream, error)
 }
 
 type DatagramOverStreamProxyServer interface {
@@ -462,24 +462,24 @@ type DatagramOverStreamProxyServer interface {
 	// this first: true, it calls AcceptDatagramOverStream; false, the same
 	// module's AcceptStream. A request it cannot classify is false, left for
 	// AcceptStream to refuse. An error means close.
-	IsDatagramOverStream(ctx context.Context, c PeekableStream) (bool, error)
+	IsDatagramOverStream(ctx context.Context, underlyingStream PeekableStream) (bool, error)
 
 	// Returns a Datagram whose messages are framed inside c.
-	AcceptDatagramOverStream(ctx context.Context, c Stream) (Datagram, Metadata, error)
+	AcceptDatagramOverStream(ctx context.Context, underlyingStream Stream) (Datagram, Metadata, error)
 }
 
 type DatagramOverStreamProxyClient interface {
-	RequestDatagramOverStream(ctx context.Context, c Stream, m Metadata) (Datagram, error)
+	RequestDatagramOverStream(ctx context.Context, underlyingStream Stream, metadata Metadata) (Datagram, error)
 }
 
 type DatagramProxyServer interface {
 	// No handshake in the usual sense: often stateless per message.
 	// Metadata.Destination may be zero because it varies per packet.
-	AcceptDatagram(ctx context.Context, c Datagram) (Datagram, Metadata, error)
+	AcceptDatagram(ctx context.Context, underlyingDatagram Datagram) (Datagram, Metadata, error)
 }
 
 type DatagramProxyClient interface {
-	RequestDatagram(ctx context.Context, c Datagram, m Metadata) (Datagram, error)
+	RequestDatagram(ctx context.Context, underlyingDatagram Datagram, metadata Metadata) (Datagram, error)
 }
 
 // A module fills the kinds its protocol supports and no more. Core checks the

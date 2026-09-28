@@ -110,7 +110,7 @@ proxy touches:
 
 Rules:
 
-- **Server role:** `AcceptStream(ctx, carrier)` reads and strips the request
+- **Server role:** `AcceptStream(ctx, underlyingStream)` reads and strips the request
   preamble and returns the payload stream plus `spec.Metadata` with the
   destination. Respect the context deadline; the inbound uses it to bound the
   handshake.
