@@ -9,6 +9,7 @@ import (
 	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
 	tlssniffer "github.com/The-Apranik/Apranik/module/sniffer/tls"
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
+	tlstransport "github.com/The-Apranik/Apranik/module/transport/tls"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 )
 
@@ -20,6 +21,7 @@ func Default() (*Registry, error) {
 	return moduleRegistry, errors.Join(
 		moduleRegistry.Transports().RegisterBaseStream(tcp.NewBaseStreamTransportModule),
 		moduleRegistry.Transports().RegisterBaseDatagram(udp.NewBaseDatagramTransportModule),
+		moduleRegistry.Transports().RegisterOverlayStream(tlstransport.NewOverlayStreamTransportModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(http.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(trojan.NewStreamProxyModule),
