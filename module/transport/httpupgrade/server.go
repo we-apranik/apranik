@@ -20,9 +20,7 @@ var (
 
 // Exactly these bytes: Xray's client compares the whole status line and the
 // whole Connection value.
-const switchingProtocolsResponse = "HTTP/1.1 101 Switching Protocols\r\n" +
-	"Connection: Upgrade\r\n" +
-	"Upgrade: websocket\r\n\r\n"
+const switchingProtocolsResponse = "HTTP/1.1 101 Switching Protocols\r\n" + "Connection: Upgrade\r\n" + "Upgrade: websocket\r\n\r\n"
 
 type server struct {
 	requiredHost       string

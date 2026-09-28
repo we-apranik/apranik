@@ -70,11 +70,7 @@ func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reade
 	}
 
 	key := request.Header.Get("Sec-WebSocket-Key")
-	if request.Method != http.MethodGet ||
-		!handshake.HeaderContainsToken(request.Header, "Upgrade", "websocket") ||
-		!handshake.HeaderContainsToken(request.Header, "Connection", "upgrade") ||
-		request.Header.Get("Sec-WebSocket-Version") != "13" ||
-		key == "" {
+	if key == "" || request.Method != http.MethodGet || !handshake.HeaderContainsToken(request.Header, "Upgrade", "websocket") || !handshake.HeaderContainsToken(request.Header, "Connection", "upgrade") || request.Header.Get("Sec-WebSocket-Version") != "13" {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
 		return nil, errNotAnUpgrade
 	}
@@ -94,11 +90,7 @@ func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reade
 		}
 	}
 
-	response := "HTTP/1.1 101 Switching Protocols\r\n" +
-		"Upgrade: websocket\r\n" +
-		"Connection: Upgrade\r\n" +
-		"Sec-WebSocket-Accept: " + acceptKeyFor(key) + "\r\n" +
-		protocolEcho + "\r\n"
+	response := "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" + "Sec-WebSocket-Accept: " + acceptKeyFor(key) + "\r\n" + protocolEcho + "\r\n"
 	if _, err := underlyingStream.Write([]byte(response)); err != nil {
 		return nil, fmt.Errorf("answering the upgrade: %w", err)
 	}
