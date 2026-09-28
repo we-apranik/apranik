@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -61,7 +62,7 @@ type stream struct {
 	// Client with early data: the handshake waits for the first Write or Read.
 	// nil once done.
 	pendingHandshake *clientHandshake
-	handshakeLimiter *handshakeReader
+	handshakeLimiter *handshake.LimitedReader
 	handshakeMutex   sync.Mutex
 	handshakeErr     error
 	handshakeDone    atomic.Bool

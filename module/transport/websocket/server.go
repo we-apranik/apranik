@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 type server struct {
+	requiredHost        string
 	path                string
 	earlyDataHeaderName string
 	earlyDataInPath     bool
@@ -18,6 +20,7 @@ type server struct {
 
 func newServer(settings *Settings) *server {
 	return &server{
+		requiredHost:        settings.Host,
 		path:                settings.Path,
 		earlyDataHeaderName: settings.EarlyDataHeaderName,
 		earlyDataInPath:     settings.EarlyDataHeaderName == "" && settings.MaxEarlyData > 0,
@@ -25,8 +28,8 @@ func newServer(settings *Settings) *server {
 }
 
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
-	release := boundByContext(ctx, underlyingStream)
-	limiter, reader := newHandshakeReader(underlyingStream)
+	release := handshake.BoundByContext(ctx, underlyingStream)
+	limiter, reader := handshake.NewReader(underlyingStream)
 	earlyData, err := s.acceptUpgrade(underlyingStream, reader)
 	if releaseErr := release(); err == nil {
 		err = releaseErr
@@ -34,7 +37,7 @@ func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Str
 	if err != nil {
 		return nil, fmt.Errorf("websocket: handshake with %s: %w", underlyingStream.RemoteAddr(), err)
 	}
-	limiter.limited = false
+	limiter.LiftLimit()
 
 	wrapped := &stream{underlyingStream: underlyingStream, reader: reader, pendingEarlyData: earlyData}
 	wrapped.handshakeDone.Store(true)
@@ -46,27 +49,33 @@ func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Str
 func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reader) ([]byte, error) {
 	request, err := http.ReadRequest(reader)
 	if err != nil {
-		writeRefusal(underlyingStream, http.StatusBadRequest)
+		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
 		return nil, fmt.Errorf("reading the upgrade request: %w", err)
+	}
+
+	// 400 for a wrong host and 404 for a wrong path, as sing-box answers.
+	if s.requiredHost != "" && !handshake.HostMatches(request.Host, s.requiredHost) {
+		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
+		return nil, fmt.Errorf("%w: %q", errWrongHost, request.Host)
 	}
 
 	earlyData, pathMatches, err := s.matchPath(request)
 	if !pathMatches {
-		writeRefusal(underlyingStream, http.StatusNotFound)
+		handshake.WriteRefusal(underlyingStream, http.StatusNotFound)
 		return nil, fmt.Errorf("%w: %q", errWrongPath, request.URL.Path)
 	}
 	if err != nil {
-		writeRefusal(underlyingStream, http.StatusBadRequest)
+		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
 		return nil, err
 	}
 
 	key := request.Header.Get("Sec-WebSocket-Key")
 	if request.Method != http.MethodGet ||
-		!headerContainsToken(request.Header, "Upgrade", "websocket") ||
-		!headerContainsToken(request.Header, "Connection", "upgrade") ||
+		!handshake.HeaderContainsToken(request.Header, "Upgrade", "websocket") ||
+		!handshake.HeaderContainsToken(request.Header, "Connection", "upgrade") ||
 		request.Header.Get("Sec-WebSocket-Version") != "13" ||
 		key == "" {
-		writeRefusal(underlyingStream, http.StatusBadRequest)
+		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
 		return nil, errNotAnUpgrade
 	}
 

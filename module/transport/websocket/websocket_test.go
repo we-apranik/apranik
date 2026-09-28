@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -437,25 +436,19 @@ func TestTheClientSendsHostPathAndHeaders(t *testing.T) {
 	}
 }
 
-func TestTheDefaultHostIsTheServersAddress(t *testing.T) {
-	domain := func(host string, port uint16) spec.Destination {
-		server, _ := spec.NewDestinationFromDomain(host, port)
-		return server
-	}
-	address := func(ip string, port uint16) spec.Destination {
-		server, _ := spec.NewDestinationFromIP(netip.MustParseAddr(ip), port)
-		return server
-	}
-	for want, server := range map[string]spec.Destination{
-		"example.com":      domain("example.com", 443),
-		"example.com:8443": domain("example.com", 8443),
-		"192.0.2.1":        address("192.0.2.1", 80),
-		"[2001:db8::1]":    address("2001:db8::1", 443),
-		"[2001:db8::1]:81": address("2001:db8::1", 81),
+func TestTheServerRequiresItsHostWhenOneIsSet(t *testing.T) {
+	serverModule := newModule(t, func(s *Settings) { s.Host = "cdn.example" })
+	for host, want := range map[string]int{
+		"cdn.example":      http.StatusSwitchingProtocols,
+		"CDN.example:8443": http.StatusSwitchingProtocols,
+		"other.example":    http.StatusBadRequest,
 	} {
-		if got := hostHeaderFor(server); got != want {
-			t.Errorf("Host for %s is %q, want %q", server, got, want)
+		request := strings.Replace(upgradeRequest("/", ""), "Host: example.com", "Host: "+host, 1)
+		response, _, _, serverDone := rawRequest(t, serverModule, request)
+		if response.StatusCode != want {
+			t.Errorf("Host %s: status %d, want %d", host, response.StatusCode, want)
 		}
+		<-serverDone
 	}
 }
 

@@ -5,10 +5,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
+	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -26,26 +26,10 @@ type client struct {
 }
 
 func newClient(settings *Settings) *client {
-	// Sorted, so every request from one outbound has the same header order.
-	names := make([]string, 0, len(settings.Headers))
-	for name := range settings.Headers {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	var lines strings.Builder
-	hasUserAgent := false
-	for _, name := range names {
-		fmt.Fprintf(&lines, "%s: %s\r\n", name, settings.Headers[name])
-		hasUserAgent = hasUserAgent || strings.EqualFold(name, "User-Agent")
-	}
-	if !hasUserAgent {
-		fmt.Fprintf(&lines, "User-Agent: %s\r\n", defaultUserAgent)
-	}
-
 	return &client{
 		path:                settings.Path,
 		host:                settings.Host,
-		extraHeaderLines:    lines.String(),
+		extraHeaderLines:    handshake.RequestHeaderLines(settings.Headers),
 		maxEarlyData:        settings.MaxEarlyData,
 		earlyDataHeaderName: settings.EarlyDataHeaderName,
 	}
@@ -63,42 +47,31 @@ type clientHandshake struct {
 func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Stream, server spec.Destination) (spec.Stream, error) {
 	host := c.host
 	if host == "" {
-		host = hostHeaderFor(server)
+		host = handshake.HostHeaderFor(server)
 	}
-	handshake := &clientHandshake{client: c, host: host}
+	deferredHandshake := &clientHandshake{client: c, host: host}
 
-	limiter, reader := newHandshakeReader(underlyingStream)
+	limiter, reader := handshake.NewReader(underlyingStream)
 	wrapped := &stream{underlyingStream: underlyingStream, reader: reader, isClient: true}
 
 	if c.maxEarlyData > 0 {
-		wrapped.pendingHandshake = handshake
+		wrapped.pendingHandshake = deferredHandshake
 		wrapped.handshakeLimiter = limiter
 		wrapped.handshakeFinished = make(chan struct{})
 		return wrapped, nil
 	}
 
-	release := boundByContext(ctx, underlyingStream)
-	err := handshake.run(underlyingStream, reader, nil)
+	release := handshake.BoundByContext(ctx, underlyingStream)
+	err := deferredHandshake.run(underlyingStream, reader, nil)
 	if releaseErr := release(); err == nil {
 		err = releaseErr
 	}
 	if err != nil {
 		return nil, fmt.Errorf("websocket: handshake with %s: %w", server, err)
 	}
-	limiter.limited = false
+	limiter.LiftLimit()
 	wrapped.handshakeDone.Store(true)
 	return wrapped, nil
-}
-
-// The Host header carries the port only when it is not HTTP's default.
-func hostHeaderFor(server spec.Destination) string {
-	if server.Port() == 80 || server.Port() == 443 {
-		if ip, isIP := server.IP(); isIP && ip.Is6() {
-			return "[" + server.Host() + "]"
-		}
-		return server.Host()
-	}
-	return server.String()
 }
 
 // run sends the upgrade request, with earlyData in it if any, and checks the
@@ -135,7 +108,8 @@ func (h *clientHandshake) run(underlyingStream spec.Stream, reader *bufio.Reader
 	if response.StatusCode != http.StatusSwitchingProtocols {
 		return fmt.Errorf("%w: %s", errUpgradeRefused, response.Status)
 	}
-	if !headerContainsToken(response.Header, "Upgrade", "websocket") || !headerContainsToken(response.Header, "Connection", "upgrade") {
+	if !handshake.HeaderContainsToken(response.Header, "Upgrade", "websocket") ||
+		!handshake.HeaderContainsToken(response.Header, "Connection", "upgrade") {
 		return fmt.Errorf("%w: missing Upgrade or Connection", errUpgradeRefused)
 	}
 	if response.Header.Get("Sec-WebSocket-Accept") != acceptKeyFor(key) {
@@ -172,7 +146,7 @@ func (s *stream) completeHandshakeWithEarlyData(p []byte) (int, error) {
 		s.finishHandshake(fmt.Errorf("websocket: handshake: %w", err))
 		return 0, s.handshakeErr
 	}
-	s.handshakeLimiter.limited = false
+	s.handshakeLimiter.LiftLimit()
 	s.finishHandshake(nil)
 	return len(early), nil
 }

@@ -1,9 +1,10 @@
 package websocket
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 )
 
 // Early data puts the start of the payload in the handshake, base64, so the
@@ -22,7 +23,9 @@ type Settings struct {
 	// Xray does, so a client's "?ed=2048" does not make it a different path.
 	Path string `json:"path"`
 
-	// Client: the Host header. Empty means the server's address as dialed.
+	// Client: the Host header; empty means the server's address as dialed.
+	// Server: if set, the Host a request must carry, port ignored; any other
+	// gets a 400.
 	Host string `json:"host"`
 
 	// Client: extra request headers. No default: encoding/json merges into an
@@ -40,41 +43,28 @@ type Settings struct {
 }
 
 // Headers the module writes itself; setting them would break the handshake.
-var headersTheModuleOwns = map[string]bool{
-	"host":                     true,
-	"upgrade":                  true,
-	"connection":               true,
-	"sec-websocket-key":        true,
-	"sec-websocket-version":    true,
-	"sec-websocket-accept":     true,
-	"sec-websocket-extensions": true,
+var headersTheModuleOwns = []string{
+	"Host", "Upgrade", "Connection",
+	"Sec-WebSocket-Key", "Sec-WebSocket-Version", "Sec-WebSocket-Accept", "Sec-WebSocket-Extensions",
 }
 
-var errPathMustStartWithSlash = errors.New(`websocket: path must start with "/"`)
-
 func (s *Settings) Validate() error {
-	if !strings.HasPrefix(s.Path, "/") {
-		return errPathMustStartWithSlash
+	if err := handshake.ValidatePath(s.Path); err != nil {
+		return fmt.Errorf("websocket: %w", err)
 	}
-	if strings.ContainsAny(s.Path, " \r\n") {
-		return fmt.Errorf("websocket: path %q contains a space or a line break", s.Path)
+	if err := handshake.ValidateHost(s.Host); err != nil {
+		return fmt.Errorf("websocket: %w", err)
 	}
 	if s.MaxEarlyData < 0 || s.MaxEarlyData > maxEarlyDataLimit {
 		return fmt.Errorf("websocket: max_early_data %d must be between 0 and %d", s.MaxEarlyData, maxEarlyDataLimit)
 	}
-	if s.EarlyDataHeaderName != "" && !isHeaderName(s.EarlyDataHeaderName) {
+	if s.EarlyDataHeaderName != "" && !handshake.IsHeaderName(s.EarlyDataHeaderName) {
 		return fmt.Errorf("websocket: early_data_header_name %q is not a valid header name", s.EarlyDataHeaderName)
 	}
-	for name, value := range s.Headers {
-		if !isHeaderName(name) {
-			return fmt.Errorf("websocket: headers: %q is not a valid header name", name)
-		}
-		if strings.ContainsAny(value, "\r\n") {
-			return fmt.Errorf("websocket: headers: the value of %q contains a line break", name)
-		}
-		if headersTheModuleOwns[strings.ToLower(name)] {
-			return fmt.Errorf("websocket: headers: %q is written by the module itself", name)
-		}
+	if err := handshake.ValidateHeaders(s.Headers, headersTheModuleOwns); err != nil {
+		return fmt.Errorf("websocket: headers: %w", err)
+	}
+	for name := range s.Headers {
 		if s.MaxEarlyData > 0 && strings.EqualFold(name, s.EarlyDataHeaderName) {
 			return fmt.Errorf("websocket: headers: %q carries early data and cannot also be set", name)
 		}
@@ -83,19 +73,3 @@ func (s *Settings) Validate() error {
 }
 
 func (s *Settings) Warnings() []string { return nil }
-
-// RFC 9110 token characters.
-func isHeaderName(name string) bool {
-	if name == "" {
-		return false
-	}
-	for _, character := range []byte(name) {
-		switch {
-		case 'a' <= character && character <= 'z', 'A' <= character && character <= 'Z', '0' <= character && character <= '9':
-		case strings.IndexByte("!#$%&'*+-.^_`|~", character) >= 0:
-		default:
-			return false
-		}
-	}
-	return true
-}
