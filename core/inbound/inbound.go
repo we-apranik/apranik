@@ -51,9 +51,23 @@ type Fallback struct {
 	IdleTimeout time.Duration
 }
 
+// StreamOverlay is one overlay layer's server side, named for logs.
+type StreamOverlay struct {
+	Name   string
+	Server spec.StreamOverlayServer
+}
+
 type StreamConfig struct {
-	Tag         string
-	Listener    spec.StreamListener
+	Tag string
+
+	// The base transport's listener. Overlays are not folded into it: they
+	// run per connection, below, so none of them ever holds up the accept
+	// loop.
+	Listener spec.StreamListener
+
+	// Ordered outward from the wire, as in the config's transport stack.
+	Overlays []StreamOverlay
+
 	ProxyServer spec.StreamProxyServer
 
 	// Nil unless the protocol also frames datagrams in its streams. Then each
@@ -109,6 +123,7 @@ func NewStream(config StreamConfig) component.Inbound {
 		refusedLogSampler:  logging.NewSampler(refusedConnectionLogInterval),
 		tag:                config.Tag,
 		listener:           config.Listener,
+		overlays:           config.Overlays,
 		proxyServer:        config.ProxyServer,
 		datagramServer:     config.DatagramOverStreamServer,
 		fallback:           config.Fallback,
@@ -122,6 +137,7 @@ func NewStream(config StreamConfig) component.Inbound {
 type streamInbound struct {
 	tag                string
 	listener           spec.StreamListener
+	overlays           []StreamOverlay
 	proxyServer        spec.StreamProxyServer
 	datagramServer     spec.DatagramOverStreamProxyServer
 	fallback           *Fallback
@@ -252,18 +268,40 @@ func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, 
 	return context.WithTimeout(ctx, i.handshakeTimeout)
 }
 
+// Internet scanners fail transport handshakes all the time, so a failure is
+// logged at Debug and the connection closed.
+func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stream) (spec.Stream, error) {
+	for _, overlay := range i.overlays {
+		wrapped, err := overlay.Server.WrapServerStream(ctx, stream)
+		if err != nil {
+			stream.Close()
+			return nil, fmt.Errorf("transport %q: %w", overlay.Name, err)
+		}
+		stream = wrapped
+	}
+	return stream, nil
+}
+
 // Recording only when something may need it: identifying peeks, and a
 // fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
+	handshakeCtx, endHandshake := i.handshakeContext(ctx)
+	defer endHandshake()
+
+	// Recording starts above the overlays, so a fallback is handed what the
+	// client sent inside them, not TLS records.
+	stream, err := i.wrapServerOverlays(handshakeCtx, stream)
+	if err != nil {
+		i.logger.Debug("Transport handshake failed", "error", err)
+		return
+	}
+
 	handshakeStream := stream
 	var recording *peekable.Stream
 	if i.datagramServer != nil || i.fallback != nil {
 		recording = peekable.NewRecordingStream(stream)
 		handshakeStream = recording
 	}
-
-	handshakeCtx, endHandshake := i.handshakeContext(ctx)
-	defer endHandshake()
 
 	if i.datagramServer != nil {
 		isDatagram, err := i.datagramServer.IsDatagramOverStream(handshakeCtx, recording)

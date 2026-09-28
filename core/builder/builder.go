@@ -1,6 +1,8 @@
 // Package builder turns a blueprint into running inbounds and outbounds. It
 // composes each transport stack as a fold, base first and each overlay
-// wrapping what is below, so it never needs to know what any layer is.
+// wrapping what is below, so it never needs to know what any layer is. Stream
+// overlays wrap one stream at a time: outbound, a dialer runs them after the
+// base dials; inbound, core/inbound runs them per accepted connection.
 package builder
 
 import (
@@ -60,6 +62,13 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
 	}
 
+	// Before the listener too: a certificate that fails to load leaves no
+	// port open.
+	overlays, err := buildStreamOverlayServers(inboundBlueprint.StreamTransport)
+	if err != nil {
+		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+	}
+
 	listener, err := buildStreamListener(inboundBlueprint.StreamTransport, inboundBlueprint.Bind)
 	if err != nil {
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
@@ -102,6 +111,7 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 		Tag:                      inboundBlueprint.Tag,
 		Sniffing:                 sniffing,
 		Listener:                 listener,
+		Overlays:                 overlays,
 		ProxyServer:              proxyServer,
 		DatagramOverStreamServer: datagramServer,
 		Fallback:                 fallback,
@@ -274,20 +284,55 @@ func buildStreamDialer(stack blueprint.StreamTransportStack) (spec.StreamDialer,
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
 	}
+	if len(stack.Overlays) == 0 {
+		return dialer, nil
+	}
 
+	clients := make([]namedStreamOverlayClient, 0, len(stack.Overlays))
 	for _, overlay := range stack.Overlays {
-		wrapped, err := overlay.WrapStreamDialer(dialer)
+		client, err := overlay.NewStreamOverlayClient()
 		if err != nil {
 			dialer.Close()
 			return nil, fmt.Errorf("transport %q: %w", overlay.Info().Name, err)
 		}
-		dialer = wrapped
+		clients = append(clients, namedStreamOverlayClient{name: overlay.Info().Name, client: client})
 	}
-	return dialer, nil
+	return &overlayStreamDialer{underlyingDialer: dialer, clients: clients}, nil
 }
 
+type namedStreamOverlayClient struct {
+	name   string
+	client spec.StreamOverlayClient
+}
+
+// overlayStreamDialer dials through the base, then runs each overlay's client
+// side in stack order over the stream, all within the caller's context.
+type overlayStreamDialer struct {
+	underlyingDialer spec.StreamDialer
+	clients          []namedStreamOverlayClient
+}
+
+func (d *overlayStreamDialer) DialStream(ctx context.Context, server spec.Destination) (spec.Stream, error) {
+	stream, err := d.underlyingDialer.DialStream(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	for _, overlay := range d.clients {
+		wrapped, err := overlay.client.WrapClientStream(ctx, stream, server)
+		if err != nil {
+			stream.Close()
+			return nil, fmt.Errorf("transport %q: %w", overlay.name, err)
+		}
+		stream = wrapped
+	}
+	return stream, nil
+}
+
+func (d *overlayStreamDialer) Close() error { return d.underlyingDialer.Close() }
+
 // Binds here, not at activation: LocalAddr must return a real address, and a
-// port conflict should be a startup error a user can read.
+// port conflict should be a startup error a user can read. Only the base:
+// overlays run per connection in core/inbound.
 func buildStreamListener(stack blueprint.StreamTransportStack, bind spec.Endpoint) (spec.StreamListener, error) {
 	if stack.Base == nil {
 		return nil, errNoBaseTransport
@@ -296,16 +341,19 @@ func buildStreamListener(stack blueprint.StreamTransportStack, bind spec.Endpoin
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
 	}
+	return listener, nil
+}
 
+func buildStreamOverlayServers(stack blueprint.StreamTransportStack) ([]inbound.StreamOverlay, error) {
+	overlays := make([]inbound.StreamOverlay, 0, len(stack.Overlays))
 	for _, overlay := range stack.Overlays {
-		wrapped, err := overlay.WrapStreamListener(listener)
+		server, err := overlay.NewStreamOverlayServer()
 		if err != nil {
-			listener.Close()
 			return nil, fmt.Errorf("transport %q: %w", overlay.Info().Name, err)
 		}
-		listener = wrapped
+		overlays = append(overlays, inbound.StreamOverlay{Name: overlay.Info().Name, Server: server})
 	}
-	return listener, nil
+	return overlays, nil
 }
 
 func buildDatagramDialer(stack blueprint.DatagramTransportStack) (spec.DatagramDialer, error) {

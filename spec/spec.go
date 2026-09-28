@@ -336,9 +336,10 @@ type Config interface {
 //
 //	["tcp", "tls", "ws"]  =>  TCP, then TLS over it, then WebSocket over that
 //
-// So what a Wrap* method is passed is everything below it, already built.
-// A base takes nothing. Arbitrary depth is permitted but is not a goal: the
-// point is that any overlay substitutes for any other.
+// A base makes dialers and listeners. A stream overlay works on one stream at
+// a time: core dials or accepts through the base, then hands each overlay in
+// turn the stream everything below it produced. Arbitrary depth is permitted
+// but is not a goal: the point is that any overlay substitutes for any other.
 
 // BaseStreamTransportModule: TCP, Unix sockets.
 //
@@ -356,12 +357,38 @@ type BaseStreamTransportModule interface {
 	NewStreamListener(bind Endpoint) (StreamListener, error)
 }
 
-// OverlayStreamTransportModule: TLS, WebSocket, gRPC.
+// OverlayStreamTransportModule: TLS, WebSocket, HTTPUpgrade. One stream in,
+// one stream out. Protocols that carry many streams over one connection
+// (HTTP/2, gRPC) are a different shape and will get their own kind.
+//
+// The New* methods build once, per role, whatever every connection shares:
+// certificates, keys, session caches. A setting only one role needs is
+// required there, so a server with no certificate fails at startup.
 type OverlayStreamTransportModule interface {
 	Config
 	Info() ModuleInfo
-	WrapStreamDialer(underlyingDialer StreamDialer) (StreamDialer, error)
-	WrapStreamListener(underlyingListener StreamListener) (StreamListener, error)
+	NewStreamOverlayClient() (StreamOverlayClient, error)
+	NewStreamOverlayServer() (StreamOverlayServer, error)
+}
+
+// StreamOverlayClient runs this layer's client side over a stream already
+// dialed to the proxy server. server is that server's address, as dialed: a
+// layer that needs a name (TLS's SNI) takes it from there.
+//
+// Core calls it once per connection, bounded by the outbound's dial timeout.
+// On error it leaves underlyingStream open; core closes it. The returned
+// stream's Close closes underlyingStream, and its CloseWrite half-closes it.
+type StreamOverlayClient interface {
+	WrapClientStream(ctx context.Context, underlyingStream Stream, server Destination) (Stream, error)
+}
+
+// StreamOverlayServer runs this layer's server side over an accepted stream.
+//
+// Core calls it once per connection, in that connection's own goroutine and
+// bounded by the inbound's handshake timeout, so a client that stalls holds
+// up nobody else. Close and error rules are StreamOverlayClient's.
+type StreamOverlayServer interface {
+	WrapServerStream(ctx context.Context, underlyingStream Stream) (Stream, error)
 }
 
 // BaseDatagramTransportModule: UDP.
@@ -372,7 +399,9 @@ type BaseDatagramTransportModule interface {
 	NewDatagramListener(bind Endpoint) (DatagramListener, error)
 }
 
-// OverlayDatagramTransportModule: DTLS, per-message obfuscation.
+// OverlayDatagramTransportModule: DTLS, per-message obfuscation. It still wraps
+// dialers and listeners; whether it moves to the per-carrier shape stream
+// overlays have is open.
 type OverlayDatagramTransportModule interface {
 	Config
 	Info() ModuleInfo

@@ -31,10 +31,8 @@ func (baseStream) NewStreamListener(spec.Endpoint) (spec.StreamListener, error) 
 
 type overlayStream struct{ settings }
 
-func (overlayStream) WrapStreamDialer(spec.StreamDialer) (spec.StreamDialer, error) { return nil, nil }
-func (overlayStream) WrapStreamListener(spec.StreamListener) (spec.StreamListener, error) {
-	return nil, nil
-}
+func (overlayStream) NewStreamOverlayClient() (spec.StreamOverlayClient, error) { return nil, nil }
+func (overlayStream) NewStreamOverlayServer() (spec.StreamOverlayServer, error) { return nil, nil }
 
 type baseDatagram struct{ settings }
 

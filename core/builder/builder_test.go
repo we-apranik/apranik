@@ -17,10 +17,9 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// This build ships no overlay transport, so the fold that composes a stack has
-// no real implementation to exercise it. A counting no-op overlay proves the
-// composition works and that each layer is handed what is already below it --
-// the property the whole extension point rests on.
+// A counting no-op overlay proves the builder builds each layer's client and
+// server side in stack order. Per-connection wrapping is exercised with the
+// real TLS module in the end-to-end tests.
 type countingOverlay struct {
 	label   string
 	applied *[]string
@@ -48,14 +47,24 @@ func (o countingOverlay) note() {
 	*o.applied = append(*o.applied, o.label)
 }
 
-func (o countingOverlay) WrapStreamDialer(underlyingDialer spec.StreamDialer) (spec.StreamDialer, error) {
+func (o countingOverlay) NewStreamOverlayClient() (spec.StreamOverlayClient, error) {
 	o.note()
-	return underlyingDialer, nil
+	return passthroughOverlay{}, nil
 }
 
-func (o countingOverlay) WrapStreamListener(underlyingListener spec.StreamListener) (spec.StreamListener, error) {
+func (o countingOverlay) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	o.note()
-	return underlyingListener, nil
+	return passthroughOverlay{}, nil
+}
+
+type passthroughOverlay struct{}
+
+func (passthroughOverlay) WrapClientStream(_ context.Context, underlyingStream spec.Stream, _ spec.Destination) (spec.Stream, error) {
+	return underlyingStream, nil
+}
+
+func (passthroughOverlay) WrapServerStream(_ context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+	return underlyingStream, nil
 }
 
 func TestStreamTransportStackComposesOutwardFromTheWire(t *testing.T) {
@@ -123,11 +132,11 @@ func TestStreamTransportStackComposesOutwardFromTheWire(t *testing.T) {
 // A failing overlay must not leak what was already built underneath it.
 type failingOverlay struct{ countingOverlay }
 
-func (failingOverlay) WrapStreamListener(spec.StreamListener) (spec.StreamListener, error) {
+func (failingOverlay) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	return nil, io.ErrUnexpectedEOF
 }
 
-func TestAFailedWrapClosesWhatWasBuilt(t *testing.T) {
+func TestAFailedOverlayLeavesNoPortOpen(t *testing.T) {
 	var (
 		mu     sync.Mutex
 		layers []string
@@ -140,9 +149,10 @@ func TestAFailedWrapClosesWhatWasBuilt(t *testing.T) {
 	defer built.Close()
 
 	base := tcp.NewBaseStreamTransportModule()
+	bind := endpoint("127.0.0.1", freeLoopbackPort(t))
 	_, err = built.BuildInbound(blueprint.Inbound{
 		Tag:     "doomed",
-		Bind:    endpoint("127.0.0.1", 0),
+		Bind:    bind,
 		Network: spec.NetworkTCP,
 		StreamTransport: blueprint.StreamTransportStack{
 			Base: base,
@@ -156,11 +166,10 @@ func TestAFailedWrapClosesWhatWasBuilt(t *testing.T) {
 		t.Fatal("a failing overlay was accepted")
 	}
 
-	// The listener beneath it bound a port; if it was not closed, binding the
-	// same stack again on the same address would be the only way to notice.
-	listener, rebindErr := base.NewStreamListener(endpoint("127.0.0.1", 0))
+	// The overlay fails before the listener binds, so the port is free.
+	listener, rebindErr := base.NewStreamListener(bind)
 	if rebindErr != nil {
-		t.Fatalf("rebinding after a failed wrap: %v", rebindErr)
+		t.Fatalf("rebinding after a failed overlay: %v", rebindErr)
 	}
 	listener.Close()
 }
