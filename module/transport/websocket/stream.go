@@ -59,8 +59,8 @@ type stream struct {
 	maskOffset       int
 	readErr          error
 
-	// Client with early data: the handshake waits for the first Write or Read.
-	// nil once done.
+	// Client with early data: the handshake waits for the first Write, which
+	// carries the start of the payload; a Read waits for it. nil once done.
 	pendingHandshake *clientHandshake
 	handshakeLimiter *handshake.LimitedReader
 	handshakeMutex   sync.Mutex
@@ -165,15 +165,19 @@ func (s *stream) readFrameUntilData() error {
 	return nil
 }
 
+// The whole Write goes out under one lock, as a net.Conn Write does, so frames
+// from two concurrent writers never interleave.
 func (s *stream) Write(p []byte) (int, error) {
 	early, err := s.completeHandshakeWithEarlyData(p)
 	if err != nil {
 		return 0, err
 	}
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
 	written := early
 	for remaining := p[early:]; len(remaining) > 0; {
 		chunk := remaining[:min(len(remaining), maxFramePayloadLength)]
-		if err := s.writeFrame(opcodeBinary, chunk); err != nil {
+		if err := s.writeFrameLocked(opcodeBinary, chunk); err != nil {
 			return written, err
 		}
 		written += len(chunk)
@@ -182,9 +186,19 @@ func (s *stream) Write(p []byte) (int, error) {
 	return written, nil
 }
 
-// writeFrame writes one final frame, header and payload in a single write to
-// the stream below. The caller's payload is copied, never masked in place.
 func (s *stream) writeFrame(opcode byte, payload []byte) error {
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
+	return s.writeFrameLocked(opcode, payload)
+}
+
+// writeFrameLocked writes one final frame, header and payload in a single
+// write to the stream below. The caller's payload is copied, never masked in
+// place. The caller holds writeMutex.
+func (s *stream) writeFrameLocked(opcode byte, payload []byte) error {
+	if s.closeSent {
+		return net.ErrClosed
+	}
 	bufferPointer := frameBuffers.Get().(*[]byte)
 	defer frameBuffers.Put(bufferPointer)
 
@@ -200,11 +214,6 @@ func (s *stream) writeFrame(opcode byte, payload []byte) error {
 	}
 	*bufferPointer = frame[:0]
 
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-	if s.closeSent {
-		return net.ErrClosed
-	}
 	if opcode == opcodeClose {
 		s.closeSent = true
 	}
