@@ -100,6 +100,7 @@ nav:
           - "tcp": configuration/transport/tcp.md
           - "udp": configuration/transport/udp.md
           - "tls": configuration/transport/tls.md
+          - "ws": configuration/transport/ws.md
       - Sniffing: configuration/sniffing.md
       - Timeouts: configuration/timeouts.md
   - How it works:

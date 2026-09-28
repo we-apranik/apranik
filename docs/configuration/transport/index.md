@@ -19,6 +19,7 @@ left out for the module's defaults.
 | `tcp` | base, stream | [TCP](tcp.md) |
 | `udp` | base, datagram | [UDP](udp.md) |
 | `tls` | overlay, stream | [TLS](tls.md) |
+| `ws` | overlay, stream | [WebSocket](ws.md) |
 
 > [!NOTE]
 > `udp` appears only inside [`freedom`](../outbound/freedom.md#udp)'s settings.
