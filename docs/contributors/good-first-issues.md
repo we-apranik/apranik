@@ -5,20 +5,21 @@ straight into a GitHub issue. Before starting one, read [Practices](practices.md
 
 ---
 
-## 1. Rate-limit the "rejected by filtering policy" log line
+## 1. Fuzz the WebSocket and HTTPUpgrade server handshakes
 
-**Description.** `core/net/udp/nat/nat.go` logs every datagram that the filtering
-policy rejects, at Notice level. There is a `TODO` saying a sender spraying packets
-can flood the log. Add a simple rate limit, for example at most one line per
-mapping per second, with a count of how many were suppressed.
+**Description.** A `ws` or `httpupgrade` inbound reads an HTTP request from
+anyone who connects (or from a CDN). `module/transport/websocket` fuzzes its frame
+reader, but neither module fuzzes the request handling in `WrapServerStream`.
+Add a fuzz target per module that feeds arbitrary bytes, as a client would send
+them, to `WrapServerStream` over a loopback or in-memory stream, and checks that
+it never panics, never reads past the 64 KiB handshake limit, and either
+succeeds or returns an error.
 
-**Files.** `core/net/udp/nat/nat.go`, `core/net/udp/nat/nat_test.go`
+**Files.** `module/transport/websocket/*_test.go`,
+`module/transport/httpupgrade/*_test.go`
 
-**Acceptance criteria.**
-
-- A burst of 1,000 rejected packets produces a bounded number of log lines.
-- The first rejection is still logged immediately.
-- The `TODO` is removed; `go test -race ./core/net/udp/nat` passes.
+**Acceptance criteria.** `go test -fuzz` runs for a minute without a failure;
+seed inputs include a valid upgrade, a wrong path and an oversized header.
 
 **Difficulty.** Easy–medium
 
@@ -27,8 +28,8 @@ mapping per second, with a count of how many were suppressed.
 ## 2. Unit tests for the router
 
 **Description.** `core/route/router` has no tests. Add tests for `Router.Route`:
-it returns the default outbound, and returns an error when constructed with a nil
-outbound.
+it returns the default outbound, and returns an error ("router: no outbound is
+configured") when constructed with a nil outbound.
 
 **Files.** `core/route/router/router_test.go` (new)
 
@@ -41,14 +42,16 @@ from `core` except the router.
 
 ## 3. Tests for the inbound accept loop and handshake timeout
 
-**Description.** `core/inbound` has no tests. Using a fake `spec.StreamListener`
-and a fake `spec.StreamProxyServer`, test that:
+**Description.** `core/inbound/inbound_test.go` covers dispatch, fallback and
+`max_connections`; `core/builder`'s end-to-end tests cover a silent TLS client.
+Still missing, with a fake `spec.StreamListener` and a fake
+`spec.StreamProxyServer`:
 
-- a handshake that never completes is abandoned after `HandshakeTimeout`;
+- a proxy handshake that never completes is abandoned after `HandshakeTimeout`;
 - a failed handshake closes the stream and does not reach the handler;
 - `Close` waits for live connections to finish.
 
-**Files.** `core/inbound/inbound_test.go` (new)
+**Files.** `core/inbound/inbound_test.go`
 
 **Acceptance criteria.** The three behaviours are covered and pass under `-race`.
 
@@ -58,14 +61,15 @@ and a fake `spec.StreamProxyServer`, test that:
 
 ## 4. Fuzz the SOCKS5 address codec
 
-**Description.** `wire.ReadAddress` in `module/proxy/socks5/wire/wire.go` parses
-attacker-controlled bytes. Add a Go fuzz test that feeds arbitrary input to
-`ReadAddress` and, when it succeeds, checks that `AppendAddress` of the result
-reads back to the same `spec.Destination`.
+**Description.** `socksaddr.ReadAddress` and `socksaddr.ParseAddress` in
+`shared/socksaddr/socksaddr.go` parse attacker-controlled bytes for both SOCKS5
+and Trojan. Add a Go fuzz test that feeds arbitrary input to both and, when one
+succeeds, checks that `AppendAddress` of the result reads back to the same
+`spec.Destination`, and that the two parsers agree.
 
-**Files.** `module/proxy/socks5/wire/wire_test.go` (new)
+**Files.** `shared/socksaddr/socksaddr_test.go`
 
-**Acceptance criteria.** `go test -fuzz=FuzzReadAddress -fuzztime=60s` finds no
+**Acceptance criteria.** `go test -fuzz=FuzzParseAddress -fuzztime=60s` finds no
 panic; seed corpus covers IPv4, IPv6 and domain forms.
 
 **Difficulty.** Easy–medium
@@ -90,7 +94,7 @@ head and header limits.
 ## 6. Fuzz the TLS and HTTP sniffers
 
 **Description.** `module/sniffer/tls` and `module/sniffer/http` read the first bytes
-of any client. Add fuzz tests asserting that `Sniff` never panics, and that for any
+of any client. Add fuzz tests asserting that `Sniff` (on the `Sniffer` that `NewSnifferModule().NewSniffer()` builds) never panics, and that for any
 input it returns either a result, `spec.ErrSniffNeedMoreData`, or another error.
 Seed with a real ClientHello (the existing test helper builds one).
 
@@ -102,12 +106,13 @@ Seed with a real ClientHello (the existing test helper builds one).
 
 ---
 
-## 7. Test that a proxy outbound closes its carrier when the handshake fails
+## 7. Test that a proxy outbound closes its stream when the handshake fails
 
-**Description.** `core/outbound` has about 11% statement coverage.
-`streamOutbound.DialStream` closes the carrier when `RequestStream` fails. Add a
-test with a fake dialer and a failing fake proxy client that checks the carrier
-is closed and the error names the outbound's tag.
+**Description.** `streamOutbound.DialStream` closes the stream it dialed when
+`RequestStream` fails. The UDP path has this test
+(`TestAFailedDatagramRequestClosesTheServerStream`); the TCP path does not. Add
+one with a fake dialer and a failing fake proxy client that checks the stream is
+closed and the error names the outbound's tag.
 
 **Files.** `core/outbound/outbound_test.go`
 

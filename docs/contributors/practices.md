@@ -49,7 +49,7 @@ func init() { registry.Global.Register("tcp", New) } // global state, hidden ord
 WebSocket or a DNS tunnel, and the stack model stops working.
 
 **Good**: `streamOutbound.DialStream` in `core/outbound/proxy.go` dials the
-server through the transport stack, then hands the carrier to
+server through the transport stack, then hands the stream to
 `proxyClient.RequestStream`.
 
 **Bad**:
@@ -63,7 +63,7 @@ func (c *client) RequestStream(ctx context.Context, _ spec.Stream, m spec.Metada
 
 ## Connection ownership and lifetimes
 
-### Whoever ends the work closes the carrier
+### Whoever ends the work closes the stream
 
 **Why.** A leaked socket in a long-running core becomes file-descriptor exhaustion
 on a phone. Ownership has to be obvious from the code.
@@ -75,18 +75,22 @@ other way out.
 **Good**: when `Session.openOrReuseOutboundDatagram` loses a race to create an
 outbound datagram, it closes the one it made before returning the winner's.
 
-**Bad**: returning an error from a function that opened a carrier without closing
+**Good**: `overlayStreamDialer.DialStream` in `core/builder/builder.go` closes
+the stream it dialed when an overlay's handshake fails, because an overlay
+leaves the stream below open on error by contract.
+
+**Bad**: returning an error from a function that opened a stream without closing
 it:
 
 ```go
-carrier, err := dialer.DialStream(ctx, server)
-payload, err := client.RequestStream(ctx, carrier, m)
+serverStream, err := dialer.DialStream(ctx, server)
+payload, err := client.RequestStream(ctx, serverStream, metadata)
 if err != nil {
-    return nil, err // carrier leaks
+    return nil, err // serverStream leaks
 }
 ```
 
-(`streamOutbound.DialStream` closes `carrier` on this path.)
+(`streamOutbound.DialStream` closes `serverStream` on this path.)
 
 ### Silence is the only end of a UDP flow
 

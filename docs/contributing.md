@@ -35,6 +35,11 @@ curl -x socks5h://127.0.0.1:1080 http://127.0.0.1:8099/
 curl -x http://127.0.0.1:1081    http://127.0.0.1:8099/
 ```
 
+To try an overlay, [Examples](configuration/examples.md) has server and client
+files for Trojan over TLS, WebSocket and HTTPUpgrade; run both on one machine
+with the client's `server` set to `127.0.0.1` and a self-signed certificate in
+its `certificate_authorities`.
+
 `./apranik modules` lists every module compiled into the build. Set the log
 level to `debug` in a copy of the config file to see handshakes, routing and sniff
 results.
@@ -43,6 +48,7 @@ results.
 
 - `spec/`: the contract. Changing it is a design decision; open an issue first.
 - `module/`: one folder per transport, proxy protocol or sniffer.
+- `shared/`: helper packages two or more modules need, one concept each.
 - `core/`: everything that composes modules. Modules never import it.
 - `config/`: the JSON config file.
 - `cmd/apranik/`: the standalone command.
@@ -71,8 +77,8 @@ Steps:
    (`type Transport struct{ Settings }`), return a fixed `spec.ModuleInfo` from
    `Info` (the registry checks it never depends on a setting), and build a
    `spec.StreamDialer` and a `spec.StreamListener`.
-3. **Carriers.** Returned streams must satisfy `spec.Stream`. If your carrier
-   cannot half-close, `CloseWrite` returns `spec.ErrNoHalfClose`.
+3. **Streams.** Returned streams must satisfy `spec.Stream`. If yours cannot
+   half-close, `CloseWrite` returns `spec.ErrNoHalfClose`.
 4. **Resolution.** A base transport is the only layer allowed to resolve a domain
    `Destination`. Do not resolve earlier, and do not resolve anything but your own
    target.
@@ -85,14 +91,66 @@ Steps:
 7. **Register.** Add the one line to `registry.Default()`. The name from `Info` is
    now valid as a `"type"` in config files.
 
-An overlay stream transport (example: `module/transport/tls`) implements
-`spec.OverlayStreamTransportModule` and registers with `RegisterOverlayStream`.
-`NewStreamOverlayClient` and `NewStreamOverlayServer` build, once, what every
-connection shares (certificates, keys) and refuse a setting their role needs but
-lacks. The components they return wrap one stream each
-(`WrapClientStream`, `WrapServerStream`): take the stream below, do the
-handshake within `ctx`, return the stream above. Never open a connection, start
-a goroutine per connection, or close the stream below on error; core does.
+## Adding an overlay transport
+
+An overlay wraps one connection at a time: TLS, WebSocket, HTTPUpgrade, or a
+new obfuscation. The examples are `module/transport/tls` (a handshake, then
+`crypto/tls` does the rest), `module/transport/websocket` (a handshake, then
+framing) and `module/transport/httpupgrade` (a handshake only). A new one,
+say `obfs`, touches:
+
+| File | Change |
+| --- | --- |
+| `module/transport/obfs/settings.go` (new) | `Settings`, `Validate`, `Warnings` |
+| `module/transport/obfs/transport.go` (new) | `Transport{Settings}`, `Info`, `NewStreamOverlayClient`, `NewStreamOverlayServer`, `NewOverlayStreamTransportModule` |
+| `module/transport/obfs/client.go`, `server.go`, `stream.go` (new) | the two roles and the stream they return |
+| `module/transport/obfs/obfs_test.go` (new) | both roles over a loopback TCP pair, no core |
+| `core/registry/default.go` | one line: `RegisterOverlayStream(obfs.NewOverlayStreamTransportModule)` |
+
+The shape:
+
+```go
+func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
+	// Once, at startup: load keys or certificates, refuse a missing one.
+	return &server{...}, nil
+}
+
+func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+	// Once per connection, in that connection's goroutine, within ctx.
+	// Read and answer the handshake on underlyingStream, then:
+	return &stream{underlyingStream: underlyingStream, ...}, nil
+}
+```
+
+Rules:
+
+- **Per role, once.** `NewStreamOverlayClient` and `NewStreamOverlayServer` build
+  what every connection shares, and refuse a setting their role needs but
+  lacks (a server without a certificate), so the mistake stops `apranik run` at
+  startup. `Validate` cannot know the role and must not read files.
+- **Per connection, within `ctx`.** `WrapClientStream(ctx, underlyingStream,
+  server)` and `WrapServerStream(ctx, underlyingStream)` finish their handshake
+  before `ctx` ends; a blocking read must fail when it does (see
+  `handshake.BoundByContext` in `shared/websocket/handshake`). The client gets
+  the server's address as dialed, for an SNI or a `Host`.
+- **Core owns the connection.** Never dial, never start an accept loop or a
+  goroutine per connection, and on error leave `underlyingStream` open: core
+  closes it. The returned stream's `Close` closes the stream below.
+- **Keep bytes read past the handshake.** If you read the handshake through a
+  buffer, the stream you return must hand on whatever the buffer already holds.
+- **Refuse like a web server** when the handshake is wrong, if the protocol is
+  HTTP-shaped: a `404` or `400`, not a silent close.
+- **Half-close.** Pass `CloseWrite` down if the protocol can express it; return
+  `spec.ErrNoHalfClose` if it cannot (WebSocket's Close ends both directions).
+- **Measure.** Anything that touches every byte (framing, masking) is a hot
+  path: benchmark it, allocate nothing per read or write.
+
+A protocol that carries many streams over one connection (HTTP/2, gRPC) does
+not fit this kind; raise it first (open question Q17).
+
+Code two overlays need, such as the WebSocket upgrade handshake, moves to a
+package under `shared/` once the second one exists
+.
 
 ## Adding a new proxy protocol
 
@@ -114,14 +172,20 @@ Rules:
   preamble and returns the payload stream plus `spec.Metadata` with the
   destination. Respect the context deadline; the inbound uses it to bound the
   handshake.
-- **Client role:** `RequestStream(ctx, carrier, metadata)` writes the preamble onto
-  a carrier that already reaches the server. It may write nothing yet if the
-  protocol puts its header on the first write.
-- **Never dial.** The carrier is handed to you. If your protocol truly needs a
+- **Client role:** `RequestStream(ctx, underlyingStream, metadata)` writes the
+  preamble onto a stream that already reaches the server. It may write nothing
+  yet if the protocol puts its header on the first write.
+- **Fallback.** If a request is not your protocol, return
+  `spec.ErrFallbackRequested` from `Accept*` before writing anything; core
+  replays every byte to the inbound's fallback.
+- **Never dial.** The stream is handed to you. If your protocol truly needs a
   second socket, look at how SOCKS5 UDP ASSOCIATE receives a
   `spec.UDPAssociateSocketFunc`, and raise the design question first.
 - **Other shapes.** A protocol with UDP also fills `spec.DatagramOverStreamProxyModule` or
   `spec.DatagramProxyModule`, each with its own constructor and registration line.
+  A datagram-over-stream server also implements `IsDatagramOverStream`, which
+  only peeks, so core can choose between `AcceptStream` and
+  `AcceptDatagramOverStream`; `module/proxy/trojan` is the example.
 
 ## Adding a new sniffer
 
@@ -145,7 +209,14 @@ Register it with `moduleRegistry.Sniffers().Register(<name>.NewSnifferModule)`.
 - **A module's tests never import `core/`.** That the contract alone is enough is
   the point of the design.
 - Prefer real bytes: the TLS sniffer tests use ClientHellos generated by
-  `crypto/tls`; proxy tests run both roles over `net.Pipe`.
+  `crypto/tls`; proxy tests run both roles over `net.Pipe`; overlay tests run
+  both roles over a loopback TCP pair, which half-closes and has deadlines.
+- Generate keys and certificates in the test (`crypto/x509`), so no key material
+  is ever committed.
+- Parsers of untrusted bytes get a fuzz target (`go test -fuzz`), as the Trojan
+  wire format and the WebSocket frame reader have.
+- End-to-end tests in `core/builder` build a server and a client from config
+  files, as `apranik run` does, and carry TCP and UDP through them.
 - Core tests use small fakes of `spec` interfaces (see
   `core/relay/datagram_test.go`) or real UDP sockets on `127.0.0.1`.
 - Everything runs under `-race`.
@@ -164,9 +235,12 @@ Register it with `moduleRegistry.Sniffers().Register(<name>.NewSnifferModule)`.
 
 Flag these for careful review:
 
-- **Parsers of untrusted bytes:** `module/proxy/*/wire`, `module/sniffer/*`, and
-  the proxy handshakes. Bound every length and allocation, and never trust a
-  declared length before checking it against what arrived.
+- **Parsers of untrusted bytes:** `module/proxy/*/wire`, `module/sniffer/*`, the
+  proxy handshakes, the WebSocket frame reader and the upgrade handshake in
+  `shared/websocket/handshake`. Bound every length and allocation, and never
+  trust a declared length before checking it against what arrived.
+- **TLS:** certificate verification stays on by default; `insecure` is warned
+  about. Never log key material or put it in an error.
 - **Authentication:** credential comparison uses `crypto/subtle`; keep it
   constant-time. Secrets are `types.Secret` and must never appear in errors,
   warnings or logs.
@@ -208,5 +282,10 @@ same way and saved next to the others.
 2. Edit the drawing.
 3. Export with **Export image → SVG**, keeping **Embed scene** switched on, and save
    over the same file name.
+
+The diagrams in this repository draw a white background, boxes with a bold
+first line, and the same palette: yellow for things outside Apranik, grey for
+config and data, violet for core, green for modules, orange for core helpers,
+blue for the contract. Keep a new diagram in that style.
 4. Update the image's alt text if the drawing now says something different; it is
    what a screen reader reads instead of the picture.

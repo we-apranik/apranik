@@ -36,7 +36,7 @@ or unsafe for a censorship-circumvention tool, this page says so.
 - [ ] Is every buffer handed to another goroutine either copied or clearly
       owned by the receiver? (See "Slices keep their whole array".)
 - [ ] Does every read and write that can wait on a peer have a deadline or a
-      context that closes the carrier?
+      context that closes the stream or datagram?
 - [ ] Does every goroutine started have an end? Who closes what makes it end?
 - [ ] Are pooled objects reset before reuse, and never used after `Put`?
 - [ ] Is anything logged per packet or per read? Debug logs still box their
@@ -123,9 +123,9 @@ to 2.
 ### Every goroutine needs an end
 
 A goroutine blocked in `Read` on a silent peer lives forever unless something
-closes the carrier or a deadline fires. Apranik's rules: the handshake has a
+closes the stream or a deadline fires. Apranik's rules: the handshake has a
 timeout, a relayed stream has an idle timeout, a UDP session and every NAT
-socket end on silence, and cancelling the context closes both carriers. A new
+socket end on silence, and cancelling the context closes both streams. A new
 loop must say which of these ends it.
 
 ### Atomics, mutexes and immutable data
@@ -180,7 +180,7 @@ HTTP module does this).
 ### Deadlines and keep-alives
 
 - Every read or write that waits on a peer is bounded, by a deadline or by a
-  context that closes the carrier.
+  context that closes the stream or datagram.
 - TCP keep-alive in Go: since Go 1.23, `net.KeepAliveConfig` sets idle time,
   probe interval and probe count. The goperf guide predates this and says only
   the idle time can be set without raw system calls. The `tcp` module uses
@@ -202,7 +202,7 @@ module caches resolutions (`resolve_cache_ttl`, 30 s); the `tcp` module does
 not (see below). A cache must respect how often records change; a stale answer
 breaks connections.
 
-### TLS (for the coming overlay)
+### TLS
 
 Parts of the goperf TLS page are wrong for Apranik and must not be followed:
 
@@ -220,6 +220,11 @@ Parts of the goperf TLS page are wrong for Apranik and must not be followed:
 - **What does apply:** session resumption and ALPN matter for handshake
   latency, and Go's defaults are already fast (the goperf tracking reports
   about 58% faster TLS handshakes in Go 1.25 than in 1.23).
+
+Applied in `module/transport/tls`: each outbound shares one resumption cache
+(`tls.NewLRUClientSessionCache`) across its connections; cipher suites, curves
+and extensions are Go's defaults, left alone for the fingerprint's sake; the
+server loads its certificates once, at startup, not per connection.
 
 ### QUIC
 
@@ -270,6 +275,8 @@ Every hot path has a benchmark in the package it measures:
 | UDP session | `core/net/udp/session`: `BenchmarkSessionSend`, `BenchmarkSessionReply` |
 | NAT | `core/net/udp/nat`: `BenchmarkNATWriteTo`, `BenchmarkNATReadFrom` |
 | Peer address | `spec`: `BenchmarkNewEndpointFromTCPAddr` |
+| WebSocket framing | `module/transport/websocket`: `BenchmarkClientToServer1KiB`, `…16KiB`, `…64KiB`, `BenchmarkServerToClient16KiB`, `BenchmarkMask16KiB` |
+| HTTPUpgrade | `module/transport/httpupgrade`: `BenchmarkClientToServer16KiB` against `BenchmarkBareTCP16KiB` |
 
 The UDP ones use stand-ins below the layer they measure, so they report that
 layer's cost alone. A new hot path gets a benchmark in the same change.
@@ -303,6 +310,9 @@ Measured with the benchmarks above (`benchstat`, 5 runs each), 2026-09-27:
 | `core/inbound` | `max_connections`: refuse beyond the limit before any handshake | new |
 | `core/net/udp/nat`, `core/inbound` | refusal and rejection logs sampled once per 10 s (`logging.Sampler`) | a sprayer's 20 packets: 20 notices → 1 |
 | `module/transport/tcp` | `net.KeepAliveConfig`: interval and count, both directions | new settings |
+| `module/transport/websocket` | frame headers read with `Peek`/`Discard` instead of into local arrays, which escaped | 3 → 0 allocations per frame (2026-09-28) |
+| `module/transport/websocket` | masking eight bytes at a time | 1.2 → 8.6 GB/s for 16 KiB |
+| `module/transport/httpupgrade` | after the handshake, reads go straight to the stream below once its buffer is drained | 0 allocations; no measurable cost against bare TCP |
 
 ## Known opportunities (not yet done)
 
@@ -311,3 +321,6 @@ Candidates for future work. Each needs a benchmark before it is started.
 | Where | What | Why it might matter |
 | --- | --- | --- |
 | `module/transport/tcp` | No DNS cache: freedom resolves a domain on every TCP dial. | Every new connection to a domain pays a lookup. The `udp` module already caches. |
+| `module/transport/tls` | The client clones its `tls.Config` on every dial to set the server name. | One allocation per connection; a small per-server-name cache would remove it. |
+| `module/transport/websocket` | Every frame is copied into a pooled buffer, header and payload together, so it goes out in one write. On the server, which does not mask, a vectored write could skip the copy. | A copy per write on the server's data path. |
+| `module/transport/websocket` | The client draws a fresh masking key from `crypto/rand` for every frame. | Cheap on Linux with the vDSO `getrandom`; unmeasured elsewhere. |
