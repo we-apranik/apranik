@@ -23,10 +23,12 @@ and one registry line) without touching anything else.
 
     ---
 
-    What Apranik is, and how to write a config file for it.
+    What Apranik is, how to run it, and how to write a config file for it.
 
     [:octicons-arrow-right-24: Overview](overview.md) ·
-    [Configuration](configuration/index.md)
+    [Command line](cli.md) ·
+    [Configuration](configuration/index.md) ·
+    [Examples](configuration/examples.md)
 
 -   :material-sitemap-outline:{ .lg .middle } **How it works**
 
@@ -66,12 +68,13 @@ and one registry line) without touching anything else.
 | Area | Implemented today |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram), `tls`, `ws` and `httpupgrade` (stream overlays) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP in the stream, named users, fallback for refused requests; plaintext until TLS exists) |
-| Outbounds | proxy outbound over a stream transport stack; `freedom` (straight to the destination, TCP and UDP); `block` (refuses everything) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP in the stream, named users, fallback for refused requests) |
+| Outbounds | proxy outbound over a stream transport stack, TCP and (for Trojan) UDP; `freedom` (straight to the destination, TCP and UDP); `block` (refuses everything) |
 | Sniffers | `tls` (SNI), `http` (Host and port); per inbound, off by default |
 | Routing | the interface and the call sites exist; there are no rules yet, so every request takes the first outbound |
 | Configuration | versioned JSON config file, checked in full before anything starts |
+| Interop | Trojan over `ws`, `httpupgrade` and `tls` tested by hand against Xray 26.7, both directions, TCP and UDP |
 
-Built overlays: `tls`, `ws`, `httpupgrade`. Not built yet: multiplexing
-transports, routing rules, UDP
-inbounds, UDP sniffing and QUIC.
+Not built yet: multiplexing transports (HTTP/2, gRPC), VLESS, routing rules, UDP
+inbounds, UDP sniffing and QUIC. For a working setup, start with the
+[deployment examples](configuration/examples.md).

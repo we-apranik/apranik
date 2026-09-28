@@ -80,6 +80,7 @@ nav:
   - Home: index.md
   - Get started:
       - Overview: overview.md
+      - Command line: cli.md
       - Glossary: glossary.md
   - Configuration:
       - configuration/index.md
@@ -104,6 +105,7 @@ nav:
           - "httpupgrade": configuration/transport/httpupgrade.md
       - Sniffing: configuration/sniffing.md
       - Timeouts: configuration/timeouts.md
+      - Examples: configuration/examples.md
   - How it works:
       - Architecture: architecture.md
       - Request lifecycle: request-lifecycle.md
