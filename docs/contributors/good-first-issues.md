@@ -146,26 +146,7 @@ temporary files.
 
 ---
 
-## 10. Settle the Go version quoted in `spec/spec.go`
-
-**Description.** A comment in `spec/spec.go` says a JSON behaviour was
-"Verified on Go 1.27.1", but `go.mod` declares `go 1.26.5`. Check the behaviour
-(a map default survives decoding) on the version in `go.mod` with a small test,
-and correct the comment.
-
-**Files.** `spec/spec.go`, a test in `config/types` or `config`
-
-**Acceptance criteria.** The comment names a version the test actually ran on.
-
-> [!NOTE]
-> This touches `spec/`. Keep it to the comment and mention it in the PR
-> description.
-
-**Difficulty.** Easy
-
----
-
-## 11. Log the sniffed domain in the handler's relay line
+## 10. Log the sniffed domain in the handler's relay line
 
 **Description.** `core/inbound` logs a sniff result at Debug, and `Handler.HandleStream`
 separately logs "relaying stream" with the inbound and outbound tags. Add the

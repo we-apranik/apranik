@@ -69,7 +69,7 @@ UDP, and QUIC.
 
 ## Quick start
 
-Requires Go 1.26 or newer.
+Requires Go 1.27 or newer.
 
 ```sh
 go build -o apranik ./cmd/apranik

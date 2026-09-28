@@ -2,7 +2,7 @@
 
 ## Setup
 
-You need Go (the version in `go.mod`, currently `go 1.26.5`) and nothing else:
+You need Go (the version in `go.mod`, currently `go 1.27`) and nothing else:
 the module has no third-party dependencies.
 
 ```sh
