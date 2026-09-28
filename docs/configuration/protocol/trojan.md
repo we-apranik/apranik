@@ -5,8 +5,8 @@ password can be handed to the inbound's [`fallback`](../inbound/index.md#fallbac
 so a probe sees an ordinary site.
 
 > [!WARNING]
-> Trojan has no encryption of its own, and no TLS overlay exists in Apranik yet.
-> Today a Trojan stack sends its password hash and all payload in the clear.
+> Trojan has no encryption of its own: run it over [`tls`](../transport/tls.md).
+> Without it, the password hash and all payload cross the wire in the clear.
 > Interoperability with other Trojan implementations has not been tested.
 
 ## Structure

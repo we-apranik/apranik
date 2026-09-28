@@ -150,8 +150,8 @@ Some findings do not stop Apranik but deserve attention, for example:
 - more than one outbound: there are no routing rules yet, so only the first is
   used (logged by `apranik run`).
 
-Trojan has no encryption of its own and no TLS overlay exists yet, so a Trojan
-stack today sends its password hash and payload in the clear.
+Trojan has no encryption of its own; a Trojan stack without
+[`tls`](transport/tls.md) sends its password hash and payload in the clear.
 
 ## Writing a config in Go
 

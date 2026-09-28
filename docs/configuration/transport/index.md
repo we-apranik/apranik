@@ -6,7 +6,8 @@ each later entry is an **overlay**, which wraps the one before it.
 
 ```json
 "transport": [
-  { "type": "tcp", "settings": { "no_delay": true } }
+  { "type": "tcp", "settings": { "no_delay": true } },
+  { "type": "tls", "settings": { "server_name": "example.com" } }
 ]
 ```
 
@@ -17,11 +18,12 @@ left out for the module's defaults.
 | --- | --- | --- |
 | `tcp` | base, stream | [TCP](tcp.md) |
 | `udp` | base, datagram | [UDP](udp.md) |
+| `tls` | overlay, stream | [TLS](tls.md) |
 
 > [!NOTE]
-> No overlay exists yet. TLS comes next, then WebSocket; today every stack is a
-> single `tcp` entry. `udp` appears only inside
-> [`freedom`](../outbound/freedom.md#udp)'s settings.
+> `udp` appears only inside [`freedom`](../outbound/freedom.md#udp)'s settings.
+> Overlays run once per connection, after the base has connected or accepted,
+> and within the inbound's `handshake_timeout` or the outbound's dial timeout.
 
 An inbound's stack listens; an outbound's stack reaches the proxy server. The same
 overlay twice in one stack is allowed (TLS inside TLS is a real technique), with a
