@@ -31,11 +31,11 @@ func runVersion(args []string) error {
 	}
 
 	fmt.Printf("apranik %s\n", version)
-	fmt.Printf("  go        %s\n", runtime.Version())
-	fmt.Printf("  platform  %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("  go         %s\n", runtime.Version())
+	fmt.Printf("  platform   %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
 	if revision, ok := buildRevision(); ok {
-		fmt.Printf("  revision  %s\n", revision)
+		fmt.Printf("  revision   %s\n", revision)
 	}
 
 	// Two builds at the same version can accept different configurations.
