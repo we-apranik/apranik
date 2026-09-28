@@ -11,6 +11,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	tlstransport "github.com/The-Apranik/Apranik/module/transport/tls"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
+	"github.com/The-Apranik/Apranik/module/transport/websocket"
 )
 
 // Default is the only place in the project that names a module. Adding one is
@@ -22,6 +23,7 @@ func Default() (*Registry, error) {
 		moduleRegistry.Transports().RegisterBaseStream(tcp.NewBaseStreamTransportModule),
 		moduleRegistry.Transports().RegisterBaseDatagram(udp.NewBaseDatagramTransportModule),
 		moduleRegistry.Transports().RegisterOverlayStream(tlstransport.NewOverlayStreamTransportModule),
+		moduleRegistry.Transports().RegisterOverlayStream(websocket.NewOverlayStreamTransportModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(http.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(trojan.NewStreamProxyModule),

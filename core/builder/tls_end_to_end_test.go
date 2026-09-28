@@ -121,9 +121,28 @@ func parseConfig(t *testing.T, text string) *blueprint.Blueprint {
 	return parsed
 }
 
+func tlsServerTransport(t *testing.T, certificates testCertificates) string {
+	return fmt.Sprintf(`[
+		{ "type": "tcp" },
+		{ "type": "tls", "settings": { "certificates": [{ "certificate": %s, "key": %s }] } }
+	]`, jsonString(t, certificates.leafPEM), jsonString(t, certificates.leafKeyPEM))
+}
+
+func tlsClientTransport(t *testing.T, certificates testCertificates) string {
+	return fmt.Sprintf(`[
+		{ "type": "tcp" },
+		{ "type": "tls", "settings": { "server_name": %q, "certificate_authorities": [{ "certificate": %s }] } }
+	]`, proxyServerName, jsonString(t, certificates.authorityPEM))
+}
+
 // startServer runs a Trojan-over-TLS inbound that sends everything out
 // through freedom, and a fallback that records what it is sent.
 func startServer(t *testing.T, certificates testCertificates) (port uint16, fallbackReceived <-chan []byte) {
+	return startTrojanServer(t, tlsServerTransport(t, certificates))
+}
+
+// startTrojanServer is startServer over any transport stack, given as JSON.
+func startTrojanServer(t *testing.T, transport string) (port uint16, fallbackReceived <-chan []byte) {
 	t.Helper()
 	fallback, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -149,15 +168,12 @@ func startServer(t *testing.T, certificates testCertificates) (port uint16, fall
 		"inbounds": [{
 			"tag": "trojan-tls-in", "listen": "127.0.0.1", "port": %d, "network": "tcp",
 			"handshake_timeout": "300ms",
-			"transport": [
-				{ "type": "tcp" },
-				{ "type": "tls", "settings": { "certificates": [{ "certificate": %s, "key": %s }] } }
-			],
+			"transport": %s,
 			"protocol": { "type": "trojan", "settings": { "users": [{ "name": "alice", "password": "correct horse" }] } },
 			"fallback": { "server": "127.0.0.1", "server_port": %d }
 		}],
 		"outbounds": [{ "tag": "freedom", "protocol": { "type": "freedom" } }]
-	}`, port, jsonString(t, certificates.leafPEM), jsonString(t, certificates.leafKeyPEM), fallback.Addr().(*net.TCPAddr).Port))
+	}`, port, transport, fallback.Addr().(*net.TCPAddr).Port))
 
 	built, err := builder.New(blueprint.Log{})
 	if err != nil {
@@ -181,21 +197,20 @@ func startServer(t *testing.T, certificates testCertificates) (port uint16, fall
 }
 
 func buildClientOutbound(t *testing.T, certificates testCertificates, serverPort uint16) component.Outbound {
+	return buildTrojanClient(t, tlsClientTransport(t, certificates), serverPort)
+}
+
+// buildTrojanClient is buildClientOutbound over any transport stack.
+func buildTrojanClient(t *testing.T, transport string, serverPort uint16) component.Outbound {
 	t.Helper()
 	clientBlueprint := parseConfig(t, fmt.Sprintf(`{
 		"version": 1,
 		"outbounds": [{
-			"tag": "trojan-tls-out", "server": "127.0.0.1", "server_port": %d,
-			"transport": [
-				{ "type": "tcp" },
-				{ "type": "tls", "settings": {
-					"server_name": %q,
-					"certificate_authorities": [{ "certificate": %s }]
-				} }
-			],
+			"tag": "trojan-out", "server": "127.0.0.1", "server_port": %d,
+			"transport": %s,
 			"protocol": { "type": "trojan", "settings": { "password": "correct horse" } }
 		}]
-	}`, serverPort, proxyServerName, jsonString(t, certificates.authorityPEM)))
+	}`, serverPort, transport))
 
 	built, err := builder.New(blueprint.Log{})
 	if err != nil {
@@ -222,8 +237,12 @@ func loopbackDestination(t *testing.T, port int) spec.Destination {
 func TestTrojanOverTLSCarriesTCP(t *testing.T) {
 	certificates := newTestCertificates(t)
 	serverPort, _ := startServer(t, certificates)
-	outbound := buildClientOutbound(t, certificates, serverPort)
+	checkTCPThrough(t, buildClientOutbound(t, certificates, serverPort))
+}
 
+// checkTCPThrough echoes a message through outbound to a local TCP server.
+func checkTCPThrough(t *testing.T, outbound component.Outbound) {
+	t.Helper()
 	echo, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -262,8 +281,12 @@ func TestTrojanOverTLSCarriesTCP(t *testing.T) {
 func TestTrojanOverTLSCarriesUDP(t *testing.T) {
 	certificates := newTestCertificates(t)
 	serverPort, _ := startServer(t, certificates)
-	outbound := buildClientOutbound(t, certificates, serverPort)
+	checkUDPThrough(t, buildClientOutbound(t, certificates, serverPort))
+}
 
+// checkUDPThrough echoes a datagram through outbound to a local UDP server.
+func checkUDPThrough(t *testing.T, outbound component.Outbound) {
+	t.Helper()
 	echo, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
 		t.Fatal(err)
