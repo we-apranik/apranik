@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 var ErrBlocked = errors.New("outbound: blocked")
 
 // NewBlock refuses every request, so routing can send traffic to it to drop it.
-func NewBlock(tag string) spec.Outbound { return blockOutbound{tag: tag} }
+func NewBlock(tag string) component.Outbound { return blockOutbound{tag: tag} }
 
 type blockOutbound struct{ tag string }
 

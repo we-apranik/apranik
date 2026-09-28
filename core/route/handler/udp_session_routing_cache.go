@@ -6,16 +6,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // PROVISIONAL: 1 minute.
 const cachedRouteIdleTimeout = time.Minute
 
-type uncachedRouteFunc func(ctx context.Context, destination spec.Destination) (spec.Outbound, error)
+type uncachedRouteFunc func(ctx context.Context, destination spec.Destination) (component.Outbound, error)
 
 type cachedRoute struct {
-	outbound           spec.Outbound
+	outbound           component.Outbound
 	lastActiveUnixNano atomic.Int64
 }
 
@@ -57,7 +58,7 @@ func (c *udpSessionRoutingCache) close() {
 
 // Racing first packets to one destination wait for a single routing. A
 // failure is not cached, so a transient one is not pinned for the idle window.
-func (c *udpSessionRoutingCache) route(ctx context.Context, destination spec.Destination) (spec.Outbound, error) {
+func (c *udpSessionRoutingCache) route(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
 	for {
 		c.mu.Lock()
 		if cached, found := c.routeByDestination[destination]; found {

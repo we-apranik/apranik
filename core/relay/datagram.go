@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
@@ -15,7 +16,7 @@ type DatagramRelayConfig struct {
 	ClientSession *session.Session
 
 	// Asked for every packet: UDP has no connection to pin a decision to.
-	OutboundForDestination func(ctx context.Context, destination spec.Destination) (spec.Outbound, error)
+	OutboundForDestination func(ctx context.Context, destination spec.Destination) (component.Outbound, error)
 
 	// Nil is allowed: Datagrams substitutes a silent logger.
 	Logger *logging.Logger

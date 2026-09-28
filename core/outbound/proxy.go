@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -29,7 +30,7 @@ type StreamConfig struct {
 	Logger *logging.Logger
 }
 
-func NewStream(config StreamConfig) spec.Outbound {
+func NewStream(config StreamConfig) component.Outbound {
 	logger := config.Logger
 	if logger == nil {
 		logger = logging.Discard()
@@ -47,7 +48,7 @@ func NewStream(config StreamConfig) spec.Outbound {
 	}
 }
 
-// dialer is a field, not an embedded interface: spec.Outbound.DialStream and
+// dialer is a field, not an embedded interface: component.Outbound.DialStream and
 // spec.StreamDialer.DialStream share a name at different signatures, so
 // embedding would not compile.
 type streamOutbound struct {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -47,7 +48,7 @@ func (b *Builder) Logger() *logging.Logger { return b.logger }
 
 func (b *Builder) Close() error { return b.logging.Close() }
 
-func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (spec.Inbound, error) {
+func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.Inbound, error) {
 	if inboundBlueprint.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("inbound %q: a datagram inbound needs a datagram proxy, and this build registers none: %w",
 			inboundBlueprint.Tag, spec.ErrUnsupportedNetwork)
@@ -143,7 +144,7 @@ func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 	return inboundBlueprint.StreamProxy.Info().Name
 }
 
-func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (spec.Outbound, error) {
+func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
 	switch {
 	case outboundBlueprint.Block:
 		return outbound.NewBlock(outboundBlueprint.Tag), nil
@@ -156,7 +157,7 @@ func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (spec.Outb
 	}
 }
 
-func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (spec.Outbound, error) {
+func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
 	freedom := outboundBlueprint.Freedom
 
 	var (
@@ -188,7 +189,7 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (sp
 	}), nil
 }
 
-func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (spec.Outbound, error) {
+func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
 	dialer, err := buildStreamDialer(outboundBlueprint.StreamTransport)
 	if err != nil {
 		return nil, fmt.Errorf("outbound %q: %w", outboundBlueprint.Tag, err)

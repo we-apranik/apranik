@@ -1,4 +1,4 @@
-// Package handler is the spec.TrafficHandler core gives every inbound. It
+// Package handler is the component.TrafficHandler core gives every inbound. It
 // asks the router for an outbound and hands the carriers to the relay:
 // once per TCP connection, and once per new destination in a UDP session,
 // whose answers it caches for the life of that session.
@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/outbound"
@@ -17,10 +18,10 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// Handler is spec.TrafficHandler: the one thing a module calls back into. It
-// decides nothing itself, asking the router for every outbound.
+// Handler is component.TrafficHandler. It decides nothing itself, asking the
+// router for every outbound.
 type Handler struct {
-	router                spec.Router
+	router                component.Router
 	streamIdleTimeout     time.Duration
 	udpSessionIdleTimeout time.Duration
 	logger                *logging.Logger
@@ -38,7 +39,7 @@ type Config struct {
 	Logger *logging.Logger
 }
 
-func New(router spec.Router, config Config) *Handler {
+func New(router component.Router, config Config) *Handler {
 	logger := config.Logger
 	if logger == nil {
 		logger = logging.Discard()
@@ -87,7 +88,7 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
 	udpSession := session.New(ctx, session.Config{Metadata: metadata, IdleTimeout: h.udpSessionIdleTimeout, Logger: h.logger})
 
-	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (spec.Outbound, error) {
+	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
 		return h.routeUDPDestination(ctx, metadata, destination)
 	}, cachedRouteIdleTimeout)
 	defer routingCache.close()
@@ -108,7 +109,7 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	}
 }
 
-func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.Metadata, destination spec.Destination) (spec.Outbound, error) {
+func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.Metadata, destination spec.Destination) (component.Outbound, error) {
 	packetMetadata := sessionMetadata
 	packetMetadata.Network = spec.NetworkUDP
 	packetMetadata.Destination = destination

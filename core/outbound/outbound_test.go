@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -132,7 +133,7 @@ func TestADialThatNeverAnswersIsBoundedByTheDialTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	outbounds := map[string]spec.Outbound{
+	outbounds := map[string]component.Outbound{
 		"freedom": outbound.NewFreedom(outbound.FreedomConfig{Tag: "freedom", Dialer: blockingDialer{}, DialTimeout: 100 * time.Millisecond}),
 		"proxy":   outbound.NewStream(outbound.StreamConfig{Tag: "proxy", ServerAddr: destination, Dialer: blockingDialer{}, DialTimeout: 100 * time.Millisecond}),
 	}

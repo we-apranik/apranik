@@ -14,11 +14,11 @@ import (
 	"github.com/The-Apranik/Apranik/config"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/spec"
 )
 
 const defaultConfigSource = "config.json"
@@ -78,7 +78,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		return errors.New("no outbounds configured")
 	}
 
-	outbounds := make([]spec.Outbound, 0, len(coreBlueprint.Outbounds))
+	outbounds := make([]component.Outbound, 0, len(coreBlueprint.Outbounds))
 	for _, outboundBlueprint := range coreBlueprint.Outbounds {
 		built, err := stackBuilder.BuildOutbound(outboundBlueprint)
 		if err != nil {

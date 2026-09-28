@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/core/relay"
@@ -32,18 +33,6 @@ const fallbackDialTimeout = 10 * time.Second
 
 // PROVISIONAL: a flood of refused connections is one warning per 10 seconds.
 const refusedConnectionLogInterval = 10 * time.Second
-
-// UDPAssociateHandler is the opt-in hook for a stream proxy server that binds
-// a datagram socket mid-handshake -- SOCKS5 UDP ASSOCIATE.
-//
-// AcceptStream's signature is fixed by spec and cannot return a Datagram, so a
-// server signals the handoff by returning ErrUDPAssociationRequested. Associate
-// must open the socket, reply and return rather than block for the session's
-// lifetime; this package owns the session from there.
-type UDPAssociateHandler interface {
-	SetAssociateSocket(spec.UDPAssociateSocketFunc)
-	Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error)
-}
 
 type Sniffing struct {
 	Sniffers []spec.Sniffer
@@ -93,7 +82,7 @@ type StreamConfig struct {
 	Logger *logging.Logger
 }
 
-func NewStream(config StreamConfig) spec.Inbound {
+func NewStream(config StreamConfig) component.Inbound {
 	logger := config.Logger
 	if logger == nil {
 		logger = logging.Discard()
@@ -154,7 +143,7 @@ type streamInbound struct {
 
 func (i *streamInbound) Tag() string { return i.tag }
 
-func (i *streamInbound) Activate(ctx context.Context, handler spec.TrafficHandler) error {
+func (i *streamInbound) Activate(ctx context.Context, handler component.TrafficHandler) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -164,7 +153,7 @@ func (i *streamInbound) Activate(ctx context.Context, handler spec.TrafficHandle
 
 	// Only when there is a socket to grant: otherwise a proxy handed one that
 	// always fails would answer with a general failure instead of X'07'.
-	if associateHandler, ok := i.proxyServer.(UDPAssociateHandler); ok && i.udpAssociateSocket != nil {
+	if associateHandler, ok := i.proxyServer.(spec.UDPAssociateHandler); ok && i.udpAssociateSocket != nil {
 		associateHandler.SetAssociateSocket(i.udpAssociateSocket)
 	}
 
@@ -199,7 +188,7 @@ func (i *streamInbound) Close() error {
 // A shutdown is told apart from a failure by ctx, not the error: Close cancels
 // before closing the listener. Matching net.ErrClosed would be wrong for a
 // gRPC or WebSocket listener.
-func (i *streamInbound) acceptLoop(ctx context.Context, handler spec.TrafficHandler) {
+func (i *streamInbound) acceptLoop(ctx context.Context, handler component.TrafficHandler) {
 	defer close(i.acceptLoopDone)
 
 	for {
@@ -265,7 +254,7 @@ func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, 
 
 // Recording only when something may need it: identifying peeks, and a
 // fallback replays the whole handshake.
-func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHandler, stream spec.Stream) {
+func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
 	carrier := stream
 	var recording *peekable.Stream
 	if i.datagramServer != nil || i.fallback != nil {
@@ -328,7 +317,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler spec.TrafficHa
 	}
 }
 
-func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler spec.TrafficHandler, datagram spec.Datagram, metadata spec.Metadata) {
+func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler component.TrafficHandler, datagram spec.Datagram, metadata spec.Metadata) {
 	// The stream is the session: closing it, from either end, ends both, so
 	// its end of file is the normal way a session finishes.
 	metadata.InboundTag = i.tag
@@ -370,8 +359,8 @@ func stopRecording(recording *peekable.Stream) {
 	}
 }
 
-func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler spec.TrafficHandler, controlStream spec.Stream, metadata spec.Metadata) {
-	associateHandler, ok := i.proxyServer.(UDPAssociateHandler)
+func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler component.TrafficHandler, controlStream spec.Stream, metadata spec.Metadata) {
+	associateHandler, ok := i.proxyServer.(spec.UDPAssociateHandler)
 	if !ok {
 		controlStream.Close()
 		i.logger.Error("Proxy reported a UDP session but does not implement UDPAssociateHandler")

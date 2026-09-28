@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/spec"
@@ -27,7 +28,7 @@ type FreedomConfig struct {
 
 // Freedom is not a proxy protocol pretending to be one: it has no server and no
 // preamble, and dials the address a proxy client would instead encode.
-func NewFreedom(config FreedomConfig) spec.Outbound {
+func NewFreedom(config FreedomConfig) component.Outbound {
 	logger := config.Logger
 	if logger == nil {
 		logger = logging.Discard()

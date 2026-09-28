@@ -492,52 +492,24 @@ type Sniffer interface {
 	Sniff(payloadPrefix []byte) (SniffResult, error)
 }
 
-// Router picks the outbound for one request. It holds no state, so the same
-// metadata always yields the same answer and a caller may cache it. Streams
-// ask once per connection; datagrams ask once per new destination.
-type Router interface {
-	Route(ctx context.Context, m Metadata) (Outbound, error)
-}
-
-// TrafficHandler is core. It is the only thing a module calls back into.
-type TrafficHandler interface {
-	HandleStream(ctx context.Context, c Stream, m Metadata) error
-
-	// A UDP session has no natural end, so core owns the session table
-	// and the idle timeout, not the inbound.
-	HandleDatagram(ctx context.Context, c Datagram, m Metadata) error
-}
-
-// Inbound = listener stack + proxy server.
-// Not Listen: a TUN inbound reads packets off a device and accepts nothing.
-type Inbound interface {
-	Tag() string
-	Activate(ctx context.Context, h TrafficHandler) error // returns once ready
-	Close() error
-}
-
-// Outbound = proxy client + dialer stack.
-//
-// Networks reports what this outbound can actually carry, so routing can rule
-// it out before a packet arrives rather than discovering it on a failed dial.
-// Calling a method for a network Networks does not list returns
-// ErrUnsupportedNetwork, but that is an invariant violation, not a path
-// routing is expected to take.
-//
-// Shares a name with StreamDialer.DialStream at a different signature, so no
-// type can be both. Accepted: core only ever holds an Outbound as an Outbound.
-// An Outbound that must act as an inner dialer needs an adapter holding it as
-// a field rather than embedding it.
-type Outbound interface {
-	Tag() string
-	Networks() []Network
-	DialStream(ctx context.Context, m Metadata) (Stream, error)
-	CreateDatagram(ctx context.Context, m Metadata) (Datagram, error)
-	Close() error
-}
-
 // UDPAssociateSocketFunc opens the second socket SOCKS5 UDP ASSOCIATE needs:
 // handshake arrives on TCP, but payload needs a separate UDP socket whose
 // address is reported back over that TCP. Granted to an inbound's proxy
 // server, by core, at construction.
 type UDPAssociateSocketFunc func(ctx context.Context) (Datagram, error)
+
+// UDPAssociateHandler is the opt-in hook for a stream proxy server that binds
+// a datagram socket mid-handshake -- SOCKS5 UDP ASSOCIATE. Core discovers it by
+// type assertion on the StreamProxyServer; an implementation should assert it
+// at compile time, so a change here breaks the build rather than UDP.
+//
+// AcceptStream cannot return a Datagram, so a server signals the handoff by
+// returning ErrUDPAssociationRequested. Core then grants the socket function
+// once, at construction, through SetAssociateSocket, and calls Associate on
+// the same control stream. Associate must open the socket, reply and return
+// rather than block for the session's lifetime; core owns the session from
+// there, and ends it when the control stream closes.
+type UDPAssociateHandler interface {
+	SetAssociateSocket(socket UDPAssociateSocketFunc)
+	Associate(ctx context.Context, controlStream Stream, metadata Metadata) (Datagram, error)
+}

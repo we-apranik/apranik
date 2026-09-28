@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -27,6 +26,8 @@ type streamServer struct {
 	socks5Server spec.StreamProxyServer
 	httpServer   spec.StreamProxyServer
 }
+
+var _ spec.UDPAssociateHandler = (*streamServer)(nil)
 
 // Exactly one byte: on UDP ASSOCIATE core hands Associate its own carrier,
 // not the peekable one made here, so nothing may stay buffered in it.
@@ -48,7 +49,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (s
 }
 
 func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) {
-	if associateHandler, ok := s.socks5Server.(inbound.UDPAssociateHandler); ok {
+	if associateHandler, ok := s.socks5Server.(spec.UDPAssociateHandler); ok {
 		associateHandler.SetAssociateSocket(socket)
 	}
 }
@@ -56,7 +57,7 @@ func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) {
 var errSOCKS5HasNoAssociate = errors.New("mixed: the socks5 server does not implement UDP ASSOCIATE")
 
 func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
-	associateHandler, ok := s.socks5Server.(inbound.UDPAssociateHandler)
+	associateHandler, ok := s.socks5Server.(spec.UDPAssociateHandler)
 	if !ok {
 		return nil, errSOCKS5HasNoAssociate
 	}

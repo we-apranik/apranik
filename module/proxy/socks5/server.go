@@ -27,6 +27,8 @@ type streamServer struct {
 	socket spec.UDPAssociateSocketFunc
 }
 
+var _ spec.UDPAssociateHandler = (*streamServer)(nil)
+
 // Without a socket func, UDP ASSOCIATE is refused with X'07'.
 func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) { s.socket = socket }
 

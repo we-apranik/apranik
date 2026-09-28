@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/relay"
 	"github.com/The-Apranik/Apranik/spec"
@@ -164,10 +165,10 @@ func (o *fakeOutbound) onlyCarrier(t *testing.T) *outboundCarrier {
 
 type countingRouter struct {
 	asked atomic.Int32
-	pick  func(spec.Destination) (spec.Outbound, error)
+	pick  func(spec.Destination) (component.Outbound, error)
 }
 
-func (r *countingRouter) outboundForDestination(_ context.Context, destination spec.Destination) (spec.Outbound, error) {
+func (r *countingRouter) outboundForDestination(_ context.Context, destination spec.Destination) (component.Outbound, error) {
 	r.asked.Add(1)
 	return r.pick(destination)
 }
@@ -197,7 +198,7 @@ func runLoop(t *testing.T, client *clientCarrier, router *countingRouter) *sessi
 
 func TestEveryPacketAsksForItsOutbound(t *testing.T) {
 	out := &fakeOutbound{tag: "freedom"}
-	router := &countingRouter{pick: func(spec.Destination) (spec.Outbound, error) { return out, nil }}
+	router := &countingRouter{pick: func(spec.Destination) (component.Outbound, error) { return out, nil }}
 
 	client := newClientCarrier()
 	runLoop(t, client, router)
@@ -222,7 +223,7 @@ func TestABlockedDestinationDropsOnlyThatPacket(t *testing.T) {
 	allowed := destinationOf(t, "192.0.2.1", 53)
 	refused := errors.New("blocked by rule")
 
-	router := &countingRouter{pick: func(destination spec.Destination) (spec.Outbound, error) {
+	router := &countingRouter{pick: func(destination spec.Destination) (component.Outbound, error) {
 		if destination == blocked {
 			return nil, refused
 		}
@@ -255,7 +256,7 @@ func TestTwoDestinationsLeaveThroughTwoOutboundsAndBothRepliesReturn(t *testing.
 	dnsAddr := destinationOf(t, "192.0.2.1", 53)
 	gameAddr := destinationOf(t, "198.51.100.7", 27015)
 
-	router := &countingRouter{pick: func(destination spec.Destination) (spec.Outbound, error) {
+	router := &countingRouter{pick: func(destination spec.Destination) (component.Outbound, error) {
 		if destination == dnsAddr {
 			return dns, nil
 		}

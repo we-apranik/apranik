@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -75,8 +76,8 @@ func (o *outboundDatagram) stopForwardingAndClose() {
 }
 
 type Session struct {
-	// spec.Outbound.CreateDatagram takes a context, and Send has nowhere else to
-	// get one.
+	// component.Outbound.CreateDatagram takes a context, and Send has nowhere
+	// else to get one.
 	ctx      context.Context
 	metadata spec.Metadata
 	logger   *logging.Logger
@@ -147,7 +148,7 @@ func (s *Session) Err() error {
 	}
 }
 
-func (s *Session) Send(payload []byte, to spec.Destination, via spec.Outbound) error {
+func (s *Session) Send(payload []byte, to spec.Destination, via component.Outbound) error {
 	if via == nil {
 		return errors.New("session: no outbound to send through")
 	}
@@ -165,7 +166,7 @@ func (s *Session) Send(payload []byte, to spec.Destination, via spec.Outbound) e
 	return nil
 }
 
-func (s *Session) openOrReuseOutboundDatagram(via spec.Outbound) (*outboundDatagram, error) {
+func (s *Session) openOrReuseOutboundDatagram(via component.Outbound) (*outboundDatagram, error) {
 	tag := via.Tag()
 
 	s.mu.Lock()
