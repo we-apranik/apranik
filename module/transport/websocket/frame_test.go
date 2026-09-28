@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 func TestTheAcceptKeyMatchesRFC6455(t *testing.T) {
@@ -117,6 +119,37 @@ func FuzzReadFrameHeader(f *testing.F) {
 		again, err := readFrameHeader(bufio.NewReader(bytes.NewReader(reencoded)))
 		if err != nil || again != header {
 			t.Fatalf("re-encoded header %+v read back as %+v, %v", header, again, err)
+		}
+	})
+}
+
+// discardingStream accepts every write, so a fuzzed stream can answer pings.
+type discardingStream struct{ spec.Stream }
+
+func (discardingStream) Write(p []byte) (int, error) { return len(p), nil }
+
+// Whatever a client sends, reading it as a server never panics or hangs, and
+// every byte it returns came from a data frame's payload.
+func FuzzServerStreamRead(f *testing.F) {
+	f.Add(append(maskedFrame(opcodeBinary, false, []byte("hel")), maskedFrame(opcodeContinuation, true, []byte("lo"))...))
+	f.Add(append(maskedFrame(opcodePing, true, []byte("x")), maskedFrame(opcodeClose, true, []byte{3, 232})...))
+	f.Fuzz(func(t *testing.T, wire []byte) {
+		server := &stream{
+			underlyingStream: discardingStream{},
+			reader:           bufio.NewReader(bytes.NewReader(wire)),
+		}
+		server.handshakeDone.Store(true)
+		buffer := make([]byte, 7)
+		total := 0
+		for {
+			n, err := server.Read(buffer)
+			total += n
+			if err != nil {
+				break
+			}
+			if total > len(wire) {
+				t.Fatalf("read %d payload bytes from %d wire bytes", total, len(wire))
+			}
 		}
 	})
 }
