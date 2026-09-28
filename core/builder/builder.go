@@ -54,6 +54,12 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 			inboundBlueprint.Tag, spec.ErrUnsupportedNetwork)
 	}
 
+	// Before the listener, so a sniffer that fails to build leaves no port open.
+	sniffing, err := buildSniffing(inboundBlueprint.Sniffing)
+	if err != nil {
+		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+	}
+
 	listener, err := buildStreamListener(inboundBlueprint.StreamTransport, inboundBlueprint.Bind)
 	if err != nil {
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
@@ -91,11 +97,6 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 
 	b.logger.With("module", inboundProtocolName(inboundBlueprint)).
 		Debug("Stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
-
-	var sniffing inbound.Sniffing
-	if inboundBlueprint.Sniffing != nil {
-		sniffing = inbound.Sniffing{Sniffers: inboundBlueprint.Sniffing.Sniffers, Timeout: inboundBlueprint.Sniffing.Timeout}
-	}
 
 	return inbound.NewStream(inbound.StreamConfig{
 		Tag:                      inboundBlueprint.Tag,
@@ -135,6 +136,21 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.HTTP.Info().Name, err)
 	}
 	return mixed.NewStreamServer(socks5Server, httpServer), nil
+}
+
+func buildSniffing(sniffingBlueprint *blueprint.Sniffing) (inbound.Sniffing, error) {
+	if sniffingBlueprint == nil {
+		return inbound.Sniffing{}, nil
+	}
+	sniffers := make([]spec.Sniffer, 0, len(sniffingBlueprint.Sniffers))
+	for _, snifferModule := range sniffingBlueprint.Sniffers {
+		sniffer, err := snifferModule.NewSniffer()
+		if err != nil {
+			return inbound.Sniffing{}, fmt.Errorf("sniffer %q: %w", snifferModule.Info().Name, err)
+		}
+		sniffers = append(sniffers, sniffer)
+	}
+	return inbound.Sniffing{Sniffers: sniffers, Timeout: sniffingBlueprint.Timeout}, nil
 }
 
 func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {

@@ -38,7 +38,14 @@ func (*Sniffer) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "tls", Description: "sniff server name (SNI) from a TLS ClientHello"}
 }
 
-func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
+// Nothing to prepare: the sniffer reads only the bytes it is given.
+func (*Sniffer) NewSniffer() (spec.Sniffer, error) { return clientHelloSniffer{}, nil }
+
+func NewSnifferModule() spec.SnifferModule { return &Sniffer{} }
+
+type clientHelloSniffer struct{}
+
+func (clientHelloSniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
 	clientHello, err := reassembleClientHello(payloadPrefix)
 	if err != nil {
 		return spec.SniffResult{}, err
@@ -49,8 +56,6 @@ func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
 	}
 	return spec.SniffResult{Protocol: "tls", Domain: strings.TrimSpace(serverName)}, nil
 }
-
-func NewSnifferModule() spec.Sniffer { return &Sniffer{} }
 
 // A ClientHello may be split across several records; the handshake bytes of
 // each are joined until the whole message is present.

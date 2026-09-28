@@ -40,26 +40,28 @@ base transport, which is the only layer that resolves.
 
 | Kind | Methods |
 | --- | --- |
-| `BaseStreamTransport` | `NewStreamDialer`, `NewStreamListener` |
-| `OverlayStreamTransport` | `WrapStreamDialer`, `WrapStreamListener` |
-| `BaseDatagramTransport` | `NewDatagramDialer`, `NewDatagramListener` |
-| `OverlayDatagramTransport` | `WrapDatagramDialer`, `WrapDatagramListener` |
+| `BaseStreamTransportModule` | `NewStreamDialer`, `NewStreamListener` |
+| `OverlayStreamTransportModule` | `WrapStreamDialer`, `WrapStreamListener` |
+| `BaseDatagramTransportModule` | `NewDatagramDialer`, `NewDatagramListener` |
+| `OverlayDatagramTransportModule` | `WrapDatagramDialer`, `WrapDatagramListener` |
 
 **Proxy kinds.** Carrier and payload are independent, so there are three shapes:
 
 | Kind | Below (carrier) | Above (payload) | Example |
 | --- | --- | --- | --- |
-| `StreamProxy` | `Stream` | `Stream` | SOCKS5, HTTP and Trojan CONNECT (implemented) |
-| `DatagramOverStreamProxy` | `Stream` | `Datagram` | Trojan UDP (implemented); VLESS planned |
-| `DatagramProxy` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
+| `StreamProxyModule` | `Stream` | `Stream` | SOCKS5, HTTP and Trojan CONNECT (implemented) |
+| `DatagramOverStreamProxyModule` | `Stream` | `Datagram` | Trojan UDP (implemented); VLESS planned |
+| `DatagramProxyModule` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
 
 [![The three proxy shapes: StreamProxy takes a Stream carrier and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxy takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxy takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
 
 A proxy protocol never opens a connection. It is handed a carrier and returns a
 carrier ("wrapper, not pump"); core runs the copy loop.
 
-**Sniffer.** `Sniff(payloadPrefix []byte) (SniffResult, error)`, returning
-`ErrSniffNeedMoreData` while the bytes so far are only a prefix.
+**Sniffer.** `SnifferModule` holds the settings and builds a `Sniffer` with
+`NewSniffer()`; the `Sniffer` has `Sniff(payloadPrefix []byte) (SniffResult,
+error)`, returning `ErrSniffNeedMoreData` while the bytes so far are only a
+prefix.
 
 **Core-facing declarations.** `Metadata` (network, destination, source, inbound
 tag, user, sniff result), and for SOCKS5's second socket
@@ -78,9 +80,9 @@ A module is a package under `module/` that exports one constructor per kind it
 fills:
 
 ```go
-func NewBaseStreamTransportModule() spec.BaseStreamTransport // module/transport/tcp
-func NewStreamProxyModule() spec.StreamProxy                 // module/proxy/socks5
-func NewSnifferModule() spec.Sniffer                         // module/sniffer/tls
+func NewBaseStreamTransportModule() spec.BaseStreamTransportModule // module/transport/tcp
+func NewStreamProxyModule() spec.StreamProxyModule                 // module/proxy/socks5
+func NewSnifferModule() spec.SnifferModule                   // module/sniffer/tls
 ```
 
 `core/registry` stores these constructors by name and kind. `registry.Default()`

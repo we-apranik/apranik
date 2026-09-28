@@ -16,15 +16,15 @@
 // Each module exports one package-level constructor per kind:
 //
 //	// transport/tcp
-//	func NewBaseStreamTransportModule() spec.BaseStreamTransport
+//	func NewBaseStreamTransportModule() spec.BaseStreamTransportModule
 //
 //	// proxy/ss2022 -- one module, three kinds
-//	func NewStreamProxyModule() spec.StreamProxy
-//	func NewDatagramOverStreamProxyModule() spec.DatagramOverStreamProxy
-//	func NewDatagramProxyModule() spec.DatagramProxy
+//	func NewStreamProxyModule() spec.StreamProxyModule
+//	func NewDatagramOverStreamProxyModule() spec.DatagramOverStreamProxyModule
+//	func NewDatagramProxyModule() spec.DatagramProxyModule
 //
 //	// sniffer/tls
-//	func NewSnifferModule() spec.Sniffer
+//	func NewSnifferModule() spec.SnifferModule
 //
 // The return type is the kind declaration, so registering a module under the
 // wrong kind does not compile and nothing here needs a type assertion.
@@ -340,7 +340,7 @@ type Config interface {
 // A base takes nothing. Arbitrary depth is permitted but is not a goal: the
 // point is that any overlay substitutes for any other.
 
-// BaseStreamTransport: TCP, Unix sockets.
+// BaseStreamTransportModule: TCP, Unix sockets.
 //
 // NewStreamListener takes bind as a parameter rather than from settings,
 // mirroring DialStream(ctx, dst), which makes a listen address on an outbound
@@ -349,31 +349,31 @@ type Config interface {
 // Known limit: bind is an Endpoint, so a transport whose endpoint is not a host
 // and port -- a Unix socket path, a TUN device name -- cannot express it.
 // Deliberately unsolved while v1 ships tcp and udp.
-type BaseStreamTransport interface {
+type BaseStreamTransportModule interface {
 	Config
 	Info() ModuleInfo
 	NewStreamDialer() (StreamDialer, error)
 	NewStreamListener(bind Endpoint) (StreamListener, error)
 }
 
-// OverlayStreamTransport: TLS, WebSocket, gRPC.
-type OverlayStreamTransport interface {
+// OverlayStreamTransportModule: TLS, WebSocket, gRPC.
+type OverlayStreamTransportModule interface {
 	Config
 	Info() ModuleInfo
 	WrapStreamDialer(inner StreamDialer) (StreamDialer, error)
 	WrapStreamListener(inner StreamListener) (StreamListener, error)
 }
 
-// BaseDatagramTransport: UDP.
-type BaseDatagramTransport interface {
+// BaseDatagramTransportModule: UDP.
+type BaseDatagramTransportModule interface {
 	Config
 	Info() ModuleInfo
 	NewDatagramDialer() (DatagramDialer, error)
 	NewDatagramListener(bind Endpoint) (DatagramListener, error)
 }
 
-// OverlayDatagramTransport: DTLS, per-message obfuscation.
-type OverlayDatagramTransport interface {
+// OverlayDatagramTransportModule: DTLS, per-message obfuscation.
+type OverlayDatagramTransportModule interface {
 	Config
 	Info() ModuleInfo
 	WrapDatagramDialer(inner DatagramDialer) (DatagramDialer, error)
@@ -459,36 +459,46 @@ type DatagramProxyClient interface {
 //
 // VLESS: stream + datagram-over-stream. Shadowsocks 2022: all three. SOCKS5:
 // stream only -- its UDP relay is anchored to a stream session, so it can
-// never be dispatched from a bare datagram, which is what DatagramProxy means.
+// never be dispatched from a bare datagram, which is what DatagramProxyModule
+// means.
 
-type StreamProxy interface {
+type StreamProxyModule interface {
 	Config
 	Info() ModuleInfo
 	NewStreamServer() (StreamProxyServer, error)
 	NewStreamClient() (StreamProxyClient, error)
 }
 
-type DatagramOverStreamProxy interface {
+type DatagramOverStreamProxyModule interface {
 	Config
 	Info() ModuleInfo
 	NewDatagramOverStreamServer() (DatagramOverStreamProxyServer, error)
 	NewDatagramOverStreamClient() (DatagramOverStreamProxyClient, error)
 }
 
-type DatagramProxy interface {
+type DatagramProxyModule interface {
 	Config
 	Info() ModuleInfo
 	NewDatagramServer() (DatagramProxyServer, error)
 	NewDatagramClient() (DatagramProxyClient, error)
 }
 
+// SnifferModule is a sniffer's settings. NewSniffer builds the Sniffer core
+// runs, so anything a sniffer prepares once -- keys, tables, compiled
+// patterns -- is prepared there, not in Validate or on the first Sniff.
+type SnifferModule interface {
+	Config
+	Info() ModuleInfo
+	NewSniffer() (Sniffer, error)
+}
+
 // Sniffer recognises a protocol in the start of a client's payload. It only
 // reads: core peeks the bytes without consuming them, and core, not the
 // sniffer, fills Metadata.Sniffed. ErrSniffNeedMoreData means the bytes so far
 // are a prefix of this protocol; any other error means they are not it.
+//
+// Core calls Sniff from many connections at once.
 type Sniffer interface {
-	Config
-	Info() ModuleInfo
 	Sniff(payloadPrefix []byte) (SniffResult, error)
 }
 

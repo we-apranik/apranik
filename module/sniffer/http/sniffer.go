@@ -34,7 +34,14 @@ func (*Sniffer) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "http", Description: "sniff host from an HTTP/1 request's Host header"}
 }
 
-func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
+// Nothing to prepare: the sniffer reads only the bytes it is given.
+func (*Sniffer) NewSniffer() (spec.Sniffer, error) { return hostHeaderSniffer{}, nil }
+
+func NewSnifferModule() spec.SnifferModule { return &Sniffer{} }
+
+type hostHeaderSniffer struct{}
+
+func (hostHeaderSniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
 	if err := startsWithKnownMethod(payloadPrefix); err != nil {
 		return spec.SniffResult{}, err
 	}
@@ -61,8 +68,6 @@ func (*Sniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
 	}
 	return spec.SniffResult{Protocol: "http"}, nil
 }
-
-func NewSnifferModule() spec.Sniffer { return &Sniffer{} }
 
 // Decides early, from the method alone, so a stream that is plainly not HTTP
 // is not held waiting for a header end that will never come.

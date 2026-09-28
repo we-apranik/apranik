@@ -12,6 +12,15 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
+func newSniffer(t *testing.T) spec.Sniffer {
+	t.Helper()
+	sniffer, err := tls.NewSnifferModule().NewSniffer()
+	if err != nil {
+		t.Fatalf("NewSniffer: %v", err)
+	}
+	return sniffer
+}
+
 func clientHelloFor(t *testing.T, serverName string) []byte {
 	t.Helper()
 
@@ -37,7 +46,7 @@ func clientHelloFor(t *testing.T, serverName string) []byte {
 }
 
 func TestTheServerNameIsReported(t *testing.T) {
-	result, err := tls.NewSnifferModule().Sniff(clientHelloFor(t, "Example.COM"))
+	result, err := newSniffer(t).Sniff(clientHelloFor(t, "Example.COM"))
 	if err != nil {
 		t.Fatalf("Sniff: %v", err)
 	}
@@ -47,7 +56,7 @@ func TestTheServerNameIsReported(t *testing.T) {
 }
 
 func TestAClientHelloWithoutAServerNameIsStillTLS(t *testing.T) {
-	result, err := tls.NewSnifferModule().Sniff(clientHelloFor(t, ""))
+	result, err := newSniffer(t).Sniff(clientHelloFor(t, ""))
 	if err != nil {
 		t.Fatalf("Sniff: %v", err)
 	}
@@ -58,7 +67,7 @@ func TestAClientHelloWithoutAServerNameIsStillTLS(t *testing.T) {
 
 func TestEveryPrefixAsksForMoreData(t *testing.T) {
 	hello := clientHelloFor(t, "example.com")
-	sniffer := tls.NewSnifferModule()
+	sniffer := newSniffer(t)
 
 	for size := 0; size < len(hello); size++ {
 		if _, err := sniffer.Sniff(hello[:size]); !errors.Is(err, spec.ErrSniffNeedMoreData) {
@@ -77,7 +86,7 @@ func TestAClientHelloSplitAcrossRecordsIsReassembled(t *testing.T) {
 	split = append(split, 0x16, 0x03, 0x01, byte(rest>>8), byte(rest))
 	split = append(split, body[half:]...)
 
-	result, err := tls.NewSnifferModule().Sniff(split)
+	result, err := newSniffer(t).Sniff(split)
 	if err != nil || result.Domain != "example.com" {
 		t.Errorf("got %+v, %v; want example.com", result, err)
 	}
@@ -85,7 +94,7 @@ func TestAClientHelloSplitAcrossRecordsIsReassembled(t *testing.T) {
 
 func TestOtherProtocolsAreRefusedAtOnce(t *testing.T) {
 	for _, payloadPrefix := range []string{"G", "GET / HTTP/1.1\r\n", "SSH-2.0-OpenSSH_9.6\r\n"} {
-		if _, err := tls.NewSnifferModule().Sniff([]byte(payloadPrefix)); err == nil || errors.Is(err, spec.ErrSniffNeedMoreData) {
+		if _, err := newSniffer(t).Sniff([]byte(payloadPrefix)); err == nil || errors.Is(err, spec.ErrSniffNeedMoreData) {
 			t.Errorf("%q returned %v, want a refusal", payloadPrefix, err)
 		}
 	}

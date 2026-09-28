@@ -67,7 +67,7 @@ Steps:
    constructor sets; `Validate` refuses impossible values at startup; `Warnings`
    reports risky but legal ones. Use `config/types.Duration` for durations and
    `types.Secret` for anything secret.
-2. **Kind.** Implement `spec.BaseStreamTransport`: embed the settings
+2. **Kind.** Implement `spec.BaseStreamTransportModule`: embed the settings
    (`type Transport struct{ Settings }`), return a fixed `spec.ModuleInfo` from
    `Info` (the registry checks it never depends on a setting), and build a
    `spec.StreamDialer` and a `spec.StreamListener`.
@@ -79,13 +79,13 @@ Steps:
 5. **Binding.** `NewStreamListener` binds immediately, so a port conflict fails at
    startup, and it refuses a zero bind address rather than listening on every
    interface.
-6. **Constructor.** Export `func NewBaseStreamTransportModule() spec.BaseStreamTransport`.
+6. **Constructor.** Export `func NewBaseStreamTransportModule() spec.BaseStreamTransportModule`.
    The return type is the kind, so registering it as the wrong kind does not
    compile.
 7. **Register.** Add the one line to `registry.Default()`. The name from `Info` is
    now valid as a `"type"` in config files.
 
-An overlay transport is the same, but implements `spec.OverlayStreamTransport`
+An overlay transport is the same, but implements `spec.OverlayStreamTransportModule`
 (`WrapStreamDialer`, `WrapStreamListener`) and registers with
 `RegisterOverlayStream`. It receives the layer below already built and must never
 open its own connection.
@@ -116,13 +116,15 @@ Rules:
 - **Never dial.** The carrier is handed to you. If your protocol truly needs a
   second socket, look at how SOCKS5 UDP ASSOCIATE receives a
   `spec.UDPAssociateSocketFunc`, and raise the design question first.
-- **Other shapes.** A protocol with UDP also fills `spec.DatagramOverStreamProxy` or
-  `spec.DatagramProxy`, each with its own constructor and registration line.
+- **Other shapes.** A protocol with UDP also fills `spec.DatagramOverStreamProxyModule` or
+  `spec.DatagramProxyModule`, each with its own constructor and registration line.
 
 ## Adding a new sniffer
 
-The examples are `module/sniffer/tls` and `module/sniffer/http`. Implement
-`spec.Sniffer`:
+The examples are `module/sniffer/tls` and `module/sniffer/http`. The module
+value implements `spec.SnifferModule` (settings, `Info`, and `NewSniffer()`,
+which prepares anything needed once), and the value it builds implements
+`spec.Sniffer`. `Sniff` is called from many connections at once:
 
 - return a `spec.SniffResult` when the bytes are recognised;
 - return `spec.ErrSniffNeedMoreData` while they are only a prefix of your protocol;

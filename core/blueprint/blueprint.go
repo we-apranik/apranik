@@ -29,13 +29,13 @@ type Blueprint struct {
 type Log = logging.Config
 
 type StreamTransportStack struct {
-	Base     spec.BaseStreamTransport
-	Overlays []spec.OverlayStreamTransport
+	Base     spec.BaseStreamTransportModule
+	Overlays []spec.OverlayStreamTransportModule
 }
 
 type DatagramTransportStack struct {
-	Base     spec.BaseDatagramTransport
-	Overlays []spec.OverlayDatagramTransport
+	Base     spec.BaseDatagramTransportModule
+	Overlays []spec.OverlayDatagramTransportModule
 }
 
 func (s StreamTransportStack) IsZero() bool   { return s.Base == nil }
@@ -55,15 +55,15 @@ type Inbound struct {
 	StreamTransport   StreamTransportStack
 	DatagramTransport DatagramTransportStack
 
-	StreamProxy   spec.StreamProxy
-	DatagramProxy spec.DatagramProxy
+	StreamProxy   spec.StreamProxyModule
+	DatagramProxy spec.DatagramProxyModule
 
 	// The special protocol mixed, in place of StreamProxy.
 	Mixed *Mixed
 
 	// Set when the stream proxy's module also registered the
 	// datagram-over-stream kind: one handshake may then ask for either.
-	DatagramOverStreamProxy spec.DatagramOverStreamProxy
+	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	// Where a stream goes when the proxy answers spec.ErrFallbackRequested.
 	// Zero means close it instead.
@@ -92,7 +92,7 @@ type Inbound struct {
 // Sniffing runs after the handshake and before routing, and only fills
 // Metadata.Sniffed: the destination is never rewritten.
 type Sniffing struct {
-	Sniffers []spec.Sniffer
+	Sniffers []spec.SnifferModule
 
 	// Zero means sniff.DefaultTimeout.
 	Timeout time.Duration
@@ -109,11 +109,11 @@ type Outbound struct {
 	// Only with Proxy: freedom and block reach no server.
 	StreamTransport StreamTransportStack
 
-	Proxy spec.StreamProxy
+	Proxy spec.StreamProxyModule
 
 	// Only with Proxy, and only when its module also registered the
 	// datagram-over-stream kind: then this outbound carries UDP too.
-	DatagramOverStreamProxy spec.DatagramOverStreamProxy
+	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	Freedom *Freedom
 	Block   bool
@@ -130,8 +130,8 @@ type Outbound struct {
 // Mixed serves SOCKS5 and HTTP on one port; core picks one per connection
 // from its first byte.
 type Mixed struct {
-	SOCKS5 spec.StreamProxy
-	HTTP   spec.StreamProxy
+	SOCKS5 spec.StreamProxyModule
+	HTTP   spec.StreamProxyModule
 }
 
 // Freedom sends straight to each destination, so its transports are always

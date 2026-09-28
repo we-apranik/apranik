@@ -25,7 +25,15 @@ func newPipe(t *testing.T) (clientSide net.Conn, inboundSide *peekable.Stream) {
 	return client, peekable.NewStream(pipeStream{inbound})
 }
 
-var bothSniffers = []spec.Sniffer{tlssniffer.NewSnifferModule(), httpsniffer.NewSnifferModule()}
+var bothSniffers = []spec.Sniffer{build(tlssniffer.NewSnifferModule()), build(httpsniffer.NewSnifferModule())}
+
+func build(module spec.SnifferModule) spec.Sniffer {
+	sniffer, err := module.NewSniffer()
+	if err != nil {
+		panic(err)
+	}
+	return sniffer
+}
 
 func TestARecognisedRequestIsReportedAndReplayed(t *testing.T) {
 	client, inboundSide := newPipe(t)
@@ -103,7 +111,7 @@ func TestAMessageInPiecesIsRecognisedWithoutWaitingForTheTimeout(t *testing.T) {
 	}()
 
 	started := time.Now()
-	result := sniff.Recognise(inboundSide, []spec.Sniffer{httpsniffer.NewSnifferModule()}, 5*time.Second)
+	result := sniff.Recognise(inboundSide, []spec.Sniffer{build(httpsniffer.NewSnifferModule())}, 5*time.Second)
 	if result == nil || result.Domain != "example.com" {
 		t.Fatalf("result = %+v", result)
 	}
@@ -168,7 +176,7 @@ func clientHello(b *testing.B) []byte {
 
 func BenchmarkSniffTLSClientHello(b *testing.B) {
 	hello := clientHello(b)
-	sniffers := []spec.Sniffer{tlssniffer.NewSnifferModule()}
+	sniffers := []spec.Sniffer{build(tlssniffer.NewSnifferModule())}
 	b.ReportAllocs()
 	for b.Loop() {
 		clientSide, inboundSide := net.Pipe()

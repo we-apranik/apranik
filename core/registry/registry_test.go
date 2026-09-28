@@ -71,24 +71,24 @@ func (datagramOverStreamProxy) NewDatagramOverStreamClient() (spec.DatagramOverS
 	return nil, nil
 }
 
-func newBaseStream(name string) func() spec.BaseStreamTransport {
-	return func() spec.BaseStreamTransport { return baseStream{settings{name}} }
+func newBaseStream(name string) func() spec.BaseStreamTransportModule {
+	return func() spec.BaseStreamTransportModule { return baseStream{settings{name}} }
 }
 
-func newOverlayStream(name string) func() spec.OverlayStreamTransport {
-	return func() spec.OverlayStreamTransport { return overlayStream{settings{name}} }
+func newOverlayStream(name string) func() spec.OverlayStreamTransportModule {
+	return func() spec.OverlayStreamTransportModule { return overlayStream{settings{name}} }
 }
 
-func newBaseDatagram(name string) func() spec.BaseDatagramTransport {
-	return func() spec.BaseDatagramTransport { return baseDatagram{settings{name}} }
+func newBaseDatagram(name string) func() spec.BaseDatagramTransportModule {
+	return func() spec.BaseDatagramTransportModule { return baseDatagram{settings{name}} }
 }
 
-func newOverlayDatagram(name string) func() spec.OverlayDatagramTransport {
-	return func() spec.OverlayDatagramTransport { return overlayDatagram{settings{name}} }
+func newOverlayDatagram(name string) func() spec.OverlayDatagramTransportModule {
+	return func() spec.OverlayDatagramTransportModule { return overlayDatagram{settings{name}} }
 }
 
-func newStreamProxy(name string) func() spec.StreamProxy {
-	return func() spec.StreamProxy { return streamProxy{settings{name}} }
+func newStreamProxy(name string) func() spec.StreamProxyModule {
+	return func() spec.StreamProxyModule { return streamProxy{settings{name}} }
 }
 
 // ---------- registration checks, in the order register runs them ----------
@@ -129,7 +129,7 @@ func TestNameMustBeWellFormed(t *testing.T) {
 // would register under one name and be looked up under another.
 func TestInfoMustBeConstant(t *testing.T) {
 	var calls int
-	varying := func() spec.BaseStreamTransport {
+	varying := func() spec.BaseStreamTransportModule {
 		calls++
 		return baseStream{settings{name: "tcp" + strings.Repeat("x", calls)}}
 	}
@@ -220,12 +220,12 @@ func TestAProxyMayFillEveryKind(t *testing.T) {
 	if err := protocols.RegisterStream(newStreamProxy("ss2022")); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
-	if err := protocols.RegisterDatagramOverStream(func() spec.DatagramOverStreamProxy {
+	if err := protocols.RegisterDatagramOverStream(func() spec.DatagramOverStreamProxyModule {
 		return datagramOverStreamProxy{settings{"ss2022"}}
 	}); err != nil {
 		t.Errorf("datagram-over-stream: %v", err)
 	}
-	if err := protocols.RegisterDatagram(func() spec.DatagramProxy {
+	if err := protocols.RegisterDatagram(func() spec.DatagramProxyModule {
 		return datagramProxy{settings{"ss2022"}}
 	}); err != nil {
 		t.Errorf("datagram: %v", err)
@@ -440,13 +440,13 @@ func constructProxy(t *testing.T, modules *registry.Registry, listing registry.L
 	}
 }
 
-type sniffer struct{ settings }
+type snifferModule struct{ settings }
 
-func (sniffer) Sniff([]byte) (spec.SniffResult, error) { return spec.SniffResult{}, nil }
+func (snifferModule) NewSniffer() (spec.Sniffer, error) { return nil, nil }
 
 func TestASnifferIsRegisteredOnceAndLookedUpByName(t *testing.T) {
 	modules := registry.New()
-	newSniffer := func() spec.Sniffer { return sniffer{settings{name: "fake"}} }
+	newSniffer := func() spec.SnifferModule { return snifferModule{settings{name: "fake"}} }
 
 	if err := modules.Sniffers().Register(newSniffer); err != nil {
 		t.Fatalf("Register: %v", err)
