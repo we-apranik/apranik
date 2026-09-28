@@ -21,7 +21,7 @@
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor per kind. |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
 | **Outbound** | How traffic leaves: a proxy client plus a dialer stack, or freedom (`component.Outbound`). |
-| **Overlay transport** | A transport that wraps a layer below it, one connection at a time, such as TLS or WebSocket. `tls` is built. |
+| **Overlay transport** | A transport that wraps a layer below it, one connection at a time, such as TLS or WebSocket. `tls` and `ws` are built. |
 | **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Payload** | What a layer returns upward: the proxied traffic with the protocol's framing removed. |
 | **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` / `block` on an outbound, or `mixed` on an inbound. |

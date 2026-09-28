@@ -109,7 +109,7 @@ layer is.
 > dialer and each overlay's client into one dialer. Inbound, the listener is the
 > base alone, and `core/inbound` runs each overlay's server side in the
 > connection's own goroutine, under the handshake timeout, so a client that
-> stalls a TLS handshake holds up nobody else. `tls` is the one overlay built.
+> stalls a TLS handshake holds up nobody else. `tls` and `ws` are built.
 
 ## Shared helper packages
 

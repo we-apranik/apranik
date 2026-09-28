@@ -65,12 +65,12 @@ and one registry line) without touching anything else.
 
 | Area | Implemented today |
 | --- | --- |
-| Transports | `tcp` (base stream), `udp` (base datagram), `tls` (stream overlay) |
+| Transports | `tcp` (base stream), `udp` (base datagram), `tls` and `ws` (stream overlays) |
 | Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP in the stream, named users, fallback for refused requests; plaintext until TLS exists) |
 | Outbounds | proxy outbound over a stream transport stack; `freedom` (straight to the destination, TCP and UDP); `block` (refuses everything) |
 | Sniffers | `tls` (SNI), `http` (Host and port); per inbound, off by default |
 | Routing | the interface and the call sites exist; there are no rules yet, so every request takes the first outbound |
 | Configuration | versioned JSON config file, checked in full before anything starts |
 
-Built overlay: `tls`. Not built yet: WebSocket and other overlays, routing
-rules, UDP inbounds, UDP sniffing and QUIC.
+Built overlays: `tls`, `ws`. Not built yet: other overlays, routing rules, UDP
+inbounds, UDP sniffing and QUIC.
