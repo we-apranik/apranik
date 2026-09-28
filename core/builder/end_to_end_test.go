@@ -29,9 +29,10 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// These tests run a Trojan-over-TLS server and client built from config
-// files, as `apranik run` builds them: the composition this milestone exists
-// to prove.
+// End-to-end tests run a Trojan server and client built from config files,
+// as `apranik run` builds them, over a given transport stack. This file holds
+// the helpers every stack's tests share, and the tests for TLS; the other
+// overlays' tests sit in their own files.
 
 const proxyServerName = "proxy.example"
 
