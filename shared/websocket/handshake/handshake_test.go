@@ -42,6 +42,8 @@ func TestHostMatchingIgnoresCaseAndPort(t *testing.T) {
 		{"[2001:db8::1]:443", "2001:db8::1", true},
 		{"other.example", "cdn.example", false},
 		{"cdn.example.evil", "cdn.example", false},
+		{"cdn.example", "cdn.example:443", true},
+		{"[2001:db8::1]", "[2001:db8::1]:443", true},
 	} {
 		if got := handshake.HostMatches(tc.request, tc.required); got != tc.want {
 			t.Errorf("HostMatches(%q, %q) = %v", tc.request, tc.required, got)

@@ -110,14 +110,16 @@ func HeaderContainsToken(header http.Header, name, token string) bool {
 }
 
 // HostMatches compares a request's Host with the one a server requires,
-// ignoring case and any port, as Xray does.
+// ignoring case and any port on either, as Xray does.
 func HostMatches(requestHost, requiredHost string) bool {
-	if host, _, err := net.SplitHostPort(requestHost); err == nil {
-		requestHost = host
+	return strings.EqualFold(hostWithoutPort(requestHost), hostWithoutPort(requiredHost))
+}
+
+func hostWithoutPort(host string) string {
+	if withoutPort, _, err := net.SplitHostPort(host); err == nil {
+		return withoutPort
 	}
-	requestHost = strings.TrimSuffix(strings.TrimPrefix(requestHost, "["), "]")
-	requiredHost = strings.TrimSuffix(strings.TrimPrefix(requiredHost, "["), "]")
-	return strings.EqualFold(requestHost, requiredHost)
+	return strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 }
 
 // HostHeaderFor is the Host a client sends when none is configured: the
