@@ -112,9 +112,9 @@ type fakeOutbound struct {
 	dialErr  error
 	slowDial time.Duration
 
-	dials    atomic.Int32
-	mu       sync.Mutex
-	carriers []*fakeDatagram
+	dials     atomic.Int32
+	mu        sync.Mutex
+	datagrams []*fakeDatagram
 }
 
 func newFakeOutbound(tag string) *fakeOutbound {
@@ -138,41 +138,41 @@ func (o *fakeOutbound) CreateDatagram(context.Context, spec.Metadata) (spec.Data
 		return nil, o.dialErr
 	}
 
-	carrier := newFakeDatagram()
+	datagram := newFakeDatagram()
 	o.mu.Lock()
-	o.carriers = append(o.carriers, carrier)
+	o.datagrams = append(o.datagrams, datagram)
 	o.mu.Unlock()
-	return carrier, nil
+	return datagram, nil
 }
 
-func (o *fakeOutbound) carrierCount() int {
+func (o *fakeOutbound) datagramCount() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return len(o.carriers)
+	return len(o.datagrams)
 }
 
-func (o *fakeOutbound) survivingCarrierCount() int {
+func (o *fakeOutbound) survivingDatagramCount() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
 	surviving := 0
-	for _, carrier := range o.carriers {
-		if !carrier.wasClosed() {
+	for _, datagram := range o.datagrams {
+		if !datagram.wasClosed() {
 			surviving++
 		}
 	}
 	return surviving
 }
 
-func (o *fakeOutbound) carrierAt(t *testing.T, index int) *fakeDatagram {
+func (o *fakeOutbound) datagramAt(t *testing.T, index int) *fakeDatagram {
 	t.Helper()
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if index >= len(o.carriers) {
-		t.Fatalf("outbound %q opened %d carriers, wanted at least %d", o.tag, len(o.carriers), index+1)
+	if index >= len(o.datagrams) {
+		t.Fatalf("outbound %q opened %d datagrams, wanted at least %d", o.tag, len(o.datagrams), index+1)
 	}
-	return o.carriers[index]
+	return o.datagrams[index]
 }
 
 func newSession(t *testing.T, config session.Config) *session.Session {
@@ -210,15 +210,15 @@ func TestSendThroughTwoOutboundsMergesBothReplies(t *testing.T) {
 		t.Fatalf("Send via game: %v", err)
 	}
 
-	if writes := dns.carrierAt(t, 0).writes(); len(writes) != 1 || writes[0] != dnsAddr {
+	if writes := dns.datagramAt(t, 0).writes(); len(writes) != 1 || writes[0] != dnsAddr {
 		t.Errorf("dns outbound saw %v, want [%v]", writes, dnsAddr)
 	}
-	if writes := game.carrierAt(t, 0).writes(); len(writes) != 1 || writes[0] != gameAddr {
+	if writes := game.datagramAt(t, 0).writes(); len(writes) != 1 || writes[0] != gameAddr {
 		t.Errorf("game outbound saw %v, want [%v]", writes, gameAddr)
 	}
 
-	dns.carrierAt(t, 0).incoming <- dnsAddr
-	game.carrierAt(t, 0).incoming <- gameAddr
+	dns.datagramAt(t, 0).incoming <- dnsAddr
+	game.datagramAt(t, 0).incoming <- gameAddr
 
 	seen := map[spec.Destination]bool{}
 	for range 2 {
@@ -262,8 +262,8 @@ func TestRacingFirstSendsOpenOneOutboundDatagram(t *testing.T) {
 
 	// Dialing happens outside the lock, so several may be dialed; only one
 	// may survive, the losers being closed.
-	if surviving := out.survivingCarrierCount(); surviving != 1 {
-		t.Errorf("16 racing sends left %d carriers alive out of %d dialed, want 1", surviving, out.carrierCount())
+	if surviving := out.survivingDatagramCount(); surviving != 1 {
+		t.Errorf("16 racing sends left %d datagrams alive out of %d dialed, want 1", surviving, out.datagramCount())
 	}
 }
 
@@ -274,19 +274,19 @@ func TestAQuietOutboundDatagramStaysOpenUntilTheSessionEnds(t *testing.T) {
 	if err := udpSession.Send([]byte("x"), destinationOf(t, "192.0.2.1", 53), out); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
-	carrier := out.carrierAt(t, 0)
+	datagram := out.datagramAt(t, 0)
 
 	time.Sleep(200 * time.Millisecond)
-	if carrier.wasClosed() {
+	if datagram.wasClosed() {
 		t.Fatal("a quiet outbound datagram was closed while its session was alive")
 	}
 
 	udpSession.Close()
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && !carrier.wasClosed() {
+	for time.Now().Before(deadline) && !datagram.wasClosed() {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !carrier.wasClosed() {
+	if !datagram.wasClosed() {
 		t.Error("closing the session left its outbound datagram open")
 	}
 }
@@ -299,23 +299,23 @@ func TestAnOutboundDatagramWhoseReadsFailIsReopened(t *testing.T) {
 	if err := udpSession.Send([]byte("x"), target, out); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
-	first := out.carrierAt(t, 0)
+	first := out.datagramAt(t, 0)
 
-	first.failNextRead(errors.New("carrier dropped"))
+	first.failNextRead(errors.New("datagram dropped"))
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) && !first.wasClosed() {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !first.wasClosed() {
-		t.Fatal("a carrier whose reads failed was not removed")
+		t.Fatal("a datagram whose reads failed was not removed")
 	}
 
 	if err := udpSession.Send([]byte("y"), target, out); err != nil {
-		t.Fatalf("Send after the carrier died: %v", err)
+		t.Fatalf("Send after the datagram died: %v", err)
 	}
-	if carriers := out.carrierCount(); carriers != 2 {
-		t.Errorf("the outbound opened %d carriers, want 2: a dead carrier must be reopened", carriers)
+	if datagrams := out.datagramCount(); datagrams != 2 {
+		t.Errorf("the outbound opened %d datagrams, want 2: a dead datagram must be reopened", datagrams)
 	}
 }
 
@@ -335,15 +335,15 @@ func TestAQuietSessionEndsWithTheIdleReason(t *testing.T) {
 	if !errors.Is(udpSession.Err(), session.ErrIdle) {
 		t.Errorf("Err() = %v, want session.ErrIdle", udpSession.Err())
 	}
-	// Done closes first and the carriers right after it, so give the close a
+	// Done closes first and the datagrams right after it, so give the close a
 	// moment instead of racing it.
-	carrier := out.carrierAt(t, 0)
+	datagram := out.datagramAt(t, 0)
 	deadline := time.Now().Add(2 * time.Second)
-	for !carrier.wasClosed() && time.Now().Before(deadline) {
+	for !datagram.wasClosed() && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if !carrier.wasClosed() {
-		t.Error("an idled-out session left its carrier open")
+	if !datagram.wasClosed() {
+		t.Error("an idled-out session left its datagram open")
 	}
 }
 
@@ -366,8 +366,8 @@ func TestCloseEndsWithTheClosedReasonAndLeaksNothing(t *testing.T) {
 	if !errors.Is(udpSession.Err(), session.ErrClosed) {
 		t.Errorf("Err() = %v, want session.ErrClosed", udpSession.Err())
 	}
-	if !first.carrierAt(t, 0).wasClosed() || !second.carrierAt(t, 0).wasClosed() {
-		t.Error("Close left an outbound carrier open")
+	if !first.datagramAt(t, 0).wasClosed() || !second.datagramAt(t, 0).wasClosed() {
+		t.Error("Close left an outbound datagram open")
 	}
 	if err := udpSession.Send([]byte("x"), destinationOf(t, "192.0.2.1", 53), first); !errors.Is(err, session.ErrClosed) {
 		t.Errorf("Send after Close: %v, want session.ErrClosed", err)
@@ -452,7 +452,7 @@ func readSource(t *testing.T, peer *net.UDPConn) *net.UDPAddr {
 }
 
 // openBenchmarkSession sends once, so the outbound datagram exists before the
-// timer starts, and stops its carrier recording what it is sent.
+// timer starts, and stops its datagram recording what it is sent.
 func openBenchmarkSession(b *testing.B) (*session.Session, *fakeOutbound, *fakeDatagram, spec.Destination) {
 	b.Helper()
 	destination, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
@@ -467,12 +467,12 @@ func openBenchmarkSession(b *testing.B) (*session.Session, *fakeOutbound, *fakeD
 	}
 
 	out.mu.Lock()
-	carrier := out.carriers[0]
+	datagram := out.datagrams[0]
 	out.mu.Unlock()
-	carrier.mu.Lock()
-	carrier.forgetWrites = true
-	carrier.mu.Unlock()
-	return udpSession, out, carrier, destination
+	datagram.mu.Lock()
+	datagram.forgetWrites = true
+	datagram.mu.Unlock()
+	return udpSession, out, datagram, destination
 }
 
 func BenchmarkSessionSend(b *testing.B) {
@@ -488,11 +488,11 @@ func BenchmarkSessionSend(b *testing.B) {
 }
 
 func BenchmarkSessionReply(b *testing.B) {
-	udpSession, _, carrier, destination := openBenchmarkSession(b)
+	udpSession, _, datagram, destination := openBenchmarkSession(b)
 
 	b.ReportAllocs()
 	for b.Loop() {
-		carrier.incoming <- destination
+		datagram.incoming <- destination
 		reply := <-udpSession.Replies()
 		reply.Release()
 	}

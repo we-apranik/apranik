@@ -77,13 +77,13 @@ func (o *freedomOutbound) DialStream(ctx context.Context, metadata spec.Metadata
 	}
 
 	dialCtx, endDial := boundedContext(ctx, o.dialTimeout, DefaultDialTimeout)
-	carrier, err := o.streamDialer.DialStream(dialCtx, metadata.Destination)
+	destinationStream, err := o.streamDialer.DialStream(dialCtx, metadata.Destination)
 	endDial()
 	if err != nil {
 		o.logger.Debug("Dial failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
-	return carrier, nil
+	return destinationStream, nil
 }
 
 // Dials nothing yet: the destination arrives per packet in WriteTo, not at

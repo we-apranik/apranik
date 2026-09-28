@@ -38,18 +38,18 @@ func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) { 
 //
 // UDP ASSOCIATE returns a nil Stream with Network NetworkUDP, since
 // AcceptStream cannot return a Datagram; Associate binds and replies.
-func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (spec.Stream, spec.Metadata, error) {
+func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetDeadline(deadline)
-		defer carrier.SetDeadline(time.Time{})
+		underlyingStream.SetDeadline(deadline)
+		defer underlyingStream.SetDeadline(time.Time{})
 	}
 
-	if err := s.authenticate(carrier); err != nil {
+	if err := s.authenticate(underlyingStream); err != nil {
 		return nil, spec.Metadata{}, err
 	}
 
 	var request [3]byte
-	if _, err := io.ReadFull(carrier, request[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, request[:]); err != nil {
 		return nil, spec.Metadata{}, fmt.Errorf("socks5: reading request: %w", err)
 	}
 	if request[0] != wire.Version5 {
@@ -57,28 +57,28 @@ func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (s
 	}
 	command := request[1]
 
-	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(carrier.RemoteAddr()), User: s.username}
+	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: s.username}
 
 	switch {
 	case command == wire.CommandConnect:
-		destination, err := socksaddr.ReadAddress(carrier)
+		destination, err := socksaddr.ReadAddress(underlyingStream)
 		if err != nil {
-			wire.WriteReply(carrier, wire.ReplyAddressNotSupported, spec.Endpoint{})
+			wire.WriteReply(underlyingStream, wire.ReplyAddressNotSupported, spec.Endpoint{})
 			return nil, spec.Metadata{}, err
 		}
-		if err := wire.WriteReply(carrier, wire.ReplySucceeded, spec.Endpoint{}); err != nil {
+		if err := wire.WriteReply(underlyingStream, wire.ReplySucceeded, spec.Endpoint{}); err != nil {
 			return nil, spec.Metadata{}, fmt.Errorf("socks5: sending reply: %w", err)
 		}
 		metadata.Network = spec.NetworkTCP
 		metadata.Destination = destination
-		return carrier, metadata, nil
+		return underlyingStream, metadata, nil
 
 	case command == wire.CommandUDPAssociate && s.udpRelay && s.socket != nil:
 		metadata.Network = spec.NetworkUDP
 		return nil, metadata, spec.ErrUDPAssociationRequested
 
 	default:
-		if err := wire.WriteReply(carrier, wire.ReplyCommandNotSupported, spec.Endpoint{}); err != nil {
+		if err := wire.WriteReply(underlyingStream, wire.ReplyCommandNotSupported, spec.Endpoint{}); err != nil {
 			return nil, spec.Metadata{}, fmt.Errorf("socks5: refusing %s: %w", wire.CommandText(command), err)
 		}
 		return nil, spec.Metadata{}, fmt.Errorf("socks5: %s not supported here", wire.CommandText(command))
@@ -138,9 +138,9 @@ func reachableAddress(bound, control net.Addr) (spec.Endpoint, error) {
 	return spec.NewEndpoint(controlEndpoint.Addr(), boundEndpoint.Port())
 }
 
-func (s *streamServer) authenticate(carrier spec.Stream) error {
+func (s *streamServer) authenticate(underlyingStream spec.Stream) error {
 	var greeting [2]byte
-	if _, err := io.ReadFull(carrier, greeting[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, greeting[:]); err != nil {
 		return fmt.Errorf("socks5: reading greeting: %w", err)
 	}
 	if greeting[0] != wire.Version5 {
@@ -151,7 +151,7 @@ func (s *streamServer) authenticate(carrier spec.Stream) error {
 	}
 
 	offered := make([]byte, greeting[1])
-	if _, err := io.ReadFull(carrier, offered); err != nil {
+	if _, err := io.ReadFull(underlyingStream, offered); err != nil {
 		return fmt.Errorf("socks5: reading authentication methods: %w", err)
 	}
 
@@ -160,21 +160,21 @@ func (s *streamServer) authenticate(carrier spec.Stream) error {
 		required = wire.MethodUserPass
 	}
 	if !slices.Contains(offered, required) {
-		carrier.Write([]byte{wire.Version5, wire.MethodNone})
+		underlyingStream.Write([]byte{wire.Version5, wire.MethodNone})
 		return fmt.Errorf("socks5: client does not offer authentication method X'%02X'", required)
 	}
-	if _, err := carrier.Write([]byte{wire.Version5, required}); err != nil {
+	if _, err := underlyingStream.Write([]byte{wire.Version5, required}); err != nil {
 		return fmt.Errorf("socks5: selecting authentication method: %w", err)
 	}
 	if required == wire.MethodNoAuth {
 		return nil
 	}
-	return s.checkCredentials(carrier)
+	return s.checkCredentials(underlyingStream)
 }
 
-func (s *streamServer) checkCredentials(carrier spec.Stream) error {
+func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
 	var header [2]byte
-	if _, err := io.ReadFull(carrier, header[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, header[:]); err != nil {
 		return fmt.Errorf("socks5: reading credentials: %w", err)
 	}
 	if header[0] != wire.AuthVersion {
@@ -182,16 +182,16 @@ func (s *streamServer) checkCredentials(carrier spec.Stream) error {
 	}
 
 	username := make([]byte, header[1])
-	if _, err := io.ReadFull(carrier, username); err != nil {
+	if _, err := io.ReadFull(underlyingStream, username); err != nil {
 		return fmt.Errorf("socks5: reading username: %w", err)
 	}
 
 	var passwordLength [1]byte
-	if _, err := io.ReadFull(carrier, passwordLength[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, passwordLength[:]); err != nil {
 		return fmt.Errorf("socks5: reading password length: %w", err)
 	}
 	password := make([]byte, passwordLength[0])
-	if _, err := io.ReadFull(carrier, password); err != nil {
+	if _, err := io.ReadFull(underlyingStream, password); err != nil {
 		return fmt.Errorf("socks5: reading password: %w", err)
 	}
 
@@ -200,11 +200,11 @@ func (s *streamServer) checkCredentials(carrier spec.Stream) error {
 	usernameMatches := subtle.ConstantTimeCompare(username, []byte(s.username)) == 1
 	passwordMatches := subtle.ConstantTimeCompare(password, []byte(s.password)) == 1
 	if !usernameMatches || !passwordMatches {
-		carrier.Write([]byte{wire.AuthVersion, wire.AuthFailed})
+		underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthFailed})
 		return errors.New("socks5: bad username or password")
 	}
 
-	if _, err := carrier.Write([]byte{wire.AuthVersion, wire.AuthSucceeded}); err != nil {
+	if _, err := underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthSucceeded}); err != nil {
 		return fmt.Errorf("socks5: accepting credentials: %w", err)
 	}
 	return nil

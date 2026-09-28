@@ -28,13 +28,13 @@ type server struct {
 // without reading, or judging, the rest.
 const commandOffset = wire.PasswordHashLength + 2
 
-func (s *server) IsDatagramOverStream(ctx context.Context, carrier spec.PeekableStream) (bool, error) {
+func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec.PeekableStream) (bool, error) {
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetReadDeadline(deadline)
-		defer carrier.SetReadDeadline(time.Time{})
+		underlyingStream.SetReadDeadline(deadline)
+		defer underlyingStream.SetReadDeadline(time.Time{})
 	}
 
-	prefix, err := carrier.Peek(commandOffset + 1)
+	prefix, err := underlyingStream.Peek(commandOffset + 1)
 	if err != nil {
 		return false, fmt.Errorf("trojan: reading request: %w", err)
 	}
@@ -43,29 +43,29 @@ func (s *server) IsDatagramOverStream(ctx context.Context, carrier spec.Peekable
 
 // Nothing is written during the handshake, so every refusal may ask for the
 // fallback.
-func (s *server) AcceptStream(ctx context.Context, carrier spec.Stream) (spec.Stream, spec.Metadata, error) {
-	metadata, err := s.accept(ctx, carrier, wire.CommandConnect)
+func (s *server) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
+	metadata, err := s.accept(ctx, underlyingStream, wire.CommandConnect)
 	if err != nil {
 		return nil, spec.Metadata{}, err
 	}
-	return carrier, metadata, nil
+	return underlyingStream, metadata, nil
 }
 
-func (s *server) AcceptDatagramOverStream(ctx context.Context, carrier spec.Stream) (spec.Datagram, spec.Metadata, error) {
-	metadata, err := s.accept(ctx, carrier, wire.CommandUDPAssociate)
+func (s *server) AcceptDatagramOverStream(ctx context.Context, underlyingStream spec.Stream) (spec.Datagram, spec.Metadata, error) {
+	metadata, err := s.accept(ctx, underlyingStream, wire.CommandUDPAssociate)
 	if err != nil {
 		return nil, spec.Metadata{}, err
 	}
-	return newStreamDatagram(carrier), metadata, nil
+	return newStreamDatagram(underlyingStream), metadata, nil
 }
 
-func (s *server) accept(ctx context.Context, carrier spec.Stream, wantedCommand byte) (spec.Metadata, error) {
+func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wantedCommand byte) (spec.Metadata, error) {
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetReadDeadline(deadline)
-		defer carrier.SetReadDeadline(time.Time{})
+		underlyingStream.SetReadDeadline(deadline)
+		defer underlyingStream.SetReadDeadline(time.Time{})
 	}
 
-	request, err := wire.ReadRequest(carrier)
+	request, err := wire.ReadRequest(underlyingStream)
 	if err != nil {
 		if isMalformedRequest(err) {
 			return spec.Metadata{}, fmt.Errorf("%w: %w", spec.ErrFallbackRequested, err)
@@ -78,7 +78,7 @@ func (s *server) accept(ctx context.Context, carrier spec.Stream, wantedCommand 
 		return spec.Metadata{}, fmt.Errorf("%w: trojan: unknown password", spec.ErrFallbackRequested)
 	}
 
-	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(carrier.RemoteAddr()), User: name}
+	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: name}
 	switch {
 	case request.Command != wantedCommand:
 		// Core dispatched on IsDatagramOverStream, so this is a mismatch

@@ -24,7 +24,7 @@ type client struct {
 // so a connection never opens with a header of fixed length on its own. There
 // is no reply either, so a wrong password surfaces as the server closing the
 // stream.
-func (c *client) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+func (c *client) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("trojan: %w: UDP goes through RequestDatagramOverStream", spec.ErrUnsupportedNetwork)
 	}
@@ -33,14 +33,14 @@ func (c *client) RequestStream(ctx context.Context, carrier spec.Stream, metadat
 	if err != nil {
 		return nil, err
 	}
-	return newRequestOnFirstWriteStream(carrier, request, firstPayloadWait), nil
+	return newRequestOnFirstWriteStream(underlyingStream, request, firstPayloadWait), nil
 }
 
 // Nothing goes on the wire here either: the request rides with the first
 // datagram and names its destination, as Xray and sing-box clients do. A UDP
 // session creates this only to send a packet, so no timer is needed.
-func (c *client) RequestDatagramOverStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
-	return newClientStreamDatagram(carrier, c.passwordHash), nil
+func (c *client) RequestDatagramOverStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
+	return newClientStreamDatagram(underlyingStream, c.passwordHash), nil
 }
 
 // requestOnFirstWriteStream puts the request in front of the first Write, or

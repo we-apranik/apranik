@@ -31,15 +31,15 @@ func newDatagramListener(bind spec.Endpoint, resolver resolverPolicy) (*datagram
 	return &datagramListener{bind: bind, resolver: resolver}, nil
 }
 
-// Port 0 in the bind address means "any free port". One carrier per listener:
+// Port 0 in the bind address means "any free port". One datagram per listener:
 // they would share the one connection, so the second caller's Close would take
-// the first caller's carrier down with it.
+// the first caller's datagram down with it.
 func (l *datagramListener) ListenDatagram(ctx context.Context) (spec.Datagram, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	if l.socket != nil {
-		return nil, fmt.Errorf("udp: listener on %s has already handed out its carrier", l.bind)
+		return nil, fmt.Errorf("udp: listener on %s has already handed out its datagram", l.bind)
 	}
 
 	if err := ctx.Err(); err != nil {

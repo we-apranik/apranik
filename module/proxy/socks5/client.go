@@ -16,10 +16,10 @@ type streamClient struct {
 	password string
 }
 
-// RequestStream speaks the client half of the handshake over a carrier that
+// RequestStream speaks the client half of the handshake over a stream that
 // already reaches the server. SOCKS5 round-trips, so an auth failure or a
 // refused destination surfaces here rather than on the first read.
-func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("socks5: %w: this client speaks CONNECT only", spec.ErrUnsupportedNetwork)
 	}
@@ -32,20 +32,20 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetDeadline(deadline)
-		defer carrier.SetDeadline(time.Time{})
+		underlyingStream.SetDeadline(deadline)
+		defer underlyingStream.SetDeadline(time.Time{})
 	}
 
 	offered := byte(wire.MethodNoAuth)
 	if c.username != "" {
 		offered = wire.MethodUserPass
 	}
-	if _, err := carrier.Write([]byte{wire.Version5, 1, offered}); err != nil {
+	if _, err := underlyingStream.Write([]byte{wire.Version5, 1, offered}); err != nil {
 		return nil, fmt.Errorf("socks5: sending greeting: %w", err)
 	}
 
 	var selection [2]byte
-	if _, err := io.ReadFull(carrier, selection[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, selection[:]); err != nil {
 		return nil, fmt.Errorf("socks5: reading method selection: %w", err)
 	}
 	if selection[0] != wire.Version5 {
@@ -60,17 +60,17 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 	}
 
 	if offered == wire.MethodUserPass {
-		if err := c.sendCredentials(carrier); err != nil {
+		if err := c.sendCredentials(underlyingStream); err != nil {
 			return nil, err
 		}
 	}
 
-	if _, err := carrier.Write(request); err != nil {
+	if _, err := underlyingStream.Write(request); err != nil {
 		return nil, fmt.Errorf("socks5: sending request: %w", err)
 	}
 
 	var reply [3]byte
-	if _, err := io.ReadFull(carrier, reply[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, reply[:]); err != nil {
 		return nil, fmt.Errorf("socks5: reading reply: %w", err)
 	}
 	if reply[0] != wire.Version5 {
@@ -80,24 +80,24 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 		return nil, &wire.ReplyError{Code: reply[1]}
 	}
 	// The bound address: read to keep the stream aligned, then discarded.
-	if _, err := socksaddr.ReadAddress(carrier); err != nil {
+	if _, err := socksaddr.ReadAddress(underlyingStream); err != nil {
 		return nil, fmt.Errorf("socks5: reading bound address: %w", err)
 	}
 
-	return carrier, nil
+	return underlyingStream, nil
 }
 
-func (c *streamClient) sendCredentials(carrier spec.Stream) error {
+func (c *streamClient) sendCredentials(underlyingStream spec.Stream) error {
 	message := []byte{wire.AuthVersion, byte(len(c.username))}
 	message = append(message, c.username...)
 	message = append(message, byte(len(c.password)))
 	message = append(message, c.password...)
-	if _, err := carrier.Write(message); err != nil {
+	if _, err := underlyingStream.Write(message); err != nil {
 		return fmt.Errorf("socks5: sending credentials: %w", err)
 	}
 
 	var status [2]byte
-	if _, err := io.ReadFull(carrier, status[:]); err != nil {
+	if _, err := io.ReadFull(underlyingStream, status[:]); err != nil {
 		return fmt.Errorf("socks5: reading credential status: %w", err)
 	}
 	if status[0] != wire.AuthVersion {

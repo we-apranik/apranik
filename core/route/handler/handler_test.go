@@ -16,7 +16,7 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// clientDatagram stands in for the carrier an inbound hands the handler for
+// clientDatagram stands in for the datagram an inbound hands the handler for
 // one UDP session, such as a SOCKS5 association.
 type clientDatagram struct {
 	outgoing chan spec.Destination

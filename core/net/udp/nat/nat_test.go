@@ -652,8 +652,8 @@ func TestEveryResolvedAddressIsAccepted(t *testing.T) {
 	first := netip.MustParseAddr("192.0.2.10")
 	second := netip.MustParseAddr("192.0.2.11")
 
-	carrier := &scriptedResolver{sentTo: []netip.Addr{first, second}, replies: make(chan spec.Destination, 4)}
-	dial := func(context.Context) (spec.Datagram, error) { return carrier, nil }
+	datagram := &scriptedResolver{sentTo: []netip.Addr{first, second}, replies: make(chan spec.Destination, 4)}
+	dial := func(context.Context) (spec.Datagram, error) { return datagram, nil }
 
 	natDatagram := newNAT(t, dial, policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering))
 	defer natDatagram.Close()
@@ -671,7 +671,7 @@ func TestEveryResolvedAddressIsAccepted(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewDestinationFromIP: %v", err)
 		}
-		carrier.replies <- replyFrom
+		datagram.replies <- replyFrom
 
 		from := expectArrival(t, arrivals, shortWait)
 		if domain, ok := from.Domain(); !ok || domain != "many.example" {
@@ -751,8 +751,8 @@ func requireArrival(t *testing.T, arrivals <-chan spec.Destination, wait time.Du
 func TestSharedAddressReportsTheDomainContactedOnThatPort(t *testing.T) {
 	shared := netip.MustParseAddr("192.0.2.50")
 
-	carrier := &scriptedResolver{sentTo: []netip.Addr{shared, shared}, replies: make(chan spec.Destination, 4)}
-	dial := func(context.Context) (spec.Datagram, error) { return carrier, nil }
+	datagram := &scriptedResolver{sentTo: []netip.Addr{shared, shared}, replies: make(chan spec.Destination, 4)}
+	dial := func(context.Context) (spec.Datagram, error) { return datagram, nil }
 
 	natDatagram := newNAT(t, dial, policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering))
 	defer natDatagram.Close()
@@ -772,7 +772,7 @@ func TestSharedAddressReportsTheDomainContactedOnThatPort(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewDestinationFromIP: %v", err)
 		}
-		carrier.replies <- replyFrom
+		datagram.replies <- replyFrom
 
 		from := requireArrival(t, arrivals, shortWait)
 		if from != expected {
@@ -786,8 +786,8 @@ func TestSharedAddressReportsTheDomainContactedOnThatPort(t *testing.T) {
 func TestAnAmbiguousSharedAddressIsNotTranslated(t *testing.T) {
 	shared := netip.MustParseAddr("192.0.2.51")
 
-	carrier := &scriptedResolver{sentTo: []netip.Addr{shared, shared}, replies: make(chan spec.Destination, 4)}
-	dial := func(context.Context) (spec.Datagram, error) { return carrier, nil }
+	datagram := &scriptedResolver{sentTo: []netip.Addr{shared, shared}, replies: make(chan spec.Destination, 4)}
+	dial := func(context.Context) (spec.Datagram, error) { return datagram, nil }
 
 	natDatagram := newNAT(t, dial, policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering))
 	defer natDatagram.Close()
@@ -803,7 +803,7 @@ func TestAnAmbiguousSharedAddressIsNotTranslated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDestinationFromIP: %v", err)
 	}
-	carrier.replies <- replyFrom
+	datagram.replies <- replyFrom
 
 	from := requireArrival(t, arrivals, shortWait)
 	if _, isDomain := from.Domain(); isDomain {
@@ -816,8 +816,8 @@ func TestAnAmbiguousSharedAddressIsNotTranslated(t *testing.T) {
 func TestALiteralDestinationIsNeverRelabelled(t *testing.T) {
 	shared := netip.MustParseAddr("192.0.2.52")
 
-	carrier := &scriptedResolver{sentTo: []netip.Addr{shared}, replies: make(chan spec.Destination, 4)}
-	dial := func(context.Context) (spec.Datagram, error) { return carrier, nil }
+	datagram := &scriptedResolver{sentTo: []netip.Addr{shared}, replies: make(chan spec.Destination, 4)}
+	dial := func(context.Context) (spec.Datagram, error) { return datagram, nil }
 
 	natDatagram := newNAT(t, dial, policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering))
 	defer natDatagram.Close()
@@ -834,7 +834,7 @@ func TestALiteralDestinationIsNeverRelabelled(t *testing.T) {
 	}
 
 	arrivals := startReading(t, natDatagram)
-	carrier.replies <- literal
+	datagram.replies <- literal
 
 	if from := requireArrival(t, arrivals, shortWait); from != literal {
 		t.Errorf("reply reported as %s, want the literal %s we contacted directly", from, literal)

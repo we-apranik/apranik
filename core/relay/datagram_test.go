@@ -1,4 +1,4 @@
-// Package relay_test drives the UDP relay loop with a fake client carrier and
+// Package relay_test drives the UDP relay loop with a fake client datagram and
 // fake outbounds, so what was routed and what was sent are both observable.
 package relay_test
 
@@ -30,9 +30,9 @@ func destinationOf(t *testing.T, host string, port uint16) spec.Destination {
 	return made
 }
 
-// clientCarrier stands in for the inbound's side: tests push packets in and
+// clientDatagram stands in for the inbound's side: tests push packets in and
 // read back whatever the loop writes towards the client.
-type clientCarrier struct {
+type clientDatagram struct {
 	outgoing chan spec.Destination
 	returned chan spec.Destination
 
@@ -41,15 +41,15 @@ type clientCarrier struct {
 	done   chan struct{}
 }
 
-func newClientCarrier() *clientCarrier {
-	return &clientCarrier{
+func newClientDatagram() *clientDatagram {
+	return &clientDatagram{
 		outgoing: make(chan spec.Destination, 16),
 		returned: make(chan spec.Destination, 16),
 		done:     make(chan struct{}),
 	}
 }
 
-func (c *clientCarrier) ReadFrom(payload []byte) (int, spec.Destination, error) {
+func (c *clientDatagram) ReadFrom(payload []byte) (int, spec.Destination, error) {
 	select {
 	case to := <-c.outgoing:
 		return copy(payload, []byte("packet")), to, nil
@@ -58,7 +58,7 @@ func (c *clientCarrier) ReadFrom(payload []byte) (int, spec.Destination, error) 
 	}
 }
 
-func (c *clientCarrier) WriteTo(payload []byte, from spec.Destination) (int, error) {
+func (c *clientDatagram) WriteTo(payload []byte, from spec.Destination) (int, error) {
 	select {
 	case c.returned <- from:
 		return len(payload), nil
@@ -67,7 +67,7 @@ func (c *clientCarrier) WriteTo(payload []byte, from spec.Destination) (int, err
 	}
 }
 
-func (c *clientCarrier) Close() error {
+func (c *clientDatagram) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.closed {
@@ -77,9 +77,9 @@ func (c *clientCarrier) Close() error {
 	return nil
 }
 
-func (c *clientCarrier) LocalAddr() net.Addr { return nil }
+func (c *clientDatagram) LocalAddr() net.Addr { return nil }
 
-type outboundCarrier struct {
+type outboundDatagram struct {
 	incoming chan spec.Destination
 	done     chan struct{}
 
@@ -88,11 +88,11 @@ type outboundCarrier struct {
 	closed  bool
 }
 
-func newOutboundCarrier() *outboundCarrier {
-	return &outboundCarrier{incoming: make(chan spec.Destination, 8), done: make(chan struct{})}
+func newOutboundDatagram() *outboundDatagram {
+	return &outboundDatagram{incoming: make(chan spec.Destination, 8), done: make(chan struct{})}
 }
 
-func (o *outboundCarrier) WriteTo(payload []byte, to spec.Destination) (int, error) {
+func (o *outboundDatagram) WriteTo(payload []byte, to spec.Destination) (int, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.closed {
@@ -102,7 +102,7 @@ func (o *outboundCarrier) WriteTo(payload []byte, to spec.Destination) (int, err
 	return len(payload), nil
 }
 
-func (o *outboundCarrier) ReadFrom(payload []byte) (int, spec.Destination, error) {
+func (o *outboundDatagram) ReadFrom(payload []byte) (int, spec.Destination, error) {
 	select {
 	case from := <-o.incoming:
 		return copy(payload, []byte("reply")), from, nil
@@ -111,7 +111,7 @@ func (o *outboundCarrier) ReadFrom(payload []byte) (int, spec.Destination, error
 	}
 }
 
-func (o *outboundCarrier) Close() error {
+func (o *outboundDatagram) Close() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if !o.closed {
@@ -121,9 +121,9 @@ func (o *outboundCarrier) Close() error {
 	return nil
 }
 
-func (o *outboundCarrier) LocalAddr() net.Addr { return nil }
+func (o *outboundDatagram) LocalAddr() net.Addr { return nil }
 
-func (o *outboundCarrier) writes() []spec.Destination {
+func (o *outboundDatagram) writes() []spec.Destination {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return append([]spec.Destination(nil), o.written...)
@@ -132,8 +132,8 @@ func (o *outboundCarrier) writes() []spec.Destination {
 type fakeOutbound struct {
 	tag string
 
-	mu       sync.Mutex
-	carriers []*outboundCarrier
+	mu        sync.Mutex
+	datagrams []*outboundDatagram
 }
 
 func (o *fakeOutbound) Tag() string              { return o.tag }
@@ -145,22 +145,22 @@ func (o *fakeOutbound) DialStream(context.Context, spec.Metadata) (spec.Stream, 
 }
 
 func (o *fakeOutbound) CreateDatagram(context.Context, spec.Metadata) (spec.Datagram, error) {
-	carrier := newOutboundCarrier()
+	datagram := newOutboundDatagram()
 	o.mu.Lock()
-	o.carriers = append(o.carriers, carrier)
+	o.datagrams = append(o.datagrams, datagram)
 	o.mu.Unlock()
-	return carrier, nil
+	return datagram, nil
 }
 
-func (o *fakeOutbound) onlyCarrier(t *testing.T) *outboundCarrier {
+func (o *fakeOutbound) onlyDatagram(t *testing.T) *outboundDatagram {
 	t.Helper()
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if len(o.carriers) != 1 {
-		t.Fatalf("outbound %q opened %d carriers, want 1", o.tag, len(o.carriers))
+	if len(o.datagrams) != 1 {
+		t.Fatalf("outbound %q opened %d datagrams, want 1", o.tag, len(o.datagrams))
 	}
-	return o.carriers[0]
+	return o.datagrams[0]
 }
 
 type countingRouter struct {
@@ -173,7 +173,7 @@ func (r *countingRouter) outboundForDestination(_ context.Context, destination s
 	return r.pick(destination)
 }
 
-func runLoop(t *testing.T, client *clientCarrier, router *countingRouter) *session.Session {
+func runLoop(t *testing.T, client *clientDatagram, router *countingRouter) *session.Session {
 	t.Helper()
 
 	udpSession := session.New(context.Background(), session.Config{})
@@ -200,7 +200,7 @@ func TestEveryPacketAsksForItsOutbound(t *testing.T) {
 	out := &fakeOutbound{tag: "freedom"}
 	router := &countingRouter{pick: func(spec.Destination) (component.Outbound, error) { return out, nil }}
 
-	client := newClientCarrier()
+	client := newClientDatagram()
 	runLoop(t, client, router)
 
 	first := destinationOf(t, "192.0.2.1", 53)
@@ -230,7 +230,7 @@ func TestABlockedDestinationDropsOnlyThatPacket(t *testing.T) {
 		return out, nil
 	}}
 
-	client := newClientCarrier()
+	client := newClientDatagram()
 	udpSession := runLoop(t, client, router)
 
 	client.outgoing <- blocked
@@ -238,7 +238,7 @@ func TestABlockedDestinationDropsOnlyThatPacket(t *testing.T) {
 
 	waitForWrites(t, out, 1)
 
-	if writes := out.onlyCarrier(t).writes(); len(writes) != 1 || writes[0] != allowed {
+	if writes := out.onlyDatagram(t).writes(); len(writes) != 1 || writes[0] != allowed {
 		t.Errorf("the outbound saw %v, want only %v", writes, allowed)
 	}
 
@@ -263,7 +263,7 @@ func TestTwoDestinationsLeaveThroughTwoOutboundsAndBothRepliesReturn(t *testing.
 		return game, nil
 	}}
 
-	client := newClientCarrier()
+	client := newClientDatagram()
 	runLoop(t, client, router)
 
 	client.outgoing <- dnsAddr
@@ -272,15 +272,15 @@ func TestTwoDestinationsLeaveThroughTwoOutboundsAndBothRepliesReturn(t *testing.
 	waitForWrites(t, dns, 1)
 	waitForWrites(t, game, 1)
 
-	if writes := dns.onlyCarrier(t).writes(); len(writes) != 1 || writes[0] != dnsAddr {
+	if writes := dns.onlyDatagram(t).writes(); len(writes) != 1 || writes[0] != dnsAddr {
 		t.Errorf("dns outbound saw %v, want [%v]", writes, dnsAddr)
 	}
-	if writes := game.onlyCarrier(t).writes(); len(writes) != 1 || writes[0] != gameAddr {
+	if writes := game.onlyDatagram(t).writes(); len(writes) != 1 || writes[0] != gameAddr {
 		t.Errorf("game outbound saw %v, want [%v]", writes, gameAddr)
 	}
 
-	dns.onlyCarrier(t).incoming <- dnsAddr
-	game.onlyCarrier(t).incoming <- gameAddr
+	dns.onlyDatagram(t).incoming <- dnsAddr
+	game.onlyDatagram(t).incoming <- gameAddr
 
 	seen := map[spec.Destination]bool{}
 	for range 2 {
@@ -303,8 +303,8 @@ func waitForWrites(t *testing.T, out *fakeOutbound, want int) {
 	for time.Now().Before(deadline) {
 		out.mu.Lock()
 		total := 0
-		for _, carrier := range out.carriers {
-			total += len(carrier.writes())
+		for _, datagram := range out.datagrams {
+			total += len(datagram.writes())
 		}
 		out.mu.Unlock()
 		if total >= want {

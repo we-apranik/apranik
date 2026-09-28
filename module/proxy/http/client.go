@@ -19,8 +19,8 @@ type streamClient struct {
 
 // RequestStream issues CONNECT and nothing else. Forwarding an absolute-form
 // request would mean parsing and rewriting the payload, which an outbound that
-// is handed an opaque carrier has no business doing.
-func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+// is handed an opaque stream has no business doing.
+func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("http: %w: CONNECT carries TCP only", spec.ErrUnsupportedNetwork)
 	}
@@ -31,8 +31,8 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetDeadline(deadline)
-		defer carrier.SetDeadline(time.Time{})
+		underlyingStream.SetDeadline(deadline)
+		defer underlyingStream.SetDeadline(time.Time{})
 	}
 
 	var request bytes.Buffer
@@ -42,11 +42,11 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 	}
 	request.WriteString("\r\n")
 
-	if _, err := carrier.Write(request.Bytes()); err != nil {
+	if _, err := underlyingStream.Write(request.Bytes()); err != nil {
 		return nil, fmt.Errorf("http: sending CONNECT: %w", err)
 	}
 
-	reader := wire.AcquireHeadReader(carrier)
+	reader := wire.AcquireHeadReader(underlyingStream)
 	defer wire.ReleaseHeadReader(reader)
 	statusLine, _, err := wire.ReadHead(reader)
 	if err != nil {
@@ -61,7 +61,7 @@ func (c *streamClient) RequestStream(ctx context.Context, carrier spec.Stream, m
 		return nil, &wire.StatusError{Code: code, Status: statusLine}
 	}
 
-	return wire.PrefixStream(carrier, nil, reader), nil
+	return wire.PrefixStream(underlyingStream, nil, reader), nil
 }
 
 func parseStatusCode(line string) (int, error) {

@@ -33,15 +33,15 @@ const (
 // becoming garbage.
 var headReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, BufferSize) }}
 
-// AcquireHeadReader returns a pooled reader over carrier. The caller must
+// AcquireHeadReader returns a pooled reader over underlyingReader. The caller must
 // ReleaseHeadReader it once the head is read and PrefixStream has been called.
-func AcquireHeadReader(carrier io.Reader) *bufio.Reader {
+func AcquireHeadReader(underlyingReader io.Reader) *bufio.Reader {
 	reader := headReaders.Get().(*bufio.Reader)
-	reader.Reset(carrier)
+	reader.Reset(underlyingReader)
 	return reader
 }
 
-// ReleaseHeadReader drops the reader's carrier and any bytes it still holds,
+// ReleaseHeadReader drops the reader's underlying reader and any bytes it still holds,
 // so a pooled reader never keeps a connection alive.
 func ReleaseHeadReader(reader *bufio.Reader) {
 	reader.Reset(nil)
@@ -57,7 +57,7 @@ func (e *StatusError) Error() string {
 	return fmt.Sprintf("http: proxy answered CONNECT with %q", e.Status)
 }
 
-// prefixStream replays bytes already read off the carrier before handing over
+// prefixStream replays bytes already read off the underlying stream before handing over
 // the rest. Both halves need it: clients pipeline payload straight after
 // CONNECT, and the reader used for the head will have swallowed it.
 type prefixStream struct {
@@ -68,9 +68,9 @@ type prefixStream struct {
 func (s *prefixStream) Read(buffer []byte) (int, error) { return s.reader.Read(buffer) }
 
 // PrefixStream returns a stream that yields head, then whatever the reader
-// buffered, then the carrier itself. The buffered bytes are copied, so the
+// buffered, then the underlying stream itself. The buffered bytes are copied, so the
 // reader can be released and reused.
-func PrefixStream(carrier spec.Stream, head []byte, buffered *bufio.Reader) spec.Stream {
+func PrefixStream(underlyingStream spec.Stream, head []byte, buffered *bufio.Reader) spec.Stream {
 	var readers []io.Reader
 	if len(head) > 0 {
 		readers = append(readers, bytes.NewReader(head))
@@ -80,9 +80,9 @@ func PrefixStream(carrier spec.Stream, head []byte, buffered *bufio.Reader) spec
 		readers = append(readers, bytes.NewReader(bytes.Clone(leftover)))
 	}
 	if len(readers) == 0 {
-		return carrier
+		return underlyingStream
 	}
-	return &prefixStream{Stream: carrier, reader: io.MultiReader(append(readers, carrier)...)}
+	return &prefixStream{Stream: underlyingStream, reader: io.MultiReader(append(readers, underlyingStream)...)}
 }
 
 func ReadHead(reader *bufio.Reader) (string, []string, error) {

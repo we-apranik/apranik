@@ -182,8 +182,8 @@ func isTimeout(err error) bool {
 // acceptingServer hands every stream straight through, with no handshake.
 type acceptingServer struct{}
 
-func (acceptingServer) AcceptStream(_ context.Context, carrier spec.Stream) (spec.Stream, spec.Metadata, error) {
-	return carrier, spec.Metadata{Network: spec.NetworkTCP}, nil
+func (acceptingServer) AcceptStream(_ context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
+	return underlyingStream, spec.Metadata{Network: spec.NetworkTCP}, nil
 }
 
 // holdingHandler keeps each stream open until the test lets it go.

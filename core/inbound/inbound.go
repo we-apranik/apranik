@@ -255,11 +255,11 @@ func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, 
 // Recording only when something may need it: identifying peeks, and a
 // fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
-	carrier := stream
+	handshakeStream := stream
 	var recording *peekable.Stream
 	if i.datagramServer != nil || i.fallback != nil {
 		recording = peekable.NewRecordingStream(stream)
-		carrier = recording
+		handshakeStream = recording
 	}
 
 	handshakeCtx, endHandshake := i.handshakeContext(ctx)
@@ -285,13 +285,13 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 		}
 	}
 
-	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, carrier)
+	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, handshakeStream)
 	endHandshake()
 	if err == nil || errors.Is(err, spec.ErrUDPAssociationRequested) {
 		stopRecording(recording)
 	}
 	if errors.Is(err, spec.ErrUDPAssociationRequested) {
-		i.handleUDPAssociate(ctx, handler, carrier, metadata)
+		i.handleUDPAssociate(ctx, handler, handshakeStream, metadata)
 		return
 	}
 	if err != nil {

@@ -81,16 +81,16 @@ func (o *streamOutbound) DialStream(ctx context.Context, metadata spec.Metadata)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, spec.ErrUnsupportedNetwork)
 	}
 
-	carrier, err := o.dialServer(ctx)
+	serverStream, err := o.dialServer(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	handshakeCtx, endHandshake := boundedContext(ctx, o.handshakeTimeout, DefaultHandshakeTimeout)
-	payload, err := o.proxyClient.RequestStream(handshakeCtx, carrier, metadata)
+	payload, err := o.proxyClient.RequestStream(handshakeCtx, serverStream, metadata)
 	endHandshake()
 	if err != nil {
-		carrier.Close()
+		serverStream.Close()
 		o.logger.Debug("Proxy handshake failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
@@ -104,16 +104,16 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, spec.ErrUnsupportedNetwork)
 	}
 
-	carrier, err := o.dialServer(ctx)
+	serverStream, err := o.dialServer(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	handshakeCtx, endHandshake := boundedContext(ctx, o.handshakeTimeout, DefaultHandshakeTimeout)
-	datagram, err := o.datagramClient.RequestDatagramOverStream(handshakeCtx, carrier, metadata)
+	datagram, err := o.datagramClient.RequestDatagramOverStream(handshakeCtx, serverStream, metadata)
 	endHandshake()
 	if err != nil {
-		carrier.Close()
+		serverStream.Close()
 		o.logger.Debug("Proxy handshake failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}
@@ -122,13 +122,13 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 
 func (o *streamOutbound) dialServer(ctx context.Context) (spec.Stream, error) {
 	dialCtx, endDial := boundedContext(ctx, o.dialTimeout, DefaultDialTimeout)
-	carrier, err := o.dialer.DialStream(dialCtx, o.serverAddr)
+	serverStream, err := o.dialer.DialStream(dialCtx, o.serverAddr)
 	endDial()
 	if err != nil {
 		o.logger.Debug("Dial to proxy server failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: reaching %s: %w", o.tag, o.serverAddr, err)
 	}
-	return carrier, nil
+	return serverStream, nil
 }
 
 func (o *streamOutbound) Close() error { return nil }

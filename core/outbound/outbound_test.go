@@ -30,13 +30,13 @@ func TestStreamOutboundRefusesDatagrams(t *testing.T) {
 		t.Errorf("Networks() = %v, want [tcp]", networks)
 	}
 
-	carrier, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
+	datagram, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
 	if !errors.Is(err, spec.ErrUnsupportedNetwork) {
 		t.Errorf("CreateDatagram: %v, want spec.ErrUnsupportedNetwork", err)
 	}
-	if carrier != nil {
-		carrier.Close()
-		t.Error("CreateDatagram returned a carrier")
+	if datagram != nil {
+		datagram.Close()
+		t.Error("CreateDatagram returned a datagram")
 	}
 }
 
@@ -150,17 +150,17 @@ func TestADialThatNeverAnswersIsBoundedByTheDialTimeout(t *testing.T) {
 	}
 }
 
-type connectedDialer struct{ carrier spec.Stream }
+type connectedDialer struct{ serverStream spec.Stream }
 
 func (d connectedDialer) DialStream(context.Context, spec.Destination) (spec.Stream, error) {
-	return d.carrier, nil
+	return d.serverStream, nil
 }
 
 func (connectedDialer) Close() error { return nil }
 
 type silentServerClient struct{}
 
-func (silentServerClient) RequestStream(ctx context.Context, carrier spec.Stream, _ spec.Metadata) (spec.Stream, error) {
+func (silentServerClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, _ spec.Metadata) (spec.Stream, error) {
 	<-ctx.Done()
 	return nil, ctx.Err()
 }
@@ -180,7 +180,7 @@ func TestAServerThatNeverAnswersTheHandshakeIsBounded(t *testing.T) {
 	proxy := outbound.NewStream(outbound.StreamConfig{
 		Tag:              "proxy",
 		ServerAddr:       server,
-		Dialer:           connectedDialer{carrier: pipeStream{outboundSide}},
+		Dialer:           connectedDialer{serverStream: pipeStream{outboundSide}},
 		ProxyClient:      silentServerClient{},
 		HandshakeTimeout: 100 * time.Millisecond,
 	})
@@ -209,15 +209,15 @@ func TestBlockRefusesBothNetworks(t *testing.T) {
 	}
 }
 
-// recordingDialer hands out one carrier and remembers where it was asked to go.
+// recordingDialer hands out one stream and remembers where it was asked to go.
 type recordingDialer struct {
-	carrier spec.Stream
-	dialed  chan spec.Destination
+	serverStream spec.Stream
+	dialed       chan spec.Destination
 }
 
 func (d recordingDialer) DialStream(_ context.Context, destination spec.Destination) (spec.Stream, error) {
 	d.dialed <- destination
-	return d.carrier, nil
+	return d.serverStream, nil
 }
 
 func (recordingDialer) Close() error { return nil }
@@ -229,15 +229,15 @@ type fakeDatagramOverStreamClient struct {
 	err       error
 }
 
-func (c fakeDatagramOverStreamClient) RequestDatagramOverStream(ctx context.Context, carrier spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
-	c.requested <- carrier
+func (c fakeDatagramOverStreamClient) RequestDatagramOverStream(ctx context.Context, underlyingStream spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
+	c.requested <- underlyingStream
 	if c.err != nil {
 		return nil, c.err
 	}
 	return fakeDatagram{}, nil
 }
 
-// closeRecordingStream reports whether the outbound closed its carrier.
+// closeRecordingStream reports whether the outbound closed its server stream.
 type closeRecordingStream struct {
 	pipeStream
 	closed chan struct{}
@@ -256,10 +256,10 @@ func proxyServer(t *testing.T) spec.Destination {
 
 // With a datagram-over-stream client, the proxy outbound declares UDP before
 // any packet, dials the proxy server -- never the packet's destination -- and
-// hands that carrier to the client.
+// hands that stream to the client.
 func TestStreamOutboundCarriesUDPInsideAStream(t *testing.T) {
-	carrier := pipeStream{}
-	dialer := recordingDialer{carrier: carrier, dialed: make(chan spec.Destination, 1)}
+	serverStream := pipeStream{}
+	dialer := recordingDialer{serverStream: serverStream, dialed: make(chan spec.Destination, 1)}
 	client := fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 1)}
 	server := proxyServer(t)
 
@@ -282,19 +282,19 @@ func TestStreamOutboundCarriesUDPInsideAStream(t *testing.T) {
 	if dialed := <-dialer.dialed; dialed != server {
 		t.Errorf("dialed %s, want the proxy server %s", dialed, server)
 	}
-	if handed := <-client.requested; handed != carrier {
-		t.Error("the client was not handed the dialed carrier")
+	if handed := <-client.requested; handed != serverStream {
+		t.Error("the client was not handed the dialed stream")
 	}
 }
 
 // A refused request must not leak the connection to the server.
-func TestAFailedDatagramRequestClosesTheCarrier(t *testing.T) {
-	carrier := closeRecordingStream{closed: make(chan struct{})}
+func TestAFailedDatagramRequestClosesTheServerStream(t *testing.T) {
+	serverStream := closeRecordingStream{closed: make(chan struct{})}
 	refusal := errors.New("refused")
 	proxy := outbound.NewStream(outbound.StreamConfig{
 		Tag:                      "proxy",
 		ServerAddr:               proxyServer(t),
-		Dialer:                   recordingDialer{carrier: carrier, dialed: make(chan spec.Destination, 1)},
+		Dialer:                   recordingDialer{serverStream: serverStream, dialed: make(chan spec.Destination, 1)},
 		DatagramOverStreamClient: fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 1), err: refusal},
 	})
 
@@ -303,9 +303,9 @@ func TestAFailedDatagramRequestClosesTheCarrier(t *testing.T) {
 		t.Errorf("CreateDatagram = %v, want the client's error", err)
 	}
 	select {
-	case <-carrier.closed:
+	case <-serverStream.closed:
 	default:
-		t.Error("the carrier to the server was left open")
+		t.Error("the stream to the server was left open")
 	}
 }
 
@@ -322,7 +322,7 @@ func TestADatagramRequestIsBoundedByTheHandshakeTimeout(t *testing.T) {
 	proxy := outbound.NewStream(outbound.StreamConfig{
 		Tag:                      "proxy",
 		ServerAddr:               proxyServer(t),
-		Dialer:                   recordingDialer{carrier: pipeStream{outboundSide}, dialed: make(chan spec.Destination, 1)},
+		Dialer:                   recordingDialer{serverStream: pipeStream{outboundSide}, dialed: make(chan spec.Destination, 1)},
 		DatagramOverStreamClient: silentDatagramClient{},
 		HandshakeTimeout:         100 * time.Millisecond,
 	})

@@ -13,7 +13,7 @@ import (
 // PROVISIONAL: 10 seconds.
 const DefaultDialTimeout = 10 * time.Second
 
-// Bounds the proxy handshake with the server once the carrier is up.
+// Bounds the proxy handshake with the server once the server stream is up.
 // PROVISIONAL: 10 seconds.
 const DefaultHandshakeTimeout = 10 * time.Second
 

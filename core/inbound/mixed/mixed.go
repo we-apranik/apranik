@@ -31,21 +31,21 @@ var _ spec.UDPAssociateHandler = (*streamServer)(nil)
 
 // Exactly one byte: on UDP ASSOCIATE core hands Associate its own carrier,
 // not the peekable one made here, so nothing may stay buffered in it.
-func (s *streamServer) AcceptStream(ctx context.Context, carrier spec.Stream) (spec.Stream, spec.Metadata, error) {
-	peekableCarrier := peekable.NewStream(carrier)
+func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
+	peekableStream := peekable.NewStream(underlyingStream)
 	if deadline, ok := ctx.Deadline(); ok {
-		carrier.SetReadDeadline(deadline)
+		underlyingStream.SetReadDeadline(deadline)
 	}
-	firstByte, err := peekableCarrier.PeekExactly(1)
-	carrier.SetReadDeadline(time.Time{})
+	firstByte, err := peekableStream.PeekExactly(1)
+	underlyingStream.SetReadDeadline(time.Time{})
 	if err != nil {
 		return nil, spec.Metadata{}, fmt.Errorf("mixed: reading the first byte: %w", err)
 	}
 
 	if firstByte[0] == socks5VersionByte {
-		return s.socks5Server.AcceptStream(ctx, peekableCarrier)
+		return s.socks5Server.AcceptStream(ctx, peekableStream)
 	}
-	return s.httpServer.AcceptStream(ctx, peekableCarrier)
+	return s.httpServer.AcceptStream(ctx, peekableStream)
 }
 
 func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) {

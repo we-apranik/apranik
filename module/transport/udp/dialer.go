@@ -44,7 +44,7 @@ func (datagramDialer) Close() error { return nil }
 // would be a real exposure.
 //
 // An address narrows the socket to its own family; without one it stays
-// dual-stack, so a single carrier reaches both IPv4 and IPv6 peers.
+// dual-stack, so a single datagram reaches both IPv4 and IPv6 peers.
 func localAddrSource(localAddr spec.Endpoint) (string, string) {
 	if !localAddr.IsValid() {
 		if localAddr.Port() == 0 {
