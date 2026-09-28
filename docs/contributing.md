@@ -85,10 +85,14 @@ Steps:
 7. **Register.** Add the one line to `registry.Default()`. The name from `Info` is
    now valid as a `"type"` in config files.
 
-An overlay transport is the same, but implements `spec.OverlayStreamTransportModule`
-(`WrapStreamDialer`, `WrapStreamListener`) and registers with
-`RegisterOverlayStream`. It receives the layer below already built and must never
-open its own connection.
+An overlay stream transport (example: `module/transport/tls`) implements
+`spec.OverlayStreamTransportModule` and registers with `RegisterOverlayStream`.
+`NewStreamOverlayClient` and `NewStreamOverlayServer` build, once, what every
+connection shares (certificates, keys) and refuse a setting their role needs but
+lacks. The components they return wrap one stream each
+(`WrapClientStream`, `WrapServerStream`): take the stream below, do the
+handshake within `ctx`, return the stream above. Never open a connection, start
+a goroutine per connection, or close the stream below on error; core does.
 
 ## Adding a new proxy protocol
 

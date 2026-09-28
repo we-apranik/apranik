@@ -55,7 +55,7 @@ Early and working. Standard library only; no third-party dependencies.
 
 | Area | Available |
 | --- | --- |
-| Transports | `tcp` (base stream), `udp` (base datagram) |
+| Transports | `tcp` (base stream), `udp` (base datagram), `tls` (stream overlay) |
 | Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; plaintext until TLS exists) |
 | Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
 | Outbounds | proxy outbounds over any stream transport, `freedom` (straight to the destination) and `block` (refuses everything) |
@@ -63,9 +63,8 @@ Early and working. Standard library only; no third-party dependencies.
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
 | Configuration | JSON config file, validated in full before anything starts |
 
-Not yet: overlay transports (TLS is next, and is the first real test of
-composition), routing rules (every request uses the first outbound), sniffing
-UDP, and QUIC.
+Not yet: overlay transports other than `tls` (WebSocket is next), routing rules
+(every request uses the first outbound), sniffing UDP, and QUIC.
 
 ## Quick start
 
@@ -296,9 +295,9 @@ else's repository.
   a domain all the way down: **only the base transport resolves**, so a poisoned
   local DNS answer never reaches a proxy protocol's decisions.
 - **Base and overlay transports.** A base transport creates a connection (TCP,
-  UDP); an overlay wraps one (TLS, WebSocket). Overlays wrap dialers and
-  listeners, so a stack is a fold the builder runs without knowing what any
-  layer is.
+  UDP); an overlay wraps one (TLS, WebSocket), one connection at a time, inside
+  core's timeouts. A stack is a fold core runs without knowing what any layer
+  is.
 - **Three proxy shapes**, because carrier and payload are independent:
   `Stream → Stream`, `Stream → Datagram` (UDP over a stream, as VLESS does), and
   `Datagram → Datagram` (native UDP). A proxy protocol never opens a connection;

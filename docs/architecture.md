@@ -36,12 +36,14 @@ expected to build a `Stream` internally (Decided; none exists yet).
 exactly one of a domain or an IP, plus a port. A domain stays a domain until the
 base transport, which is the only layer that resolves.
 
-**Transport kinds.** A base transport creates connections; an overlay wraps them:
+**Transport kinds.** A base transport creates connections; an overlay wraps them.
+A stream overlay works on one stream at a time: it builds a client and a server
+once, and each wraps one connection:
 
 | Kind | Methods |
 | --- | --- |
 | `BaseStreamTransportModule` | `NewStreamDialer`, `NewStreamListener` |
-| `OverlayStreamTransportModule` | `WrapStreamDialer`, `WrapStreamListener` |
+| `OverlayStreamTransportModule` | `NewStreamOverlayClient` → `WrapClientStream`, `NewStreamOverlayServer` → `WrapServerStream` |
 | `BaseDatagramTransportModule` | `NewDatagramDialer`, `NewDatagramListener` |
 | `OverlayDatagramTransportModule` | `WrapDatagramDialer`, `WrapDatagramListener` |
 
@@ -103,8 +105,11 @@ layer is.
 
 
 > [!NOTE]
-> No overlay transport exists yet, so today every stack is a single base
-> transport and `Wrap*` is never called. TLS is planned as the first real test.
+> Stream overlays run per connection. Outbound, the builder composes the base
+> dialer and each overlay's client into one dialer. Inbound, the listener is the
+> base alone, and `core/inbound` runs each overlay's server side in the
+> connection's own goroutine, under the handshake timeout, so a client that
+> stalls a TLS handshake holds up nobody else. `tls` is the one overlay built.
 
 ## Shared helper packages
 
