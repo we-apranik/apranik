@@ -56,15 +56,18 @@ Early and working. Standard library only; no third-party dependencies.
 | Area | Available |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram), `tls`, `ws` and `httpupgrade` (stream overlays) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; plaintext until TLS exists) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`) |
 | Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
-| Outbounds | proxy outbounds over any stream transport, `freedom` (straight to the destination) and `block` (refuses everything) |
+| Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan), `freedom` (straight to the destination) and `block` (refuses everything) |
 | Sniffers | `tls` (SNI from a ClientHello), `http` (Host header), per inbound, off by default |
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
 | Configuration | JSON config file, validated in full before anything starts |
 
-Not yet: multiplexing transports (HTTP/2, gRPC), routing rules (every request
-uses the first outbound), sniffing UDP, and QUIC.
+Not yet: multiplexing transports (HTTP/2, gRPC), VLESS, uTLS, routing rules
+(every request uses the first outbound), sniffing UDP, and QUIC.
+
+Complete server and client configs for Trojan over TLS, WebSocket and
+HTTPUpgrade are in [docs/configuration/examples.md](docs/configuration/examples.md).
 
 ## Quick start
 
@@ -159,13 +162,14 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `tag` | name used in logs |
 | `listen`, `port` | IP address and port to listen on; an address is required, so nothing is exposed on every interface by omission |
 | `network` | `tcp` (default) or `udp` |
-| `handshake_timeout` | how long a client may take to finish the proxy handshake; default `10s`, negative disables |
+| `handshake_timeout` | how long a client may take to finish its handshakes, overlays (TLS, WebSocket) and proxy together; default `10s`, negative disables |
 | `tcp_idle_timeout` | a TCP connection silent in both directions for this long is closed; default `5m`, negative disables |
 | `max_connections` | connections held at once; one more is closed as soon as it is accepted; default `0`, no limit |
 | `udp_session_idle_timeout` | a UDP session silent for this long is ended; default `5m` |
-| `transport` | the transport stack, base first, e.g. `[{ "type": "tcp" }]` |
+| `transport` | the transport stack, base first, e.g. `[{ "type": "tcp" }, { "type": "tls", ... }]` |
 | `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
 | `sniffing` | absent means off; see below |
+| `fallback` | `{ "server", "server_port" }`: where a request the protocol refuses is replayed (Trojan) |
 
 ### Sniffing (`inbounds[].sniffing`)
 
@@ -186,10 +190,10 @@ inbounds only, for now.
 | Key | Meaning |
 | --- | --- |
 | `tag` | name used in logs |
-| `protocol` | a proxy protocol such as `socks5` or `http`, or one of the special protocols `freedom` and `block` |
+| `protocol` | a proxy protocol such as `socks5`, `http` or `trojan`, or one of the special protocols `freedom` and `block` |
 | `server`, `server_port` | the proxy server to reach; proxy protocols only |
 | `transport` | the transport stack used to reach the server; proxy protocols only |
-| `dial_timeout` | how long to wait for a connection to the server (or, for freedom, the destination); default `10s`, negative disables; not with `block` |
+| `dial_timeout` | how long to wait for a connection to the server (or, for freedom, the destination), overlay handshakes included; default `10s`, negative disables; not with `block` |
 | `handshake_timeout` | how long the proxy handshake with the server may take; proxy protocols only; default `10s`, negative disables |
 
 ### Special inbound protocol
@@ -245,8 +249,12 @@ anyone who can reach the socket inject packets into a session.
 | --- | --- |
 | `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`) |
 | `udp` | `resolve_timeout` (default `5s`): longest a domain lookup may take; `resolve_cache_ttl` (default `30s`): how long a resolved domain is reused |
+| `tls` | client: `server_name`, `insecure`, `certificate_authorities`; server: `certificates` (file or inline PEM); both: `alpn`, `min_version` (default `1.2`), `max_version` (default `1.3`) |
+| `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `max_early_data` (default `0`), `early_data_header_name` (default `Sec-WebSocket-Protocol`) |
+| `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |
 | `http` | `username`, `password` |
+| `trojan` | server: `users` (`[{ name, password }]`); client: `password` |
 
 An inbound with no username is accepted with a warning: anyone who can reach it
 may use it.
@@ -273,13 +281,14 @@ environment variable turns color off regardless.
 
 ### Layers
 
-[![Layers and import direction: cmd/apranik imports config, config imports core, core's registry names the modules, and modules implement spec. Every layer imports spec directly; modules may also import config/types. spec imports nothing from the project.](docs/assets/diagrams/architecture-overview.excalidraw.svg)](docs/assets/diagrams/architecture-overview.excalidraw.svg)
+[![Layers and import direction: cmd/apranik imports config, config imports core, core's registry names the modules, modules may import shared helper packages, and everything implements or uses spec. Every layer imports spec directly; spec imports nothing from the project. Modules also use config/types for shared JSON values.](docs/assets/diagrams/architecture-overview.excalidraw.svg)](docs/assets/diagrams/architecture-overview.excalidraw.svg)
 
 | Layer | Holds | May import |
 | --- | --- | --- |
-| `spec` | every interface and the address types; no state, no logic | nothing from the project |
-| `module` | transports and proxy protocols, one folder each | `spec`, and `config/types` for shared JSON values |
-| `core` | building, routing, relaying, UDP sessions and NAT | `spec` and modules |
+| `spec` | the module contract: interfaces, address types, sentinel errors; no state | nothing from the project |
+| `shared` | helpers two modules need, one concept each (`socksaddr`, `websocket/handshake`) | `spec` and the standard library |
+| `module` | transports, proxy protocols and sniffers, one folder each | `spec`, `shared`, and `config/types` for shared JSON values |
+| `core` | building, routing, relaying, UDP sessions and NAT | `spec`, `shared` and modules |
 | `config` | JSON config file to a blueprint | `spec`, `core` |
 
 Modules never import core. A module is a folder that could live in someone
@@ -298,18 +307,20 @@ else's repository.
   UDP); an overlay wraps one (TLS, WebSocket), one connection at a time, inside
   core's timeouts. A stack is a fold core runs without knowing what any layer
   is.
-- **Three proxy shapes**, because carrier and payload are independent:
-  `Stream → Stream`, `Stream → Datagram` (UDP over a stream, as VLESS does), and
-  `Datagram → Datagram` (native UDP). A proxy protocol never opens a connection;
-  it is handed a carrier.
-- **Wrapper, not pump.** A proxy protocol returns a carrier and core copies the
-  bytes, so protocols and transports stay the same shape.
+- **Three proxy shapes**, because what sits below a protocol and what it returns
+  are independent: `Stream → Stream`, `Stream → Datagram` (UDP over a stream, as
+  Trojan and VLESS do), and `Datagram → Datagram` (native UDP). A proxy protocol
+  never opens a connection; it is handed an underlying stream.
+- **Wrapper, not pump.** A proxy protocol returns a stream or datagram and core
+  copies the bytes, so protocols and transports stay the same shape.
 
 ### A TCP connection
 
 [![Sequence of one TCP connection: the client connects to core/inbound, the socks5 server negotiates and returns the payload stream and Metadata, core/sniff optionally peeks and replays, the handler asks the router, freedom dials the destination through the tcp module, and core/relay copies bytes both ways with half-close.](docs/assets/diagrams/tcp-lifecycle.excalidraw.svg)](docs/assets/diagrams/tcp-lifecycle.excalidraw.svg)
 
-1. An inbound accepts a connection through its transport stack.
+1. An inbound accepts a connection on its base transport and, in that
+   connection's own goroutine, runs any overlays (a TLS handshake, a WebSocket
+   upgrade).
 2. The proxy protocol reads the handshake and returns the payload and its
    `Metadata`: where the client wants to go.
 3. The traffic handler asks the **router** for an outbound.
@@ -322,7 +333,7 @@ else's repository.
 UDP has no connection, so a single client flow can reach many destinations,
 each possibly through a different outbound. Three pieces handle that:
 
-[![One UDP session: the client's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for an outbound and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram. The router is shared; another client has its own session and NAT.](docs/assets/diagrams/udp-session-structure.excalidraw.svg)](docs/assets/diagrams/udp-session-structure.excalidraw.svg)
+[![One UDP session: client A's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for an outbound and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram with its local socket reaching several destinations. The router is shared. Client B has its own session and NAT, so replies never cross.](docs/assets/diagrams/udp-session-structure.excalidraw.svg)](docs/assets/diagrams/udp-session-structure.excalidraw.svg)
 
 - **The handler routes.** For each packet the relay asks the handler which
   outbound to use; the handler asks the router once per *new destination* and
