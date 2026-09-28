@@ -3,7 +3,8 @@
 An overlay stream transport: WebSocket (RFC 6455) over HTTP/1.1, on top of the
 layer below it. Used to pass through CDNs and HTTP reverse proxies, usually
 with [`tls`](tls.md) below it or at the CDN. Compatible with Xray's and
-sing-box's WebSocket transports, early data included.
+sing-box's WebSocket transports, early data included; see
+[how it differs from `httpupgrade`](index.md#choosing-a-stack).
 
 ## Structure
 

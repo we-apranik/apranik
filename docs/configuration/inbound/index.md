@@ -82,8 +82,10 @@ proxy protocol exists yet.
 <span class="cfg cfg-type">list of modules</span>
 <span class="cfg cfg-req">Required</span>
 
-The [transport stack](../transport/index.md), base transport first. Today that is
-`[{ "type": "tcp" }]`.
+The [transport stack](../transport/index.md), base transport first, then any
+overlays: `[{ "type": "tcp" }]`, or for example
+`[{ "type": "tcp" }, { "type": "tls", ... }, { "type": "ws", ... }]`. Overlays
+run once per accepted connection, inside `handshake_timeout`.
 
 ### `protocol`
 
@@ -117,12 +119,18 @@ from its first byte over plain TCP. Connections that close, reset or stay silent
 are closed, not forwarded. Today only [`trojan`](../protocol/trojan.md) refuses
 into a fallback.
 
+The fallback receives what the client sent inside the overlays: behind `tls` it
+gets the decrypted HTTP request, not TLS records. A client that fails an overlay
+handshake (not TLS at all, or a wrong WebSocket path, which gets a `404`) is
+closed, not forwarded.
+
 ### `handshake_timeout`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>10s</code></span>
 
-How long a client has to finish the proxy handshake. Negative disables.
+How long a client has to finish its handshakes: every overlay's (TLS,
+WebSocket upgrade) and then the proxy protocol's, together. Negative disables.
 
 ### `tcp_idle_timeout`
 

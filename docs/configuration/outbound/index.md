@@ -69,7 +69,10 @@ A name unique among outbounds. It appears in logs.
 <span class="cfg cfg-note">proxy protocols only</span>
 
 The proxy server: an IP or a domain. A domain is resolved by the base transport
-when it dials.
+when it dials. Overlays that need a name use it too: [`tls`](../transport/tls.md)
+sends a domain `server` as the SNI unless `server_name` is set, and
+[`ws`](../transport/ws.md) and [`httpupgrade`](../transport/httpupgrade.md) send
+it as the `Host` unless `host` is set.
 
 ### `server_port`
 
@@ -86,15 +89,17 @@ The proxy server's port.
 <span class="cfg cfg-note">proxy protocols only</span>
 
 The [transport stack](../transport/index.md) used to reach the server, base
-transport first.
+transport first, then any overlays, for example
+`[{ "type": "tcp" }, { "type": "tls" }]`.
 
 ### `dial_timeout`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>10s</code></span>
 
-How long reaching the server may take (for `freedom`, the destination). Negative
-disables. Not for `block`.
+How long reaching the server may take (for `freedom`, the destination),
+including every overlay's handshake (TLS, WebSocket upgrade). Negative disables.
+Not for `block`.
 
 ### `handshake_timeout`
 

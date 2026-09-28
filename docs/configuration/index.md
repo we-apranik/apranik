@@ -58,6 +58,8 @@ setting. Set `false` only to share one file with a newer core.
 
 ## Checking a config file
 
+See [Command line](../cli.md) for every command and flag.
+
 ```sh
 apranik check -config config.json    # report every problem, run nothing
 apranik run   -config config.json    # check, then serve until interrupted
@@ -89,7 +91,9 @@ The steps split along one line, **reading** and **running**:
   conflicting pair, an unsafe value. It opens nothing, so `apranik check` works on
   a machine that could never run the config file.
 - `core/builder` turns a clean config into running components. It binds
-  listeners at build time, so a port conflict is a startup error.
+  listeners and loads files a module needs (TLS certificates, for example) at
+  build time, so a port conflict or an unreadable certificate is a startup
+  error from `apranik run`. `apranik check` does not get that far.
 
 ## Value types
 
@@ -120,7 +124,9 @@ overrides only what it names; everything else keeps the module's default.
 
     ---
 
-    [`tcp`](transport/tcp.md) · [`udp`](transport/udp.md), stacked as
+    [`tcp`](transport/tcp.md) · [`udp`](transport/udp.md) as bases;
+    [`tls`](transport/tls.md) · [`ws`](transport/ws.md) ·
+    [`httpupgrade`](transport/httpupgrade.md) as overlays, stacked as
     described in [Transport](transport/index.md).
 
 -   :material-magnify-scan:{ .lg .middle } **Sniffers**
@@ -146,12 +152,14 @@ Some findings do not stop Apranik but deserve attention, for example:
 - an inbound with no username: anyone who can reach it may use it;
 - `endpoint-independent` NAT filtering: an off-path sender can inject packets;
 - a sniffing timeout over 5 seconds;
+- TLS with `insecure` on, or a `min_version` below 1.2;
 - no log outputs;
 - more than one outbound: there are no routing rules yet, so only the first is
   used (logged by `apranik run`).
 
 Trojan has no encryption of its own; a Trojan stack without
-[`tls`](transport/tls.md) sends its password hash and payload in the clear.
+[`tls`](transport/tls.md) (on the stack or at a CDN in front) sends its password
+hash and payload in the clear. [Examples](examples.md) has complete setups.
 
 ## Writing a config in Go
 

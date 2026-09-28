@@ -5,7 +5,7 @@ with, then the payload as raw bytes, with no WebSocket framing. Like
 [`ws`](ws.md) it passes CDNs and HTTP reverse proxies, at no cost after the
 handshake, but only through ones that relay an upgraded connection without
 checking its frames (Cloudflare does, in practice). Compatible with Xray's and
-sing-box's `httpupgrade`.
+sing-box's `httpupgrade`; see [how it differs from `ws`](index.md#choosing-a-stack).
 
 ## Structure
 

@@ -30,3 +30,15 @@ left out for the module's defaults.
 An inbound's stack listens; an outbound's stack reaches the proxy server. The same
 overlay twice in one stack is allowed (TLS inside TLS is a real technique), with a
 warning.
+
+## Choosing a stack
+
+| Goal | Stack |
+| --- | --- |
+| Look like an HTTPS site | `tcp → tls` |
+| Pass a CDN or HTTP reverse proxy | `tcp → tls → ws`, or `tcp → ws` when the CDN ends TLS |
+| The same, with no cost after the handshake | `httpupgrade` in place of `ws`, where nothing checks WebSocket frames |
+
+[![What ws and httpupgrade put on the wire: both send the same HTTP/1.1 upgrade request and get a 101 answer; ws then carries the payload in WebSocket frames with a header and, from the client, a mask; httpupgrade carries the payload as raw bytes.](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)
+
+[Examples](../examples.md) has complete server and client files for each.
