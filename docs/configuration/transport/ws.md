@@ -63,15 +63,16 @@ data there and echoes the header. Set it to `""` for sing-box's path mode, where
 early data is appended to the path; a server then accepts it only when
 `max_early_data` is above 0.
 
-## Outbound
-
 ### `host`
 
 <span class="cfg cfg-type">string</span>
-<span class="cfg cfg-def">Default: the server's address</span>
 
-The `Host` header, which a CDN routes on. It may differ from the TLS
-`server_name` and from the address dialed.
+Outbound: the `Host` header, which a CDN routes on; default the server's
+address. It may differ from the TLS `server_name` and from the address dialed.
+Inbound: if set, the `Host` a request must carry (case and port ignored); any
+other gets a `400`. Unset accepts any.
+
+## Outbound
 
 ### `headers`
 
