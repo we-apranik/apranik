@@ -17,10 +17,6 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// foreignConfig satisfies spec.Config without being http's own type. Since
-// spec.Config replaced any, a plain string no longer compiles here at all.
-type foreignConfig struct{}
-
 func domainDst(domain string, port uint16) spec.Destination {
 	destination, err := spec.NewDestinationFromDomain(domain, port)
 	if err != nil {
@@ -36,8 +32,6 @@ func ipDst(ip string, port uint16) spec.Destination {
 	}
 	return destination
 }
-
-func (foreignConfig) Validate() error { return nil }
 
 // pipeStream adapts net.Pipe to spec.Stream. CloseWrite reports
 // spec.ErrNoHalfClose, so these tests run over a stream weaker than TCP.

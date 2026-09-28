@@ -18,8 +18,6 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-const shortWait = 500 * time.Millisecond
-
 func destinationOf(t *testing.T, host string, port uint16) spec.Destination {
 	t.Helper()
 
