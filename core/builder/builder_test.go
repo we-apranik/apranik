@@ -48,14 +48,14 @@ func (o countingOverlay) note() {
 	*o.applied = append(*o.applied, o.label)
 }
 
-func (o countingOverlay) WrapStreamDialer(inner spec.StreamDialer) (spec.StreamDialer, error) {
+func (o countingOverlay) WrapStreamDialer(underlyingDialer spec.StreamDialer) (spec.StreamDialer, error) {
 	o.note()
-	return inner, nil
+	return underlyingDialer, nil
 }
 
-func (o countingOverlay) WrapStreamListener(inner spec.StreamListener) (spec.StreamListener, error) {
+func (o countingOverlay) WrapStreamListener(underlyingListener spec.StreamListener) (spec.StreamListener, error) {
 	o.note()
-	return inner, nil
+	return underlyingListener, nil
 }
 
 func TestStreamTransportStackComposesOutwardFromTheWire(t *testing.T) {

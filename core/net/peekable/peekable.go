@@ -27,7 +27,7 @@ var (
 type Stream struct {
 	spec.Stream
 
-	// Bytes taken from the inner stream and not yet dropped. With recording
+	// Bytes taken from the underlying stream and not yet dropped. With recording
 	// on, this starts at the first byte ever read.
 	buffered []byte
 
@@ -40,12 +40,12 @@ type Stream struct {
 
 var _ spec.PeekableStream = (*Stream)(nil)
 
-func NewStream(inner spec.Stream) *Stream { return &Stream{Stream: inner} }
+func NewStream(underlyingStream spec.Stream) *Stream { return &Stream{Stream: underlyingStream} }
 
 // NewRecordingStream keeps everything read until StopRecording, so Rewind can
 // replay it.
-func NewRecordingStream(inner spec.Stream) *Stream {
-	return &Stream{Stream: inner, recording: true}
+func NewRecordingStream(underlyingStream spec.Stream) *Stream {
+	return &Stream{Stream: underlyingStream, recording: true}
 }
 
 func (s *Stream) Peek(n int) ([]byte, error) { return s.peek(n, true) }

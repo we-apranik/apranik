@@ -209,7 +209,7 @@ type PeekableStream interface {
 	Peek(n int) ([]byte, error)
 
 	// PeekExactly is Peek that never reads past n, so once those bytes are
-	// read nothing stays buffered and the inner stream can be handed on.
+	// read nothing stays buffered and the underlying stream can be handed on.
 	PeekExactly(n int) ([]byte, error)
 }
 
@@ -336,7 +336,7 @@ type Config interface {
 //
 //	["tcp", "tls", "ws"]  =>  TCP, then TLS over it, then WebSocket over that
 //
-// So the inner passed to a Wrap* method is everything below it, already built.
+// So what a Wrap* method is passed is everything below it, already built.
 // A base takes nothing. Arbitrary depth is permitted but is not a goal: the
 // point is that any overlay substitutes for any other.
 
@@ -360,8 +360,8 @@ type BaseStreamTransportModule interface {
 type OverlayStreamTransportModule interface {
 	Config
 	Info() ModuleInfo
-	WrapStreamDialer(inner StreamDialer) (StreamDialer, error)
-	WrapStreamListener(inner StreamListener) (StreamListener, error)
+	WrapStreamDialer(underlyingDialer StreamDialer) (StreamDialer, error)
+	WrapStreamListener(underlyingListener StreamListener) (StreamListener, error)
 }
 
 // BaseDatagramTransportModule: UDP.
@@ -376,8 +376,8 @@ type BaseDatagramTransportModule interface {
 type OverlayDatagramTransportModule interface {
 	Config
 	Info() ModuleInfo
-	WrapDatagramDialer(inner DatagramDialer) (DatagramDialer, error)
-	WrapDatagramListener(inner DatagramListener) (DatagramListener, error)
+	WrapDatagramDialer(underlyingDialer DatagramDialer) (DatagramDialer, error)
+	WrapDatagramListener(underlyingListener DatagramListener) (DatagramListener, error)
 }
 
 // Metadata is what the client asked for. It is the only thing that crosses

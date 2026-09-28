@@ -43,7 +43,7 @@ type Inbound interface {
 //
 // Shares a name with spec.StreamDialer.DialStream at a different signature, so
 // no type can be both. Accepted: core only ever holds an Outbound as an
-// Outbound. An Outbound that must act as an inner dialer needs an adapter
+// Outbound. An Outbound that must act as an underlying dialer needs an adapter
 // holding it as a field rather than embedding it.
 type Outbound interface {
 	Tag() string

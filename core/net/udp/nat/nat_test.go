@@ -518,11 +518,11 @@ func TestConcurrentFirstWritesLeaveOneSocket(t *testing.T) {
 		opened []*trackedDatagram
 	)
 	dial := func(ctx context.Context) (spec.Datagram, error) {
-		inner, err := real.CreateDatagram(ctx, spec.Endpoint{})
+		underlyingDatagram, err := real.CreateDatagram(ctx, spec.Endpoint{})
 		if err != nil {
 			return nil, err
 		}
-		tracked := &trackedDatagram{Datagram: inner}
+		tracked := &trackedDatagram{Datagram: underlyingDatagram}
 		mu.Lock()
 		opened = append(opened, tracked)
 		mu.Unlock()
