@@ -8,7 +8,7 @@ bottom layer, `spec`, imports nothing from the project.
 
 | Layer | Holds | May import |
 | --- | --- | --- |
-| `spec` | every interface, the address types and the sentinel errors; no state | nothing from the project |
+| `spec` | the module contract: interfaces, the address types and the sentinel errors; no state | nothing from the project |
 | `module/*` | transports, proxy protocols and sniffers, one folder each | `spec`, and `config/types` for shared JSON values |
 | `core/*` | registry, building, routing, relaying, UDP sessions and NAT, logging | `spec` and modules |
 | `config` | the JSON config file → `blueprint.Blueprint` | `spec`, `core` |
@@ -61,9 +61,12 @@ carrier ("wrapper, not pump"); core runs the copy loop.
 **Sniffer.** `Sniff(payloadPrefix []byte) (SniffResult, error)`, returning
 `ErrSniffNeedMoreData` while the bytes so far are only a prefix.
 
-**Core-facing interfaces.** `Metadata` (network, destination, source, inbound
-tag, user, sniff result), `Router`, `TrafficHandler`, `Inbound`, `Outbound`, and
-`UDPAssociateSocketFunc` for SOCKS5's second socket.
+**Core-facing declarations.** `Metadata` (network, destination, source, inbound
+tag, user, sniff result), and for SOCKS5's second socket
+`UDPAssociateSocketFunc` plus the optional `UDPAssociateHandler` a proxy server
+implements to receive it. `Router`, `TrafficHandler`, `Inbound` and `Outbound`
+are not module contract: modules never use them, so they live in
+`core/component`.
 
 Every module kind embeds `Config` (`Validate() error`, `Warnings() []string`) and
 has `Info() ModuleInfo`. The module value *is* its configuration: core decodes the
@@ -115,13 +118,13 @@ a design note.
 | --- | --- |
 | `core/registry` | name → module constructor, per kind, with clear errors for a name used in the wrong position |
 | `core/blueprint` | a validated description of every inbound and outbound; nothing is opened |
-| `core/builder` | blueprint → `spec.Inbound` / `spec.Outbound`; folds stacks; grants the UDP associate socket |
+| `core/builder` | blueprint → `component.Inbound` / `component.Outbound`; folds stacks; grants the UDP associate socket |
 | `core/inbound` | accept loop, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
 | `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
 | `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
-| `core/route/router` | `spec.Router`; with no rules yet, always the default outbound |
-| `core/route/handler` | `spec.TrafficHandler`: asks the router, dials, relays; owns each UDP session and its routing cache |
+| `core/route/router` | `component.Router`; with no rules yet, always the default outbound |
+| `core/route/handler` | `component.TrafficHandler`: asks the router, dials, relays; owns each UDP session and its routing cache |
 | `core/relay` | `relay.Stream` copies both ways and carries half-close; `relay.Datagrams` moves packets between a client and its UDP session |
 | `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams), freedom and block |
 | `core/net/udp/session` | one UDP session: one datagram per outbound, replies merged, closed on silence |

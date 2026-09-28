@@ -14,13 +14,13 @@
 | **Endpoint** | `spec.Endpoint`: an IP and a port, already resolved. |
 | **Fallback** | Where an inbound sends a request its protocol refuses with `spec.ErrFallbackRequested`: every byte, from the first, is replayed to that address over plain TCP, so a probe sees an ordinary service. |
 | **Freedom** | The special outbound protocol that sends straight to each destination, over plain TCP and UDP. |
-| **Handler** | `core/route/handler`: the `spec.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
-| **Inbound** | How traffic enters: a listener stack plus a proxy server (`spec.Inbound`). |
+| **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
+| **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor per kind. |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
-| **Outbound** | How traffic leaves: a proxy client plus a dialer stack, or freedom (`spec.Outbound`). |
+| **Outbound** | How traffic leaves: a proxy client plus a dialer stack, or freedom (`component.Outbound`). |
 | **Overlay transport** | A transport that wraps a layer below it, such as TLS or WebSocket. None is built yet. |
 | **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Payload** | What a layer returns upward: the proxied traffic with the protocol's framing removed. |
