@@ -18,8 +18,9 @@ functionality is available as Go packages for programs that want to link it in.
 - **Not a GUI or client application.** There is no user interface, and one is not
   planned.
 - **Not a protocol collection.** Protocol count is not the goal. Today it ships three
-  proxy protocols (SOCKS5, HTTP and Trojan) and two base transports (TCP and UDP), because
-  those are enough to prove the architecture.
+  proxy protocols (SOCKS5, HTTP and Trojan), two base transports (TCP and UDP) and
+  three overlays (TLS, WebSocket and HTTPUpgrade), because those are enough to
+  prove the architecture and to carry real traffic through a censor.
 - **Not a replacement narrative.** Xray-core, sing-box and mihomo are mature and
   useful. The claim is narrower: their architecture is not optimised for rapid,
   Iran-specific adaptation.
@@ -56,10 +57,18 @@ If adding something needs more than that (an edit to `spec`, the builder or
 another module), the project treats it as a design failure to record and fix,
 not a cost to accept.
 
-> [!NOTE]
-> The main planned test of this claim is adding a TLS overlay transport, then
-> WebSocket and VLESS, and counting the files changed outside their own folders.
-> None of those exist yet.
+## Measured so far
+
+The claim is tested by adding modules and counting the files each one needed
+outside its own folder.
+
+| Module | Outside its folder | Verdict |
+| --- | --- | --- |
+| `tls` (first overlay) | one registry line, plus a one-time change to the overlay contract and core | the change was a design finding: overlays wrapping listeners let one silent client stall an inbound |
+| `ws` | one registry line | as intended |
+| `httpupgrade` | one registry line, plus moving the handshake it shares with `ws` to `shared/websocket/handshake` | as intended: shared code moves out once a second user exists |
+
+VLESS, the next protocol, is the next measurement.
 
 ## Where to go next
 

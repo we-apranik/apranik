@@ -1,8 +1,9 @@
 # Request lifecycle
 
 This page follows real traffic through the code: first one TCP connection through
-a SOCKS5 inbound and the freedom outbound, then one UDP session opened by SOCKS5
-UDP ASSOCIATE. Every function named here exists in the repository today.
+a SOCKS5 inbound and the freedom outbound, then the same connection through a
+Trojan-over-TLS proxy, then one UDP session opened by SOCKS5 UDP ASSOCIATE.
+Every function named here exists in the repository today.
 
 ## Startup
 
@@ -27,9 +28,13 @@ UDP ASSOCIATE. Every function named here exists in the repository today.
 Step by step:
 
 1. **Accept.** `streamInbound.acceptLoop` (in `core/inbound/inbound.go`) calls the
-   listener's `AcceptStream` and starts `handleStream` for each connection.
+   base listener's `AcceptStream`, takes a `max_connections` slot, and starts
+   `handleStream` in a goroutine for each connection.
 2. **Handshake.** `handleStream` bounds the handshake with `handshakeContext`
-   (default 10 seconds) and calls the proxy server's `AcceptStream`. For SOCKS5
+   (default 10 seconds). If the inbound's stack has overlays,
+   `wrapServerOverlays` runs each one's `WrapServerStream` first, in stack order
+   (a TLS handshake, a WebSocket upgrade); a failure is logged at Debug and the
+   connection closed. Then it calls the proxy server's `AcceptStream`. For SOCKS5
    this is `streamServer.AcceptStream` in `module/proxy/socks5/server.go`: it
    authenticates, reads the CONNECT request, replies, and returns the same stream
    as the payload plus a `Metadata` with the destination.
@@ -92,7 +97,26 @@ Step by step:
    datagrams live as long as the session; within freedom, each NAT socket closes
    after the outbound's `nat.idle_timeout`.
 
-> [!NOTE]
-> A proxy outbound cannot carry UDP today: `streamOutbound.CreateDatagram`
-> returns `spec.ErrUnsupportedNetwork`, because no implemented proxy protocol has a
-> datagram kind. UDP leaves only through freedom.
+## Through a proxy outbound over TLS
+
+On the client side, a Trojan-over-TLS outbound replaces step 5:
+
+1. `streamOutbound.DialStream` (in `core/outbound/proxy.go`) calls its dialer
+   with the proxy server's address, bounded by `dial_timeout`. The builder made
+   that dialer from the base and the overlays: `overlayStreamDialer.DialStream`
+   in `core/builder/builder.go` dials TCP, then calls the TLS client's
+   `WrapClientStream`, which handshakes with the server's domain as SNI.
+2. The Trojan client's `RequestStream` returns at once; it sends the request
+   together with the first payload, or alone after 100ms.
+3. On the server, the TLS inbound's `WrapServerStream` handshakes in that
+   connection's goroutine; Trojan's `IsDatagramOverStream` peeks at the command
+   byte, and `AcceptStream` checks the password and reads the destination. The
+   rest is steps 3–6 above, on the server.
+
+For UDP, `streamOutbound.CreateDatagram` does the same dial and calls
+`RequestDatagramOverStream`: every datagram of the UDP session is framed inside
+that one stream, and the server's `AcceptDatagramOverStream` hands the handler a
+`Datagram`. Without a datagram-over-stream kind (SOCKS5 and HTTP as clients),
+the outbound's `Networks()` lists only `tcp`, and `CreateDatagram` returns
+`spec.ErrUnsupportedNetwork`: a UDP packet routed there is dropped and logged at
+Debug.

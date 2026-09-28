@@ -1,25 +1,27 @@
 # Architecture
 
-Apranik is four layers. Each one imports only the layers below it, and the
+Apranik is a few layers. Each one imports only the layers below it, and the
 bottom layer, `spec`, imports nothing from the project.
 
-[![Layers and import direction: cmd/apranik imports config, config imports core, core's registry names the modules, and modules implement spec. Every layer imports spec directly; spec imports nothing from the project.](assets/diagrams/architecture-overview.excalidraw.svg)](assets/diagrams/architecture-overview.excalidraw.svg)
+[![Layers and import direction: cmd/apranik imports config, config imports core, core's registry names the modules, modules may import shared helper packages, and everything implements or uses spec. Every layer imports spec directly; spec imports nothing from the project. Modules also use config/types for shared JSON values.](assets/diagrams/architecture-overview.excalidraw.svg)](assets/diagrams/architecture-overview.excalidraw.svg)
 
 
 | Layer | Holds | May import |
 | --- | --- | --- |
-| `spec` | the module contract: interfaces, the address types and the sentinel errors; no state | nothing from the project |
-| `module/*` | transports, proxy protocols and sniffers, one folder each | `spec`, and `config/types` for shared JSON values |
-| `core/*` | registry, building, routing, relaying, UDP sessions and NAT, logging | `spec` and modules |
+| `spec` | the module contract: interfaces, the address types (with their constructors) and the sentinel errors; no state | nothing from the project |
+| `shared/*` | helper code two or more modules need that is not contract, one concept per package | `spec` and the standard library |
+| `module/*` | transports, proxy protocols and sniffers, one folder each | `spec`, `shared/*`, and `config/types` for shared JSON values; never another module |
+| `core/*` | registry, building, routing, relaying, UDP sessions and NAT, logging; `core/component` declares the roles core's parts play for each other | `spec`, `shared/*` and modules |
 | `config` | the JSON config file → `blueprint.Blueprint` | `spec`, `core` |
 | `cmd/apranik` | the standalone command | everything above |
 
 ## The spec contract
 
-[![What spec declares: two carriers (Stream, Datagram); two address types (Endpoint, Destination); four transport kinds (base and overlay, stream and datagram); three proxy kinds (StreamProxy, DatagramOverStreamProxy, DatagramProxy); Sniffer; the core-facing types Metadata, Router, TrafficHandler, Inbound, Outbound and UDPAssociateSocketFunc; the Config and Info methods every module kind has; and the sentinel errors.](assets/diagrams/spec-contract.excalidraw.svg)](assets/diagrams/spec-contract.excalidraw.svg)
+[![What spec declares: two carriers (Stream, Datagram) plus PeekableStream; two address types (Endpoint, Destination); four transport module kinds, with stream overlays wrapping one connection at a time; three proxy module kinds; SnifferModule and Sniffer; what crosses the proxy layer (Metadata, the UDP ASSOCIATE hook, the fallback sentinel); the Config and Info methods every module kind has; and the sentinel errors. Router, TrafficHandler, Inbound and Outbound are not in spec but in core/component.](assets/diagrams/spec-contract.excalidraw.svg)](assets/diagrams/spec-contract.excalidraw.svg)
 
 [`spec/spec.go`](https://github.com/The-Apranik/Apranik/blob/main/spec/spec.go)
-is a single file of declarations. Its main groups:
+is the module contract, in one file. It holds interfaces, sentinel errors and
+value types with their constructors, and no state. Its main groups:
 
 **Carriers.** There are two, and only two:
 
@@ -28,6 +30,11 @@ is a single file of declarations. Its main groups:
   leaving a caller hanging.
 - `Datagram`: `ReadFrom` / `WriteTo` with message boundaries kept, addressed by
   `Destination`.
+
+`PeekableStream` adds `Peek` and `PeekExactly` to a `Stream`; core implements it
+(`core/net/peekable`) and hands it to protocols that need to look before they
+read. `ResolvedWriter` is an optional capability of a `Datagram` that resolves
+domains itself.
 
 Substrates with no server initiative, such as DNS tunnels or mailbox relays, are
 expected to build a `Stream` internally (Decided; none exists yet).
@@ -47,18 +54,22 @@ once, and each wraps one connection:
 | `BaseDatagramTransportModule` | `NewDatagramDialer`, `NewDatagramListener` |
 | `OverlayDatagramTransportModule` | `WrapDatagramDialer`, `WrapDatagramListener` |
 
-**Proxy kinds.** Carrier and payload are independent, so there are three shapes:
+**Proxy kinds.** What sits below a protocol (its underlying carrier) and what it
+returns above (its payload) are independent, so there are three shapes:
 
-| Kind | Below (carrier) | Above (payload) | Example |
+| Kind | Below (underlying) | Above (payload) | Example |
 | --- | --- | --- | --- |
 | `StreamProxyModule` | `Stream` | `Stream` | SOCKS5, HTTP and Trojan CONNECT (implemented) |
 | `DatagramOverStreamProxyModule` | `Stream` | `Datagram` | Trojan UDP (implemented); VLESS planned |
 | `DatagramProxyModule` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
 
-[![The three proxy shapes: StreamProxy takes a Stream carrier and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxy takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxy takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
+[![The three proxy shapes: StreamProxyModule takes an underlying Stream and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxyModule takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxyModule takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
 
-A proxy protocol never opens a connection. It is handed a carrier and returns a
-carrier ("wrapper, not pump"); core runs the copy loop.
+A proxy protocol never opens a connection. It is handed an underlying stream or
+datagram and returns a payload ("wrapper, not pump"); core runs the copy loop.
+A server's `Accept*` may return `ErrFallbackRequested` for a request that is not
+its protocol, before writing anything; core then replays the request to the
+inbound's fallback.
 
 **Sniffer.** `SnifferModule` holds the settings and builds a `Sniffer` with
 `NewSniffer()`; the `Sniffer` has `Sniff(payloadPrefix []byte) (SniffResult,
@@ -82,51 +93,68 @@ A module is a package under `module/` that exports one constructor per kind it
 fills:
 
 ```go
-func NewBaseStreamTransportModule() spec.BaseStreamTransportModule // module/transport/tcp
-func NewStreamProxyModule() spec.StreamProxyModule                 // module/proxy/socks5
-func NewSnifferModule() spec.SnifferModule                   // module/sniffer/tls
+func NewBaseStreamTransportModule() spec.BaseStreamTransportModule       // module/transport/tcp
+func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule // module/transport/tls
+func NewStreamProxyModule() spec.StreamProxyModule                       // module/proxy/socks5
+func NewSnifferModule() spec.SnifferModule                               // module/sniffer/tls
 ```
+
+The module value is the settings; its `New...` methods build the running parts
+once, per role (a TLS server loads its certificates there).
 
 `core/registry` stores these constructors by name and kind. `registry.Default()`
 in `core/registry/default.go` is the only place in the project that names a
 module. There is no `init()` and no global registry, so a Go program using Apranik can build a
 registry containing modules Apranik has never heard of.
 
-[![Module registration: core/registry/default.go is the only file naming modules and registers tcp, udp, socks5, http and the tls and http sniffers into typed tables for transports, proxy protocols and sniffers. Every registration is checked; config.Parse looks modules up by name and position.](assets/diagrams/module-registry.excalidraw.svg)](assets/diagrams/module-registry.excalidraw.svg)
+[![Module registration: core/registry/default.go is the only file naming modules and registers tcp, udp, tls, ws, httpupgrade, socks5, http, trojan (twice: stream and datagram-over-stream) and the tls and http sniffers into typed tables for transports, proxy protocols and sniffers. Every registration is checked; config.Parse looks modules up by name and position.](assets/diagrams/module-registry.excalidraw.svg)](assets/diagrams/module-registry.excalidraw.svg)
 
 ## Stack composition
 
 A transport stack is written base first, then overlays outward from the wire.
-The builder composes it as a fold: it asks the base for a dialer or listener,
-then hands that to each overlay's `Wrap*` method. It never needs to know what a
-layer is.
+Only the base makes a dialer or listener. Each stream overlay wraps one
+connection at a time,
+so the builder composes a stack without knowing what any layer is:
 
-[![Stack composition. Inbound: the client connection enters the tcp base transport, passes through overlays (planned, none built), then the proxy server, which returns payload and Metadata, then optional sniffing, then the handler. Outbound: the proxy client (absent for freedom), overlays (planned), the tcp base transport, then the proxy server or destination.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)
+- **Outbound.** The builder asks the base for a dialer and each overlay for its
+  client, and joins them into one `StreamDialer`: dial through the base, then
+  `WrapClientStream` in stack order. The outbound's `dial_timeout` covers all of
+  it.
+- **Inbound.** The listener is the base alone. `core/inbound` accepts, counts the
+  connection against `max_connections`, and starts a goroutine for it; there it
+  runs each overlay's `WrapServerStream`, then the proxy server, all within the
+  inbound's `handshake_timeout`. A client that stalls a TLS handshake holds up
+  only its own goroutine.
 
+[![Stack composition. Inbound, reading up from the wire: the client connection, the tcp base listener that returns at once, overlays (tls, ws, httpupgrade) wrapping the connection in its own goroutine within handshake_timeout, the proxy server returning payload and Metadata, optional sniffing, then the handler. Proxy outbound, writing down: the proxy client, overlays wrapping the dialed stream within dial_timeout, the tcp base transport, then the proxy server. Freedom has no stack; block refuses both.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)
 
-> [!NOTE]
-> Stream overlays run per connection. Outbound, the builder composes the base
-> dialer and each overlay's client into one dialer. Inbound, the listener is the
-> base alone, and `core/inbound` runs each overlay's server side in the
-> connection's own goroutine, under the handshake timeout, so a client that
-> stalls a TLS handshake holds up nobody else. `tls`, `ws` and `httpupgrade` are built.
+[![Stream overlays run per connection: the accept loop only accepts, takes a max_connections slot and starts a goroutine; that goroutine runs the tls and ws server sides, the proxy server and the handler, bounded by handshake_timeout. A silent client holds only its own goroutine. A failed overlay handshake is closed; fallback recording starts above the overlays. On a proxy outbound the same layers run after the base dials.](assets/diagrams/overlay-per-connection.excalidraw.svg)](assets/diagrams/overlay-per-connection.excalidraw.svg)
+
+Protocols that carry many streams over one connection (HTTP/2, gRPC) do not fit
+this shape and will get their own kind (open question Q17). Datagram overlays
+still wrap dialers and listeners; none exists yet.
 
 ## Shared helper packages
 
 Code several modules need that is not part of the contract lives under
 `shared/`, one concept per package. Modules may import these, `spec` and
-`config/types`, and never another module. Today there is one:
-`shared/socksaddr`, the RFC 1928 address codec used by SOCKS5 and Trojan. See
-a design note.
+`config/types`, and never another module. A package is added only once two
+real modules need it:
+
+| Package | Concept | Used by |
+| --- | --- | --- |
+| `shared/socksaddr` | the RFC 1928 address codec: ATYP, address, port | `socks5`, `trojan` |
+| `shared/websocket/handshake` | the HTTP/1.1 WebSocket upgrade handshake: size limit, context bound, web-server refusals, Host handling | `ws`, `httpupgrade` |
 
 ## Core packages
 
 | Package | Responsibility |
 | --- | --- |
+| `core/component` | the roles core's own parts play for each other: `Inbound`, `Outbound`, `Router`, `TrafficHandler`; modules never use them |
 | `core/registry` | name → module constructor, per kind, with clear errors for a name used in the wrong position |
 | `core/blueprint` | a validated description of every inbound and outbound; nothing is opened |
-| `core/builder` | blueprint → `component.Inbound` / `component.Outbound`; folds stacks; grants the UDP associate socket |
-| `core/inbound` | accept loop, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
+| `core/builder` | blueprint → `component.Inbound` / `component.Outbound`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket |
+| `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
 | `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
 | `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
@@ -153,6 +181,10 @@ possibly through a different outbound. Three pieces share the work:
 - **The NAT sits behind freedom.** `nat.Datagram` decides which local socket carries
   each destination and which senders may reply, using RFC 4787 mapping and
   filtering. Replies to a domain are reported back under the domain the client used.
+- **A proxy outbound frames UDP in a stream.** When its protocol has a
+  datagram-over-stream kind (Trojan), `CreateDatagram` dials the server through
+  the stack, overlays included, and returns a `Datagram` whose messages are framed
+  inside that one stream. One stream per UDP session per outbound.
 
 Because each UDP session has its own NAT, two clients never receive each other's
 replies. Timeouts are PROVISIONAL and configured beside what they bound: a silent
@@ -165,13 +197,15 @@ route is forgotten after 1 minute (internal).
 ## Package dependency graph
 
 Drawn from `go list` imports (the `cmd/apranik` main package is left out).
-Edges to `spec` and `core/logging` are omitted: every package shown imports `spec`
-except `config/types` and `core/logging`, and nine packages import `core/logging`.
-Modules are grouped, since only `core/registry` (and `core/builder`, for `udp`)
-imports them.
+Edges to `spec`, `core/logging` and `core/component` are omitted: nearly every
+package imports `spec`, nine import `core/logging` and eight import
+`core/component`. Modules are grouped, since only `core/registry` (and
+`core/builder`, for `tcp` and `udp`) imports them.
 
-[![Package dependency graph generated from go list: cmd/apranik/cli imports config and the core packages it wires; config imports registry, blueprint, config/types and nat; core/registry imports every module; core/builder imports blueprint, inbound, outbound and the udp module; the handler imports outbound, relay and session; nat, session and relay import core/net/udp. Edges to spec and core/logging are left out.](assets/diagrams/package-dependencies.excalidraw.svg)](assets/diagrams/package-dependencies.excalidraw.svg)
+[![Package dependency graph generated from go list: cmd/apranik/cli imports config and the core packages it wires; config imports registry, blueprint, config/types and nat; core/registry imports every module; core/builder imports blueprint, registry, inbound, inbound/mixed, outbound and the tcp and udp modules; inbound imports sniff, peekable and relay; the handler imports outbound, relay and session; nat, session and relay import core/net/udp. socks5 and trojan share shared/socksaddr; ws and httpupgrade share shared/websocket/handshake. Edges to spec, core/logging and core/component are left out.](assets/diagrams/package-dependencies.excalidraw.svg)](assets/diagrams/package-dependencies.excalidraw.svg)
 
-Two edges worth knowing: `core/builder` imports `module/transport/udp` directly,
-to open SOCKS5 associate sockets without a registry lookup, and `cmd/apranik/cli`
-imports the router and handler because it wires them together.
+Three edges worth knowing: `core/builder` imports `module/transport/udp`
+directly, to open SOCKS5 associate sockets without a registry lookup, and
+`module/transport/tcp`, because a fallback is always dialed over plain TCP;
+`cmd/apranik/cli` imports the router and handler because it wires them
+together.
