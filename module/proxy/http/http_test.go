@@ -40,7 +40,7 @@ func ipDst(ip string, port uint16) spec.Destination {
 func (foreignConfig) Validate() error { return nil }
 
 // pipeStream adapts net.Pipe to spec.Stream. CloseWrite reports
-// spec.ErrNoHalfClose, so these tests run over a carrier weaker than TCP.
+// spec.ErrNoHalfClose, so these tests run over a stream weaker than TCP.
 type pipeStream struct {
 	net.Conn
 }
@@ -310,14 +310,14 @@ func TestClientRefusesUDPMetadata(t *testing.T) {
 func TestModuleFillsOneShapeOnly(t *testing.T) {
 	var m any = (&proxyhttp.Proxy{})
 
-	if _, ok := m.(spec.StreamProxy); !ok {
-		t.Error("http.Module does not implement spec.StreamProxy")
+	if _, ok := m.(spec.StreamProxyModule); !ok {
+		t.Error("http.Module does not implement spec.StreamProxyModule")
 	}
-	if _, ok := m.(spec.DatagramProxy); ok {
-		t.Error("http.Module implements spec.DatagramProxy; HTTP has no UDP story")
+	if _, ok := m.(spec.DatagramProxyModule); ok {
+		t.Error("http.Module implements spec.DatagramProxyModule; HTTP has no UDP story")
 	}
-	if _, ok := m.(spec.DatagramOverStreamProxy); ok {
-		t.Error("http.Module implements spec.DatagramOverStreamProxy")
+	if _, ok := m.(spec.DatagramOverStreamProxyModule); ok {
+		t.Error("http.Module implements spec.DatagramOverStreamProxyModule")
 	}
 }
 

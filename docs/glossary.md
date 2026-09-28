@@ -2,7 +2,7 @@
 
 | Term | Meaning |
 | --- | --- |
-| **Base transport** | A transport that creates connections from nothing: `tcp` and `udp`. Implements `spec.BaseStreamTransport` or `spec.BaseDatagramTransport`. Also called an underlay. |
+| **Base transport** | A transport that creates connections from nothing: `tcp` and `udp`. Implements `spec.BaseStreamTransportModule` or `spec.BaseDatagramTransportModule`. Also called an underlay. |
 | **Block** | The special outbound protocol that refuses every connection and drops every UDP packet. |
 | **Blueprint** | A `blueprint.Blueprint`: every inbound and outbound with its modules looked up, decoded and validated, but nothing opened. |
 | **Builder** | `core/builder`: turns a blueprint into running inbounds and outbounds by folding transport stacks. |

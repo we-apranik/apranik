@@ -4,43 +4,43 @@ import "github.com/The-Apranik/Apranik/spec"
 
 // TransportRegistry is the transport namespace, independent of the proxy one.
 type TransportRegistry struct {
-	baseStream      map[string]func() spec.BaseStreamTransport
-	overlayStream   map[string]func() spec.OverlayStreamTransport
-	baseDatagram    map[string]func() spec.BaseDatagramTransport
-	overlayDatagram map[string]func() spec.OverlayDatagramTransport
+	baseStream      map[string]func() spec.BaseStreamTransportModule
+	overlayStream   map[string]func() spec.OverlayStreamTransportModule
+	baseDatagram    map[string]func() spec.BaseDatagramTransportModule
+	overlayDatagram map[string]func() spec.OverlayDatagramTransportModule
 
 	registered index
 }
 
-func (r *TransportRegistry) RegisterBaseStream(newModule func() spec.BaseStreamTransport) error {
+func (r *TransportRegistry) RegisterBaseStream(newModule func() spec.BaseStreamTransportModule) error {
 	return register(&r.baseStream, newModule, KindBaseStream, r.claim)
 }
 
-func (r *TransportRegistry) RegisterOverlayStream(newModule func() spec.OverlayStreamTransport) error {
+func (r *TransportRegistry) RegisterOverlayStream(newModule func() spec.OverlayStreamTransportModule) error {
 	return register(&r.overlayStream, newModule, KindOverlayStream, r.claim)
 }
 
-func (r *TransportRegistry) RegisterBaseDatagram(newModule func() spec.BaseDatagramTransport) error {
+func (r *TransportRegistry) RegisterBaseDatagram(newModule func() spec.BaseDatagramTransportModule) error {
 	return register(&r.baseDatagram, newModule, KindBaseDatagram, r.claim)
 }
 
-func (r *TransportRegistry) RegisterOverlayDatagram(newModule func() spec.OverlayDatagramTransport) error {
+func (r *TransportRegistry) RegisterOverlayDatagram(newModule func() spec.OverlayDatagramTransportModule) error {
 	return register(&r.overlayDatagram, newModule, KindOverlayDatagram, r.claim)
 }
 
-func (r *TransportRegistry) LookupBaseStream(name string) (func() spec.BaseStreamTransport, error) {
+func (r *TransportRegistry) LookupBaseStream(name string) (func() spec.BaseStreamTransportModule, error) {
 	return lookup(r.baseStream, name, KindBaseStream, r.registered.kinds(name))
 }
 
-func (r *TransportRegistry) LookupOverlayStream(name string) (func() spec.OverlayStreamTransport, error) {
+func (r *TransportRegistry) LookupOverlayStream(name string) (func() spec.OverlayStreamTransportModule, error) {
 	return lookup(r.overlayStream, name, KindOverlayStream, r.registered.kinds(name))
 }
 
-func (r *TransportRegistry) LookupBaseDatagram(name string) (func() spec.BaseDatagramTransport, error) {
+func (r *TransportRegistry) LookupBaseDatagram(name string) (func() spec.BaseDatagramTransportModule, error) {
 	return lookup(r.baseDatagram, name, KindBaseDatagram, r.registered.kinds(name))
 }
 
-func (r *TransportRegistry) LookupOverlayDatagram(name string) (func() spec.OverlayDatagramTransport, error) {
+func (r *TransportRegistry) LookupOverlayDatagram(name string) (func() spec.OverlayDatagramTransportModule, error) {
 	return lookup(r.overlayDatagram, name, KindOverlayDatagram, r.registered.kinds(name))
 }
 

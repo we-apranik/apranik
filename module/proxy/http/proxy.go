@@ -2,7 +2,7 @@ package http
 
 import "github.com/The-Apranik/Apranik/spec"
 
-// Proxy fills StreamProxy only: HTTP CONNECT tunnels a stream and has no
+// Proxy fills StreamProxyModule only: HTTP CONNECT tunnels a stream and has no
 // datagram form.
 type Proxy struct{ Settings }
 
@@ -18,4 +18,4 @@ func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
 	return &streamClient{username: p.Username, password: p.Password.Reveal()}, nil
 }
 
-func NewStreamProxyModule() spec.StreamProxy { return &Proxy{} }
+func NewStreamProxyModule() spec.StreamProxyModule { return &Proxy{} }

@@ -73,14 +73,14 @@ func TestStreamTransportStackComposesOutwardFromTheWire(t *testing.T) {
 
 	listenerStack := blueprint.StreamTransportStack{
 		Base: tcp.NewBaseStreamTransportModule(),
-		Overlays: []spec.OverlayStreamTransport{
+		Overlays: []spec.OverlayStreamTransportModule{
 			countingOverlay{label: "inner", applied: &listenerLayers, mu: &mu},
 			countingOverlay{label: "outer", applied: &listenerLayers, mu: &mu},
 		},
 	}
 	dialerStack := blueprint.StreamTransportStack{
 		Base: tcp.NewBaseStreamTransportModule(),
-		Overlays: []spec.OverlayStreamTransport{
+		Overlays: []spec.OverlayStreamTransportModule{
 			countingOverlay{label: "inner", applied: &dialerLayers, mu: &mu},
 			countingOverlay{label: "outer", applied: &dialerLayers, mu: &mu},
 		},
@@ -146,7 +146,7 @@ func TestAFailedWrapClosesWhatWasBuilt(t *testing.T) {
 		Network: spec.NetworkTCP,
 		StreamTransport: blueprint.StreamTransportStack{
 			Base: base,
-			Overlays: []spec.OverlayStreamTransport{
+			Overlays: []spec.OverlayStreamTransportModule{
 				failingOverlay{countingOverlay{label: "boom", applied: &layers, mu: &mu}},
 			},
 		},
@@ -186,14 +186,14 @@ func (passthroughProxy) NewStreamClient() (spec.StreamProxyClient, error) {
 
 type passthroughServer struct{}
 
-func (passthroughServer) AcceptStream(ctx context.Context, carrier spec.Stream) (spec.Stream, spec.Metadata, error) {
-	return carrier, spec.Metadata{Network: spec.NetworkTCP}, nil
+func (passthroughServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
+	return underlyingStream, spec.Metadata{Network: spec.NetworkTCP}, nil
 }
 
 type passthroughClient struct{}
 
-func (passthroughClient) RequestStream(ctx context.Context, carrier spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
-	return carrier, nil
+func (passthroughClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
+	return underlyingStream, nil
 }
 
 type dispatchedNetworks chan spec.Network

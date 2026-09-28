@@ -2,10 +2,10 @@ package socks5
 
 import "github.com/The-Apranik/Apranik/spec"
 
-// Proxy fills StreamProxy and nothing else. UDP ASSOCIATE is served through
-// the stream kind rather than through DatagramProxy: spec's datagram kinds are
-// handed a carrier, and this protocol has to negotiate on TCP before a
-// datagram socket exists.
+// Proxy fills StreamProxyModule and nothing else. UDP ASSOCIATE is served
+// through the stream kind rather than through DatagramProxyModule: spec's
+// datagram kinds are handed a datagram, and this protocol has to negotiate on
+// TCP before a datagram socket exists.
 type Proxy struct{ Settings }
 
 func (*Proxy) Info() spec.ModuleInfo {
@@ -27,6 +27,6 @@ func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
 	}, nil
 }
 
-func NewStreamProxyModule() spec.StreamProxy {
+func NewStreamProxyModule() spec.StreamProxyModule {
 	return &Proxy{Settings: Settings{UDPRelay: true}}
 }

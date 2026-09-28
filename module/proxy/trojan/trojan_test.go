@@ -1,5 +1,5 @@
 // Package trojan_test exercises the trojan module through spec alone: no
-// registry, no builder, no relay. The carrier is a net.Pipe.
+// registry, no builder, no relay. The underlying stream is a net.Pipe.
 package trojan_test
 
 import (
@@ -99,11 +99,11 @@ type acceptedStream struct {
 }
 
 // serveStream does what core does: identify, then call the matching accept.
-func serveStream(t *testing.T, carrier spec.Stream) <-chan acceptedStream {
+func serveStream(t *testing.T, underlyingStream spec.Stream) <-chan acceptedStream {
 	server := newServer(t)
 	results := make(chan acceptedStream, 1)
 	go func() {
-		peekable := newBufferedStream(carrier)
+		peekable := newBufferedStream(underlyingStream)
 		isDatagram, err := server.IsDatagramOverStream(context.Background(), peekable)
 		if err != nil || isDatagram {
 			results <- acceptedStream{isDatagram: isDatagram, err: err}
@@ -315,13 +315,13 @@ func TestSettingsDoNotPrintPasswords(t *testing.T) {
 
 func TestModuleFillsBothStreamCarriedShapes(t *testing.T) {
 	var module any = &trojan.Proxy{}
-	if _, ok := module.(spec.StreamProxy); !ok {
-		t.Error("not a spec.StreamProxy")
+	if _, ok := module.(spec.StreamProxyModule); !ok {
+		t.Error("not a spec.StreamProxyModule")
 	}
-	if _, ok := module.(spec.DatagramOverStreamProxy); !ok {
-		t.Error("not a spec.DatagramOverStreamProxy")
+	if _, ok := module.(spec.DatagramOverStreamProxyModule); !ok {
+		t.Error("not a spec.DatagramOverStreamProxyModule")
 	}
-	if _, ok := module.(spec.DatagramProxy); ok {
+	if _, ok := module.(spec.DatagramProxyModule); ok {
 		t.Error("claims native datagrams; Trojan's UDP is framed in the stream")
 	}
 }
@@ -374,16 +374,16 @@ func expectNoWrite(t *testing.T, stream writeRecordingStream, within time.Durati
 }
 
 func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
-	carrier := newWriteRecordingStream()
+	underlyingStream := newWriteRecordingStream()
 	destination := domainDestination("example.com", 443)
-	upstream, err := newClient(t, "p").RequestStream(context.Background(), carrier, spec.Metadata{Network: spec.NetworkTCP, Destination: destination})
+	upstream, err := newClient(t, "p").RequestStream(context.Background(), underlyingStream, spec.Metadata{Network: spec.NetworkTCP, Destination: destination})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectNoWrite(t, carrier, 20*time.Millisecond)
+	expectNoWrite(t, underlyingStream, 20*time.Millisecond)
 
 	upstream.Write([]byte("GET / HTTP/1.1\r\n\r\n"))
-	first := <-carrier.writes
+	first := <-underlyingStream.writes
 	request, err := wire.ReadRequest(bytes.NewReader(first))
 	if err != nil {
 		t.Fatalf("first write is not a request: %v", err)
@@ -393,7 +393,7 @@ func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
 	}
 
 	upstream.Write([]byte("more"))
-	if second := <-carrier.writes; string(second) != "more" {
+	if second := <-underlyingStream.writes; string(second) != "more" {
 		t.Errorf("second write = %q, want the payload alone", second)
 	}
 	upstream.Close()
@@ -401,8 +401,8 @@ func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
 
 // A server-first protocol sends nothing, so the request cannot wait forever.
 func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
-	carrier := newWriteRecordingStream()
-	upstream, err := newClient(t, "p").RequestStream(context.Background(), carrier, spec.Metadata{
+	underlyingStream := newWriteRecordingStream()
+	upstream, err := newClient(t, "p").RequestStream(context.Background(), underlyingStream, spec.Metadata{
 		Network: spec.NetworkTCP, Destination: domainDestination("smtp.example", 25),
 	})
 	if err != nil {
@@ -411,7 +411,7 @@ func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
 	defer upstream.Close()
 
 	select {
-	case first := <-carrier.writes:
+	case first := <-underlyingStream.writes:
 		if length, err := wire.RequestLength(first); err != nil || length != len(first) {
 			t.Errorf("write = %q, want exactly one request", first)
 		}
@@ -420,22 +420,22 @@ func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
 	}
 
 	upstream.Write([]byte("EHLO"))
-	if next := <-carrier.writes; string(next) != "EHLO" {
+	if next := <-underlyingStream.writes; string(next) != "EHLO" {
 		t.Errorf("after the request = %q, want the payload alone", next)
 	}
 }
 
 func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
-	carrier := newWriteRecordingStream()
-	datagram, err := newClient(t, "p").RequestDatagramOverStream(context.Background(), carrier, spec.Metadata{Network: spec.NetworkUDP})
+	underlyingStream := newWriteRecordingStream()
+	datagram, err := newClient(t, "p").RequestDatagramOverStream(context.Background(), underlyingStream, spec.Metadata{Network: spec.NetworkUDP})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectNoWrite(t, carrier, 150*time.Millisecond)
+	expectNoWrite(t, underlyingStream, 150*time.Millisecond)
 
 	dns := domainDestination("dns.example", 53)
 	datagram.WriteTo([]byte("query"), dns)
-	first := bytes.NewReader(<-carrier.writes)
+	first := bytes.NewReader(<-underlyingStream.writes)
 	request, err := wire.ReadRequest(first)
 	if err != nil {
 		t.Fatalf("first write does not start with a request: %v", err)
@@ -451,7 +451,7 @@ func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
 	}
 
 	datagram.WriteTo([]byte("again"), dns)
-	if _, err := wire.ReadRequest(bytes.NewReader(<-carrier.writes)); err == nil {
+	if _, err := wire.ReadRequest(bytes.NewReader(<-underlyingStream.writes)); err == nil {
 		t.Error("the request was sent twice")
 	}
 }

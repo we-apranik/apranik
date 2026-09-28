@@ -1,6 +1,6 @@
 // Package socks5_test exercises the socks5 module through spec alone. It does
 // not import core: no registry, no builder, no relay, and no transport either
-// -- the carrier below is a net.Pipe, which is the point. A proxy protocol that
+// -- the stream below is a net.Pipe, which is the point. A proxy protocol that
 // needed a real transport to be testable would not be isolated.
 package socks5_test
 
@@ -25,7 +25,7 @@ import (
 //
 // CloseWrite reports spec.ErrNoHalfClose, because net.Pipe genuinely cannot
 // half-close. That is exactly the case the sentinel exists for, and it means
-// these tests run over a carrier that is weaker than TCP -- if the protocol
+// these tests run over a stream that is weaker than TCP -- if the protocol
 // quietly depended on half-close, it would fail here.
 type pipeStream struct {
 	net.Conn
@@ -281,14 +281,14 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 func TestModuleFillsOneShapeOnly(t *testing.T) {
 	var m any = (&socks5.Proxy{})
 
-	if _, ok := m.(spec.StreamProxy); !ok {
-		t.Error("socks5.Proxy does not implement spec.StreamProxy")
+	if _, ok := m.(spec.StreamProxyModule); !ok {
+		t.Error("socks5.Proxy does not implement spec.StreamProxyModule")
 	}
-	if _, ok := m.(spec.DatagramProxy); ok {
-		t.Error("socks5.Proxy implements spec.DatagramProxy; UDP ASSOCIATE needs a bind mid-handshake, which that shape has no room for")
+	if _, ok := m.(spec.DatagramProxyModule); ok {
+		t.Error("socks5.Proxy implements spec.DatagramProxyModule; UDP ASSOCIATE needs a bind mid-handshake, which that shape has no room for")
 	}
-	if _, ok := m.(spec.DatagramOverStreamProxy); ok {
-		t.Error("socks5.Proxy implements spec.DatagramOverStreamProxy; ASSOCIATE's datagrams travel on their own socket, not framed inside the TCP stream")
+	if _, ok := m.(spec.DatagramOverStreamProxyModule); ok {
+		t.Error("socks5.Proxy implements spec.DatagramOverStreamProxyModule; ASSOCIATE's datagrams travel on their own socket, not framed inside the TCP stream")
 	}
 	if _, ok := m.(interface {
 		SetAssociateSocket(spec.UDPAssociateSocketFunc)

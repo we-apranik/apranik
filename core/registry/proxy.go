@@ -7,34 +7,34 @@ import "github.com/The-Apranik/Apranik/spec"
 // kind registers once per kind, and any combination is allowed -- unlike
 // transports, nothing about position makes one ambiguous.
 type ProxyProtocolRegistry struct {
-	stream             map[string]func() spec.StreamProxy
-	datagramOverStream map[string]func() spec.DatagramOverStreamProxy
-	datagram           map[string]func() spec.DatagramProxy
+	stream             map[string]func() spec.StreamProxyModule
+	datagramOverStream map[string]func() spec.DatagramOverStreamProxyModule
+	datagram           map[string]func() spec.DatagramProxyModule
 
 	registered index
 }
 
-func (r *ProxyProtocolRegistry) RegisterStream(newModule func() spec.StreamProxy) error {
+func (r *ProxyProtocolRegistry) RegisterStream(newModule func() spec.StreamProxyModule) error {
 	return register(&r.stream, newModule, KindStreamProxy, r.claim)
 }
 
-func (r *ProxyProtocolRegistry) RegisterDatagramOverStream(newModule func() spec.DatagramOverStreamProxy) error {
+func (r *ProxyProtocolRegistry) RegisterDatagramOverStream(newModule func() spec.DatagramOverStreamProxyModule) error {
 	return register(&r.datagramOverStream, newModule, KindDatagramOverStreamProxy, r.claim)
 }
 
-func (r *ProxyProtocolRegistry) RegisterDatagram(newModule func() spec.DatagramProxy) error {
+func (r *ProxyProtocolRegistry) RegisterDatagram(newModule func() spec.DatagramProxyModule) error {
 	return register(&r.datagram, newModule, KindDatagramProxy, r.claim)
 }
 
-func (r *ProxyProtocolRegistry) LookupStream(name string) (func() spec.StreamProxy, error) {
+func (r *ProxyProtocolRegistry) LookupStream(name string) (func() spec.StreamProxyModule, error) {
 	return lookup(r.stream, name, KindStreamProxy, r.registered.kinds(name))
 }
 
-func (r *ProxyProtocolRegistry) LookupDatagramOverStream(name string) (func() spec.DatagramOverStreamProxy, error) {
+func (r *ProxyProtocolRegistry) LookupDatagramOverStream(name string) (func() spec.DatagramOverStreamProxyModule, error) {
 	return lookup(r.datagramOverStream, name, KindDatagramOverStreamProxy, r.registered.kinds(name))
 }
 
-func (r *ProxyProtocolRegistry) LookupDatagram(name string) (func() spec.DatagramProxy, error) {
+func (r *ProxyProtocolRegistry) LookupDatagram(name string) (func() spec.DatagramProxyModule, error) {
 	return lookup(r.datagram, name, KindDatagramProxy, r.registered.kinds(name))
 }
 

@@ -145,10 +145,10 @@ func TestWriteToRejectsMalformedAddresses(t *testing.T) {
 	}
 }
 
-// One carrier, both address families. Picking a family from a destination
+// One datagram, both address families. Picking a family from a destination
 // used to pin the socket to whichever peer came first, so a session that sent
 // to IPv4 could never afterwards reach IPv6 -- DNS then QUIC, in practice.
-func TestOneCarrierReachesBothAddressFamilies(t *testing.T) {
+func TestOneDatagramReachesBothAddressFamilies(t *testing.T) {
 	v4, v4Addr := bindLocal(t)
 	v6, v6Addr := bindLocalOn(t, netip.MustParseAddr("::1"))
 
@@ -168,7 +168,7 @@ func TestOneCarrierReachesBothAddressFamilies(t *testing.T) {
 		server spec.Datagram
 	}{
 		{"IPv4 first", v4Addr, v4},
-		{"then IPv6 on the same carrier", v6Addr, v6},
+		{"then IPv6 on the same datagram", v6Addr, v6},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := client.WriteTo([]byte("x"), tc.to); err != nil {
@@ -194,15 +194,15 @@ func TestCreateDatagramBindsWhereTheCallerAsks(t *testing.T) {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
 
-	carrier, err := d.CreateDatagram(context.Background(), endpoint("127.0.0.1", 0))
+	datagram, err := d.CreateDatagram(context.Background(), endpoint("127.0.0.1", 0))
 	if err != nil {
 		t.Fatalf("CreateDatagram: %v", err)
 	}
-	defer carrier.Close()
+	defer datagram.Close()
 
-	local, ok := carrier.LocalAddr().(*net.UDPAddr)
+	local, ok := datagram.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		t.Fatalf("LocalAddr is %T, want *net.UDPAddr", carrier.LocalAddr())
+		t.Fatalf("LocalAddr is %T, want *net.UDPAddr", datagram.LocalAddr())
 	}
 	if !local.IP.Equal(net.IPv4(127, 0, 0, 1)) {
 		t.Errorf("bound to %s, want the requested 127.0.0.1", local.IP)
@@ -215,14 +215,14 @@ func TestCreateDatagramBindsWhereTheCallerAsks(t *testing.T) {
 func TestModuleFillsOneKindOnly(t *testing.T) {
 	var module any = &udp.Transport{}
 
-	if _, ok := module.(spec.BaseDatagramTransport); !ok {
-		t.Error("udp.Transport does not implement spec.BaseDatagramTransport")
+	if _, ok := module.(spec.BaseDatagramTransportModule); !ok {
+		t.Error("udp.Transport does not implement spec.BaseDatagramTransportModule")
 	}
-	if _, ok := module.(spec.OverlayDatagramTransport); ok {
-		t.Error("udp.Transport implements spec.OverlayDatagramTransport; it is a base transport")
+	if _, ok := module.(spec.OverlayDatagramTransportModule); ok {
+		t.Error("udp.Transport implements spec.OverlayDatagramTransportModule; it is a base transport")
 	}
-	if _, ok := module.(spec.BaseStreamTransport); ok {
-		t.Error("udp.Transport implements spec.BaseStreamTransport")
+	if _, ok := module.(spec.BaseStreamTransportModule); ok {
+		t.Error("udp.Transport implements spec.BaseStreamTransportModule")
 	}
 }
 
@@ -264,9 +264,9 @@ func TestBindAcceptsAnEphemeralPort(t *testing.T) {
 	}
 }
 
-// Two carriers would share one connection, so either one's Close would take
+// Two datagrams would share one connection, so either one's Close would take
 // the other down with it.
-func TestListenDatagramHandsOutOneCarrier(t *testing.T) {
+func TestListenDatagramHandsOutOneDatagram(t *testing.T) {
 	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0))
 	if err != nil {
 		t.Fatalf("NewDatagramListener: %v", err)

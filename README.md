@@ -347,7 +347,7 @@ A module is a package under `module/` that implements one of the `spec` kinds an
 exports a constructor per kind:
 
 ```go
-func NewBaseStreamTransportModule() spec.BaseStreamTransport
+func NewBaseStreamTransportModule() spec.BaseStreamTransportModule
 ```
 
 Register it with one line in `core/registry`, and it is available to config files by

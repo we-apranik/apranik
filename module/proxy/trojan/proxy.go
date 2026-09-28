@@ -7,8 +7,8 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// Proxy fills StreamProxy for CONNECT and DatagramOverStreamProxy for UDP
-// ASSOCIATE, whose datagrams are framed inside the same stream.
+// Proxy fills StreamProxyModule for CONNECT and DatagramOverStreamProxyModule
+// for UDP ASSOCIATE, whose datagrams are framed inside the same stream.
 type Proxy struct{ Settings }
 
 func (*Proxy) Info() spec.ModuleInfo {
@@ -45,6 +45,6 @@ func (p *Proxy) newClient() (*client, error) {
 	return &client{passwordHash: wire.HashPassword(p.Password.Reveal())}, nil
 }
 
-func NewStreamProxyModule() spec.StreamProxy { return &Proxy{} }
+func NewStreamProxyModule() spec.StreamProxyModule { return &Proxy{} }
 
-func NewDatagramOverStreamProxyModule() spec.DatagramOverStreamProxy { return &Proxy{} }
+func NewDatagramOverStreamProxyModule() spec.DatagramOverStreamProxyModule { return &Proxy{} }

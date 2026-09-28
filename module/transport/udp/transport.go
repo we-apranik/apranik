@@ -31,7 +31,7 @@ func (t *Transport) NewDatagramListener(bind spec.Endpoint) (spec.DatagramListen
 	return newDatagramListener(bind, t.resolverPolicy())
 }
 
-func NewBaseDatagramTransportModule() spec.BaseDatagramTransport {
+func NewBaseDatagramTransportModule() spec.BaseDatagramTransportModule {
 	return &Transport{Settings: Settings{
 		ResolveTimeout:  types.Duration(DefaultResolveTimeout),
 		ResolveCacheTTL: types.Duration(DefaultResolveCacheTTL),

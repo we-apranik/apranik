@@ -54,7 +54,7 @@ func (t *Transport) NewStreamListener(bind spec.Endpoint) (spec.StreamListener, 
 
 // The return type is the kind declaration: registering this as anything else
 // will not compile.
-func NewBaseStreamTransportModule() spec.BaseStreamTransport {
+func NewBaseStreamTransportModule() spec.BaseStreamTransportModule {
 	return &Transport{Settings: Settings{
 		KeepAlive: types.Duration(15 * time.Second),
 		NoDelay:   true,
