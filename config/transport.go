@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // A stack is read by position: index 0 is the base, the rest are overlays
@@ -27,20 +28,26 @@ func (b *configBuilder) buildStreamTransportStack(stack []rawModule, loc string)
 	}
 
 	for index, layer := range stack[1:] {
-		layerLoc := indexLocation(loc, index+1)
-
-		newModule, err := transports.LookupOverlayStream(layer.Type)
-		if err != nil {
-			b.diagnostics.report(layerLoc, err)
-			continue
-		}
-		overlay := newModule()
-		if b.decodeSettings(overlay, layer.Settings, fieldLocation(layerLoc, "settings")) {
+		if overlay := b.buildStreamOverlay(layer, indexLocation(loc, index+1)); overlay != nil {
 			built.Overlays = append(built.Overlays, overlay)
 		}
 	}
 
 	return built
+}
+
+// Returns nil after reporting why, so the stack is built without it.
+func (b *configBuilder) buildStreamOverlay(layer rawModule, layerLoc string) spec.OverlayStreamTransportModule {
+	newModule, err := b.modules.Transports().LookupOverlayStream(layer.Type)
+	if err != nil {
+		b.diagnostics.report(layerLoc, err)
+		return nil
+	}
+	overlay := newModule()
+	if !b.decodeSettings(overlay, layer.Settings, fieldLocation(layerLoc, "settings")) {
+		return nil
+	}
+	return overlay
 }
 
 func (b *configBuilder) buildDatagramTransportStack(stack []rawModule, loc string) blueprint.DatagramTransportStack {

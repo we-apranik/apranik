@@ -341,14 +341,122 @@ func TestProxyOutboundNeedsAServer(t *testing.T) {
 	}
 }
 
-func TestFreedomTakesNoTransport(t *testing.T) {
+func freedomWithTransport(transport string) string {
+	return strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"transport": `+transport+`, "protocol": {"type": "freedom"}`, 1)
+}
+
+func TestFreedomTakesTCPAndFragment(t *testing.T) {
+	document := freedomWithTransport(`[{"type": "tcp", "settings": {"keep_alive": "15s"}}, {"type": "fragment", "settings": {"piece_sizes": ["1-3", "20"]}}]`)
+	registered := modules(t)
+	configuration, diagnostics := config.Parse([]byte(document), registered)
+	diagnostics = append(diagnostics, config.Check(configuration)...)
+	requireNoErrors(t, diagnostics)
+
+	stack := configuration.Outbounds[0].Freedom.StreamTransport
+	if stack.Base == nil || stack.Base.Info().Name != "tcp" || len(stack.Overlays) != 1 || stack.Overlays[0].Info().Name != "fragment" {
+		t.Errorf("freedom's stack is not tcp, fragment: %+v", stack)
+	}
+}
+
+func TestFreedomWithoutTransportIsPlainTCP(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	stack := configuration.Outbounds[0].Freedom.StreamTransport
+	if stack.Base == nil || stack.Base.Info().Name != "tcp" || len(stack.Overlays) != 0 {
+		t.Errorf("freedom's default stack is not plain tcp: %+v", stack)
+	}
+}
+
+func TestFreedomRefusesATransportThatNeedsAServerSide(t *testing.T) {
+	diagnostics, failed := loadAndCheck(t, freedomWithTransport(`[{"type": "tcp"}, {"type": "ws"}]`))
+	if !failed || !find(diagnostics, "outbounds[0].transport[1]", `"ws" cannot be used with freedom`) ||
+		!find(diagnostics, "outbounds[0].transport[1]", "Transports that work with freedom: tcp, fragment") {
+		t.Errorf("ws under freedom was not refused clearly: %v", diagnostics)
+	}
+	if len(diagnostics) != 1 {
+		t.Errorf("want the refusal once, got %v", diagnostics)
+	}
+}
+
+func TestFreedomsTransportMustStartWithTCP(t *testing.T) {
+	cases := map[string]string{
+		`[{"type": "udp"}]`:      "cannot carry freedom's TCP traffic",
+		`[{"type": "fragment"}]`: `"fragment" is an overlay and needs a connection below it`,
+	}
+	for transport, want := range cases {
+		diagnostics, failed := loadAndCheck(t, freedomWithTransport(transport))
+		if !failed || !find(diagnostics, "outbounds[0].transport[0]", want) {
+			t.Errorf("%s: want %q, got %v", transport, want, diagnostics)
+		}
+	}
+}
+
+func TestFreedomsOldTCPSettingsAreRefused(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"protocol": {"type": "freedom"}`,
-		`"transport": [{"type": "tcp"}], "protocol": {"type": "freedom"}`, 1)
-
+		`"protocol": {"type": "freedom", "settings": {"tcp": {"keep_alive": "15s"}}}`, 1)
 	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].transport", "freedom takes no transport") {
-		t.Errorf("a freedom outbound with a transport was not refused: %v", diagnostics)
+	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.tcp", "freedom no longer takes tcp here") {
+		t.Errorf("settings.tcp was not refused clearly: %v", diagnostics)
+	}
+}
+
+func TestBlockTakesNoTransport(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"transport": [{"type": "tcp"}], "protocol": {"type": "block"}`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].transport", "block takes no transport") {
+		t.Errorf("a block outbound with a transport was not refused: %v", diagnostics)
+	}
+}
+
+func TestATransportWithNoServerSideIsRefusedOnAnInbound(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5"`,
+		`"transport": [{"type": "tcp"}, {"type": "fragment"}],
+    "protocol": {"type": "socks5"`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].transport[1]", `"fragment" has no server side`) {
+		t.Errorf("fragment on an inbound was not refused: %v", diagnostics)
+	}
+}
+
+// noServerSideTransport stands for a program's own technique: the list of
+// transports that work with freedom must come from the registry, not a list
+// in core.
+type noServerSideTransport struct{}
+
+func (noServerSideTransport) Validate() error    { return nil }
+func (noServerSideTransport) Warnings() []string { return nil }
+func (noServerSideTransport) Info() spec.ModuleInfo {
+	return spec.ModuleInfo{Name: "decoy", Description: "test"}
+}
+func (noServerSideTransport) TransportInfo() spec.TransportInfo {
+	return spec.TransportInfo{NeedsNoServerSide: true}
+}
+func (noServerSideTransport) NewStreamOverlayClient() (spec.StreamOverlayClient, error) {
+	return nil, nil
+}
+func (noServerSideTransport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
+	return nil, nil
+}
+
+func TestTheFreedomListComesFromTheRegistry(t *testing.T) {
+	registered := modules(t)
+	if err := registered.Transports().RegisterOverlayStream(func() spec.OverlayStreamTransportModule { return noServerSideTransport{} }); err != nil {
+		t.Fatal(err)
+	}
+	_, diagnostics := config.Parse([]byte(freedomWithTransport(`[{"type": "tcp"}, {"type": "tls"}]`)), registered)
+	if !find(diagnostics, "outbounds[0].transport[1]", "Transports that work with freedom: tcp, decoy, fragment") {
+		t.Errorf("the registered module is missing from the list: %v", diagnostics)
+	}
+
+	if _, diagnostics := config.Parse([]byte(freedomWithTransport(`[{"type": "tcp"}, {"type": "decoy"}, {"type": "fragment"}]`)), registered); diagnostics.HasErrors() {
+		t.Errorf("a registered module that needs no server side was refused: %v", diagnostics)
 	}
 }
 

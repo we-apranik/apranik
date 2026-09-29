@@ -81,19 +81,22 @@ type rawOutbound struct {
 	DialTimeout      types.Duration `json:"dial_timeout"`
 	HandshakeTimeout types.Duration `json:"handshake_timeout"`
 
-	// Only with a proxy protocol: freedom and block reach no server.
+	// A proxy protocol's way to its server, or freedom's to each destination;
+	// block takes none.
 	Transport []rawModule `json:"transport"`
 
 	// A proxy protocol, or one of the special protocols freedom and block.
 	Protocol rawModule `json:"protocol"`
 }
 
-// Freedom's transports are always plain tcp and udp, so only their settings
-// are given, beside the NAT behaviour of its UDP.
+// Freedom's TCP is its outbound's transport stack; its UDP is always plain
+// udp, so only those settings are given, beside the NAT behaviour.
 type rawFreedomSettings struct {
 	NAT *rawNAT         `json:"nat"`
-	TCP json.RawMessage `json:"tcp"`
 	UDP json.RawMessage `json:"udp"`
+
+	// Moved to the transport stack; read only to say so.
+	MovedTCP json.RawMessage `json:"tcp"`
 }
 
 // Mixed's halves are always the socks5 and http modules, so only their

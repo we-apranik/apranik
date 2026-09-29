@@ -126,6 +126,12 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 
 	transportLoc := fieldLocation(loc, "transport")
 	checkStreamTransportStack(diagnostics, inbound.StreamTransport, transportLoc)
+	for index, overlay := range inbound.StreamTransport.Overlays {
+		if needsNoServerSide(overlay) {
+			diagnostics.errorf(indexLocation(transportLoc, index+1),
+				"%q has no server side; it only changes outgoing connections, so it does nothing on an inbound. Remove it here", overlay.Info().Name)
+		}
+	}
 	checkDatagramTransportStack(diagnostics, inbound.DatagramTransport, transportLoc)
 
 	collectWarnings(diagnostics, inbound.StreamProxy, fieldLocation(loc, "protocol", "settings"))
@@ -219,8 +225,11 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 	if outbound.Server.IsValid() {
 		diagnostics.errorf(fieldLocation(loc, "server"), "%s reaches no proxy server, so it takes no server", special)
 	}
-	if !outbound.StreamTransport.IsZero() {
-		diagnostics.errorf(fieldLocation(loc, "transport"), "%s takes no transport: its connections are always plain tcp and udp", special)
+	if outbound.Block && !outbound.StreamTransport.IsZero() {
+		diagnostics.errorf(fieldLocation(loc, "transport"), "block takes no transport: it connects nowhere")
+	}
+	if outbound.Freedom != nil && !outbound.StreamTransport.IsZero() {
+		diagnostics.errorf(fieldLocation(loc, "transport"), "freedom's transport belongs in its own stack, Freedom.StreamTransport")
 	}
 	if outbound.HandshakeTimeout != 0 {
 		diagnostics.errorf(fieldLocation(loc, "handshake_timeout"), "%s has no proxy handshake", special)
@@ -231,7 +240,15 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 
 	if outbound.Freedom != nil {
 		settingsLoc := fieldLocation(protocolLoc, "settings")
-		collectWarnings(diagnostics, outbound.Freedom.StreamTransport.Base, fieldLocation(settingsLoc, "tcp"))
+		transportLoc := fieldLocation(loc, "transport")
+		checkStreamTransportStack(diagnostics, outbound.Freedom.StreamTransport, transportLoc)
+		for index, overlay := range outbound.Freedom.StreamTransport.Overlays {
+			if !needsNoServerSide(overlay) {
+				name := overlay.Info().Name
+				diagnostics.errorf(indexLocation(transportLoc, index+1),
+					"%q cannot be used with freedom. Freedom connects straight to each destination, and a destination does not run %q; only transports that need no server side work there", name, name)
+			}
+		}
 		collectWarnings(diagnostics, outbound.Freedom.DatagramTransport.Base, fieldLocation(settingsLoc, "udp"))
 		if outbound.Freedom.NAT != nil {
 			checkUDPPolicy(diagnostics, *outbound.Freedom.NAT, fieldLocation(settingsLoc, "nat"))
@@ -312,6 +329,12 @@ func transportApplicationProtocols(overlay spec.OverlayStreamTransportModule) []
 		return provider.TransportInfo().ApplicationProtocols
 	}
 	return nil
+}
+
+// Declared by the transport itself, so no transport is named here.
+func needsNoServerSide(overlay spec.OverlayStreamTransportModule) bool {
+	provider, provides := overlay.(spec.TransportInfoProvider)
+	return provides && provider.TransportInfo().NeedsNoServerSide
 }
 
 func quotedList(values []string) string {

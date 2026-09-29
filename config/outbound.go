@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
@@ -13,6 +14,9 @@ import (
 const (
 	freedomProtocol = registry.FreedomProtocolName
 	blockProtocol   = registry.BlockProtocolName
+
+	// Named here as freedom's udp is: the base that reaches destinations.
+	freedomBaseTransport = "tcp"
 )
 
 func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Outbound {
@@ -31,8 +35,9 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		}
 	}
 
-	if len(raw.Transport) > 0 {
-		outbound.StreamTransport = b.buildStreamTransportStack(raw.Transport, fieldLocation(loc, "transport"))
+	transportLoc := fieldLocation(loc, "transport")
+	if len(raw.Transport) > 0 && raw.Protocol.Type != freedomProtocol {
+		outbound.StreamTransport = b.buildStreamTransportStack(raw.Transport, transportLoc)
 	}
 
 	protocolLoc := fieldLocation(loc, "protocol")
@@ -40,7 +45,7 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 	case "":
 		b.diagnostics.report(protocolLoc, errMissingField("type", "protocol"))
 	case freedomProtocol:
-		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"))
+		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"), raw.Transport, transportLoc)
 	case mixedProtocol:
 		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol, freedom or block")
 	case blockProtocol:
@@ -63,7 +68,7 @@ func hasSettings(raw json.RawMessage) bool {
 	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("{}")) && !bytes.Equal(trimmed, []byte("null"))
 }
 
-func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string) *blueprint.Freedom {
+func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string, transport []rawModule, transportLoc string) *blueprint.Freedom {
 	var settings rawFreedomSettings
 	if len(raw) > 0 {
 		decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -75,17 +80,14 @@ func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string) *blueprint
 			return nil
 		}
 	}
-
-	freedom := &blueprint.Freedom{}
-	transports := b.modules.Transports()
-
-	if newModule, err := transports.LookupBaseStream("tcp"); err != nil {
-		b.diagnostics.report(loc, err)
-	} else if tcp := newModule(); b.decodeSettings(tcp, settings.TCP, fieldLocation(loc, "tcp")) {
-		freedom.StreamTransport = blueprint.StreamTransportStack{Base: tcp}
+	if settings.MovedTCP != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "tcp"),
+			`freedom no longer takes tcp here. Put tcp's settings in its transport: [{"type": "tcp", "settings": {...}}]`)
 	}
 
-	if newModule, err := transports.LookupBaseDatagram("udp"); err != nil {
+	freedom := &blueprint.Freedom{StreamTransport: b.buildFreedomStreamTransport(transport, transportLoc)}
+
+	if newModule, err := b.modules.Transports().LookupBaseDatagram("udp"); err != nil {
 		b.diagnostics.report(loc, err)
 	} else if udp := newModule(); b.decodeSettings(udp, settings.UDP, fieldLocation(loc, "udp")) {
 		freedom.DatagramTransport = blueprint.DatagramTransportStack{Base: udp}
@@ -96,6 +98,67 @@ func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string) *blueprint
 	}
 	return freedom
 }
+
+// Freedom connects straight to each destination, which runs none of our
+// layers: its stack is tcp, then only overlays that need no server side. A
+// refused layer is reported and left out, so Check does not report it again.
+func (b *configBuilder) buildFreedomStreamTransport(stack []rawModule, loc string) blueprint.StreamTransportStack {
+	transports := b.modules.Transports()
+	if len(stack) == 0 {
+		stack = []rawModule{{Type: freedomBaseTransport}}
+	}
+
+	var built blueprint.StreamTransportStack
+	baseLoc := indexLocation(loc, 0)
+	switch base := stack[0].Type; {
+	case base == freedomBaseTransport:
+		built = b.buildStreamTransportStack(stack[:1], loc)
+	case isRegistered(transports.LookupOverlayStream(base)):
+		b.diagnostics.errorf(baseLoc, `%q is an overlay and needs a connection below it to wrap. Put %q first: [{"type": %q}, {"type": %q}]`,
+			base, freedomBaseTransport, freedomBaseTransport, base)
+	case isRegistered(transports.LookupBaseDatagram(base)):
+		b.diagnostics.errorf(baseLoc, "freedom's transport must start with %q, the base that connects straight to each destination; %q cannot carry freedom's TCP traffic. Freedom's UDP is set in its settings.udp",
+			freedomBaseTransport, base)
+	case isRegistered(transports.LookupBaseStream(base)):
+		b.diagnostics.errorf(baseLoc, "freedom's transport must start with %q, the base that connects straight to each destination; got %q",
+			freedomBaseTransport, base)
+	default:
+		_, err := transports.LookupBaseStream(base)
+		b.diagnostics.report(baseLoc, err)
+	}
+
+	for index, layer := range stack[1:] {
+		layerLoc := indexLocation(loc, index+1)
+		overlay := b.buildStreamOverlay(layer, layerLoc)
+		if overlay == nil {
+			continue
+		}
+		if !needsNoServerSide(overlay) {
+			b.diagnostics.errorf(layerLoc, "%q cannot be used with freedom. Freedom connects straight to each destination, and a destination does not run %q, so it would receive %s framing instead of the client's traffic. Transports that work with freedom: %s",
+				layer.Type, layer.Type, layer.Type, strings.Join(b.transportsThatWorkWithFreedom(), ", "))
+			continue
+		}
+		built.Overlays = append(built.Overlays, overlay)
+	}
+	return built
+}
+
+// Read from the registry, so a program's own modules are listed too.
+func (b *configBuilder) transportsThatWorkWithFreedom() []string {
+	names := []string{freedomBaseTransport}
+	transports := b.modules.Transports()
+	for _, listing := range transports.Modules() {
+		if listing.Kind != registry.KindOverlayStream {
+			continue
+		}
+		if newModule, err := transports.LookupOverlayStream(listing.Name); err == nil && needsNoServerSide(newModule()) {
+			names = append(names, listing.Name)
+		}
+	}
+	return names
+}
+
+func isRegistered[Constructor any](_ Constructor, err error) bool { return err == nil }
 
 // Starts from nat's own default so an unset field keeps that package's
 // choice; outbound decides nothing here. Each field is checked separately so a
