@@ -132,7 +132,7 @@ func tlsServerTransport(t *testing.T, certificates testCertificates) string {
 func tlsClientTransport(t *testing.T, certificates testCertificates) string {
 	return fmt.Sprintf(`[
 		{ "type": "tcp" },
-		{ "type": "tls", "settings": { "server_name": %q, "certificate_authorities": [{ "certificate": %s }] } }
+		{ "type": "tls", "settings": { "server_name": %q, "alpn": ["http/1.1"], "certificate_authorities": [{ "certificate": %s }] } }
 	]`, proxyServerName, jsonString(t, certificates.authorityPEM))
 }
 

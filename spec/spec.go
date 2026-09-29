@@ -371,6 +371,23 @@ type OverlayStreamTransportModule interface {
 	NewStreamOverlayServer() (StreamOverlayServer, error)
 }
 
+// TransportInfoProvider is optional on a stream overlay transport module. Unlike
+// Info, it describes this configuration, so it may depend on settings. Only the
+// config check reads it.
+type TransportInfoProvider interface {
+	TransportInfo() TransportInfo
+}
+
+// TransportInfo lets the config check find transports that cannot work
+// together. Add a field only for a check at least two transports need.
+type TransportInfo struct {
+	// ALPN names ("http/1.1", "h2"). A transport speaking a protocol lists what
+	// it can speak (WebSocket: "http/1.1"); one negotiating ALPN lists what it
+	// offers (TLS: its alpn setting). Everything offered must be speakable by
+	// the transport directly above.
+	ApplicationProtocols []string
+}
+
 // StreamOverlayClient runs this layer's client side over a stream already
 // dialed to the proxy server. server is that server's address, as dialed: a
 // layer that needs a name (TLS's SNI) takes it from there.

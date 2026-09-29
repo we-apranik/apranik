@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // One settings type for both roles: an outbound reads the client fields, an
@@ -32,8 +33,14 @@ type Settings struct {
 	// shares nothing with it.
 	ALPN []string `json:"alpn"`
 
+	// Both. Empty means Go's defaults: 1.2 and 1.3. A client may set them
+	// only with fingerprint "none": a browser's ClientHello fixes its own.
 	MinVersion string `json:"min_version"`
 	MaxVersion string `json:"max_version"`
+
+	// Client: whose ClientHello to imitate, through uTLS. Empty means
+	// "chrome"; "none" means Go's own.
+	Fingerprint string `json:"fingerprint"`
 }
 
 // A PEM certificate, from a file or inline: exactly one of the two.
@@ -51,6 +58,7 @@ type Certificate struct {
 }
 
 var versionsByName = map[string]uint16{
+	"":    0,
 	"1.0": cryptotls.VersionTLS10,
 	"1.1": cryptotls.VersionTLS11,
 	"1.2": cryptotls.VersionTLS12,
@@ -68,8 +76,15 @@ func (s *Settings) Validate() error {
 	if !known {
 		return fmt.Errorf("tls: max_version %q is not one of 1.0, 1.1, 1.2, 1.3", s.MaxVersion)
 	}
-	if minVersion > maxVersion {
+	if minVersion != 0 && maxVersion != 0 && minVersion > maxVersion {
 		return fmt.Errorf("tls: min_version %s is above max_version %s", s.MinVersion, s.MaxVersion)
+	}
+
+	if !isKnownFingerprint(s.Fingerprint) {
+		return fmt.Errorf("tls: fingerprint %q is not known; see the tls page for the list", s.Fingerprint)
+	}
+	if s.usesFingerprint() && (s.MinVersion != "" || s.MaxVersion != "") {
+		return fmt.Errorf("tls: min_version and max_version cannot be used with fingerprint %q, whose ClientHello fixes the versions; set fingerprint to %q to use them", s.Fingerprint, fingerprintNone)
 	}
 
 	for index, protocol := range s.ALPN {
@@ -118,8 +133,40 @@ func (s *Settings) Warnings() []string {
 			warnings = append(warnings, "tls: certificate_authorities has no effect while insecure is on")
 		}
 	}
-	if versionsByName[s.MinVersion] < cryptotls.VersionTLS12 {
+	if s.MinVersion != "" && versionsByName[s.MinVersion] < cryptotls.VersionTLS12 {
 		warnings = append(warnings, fmt.Sprintf("tls: min_version %s allows protocol versions with known weaknesses; 1.2 is the usual floor", s.MinVersion))
 	}
+	if fingerprint, known := fingerprintsByName[s.Fingerprint]; known && fingerprint.stale {
+		warnings = append(warnings, fmt.Sprintf("tls: fingerprint %q imitates %s, which is rarely seen today and may stand out; prefer chrome, firefox or safari", s.Fingerprint, fingerprint.imitates))
+	}
 	return warnings
+}
+
+// The same settings serve both roles, and nothing tells them which. A server
+// cannot run without certificates and a client never reads them, so settings
+// without certificates are taken to be a client's: the default fingerprint then
+// applies, and check can see what it will offer.
+func (s *Settings) looksLikeAClient() bool {
+	return len(s.Certificates) == 0
+}
+
+// Whether a client built from these settings sends a browser's ClientHello:
+// named explicitly, or the default for settings that look like a client's.
+func (s *Settings) usesFingerprint() bool {
+	if s.Fingerprint == "" {
+		return s.looksLikeAClient()
+	}
+	return s.Fingerprint != fingerprintNone
+}
+
+// A client offers its alpn setting, or its fingerprint's list when alpn is
+// unset; a server offers its alpn setting.
+func (s *Settings) TransportInfo() spec.TransportInfo {
+	if len(s.ALPN) > 0 {
+		return spec.TransportInfo{ApplicationProtocols: s.ALPN}
+	}
+	if s.usesFingerprint() {
+		return spec.TransportInfo{ApplicationProtocols: presetApplicationProtocols(effectiveFingerprint(s.Fingerprint))}
+	}
+	return spec.TransportInfo{}
 }

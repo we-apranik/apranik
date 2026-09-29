@@ -856,3 +856,79 @@ func TestMaxConnectionsOnAUDPInboundIsRefused(t *testing.T) {
 		t.Errorf("max_connections on a udp inbound was not refused at its path: %v", diagnostics)
 	}
 }
+
+// ---------- application protocols across a stack ----------
+
+// withOutboundStack replaces the freedom outbound with a Trojan outbound over
+// the given transport stack.
+func withOutboundStack(stack string) string {
+	return strings.Replace(goodDocument,
+		`"tag": "freedom",
+    "protocol": {"type": "freedom"}`,
+		`"tag": "proxied",
+    "server": "proxy.example.com",
+    "server_port": 443,
+    "transport": `+stack+`,
+    "protocol": {"type": "trojan", "settings": {"password": "p"}}`, 1)
+}
+
+func TestTLSMayOfferOnlyWhatTheTransportAboveSpeaks(t *testing.T) {
+	const alpnPath = "outbounds[0].transport[1].settings.alpn"
+	for name, tc := range map[string]struct {
+		stack   string
+		refused bool
+	}{
+		"chrome's list under ws": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"fingerprint": "chrome"}}, {"type": "ws"}]`, true},
+		"randomized under httpupgrade": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"fingerprint": "randomized"}}, {"type": "httpupgrade"}]`, true},
+		"h2 and http/1.1 under ws": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"alpn": ["h2", "http/1.1"]}}, {"type": "ws"}]`, true},
+		"h2 under httpupgrade": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"alpn": ["h2"]}}, {"type": "httpupgrade"}]`, true},
+		"http/1.1 under ws": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"fingerprint": "chrome", "alpn": ["http/1.1"]}}, {"type": "ws"}]`, false},
+		"the default fingerprint under ws": {
+			`[{"type": "tcp"}, {"type": "tls"}, {"type": "ws"}]`, true},
+		"no fingerprint under ws": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"fingerprint": "none"}}, {"type": "ws"}]`, false},
+		"chrome's list with nothing above": {
+			`[{"type": "tcp"}, {"type": "tls", "settings": {"fingerprint": "chrome"}}]`, false},
+	} {
+		diagnostics, failed := loadAndCheck(t, withOutboundStack(tc.stack))
+		if failed != tc.refused {
+			t.Errorf("%s: refused %v, want %v: %v", name, failed, tc.refused, diagnostics)
+			continue
+		}
+		if tc.refused && !find(diagnostics, alpnPath, `set alpn to ["http/1.1"]`) {
+			t.Errorf("%s: no error naming the fix at %s: %v", name, alpnPath, diagnostics)
+		}
+	}
+}
+
+// A server's offer is its alpn alone: the default fingerprint is a client's.
+func TestAnInboundTLSServerWithoutAlpnPassesUnderWS(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5"`,
+		`"transport": [{"type": "tcp"}, {"type": "tls", "settings": {"certificates": [{"certificate": "c", "key": "k"}]}}, {"type": "ws"}],
+    "protocol": {"type": "socks5"`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Errorf("an inbound tls without alpn under ws was refused: %v", diagnostics.Err())
+	}
+}
+
+func TestAnInboundTLSServerIsCheckedToo(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"transport": [{"type": "tcp"}],
+    "protocol": {"type": "socks5"`,
+		`"transport": [{"type": "tcp"}, {"type": "tls", "settings": {"alpn": ["h2", "http/1.1"], "certificates": [{"certificate": "c", "key": "k"}]}}, {"type": "ws"}],
+    "protocol": {"type": "socks5"`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].transport[1].settings.alpn", "ws above it can speak only") {
+		t.Errorf("an inbound tls offering h2 under ws was not refused: %v", diagnostics)
+	}
+}

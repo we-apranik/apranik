@@ -1,6 +1,9 @@
 package config
 
 import (
+	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
@@ -278,6 +281,45 @@ func checkStreamTransportStack(diagnostics *Diagnostics, stack blueprint.StreamT
 		}
 		seen[name] = index
 	}
+	checkApplicationProtocols(diagnostics, stack.Overlays, loc)
+}
+
+// A transport that negotiates ALPN (TLS) must offer only protocols the
+// transport directly above it can speak (WebSocket: http/1.1). Otherwise the
+// other end, often a CDN, may choose h2, and the connection fails after the
+// handshake with an error that does not point here.
+func checkApplicationProtocols(diagnostics *Diagnostics, overlays []spec.OverlayStreamTransportModule, loc string) {
+	for index := 0; index+1 < len(overlays); index++ {
+		lower, upper := overlays[index], overlays[index+1]
+		offered := transportApplicationProtocols(lower)
+		speakable := transportApplicationProtocols(upper)
+		if len(offered) == 0 || len(speakable) == 0 {
+			continue
+		}
+		for _, protocol := range offered {
+			if !slices.Contains(speakable, protocol) {
+				diagnostics.errorf(fieldLocation(indexLocation(loc, index+1), "settings", "alpn"),
+					"%s offers %v, but %s above it can speak only %v, and the other end may choose %s; set alpn to %v",
+					lower.Info().Name, offered, upper.Info().Name, speakable, protocol, quotedList(speakable))
+				break
+			}
+		}
+	}
+}
+
+func transportApplicationProtocols(overlay spec.OverlayStreamTransportModule) []string {
+	if provider, provides := overlay.(spec.TransportInfoProvider); provides {
+		return provider.TransportInfo().ApplicationProtocols
+	}
+	return nil
+}
+
+func quotedList(values []string) string {
+	quoted := make([]string, len(values))
+	for index, value := range values {
+		quoted[index] = strconv.Quote(value)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 func checkDatagramTransportStack(diagnostics *Diagnostics, stack blueprint.DatagramTransportStack, loc string) {

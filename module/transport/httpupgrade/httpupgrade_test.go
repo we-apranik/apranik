@@ -456,3 +456,15 @@ func BenchmarkBareTCP16KiB(b *testing.B) {
 	}
 	<-done
 }
+
+// The upgrade request is HTTP/1.1, so the config check refuses a TLS below
+// that offers anything else.
+func TestItSpeaksHTTP1Point1(t *testing.T) {
+	provider, provides := NewOverlayStreamTransportModule().(spec.TransportInfoProvider)
+	if !provides {
+		t.Fatal("no TransportInfo")
+	}
+	if got := provider.TransportInfo().ApplicationProtocols; len(got) != 1 || got[0] != "http/1.1" {
+		t.Errorf("speaks %v, want [http/1.1]", got)
+	}
+}

@@ -32,7 +32,7 @@ type testAuthority struct {
 	pem         string
 }
 
-func newTestAuthority(t *testing.T) *testAuthority {
+func newTestAuthority(t testing.TB) *testAuthority {
 	t.Helper()
 	key := newKey(t)
 	template := &x509.Certificate{
@@ -56,7 +56,7 @@ func newTestAuthority(t *testing.T) *testAuthority {
 }
 
 // issue returns a leaf certificate and key, both PEM, for the given names.
-func (a *testAuthority) issue(t *testing.T, domains []string, ips []netip.Addr) (certificatePEM, keyPEM string) {
+func (a *testAuthority) issue(t testing.TB, domains []string, ips []netip.Addr) (certificatePEM, keyPEM string) {
 	t.Helper()
 	key := newKey(t)
 	template := &x509.Certificate{
@@ -82,7 +82,7 @@ func (a *testAuthority) issue(t *testing.T, domains []string, ips []netip.Addr) 
 	return encodePEM("CERTIFICATE", der), encodePEM("EC PRIVATE KEY", keyDER)
 }
 
-func newKey(t *testing.T) *ecdsa.PrivateKey {
+func newKey(t testing.TB) *ecdsa.PrivateKey {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -96,7 +96,7 @@ func encodePEM(blockType string, der []byte) string {
 }
 
 // newModule is what the config would decode: defaults, then the test's edits.
-func newModule(t *testing.T, edit func(*tls.Settings)) *tls.Transport {
+func newModule(t testing.TB, edit func(*tls.Settings)) *tls.Transport {
 	t.Helper()
 	transport := tls.NewOverlayStreamTransportModule().(*tls.Transport)
 	edit(&transport.Settings)
@@ -107,7 +107,7 @@ func newModule(t *testing.T, edit func(*tls.Settings)) *tls.Transport {
 }
 
 // tcpPair is a connected loopback TCP pair: real half-close, real deadlines.
-func tcpPair(t *testing.T) (clientSide, serverSide *net.TCPConn) {
+func tcpPair(t testing.TB) (clientSide, serverSide *net.TCPConn) {
 	t.Helper()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
@@ -132,7 +132,7 @@ func tcpPair(t *testing.T) (clientSide, serverSide *net.TCPConn) {
 	return clientSide, serverSide
 }
 
-func destination(t *testing.T, host string, port uint16) spec.Destination {
+func destination(t testing.TB, host string, port uint16) spec.Destination {
 	t.Helper()
 	if ip, err := netip.ParseAddr(host); err == nil {
 		server, err := spec.NewDestinationFromIP(ip, port)
@@ -191,7 +191,7 @@ func serverFor(t *testing.T, authority *testAuthority, domains []string, ips []n
 	})
 }
 
-func clientTrusting(t *testing.T, authority *testAuthority, edit func(*tls.Settings)) *tls.Transport {
+func clientTrusting(t testing.TB, authority *testAuthority, edit func(*tls.Settings)) *tls.Transport {
 	return newModule(t, func(s *tls.Settings) {
 		s.CertificateAuthorities = []tls.CertificateAuthority{{Certificate: authority.pem}}
 		if edit != nil {
@@ -298,13 +298,13 @@ func TestALPNIsNegotiated(t *testing.T) {
 		s.Certificates = []tls.Certificate{{Certificate: certificatePEM, Key: types.Secret(keyPEM)}}
 		s.ALPN = []string{"h2", "http/1.1"}
 	})
-	clientResult, _ := handshake(t,
+	clientResult, serverResult := handshake(t,
 		clientTrusting(t, authority, func(s *tls.Settings) { s.ALPN = []string{"http/1.1"} }),
 		serverModule, destination(t, "example.com", 443))
 	if clientResult.err != nil {
 		t.Fatalf("client: %v", clientResult.err)
 	}
-	if got := clientResult.stream.(interface {
+	if got := serverResult.stream.(interface {
 		ConnectionState() cryptotls.ConnectionState
 	}).ConnectionState().NegotiatedProtocol; got != "http/1.1" {
 		t.Errorf("negotiated %q, want http/1.1", got)
@@ -319,7 +319,7 @@ func TestVersionsOutsideTheRangeAreRefused(t *testing.T) {
 		s.MinVersion = "1.3"
 	})
 	clientResult, _ := handshake(t,
-		clientTrusting(t, authority, func(s *tls.Settings) { s.MaxVersion = "1.2" }),
+		clientTrusting(t, authority, func(s *tls.Settings) { s.Fingerprint, s.MaxVersion = "none", "1.2" }),
 		serverModule, destination(t, "example.com", 443))
 	if clientResult.err == nil {
 		t.Fatal("a 1.2-only client reached a 1.3-only server")
@@ -435,7 +435,10 @@ func TestValidateRefusesMalformedSettings(t *testing.T) {
 		"authority with both": func(s *tls.Settings) {
 			s.CertificateAuthorities = []tls.CertificateAuthority{{CertificateFile: "a", Certificate: "b"}}
 		},
-		"certificate without key": func(s *tls.Settings) { s.Certificates = []tls.Certificate{{CertificateFile: "a"}} },
+		"certificate without key":        func(s *tls.Settings) { s.Certificates = []tls.Certificate{{CertificateFile: "a"}} },
+		"unknown fingerprint":            func(s *tls.Settings) { s.Fingerprint = "netscape" },
+		"fingerprint with a min version": func(s *tls.Settings) { s.Fingerprint, s.MinVersion = "firefox", "1.3" },
+		"fingerprint with a max version": func(s *tls.Settings) { s.Fingerprint, s.MaxVersion = "chrome", "1.2" },
 		"key twice": func(s *tls.Settings) {
 			s.Certificates = []tls.Certificate{{CertificateFile: "a", KeyFile: "b", Key: "secret-key-material"}}
 		},
@@ -462,7 +465,10 @@ func TestWarnings(t *testing.T) {
 			s.Insecure = true
 			s.CertificateAuthorities = []tls.CertificateAuthority{{Certificate: "x"}}
 		}, 2},
-		"old version": {func(s *tls.Settings) { s.MinVersion = "1.0" }, 1},
+		"old version":       {func(s *tls.Settings) { s.MinVersion = "1.0" }, 1},
+		"stale fingerprint": {func(s *tls.Settings) { s.Fingerprint = "edge" }, 1},
+		"older version":     {func(s *tls.Settings) { s.Fingerprint = "hellochrome_120" }, 1},
+		"current version":   {func(s *tls.Settings) { s.Fingerprint = "hellochrome_133" }, 0},
 	} {
 		transport := tls.NewOverlayStreamTransportModule().(*tls.Transport)
 		tc.edit(&transport.Settings)

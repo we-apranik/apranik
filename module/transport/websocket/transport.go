@@ -15,6 +15,11 @@ func (*Transport) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "ws", Description: "WebSocket (RFC 6455) over the stream below"}
 }
 
+// The upgrade request is HTTP/1.1, so a TLS below must not offer anything else.
+func (*Transport) TransportInfo() spec.TransportInfo {
+	return spec.TransportInfo{ApplicationProtocols: []string{"http/1.1"}}
+}
+
 func (t *Transport) NewStreamOverlayClient() (spec.StreamOverlayClient, error) {
 	return newClient(&t.Settings), nil
 }
