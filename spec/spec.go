@@ -386,6 +386,11 @@ type TransportInfo struct {
 	// offers (TLS: its alpn setting). Everything offered must be speakable by
 	// the transport directly above.
 	ApplicationProtocols []string
+
+	// The far end needs no matching layer: whatever this transport does
+	// (splitting, timing, decoy packets) is invisible to the server, so it
+	// works toward any destination, as freedom's must.
+	NeedsNoServerSide bool
 }
 
 // StreamOverlayClient runs this layer's client side over a stream already
