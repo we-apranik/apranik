@@ -113,6 +113,7 @@ nav:
       - Contributing guide: contributing.md
       - Practices: contributors/practices.md
       - Performance: contributors/performance.md
+      - Interoperability tests: contributors/interop.md
       - Good first issues: contributors/good-first-issues.md
   - Design:
       - Decisions:
