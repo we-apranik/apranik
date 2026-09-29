@@ -42,8 +42,8 @@ architecture is not optimised for rapid, Iran-specific adaptation.
 - **Safe defaults.** A listen address is required, sniffing is off until asked
   for, an inbound without credentials is warned about, and secrets never appear
   in error text.
-- **Standard library first.** No third-party dependencies today; each one must
-  be justified.
+- **Standard library first.** Each dependency must be justified; the one so far
+  is uTLS, for browser ClientHellos.
 - **A core, not an app.** Apranik ships a binary and a library; the user
   interface belongs to the clients and panels that run it.
 
@@ -53,11 +53,11 @@ architecture is not optimised for rapid, Iran-specific adaptation.
 
 ## Status
 
-Early and working. Standard library only; no third-party dependencies.
+Early and working. One dependency: uTLS.
 
 | Area | Available |
 | --- | --- |
-| Transports | `tcp` (base stream), `udp` (base datagram), `tls`, `ws` and `httpupgrade` (stream overlays) |
+| Transports | `tcp` (base stream), `udp` (base datagram), `tls` (Chrome's ClientHello by default, via uTLS), `ws` and `httpupgrade` (stream overlays) |
 | Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`) |
 | Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
 | Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan), `freedom` (straight to the destination) and `block` (refuses everything) |
@@ -65,7 +65,7 @@ Early and working. Standard library only; no third-party dependencies.
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
 | Configuration | JSON config file, validated in full before anything starts |
 
-Not yet: multiplexing transports (HTTP/2, gRPC), VLESS, uTLS, routing rules
+Not yet: multiplexing transports (HTTP/2, gRPC), VLESS, REALITY, ECH, routing rules
 (every request uses the first outbound), sniffing UDP, and QUIC.
 
 Complete server and client configs for Trojan over TLS, WebSocket and
@@ -251,7 +251,7 @@ anyone who can reach the socket inject packets into a session.
 | --- | --- |
 | `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`) |
 | `udp` | `resolve_timeout` (default `5s`): longest a domain lookup may take; `resolve_cache_ttl` (default `30s`): how long a resolved domain is reused |
-| `tls` | client: `server_name`, `insecure`, `certificate_authorities`; server: `certificates` (file or inline PEM); both: `alpn`, `min_version` (default `1.2`), `max_version` (default `1.3`) |
+| `tls` | client: `server_name`, `insecure`, `certificate_authorities`, `fingerprint` (default `chrome`; `none` for Go's own); server: `certificates` (file or inline PEM); both: `alpn` (`["http/1.1"]` under `ws` and `httpupgrade`), `min_version`, `max_version` (a client only with `fingerprint: none`) |
 | `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `max_early_data` (default `0`), `early_data_header_name` (default `Sec-WebSocket-Protocol`) |
 | `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |

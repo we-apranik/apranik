@@ -2,8 +2,9 @@
 
 ## Setup
 
-You need Go (the version in `go.mod`, currently `go 1.27`) and nothing else:
-the module has no third-party dependencies.
+You need Go (the version in `go.mod`, currently `go 1.27`) and nothing else.
+The one third-party dependency, uTLS, is fetched by `go build`; adding another
+needs a justification in the design notes.
 
 ```sh
 git clone https://github.com/The-Apranik/Apranik.git

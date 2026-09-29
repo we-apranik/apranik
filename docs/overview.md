@@ -70,6 +70,7 @@ outside its own folder.
 | `tls` (first overlay) | one registry line, plus a one-time change to the overlay contract and core | the change was a design finding: overlays wrapping listeners let one silent client stall an inbound |
 | `ws` | one registry line | as intended |
 | `httpupgrade` | one registry line, plus moving the handshake it shares with `ws` to `shared/websocket/handshake` | as intended: shared code moves out once a second user exists |
+| `tls` fingerprints (uTLS) | none for the feature itself; a new contract concept, `spec.TransportInfo`, and its check in `config`, which `ws` and `httpupgrade` report to | a design finding: TLS's ALPN must suit the transport above it, which no module could see; the check makes the combination checkable without letting modules know each other |
 
 VLESS, the next protocol, is the next measurement.
 

@@ -20,7 +20,7 @@ With no command, or with `-h`, it prints the list of commands.
 go build -o apranik ./cmd/apranik
 ```
 
-Go 1.27 or newer, standard library only: there is nothing else to fetch.
+Go 1.27 or newer. The one dependency, uTLS, is fetched by `go build`.
 
 ## `run`
 

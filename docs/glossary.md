@@ -2,6 +2,7 @@
 
 | Term | Meaning |
 | --- | --- |
+| **ALPN** | Application-Layer Protocol Negotiation: the list of protocols (`h2`, `http/1.1`) a TLS client offers and the one the server picks. `tls`'s `alpn` sets it; `apranik check` refuses a list the transport above cannot speak. |
 | **Base transport** | A transport that creates connections from nothing: `tcp` and `udp`. Implements `spec.BaseStreamTransportModule` or `spec.BaseDatagramTransportModule`. Also called an underlay. |
 | **Block** | The special outbound protocol that refuses every connection and drops every UDP packet. |
 | **Blueprint** | A `blueprint.Blueprint`: every inbound and outbound with its modules looked up, decoded and validated, but nothing opened. |
@@ -16,6 +17,7 @@
 | **Early data** | Payload sent inside a handshake to save a round trip: `ws` puts the start of the first write in a header (`max_early_data`, Xray's `ed`). |
 | **Endpoint** | `spec.Endpoint`: an IP and a port, already resolved. |
 | **Fallback** | Where an inbound sends a request its protocol refuses with `spec.ErrFallbackRequested`: every byte, from the first, is replayed to that address over plain TCP, so a probe sees an ordinary service. |
+| **Fingerprint** | What a TLS ClientHello reveals about the program that sent it: cipher suites, extensions, their order. `tls`'s `fingerprint` picks a browser's to imitate through uTLS. |
 | **Freedom** | The special outbound protocol that sends straight to each destination, over plain TCP and UDP. |
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
@@ -26,18 +28,20 @@
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
 | **Outbound** | How traffic leaves: a proxy client plus a dialer stack, or freedom (`component.Outbound`). |
 | **Overlay transport** | A transport that wraps a layer below it, one connection at a time (`WrapClientStream`, `WrapServerStream`), such as TLS or WebSocket. `tls`, `ws` and `httpupgrade` are built. |
-| **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Payload** | What a layer returns upward: the proxied traffic with the protocol's framing removed. |
+| **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Pipelining** | `httpupgrade`'s `pipeline`: the client sends its payload right after the upgrade request, without waiting for the `101`. |
 | **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` / `block` on an outbound, or `mixed` on an inbound. |
 | **Proxy protocol** | A module that speaks proxy semantics over a supplied carrier, such as SOCKS5, HTTP CONNECT or Trojan. It never opens a connection itself. Its server `Accept*`s requests; its client `Request*`s a payload. |
 | **Registry** | `core/registry`: maps the names used in config files to module constructors, per kind. `registry.Default()` is the only place that names modules. |
-| **Request** | What a proxy client sends to ask the server for a payload. `Request*` methods connect nothing and may send nothing until the first write. |
 | **Relay** | `core/relay`: the copy loops. `relay.Stream` for TCP, `relay.Datagrams` for a UDP session. |
+| **Request** | What a proxy client sends to ask the server for a payload. `Request*` methods connect nothing and may send nothing until the first write. |
 | **Router** | `core/route/router`: picks the outbound for a `Metadata`. Stateless; no rules exist yet. |
+| **Shared package** | A package under `shared/` that modules may import: one concept, no state, `spec` and the standard library only. |
 | **SNI** | Server Name Indication: the host name a TLS client sends in the clear. The `tls` sniffer reads it; the `tls` transport sends it. |
 | **Sniffer** | A module that recognises a protocol in the start of a payload and reports its domain, such as the TLS SNI or the HTTP `Host`. `SnifferModule` holds its settings and builds the `Sniffer`. |
-| **Shared package** | A package under `shared/` that modules may import: one concept, no state, `spec` and the standard library only. |
 | **Stack** | A list of transports, base first and overlays outward from the wire, composed as a fold. |
-| **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream)` or `AcceptStream(ctx, underlyingStream)`. |
+| **Transport info** | `spec.TransportInfo`: facts about a configured transport that only the config check reads, today the application protocols it offers or can speak. |
 | **UDP session** | One client's UDP flow, such as one SOCKS5 association: `core/net/udp/session`. |
+| **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream)` or `AcceptStream(ctx, underlyingStream)`. |
+| **uTLS** | The library (`github.com/refraction-networking/utls`) that sends a copy of a real browser's ClientHello; Apranik's one dependency. |
