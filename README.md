@@ -15,8 +15,10 @@ quickly a new circumvention technique can be added.
 
 So Apranik is built around one property: **a researcher who discovers a new
 technique can ship it as one module, without touching anything else.** Adding a
-module means a new folder and one line in the registry. If a change needs edits
-to the contract, to another module, or to the builder, the design has failed.
+module means a new folder and one line in the registry. If a technique needs
+edits to the contract, to another module, or to the builder, the contract is
+missing a concept; the fix is to add that concept, once and generally, never to
+let one module know another.
 
 [![From a technique to a deployed module: a researcher finds a technique, writes one folder under module/ implementing one spec kind, tests it without core, adds one line to core/registry/default.go, names it by "type" in a config file that apranik check validates, and ships it in a release of the apranik binary that clients and panels pick up (planned). spec, the builder, core's inbound and outbound, every other module and the config parser stay untouched.](docs/assets/diagrams/research-to-deployment.excalidraw.svg)](docs/assets/diagrams/research-to-deployment.excalidraw.svg)
 

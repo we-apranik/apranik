@@ -53,9 +53,12 @@ Everything is organised around one property: **a new technique is one module.**
 [![From a technique to a deployed module: a researcher finds a technique, writes one folder under module/ implementing one spec kind, tests it without core, adds one line to core/registry/default.go, names it by "type" in a config file that apranik check validates, and ships it in a release of the apranik binary that clients and panels pick up (planned).](assets/diagrams/research-to-deployment.excalidraw.svg)](assets/diagrams/research-to-deployment.excalidraw.svg)
 
 
-If adding something needs more than that (an edit to `spec`, the builder or
-another module), the project treats it as a design failure to record and fix,
-not a cost to accept.
+If adding a technique needs more than that (an edit to `spec`, the builder or
+another module), the contract is missing something, and the project records and
+fixes it rather than accepting the cost. Fixing it means giving the contract a
+new, general concept, one that at least two modules need, so the next technique
+of that kind needs no edit. Code in one module that knows another module by name
+is never the fix.
 
 ## Measured so far
 
