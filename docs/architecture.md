@@ -19,9 +19,10 @@ bottom layer, `spec`, imports nothing from the project.
 
 [![What spec declares: two carriers (Stream, Datagram) plus PeekableStream; two address types (Endpoint, Destination); four transport module kinds, with stream overlays wrapping one connection at a time; three proxy module kinds; SnifferModule and Sniffer; what crosses the proxy layer (Metadata, the UDP ASSOCIATE hook, the fallback sentinel); the Config and Info methods every module kind has; and the sentinel errors. Router, TrafficHandler, Inbound and Outbound are not in spec but in core/component.](assets/diagrams/spec-contract.excalidraw.svg)](assets/diagrams/spec-contract.excalidraw.svg)
 
-[`spec/spec.go`](https://github.com/The-Apranik/Apranik/blob/main/spec/spec.go)
-is the module contract, in one file. It holds interfaces, sentinel errors and
-value types with their constructors, and no state. Its main groups:
+[`spec/`](https://github.com/The-Apranik/Apranik/tree/main/spec) is the
+module contract, one package split into a file per group (`doc.go` lists
+them). It holds interfaces, sentinel errors and value types with their
+constructors, and no state. Its main groups:
 
 **Carriers.** There are two, and only two:
 
