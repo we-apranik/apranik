@@ -18,7 +18,8 @@
 | **Endpoint** | `spec.Endpoint`: an IP and a port, already resolved. |
 | **Fallback** | Where an inbound sends a request its protocol refuses with `spec.ErrFallbackRequested`: every byte, from the first, is replayed to that address over plain TCP, so a probe sees an ordinary service. |
 | **Fingerprint** | What a TLS ClientHello reveals about the program that sent it: cipher suites, extensions, their order. `tls`'s `fingerprint` picks a browser's to imitate through uTLS. |
-| **Freedom** | The special outbound protocol that sends straight to each destination, over plain TCP and UDP. |
+| **Fragment** | The overlay transport that cuts the TLS ClientHello into records, packets or both, so DPI that does not reassemble never sees the server name whole. Outbound only. |
+| **Freedom** | The special outbound protocol that sends straight to each destination, over TCP (its transport: `tcp`, then only transports that need no server side) and UDP. |
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |

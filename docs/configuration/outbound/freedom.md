@@ -1,7 +1,7 @@
 # Freedom
 
-`freedom` sends each connection straight to its destination, over plain TCP and
-UDP. It is a special outbound protocol, built by core.
+`freedom` sends each connection straight to its destination, over TCP and UDP.
+It is a special outbound protocol, built by core.
 
 ## Structure
 
@@ -10,10 +10,13 @@ UDP. It is a special outbound protocol, built by core.
 ```json
 {
   "tag": "direct",
+  "transport": [
+    { "type": "tcp", "settings": { "keep_alive": "15s" } },
+    { "type": "fragment" }
+  ],
   "protocol": {
     "type": "freedom",
     "settings": {
-      "tcp": { "keep_alive": "15s" },
       "udp": { "resolve_timeout": "5s" },
       "nat": {
         "mapping": "endpoint-independent",
@@ -28,19 +31,36 @@ UDP. It is a special outbound protocol, built by core.
 
 </div>
 
-Only [`tag`](index.md#tag) and [`dial_timeout`](index.md#dial_timeout) apply of
-the [outbound fields](index.md); freedom takes no server and no transport.
+Of the [outbound fields](index.md), [`tag`](index.md#tag),
+[`dial_timeout`](index.md#dial_timeout) and `transport` apply; freedom takes no
+server.
+
+## Transport
+
+Freedom's `transport` is how its TCP connections reach each destination. Left
+out, it is plain `tcp` with the module's defaults. It must start with
+[`tcp`](../transport/tcp.md), and above it may hold only transports that need
+no server side, such as [`fragment`](../transport/fragment.md): a destination
+runs none of Apranik's layers, so anything it would have to undo, such as
+`tls` or `ws`, would reach it as garbage. `check` refuses those and lists the
+transports that do work:
+
+```
+outbounds[1].transport[1]: "ws" cannot be used with freedom. Freedom connects
+straight to each destination, and a destination does not run "ws", so it would
+receive ws framing instead of the client's traffic. Transports that work with
+freedom: tcp, fragment.
+```
+
+`tcp`'s settings, which older versions took as `settings.tcp`, now go in the
+stack: `[{ "type": "tcp", "settings": { "keep_alive": "15s" } }]`. A config
+still using `settings.tcp` is refused with that advice.
+
+Freedom's UDP is not part of the stack; it is set in [`udp`](#udp).
 
 <div class="cfg-fields" markdown>
 
 ## Fields
-
-### `tcp`
-
-<span class="cfg cfg-type">object</span>
-<span class="cfg cfg-def">Default: the module's defaults</span>
-
-[`tcp` transport settings](../transport/tcp.md) for its TCP connections.
 
 ### `udp`
 

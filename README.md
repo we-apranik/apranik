@@ -110,7 +110,9 @@ can be checked on a machine that could never run it.
 A config file has a log section, inbounds (how traffic arrives) and outbounds (how
 it leaves). Inbounds and outbounds share one shape: a `transport` stack and a
 `protocol`, each written as `{ "type": ..., "settings": {...} }`. Two outbound
-protocols are special: `freedom` and `block` take no server and no transport.
+protocols are special: `freedom` and `block` take no server; `block` takes no
+transport, and `freedom`'s holds only `tcp` and transports that need no server
+side, such as `fragment`.
 One inbound protocol is special: `mixed` serves SOCKS5 and HTTP on one port.
 
 ```json
@@ -218,13 +220,17 @@ at its own path, such as `protocol.settings.http`. TCP inbounds only.
 
 ### Special outbound protocols
 
-**`freedom`** sends traffic straight to each destination over plain TCP and UDP.
-It takes no server and no transport. Its optional settings configure those two
-transports and the NAT behaviour of its UDP:
+**`freedom`** sends traffic straight to each destination over TCP and UDP. It
+takes no server. Its optional `transport` is how its TCP reaches destinations:
+`tcp` first, then only transports that need no server side, such as `fragment`
+(a destination runs none of Apranik's layers, so `tls` or `ws` there is
+refused). Left out, it is plain `tcp`. Its settings configure its UDP and the
+NAT behaviour of that UDP:
 
 ```json
-{ "tag": "direct", "protocol": { "type": "freedom", "settings": {
-    "tcp": { "keep_alive": "15s" },
+{ "tag": "direct",
+  "transport": [{ "type": "tcp", "settings": { "keep_alive": "15s" } }, { "type": "fragment" }],
+  "protocol": { "type": "freedom", "settings": {
     "udp": { "resolve_timeout": "5s" },
     "nat": { "filtering": "address-and-port-dependent", "idle_timeout": "5m" }
 } } }
@@ -232,7 +238,6 @@ transports and the NAT behaviour of its UDP:
 
 | `settings` key | Meaning |
 | --- | --- |
-| `tcp` | the `tcp` module's settings (see Module settings) |
 | `udp` | the `udp` module's settings (see Module settings) |
 | `nat.mapping` | `endpoint-independent` (default), `address-dependent`, `address-and-port-dependent` |
 | `nat.filtering` | same three; default `address-and-port-dependent` |
@@ -254,6 +259,7 @@ anyone who can reach the socket inject packets into a session.
 | `tls` | client: `server_name`, `insecure`, `certificate_authorities`, `fingerprint` (default `chrome`; `none` for Go's own); server: `certificates` (file or inline PEM); both: `alpn` (`["http/1.1"]` under `ws` and `httpupgrade`), `min_version`, `max_version` (a client only with `fingerprint: none`) |
 | `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `max_early_data` (default `0`), `early_data_header_name` (default `Sec-WebSocket-Protocol`) |
 | `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`) |
+| `fragment` | outbound only: `tls_records`, `tcp_packets` (both default `true`), `piece_sizes` (default `["3-5", "10-20"]`), `piece_delays` (default `["10-20ms"]`, only with `tcp_packets`), `max_pieces` (default `"4-8"`, `0` no limit), `split_sni` (default `true`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`) |
 | `http` | `username`, `password` |
 | `trojan` | server: `users` (`[{ name, password }]`); client: `password` |

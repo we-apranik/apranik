@@ -103,6 +103,7 @@ nav:
           - "tls": configuration/transport/tls.md
           - "ws": configuration/transport/ws.md
           - "httpupgrade": configuration/transport/httpupgrade.md
+          - "fragment": configuration/transport/fragment.md
       - Sniffing: configuration/sniffing.md
       - Timeouts: configuration/timeouts.md
       - Examples: configuration/examples.md

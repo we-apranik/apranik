@@ -41,8 +41,9 @@ destination, or nowhere.
 | `block` | [Block](block.md) | nothing: refuses everything |
 
 `freedom` and `block` are special protocols built by core. They reach no proxy
-server, so they take no `server`, `server_port`, `transport` or
-`handshake_timeout`.
+server, so they take no `server`, `server_port` or `handshake_timeout`. Block
+takes no `transport`; freedom's holds only [`tcp` and transports that need no
+server side](freedom.md#transport).
 
 <div class="cfg-fields" markdown>
 
