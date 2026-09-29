@@ -3,9 +3,11 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/The-Apranik/Apranik/core/registry"
 )
@@ -31,11 +33,13 @@ func runVersion(args []string) error {
 	}
 
 	fmt.Printf("apranik %s\n", version)
-	fmt.Printf("  go         %s\n", runtime.Version())
-	fmt.Printf("  platform   %s/%s\n", runtime.GOOS, runtime.GOARCH)
 
+	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer writer.Flush()
+	fmt.Fprintf(writer, "  go\t%s\n", runtime.Version())
+	fmt.Fprintf(writer, "  platform\t%s/%s\n", runtime.GOOS, runtime.GOARCH)
 	if revision, ok := buildRevision(); ok {
-		fmt.Printf("  revision   %s\n", revision)
+		fmt.Fprintf(writer, "  revision\t%s\n", revision)
 	}
 
 	// Two builds at the same version can accept different configurations.
@@ -43,9 +47,10 @@ func runVersion(args []string) error {
 	if err != nil {
 		return fmt.Errorf("building the module registry: %w", err)
 	}
-	fmt.Printf("  transports %s\n", strings.Join(moduleNames(modules.Transports().Modules()), ", "))
-	fmt.Printf("  proxies    %s\n", strings.Join(moduleNames(modules.ProxyProtocols().Modules()), ", "))
-	fmt.Printf("  sniffers   %s\n", strings.Join(moduleNames(modules.Sniffers().Modules()), ", "))
+	fmt.Fprintln(writer)
+	for _, group := range modulesByKind(modules) {
+		fmt.Fprintf(writer, "  %s\t%s\n", group.heading(), strings.Join(group.names(), ", "))
+	}
 	return nil
 }
 

@@ -3,9 +3,8 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"os"
 	"slices"
-	"text/tabwriter"
+	"strings"
 
 	"github.com/The-Apranik/Apranik/core/registry"
 )
@@ -15,7 +14,7 @@ var cmdModules = &Command{
 	Short: "list the modules this build can be configured with",
 	Usage: `Usage: apranik modules
 
-List every registered transport, proxy protocol and sniffer, with the kind it fills.
+List every registered transport, proxy protocol and sniffer, grouped by the\nkind it fills; a module filling several kinds appears under each.
 A "type" in a config file must name one of these.
 
 Everything printed comes from the module itself, so a module describes itself
@@ -37,29 +36,72 @@ func runModules(args []string) error {
 		return fmt.Errorf("building the module registry: %w", err)
 	}
 
-	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer writer.Flush()
-
-	fmt.Fprint(writer, "SUBSYSTEM\tNAME\tKIND\tDESCRIPTION\n")
-	for _, listing := range modules.Transports().Modules() {
-		fmt.Fprintf(writer, "transport\t%s\t%s\t%s\n", listing.Name, listing.Kind, listing.Description)
+	// Padded by hand, not with tabwriter: the headings and blank lines
+	// between groups would end its columns, and each group would align alone.
+	groups := modulesByKind(modules)
+	nameWidth := 0
+	for _, group := range groups {
+		for _, listing := range group.listings {
+			nameWidth = max(nameWidth, len(listing.Name))
+		}
 	}
-	for _, listing := range modules.ProxyProtocols().Modules() {
-		fmt.Fprintf(writer, "proxy\t%s\t%s\t%s\n", listing.Name, listing.Kind, listing.Description)
-	}
-	for _, listing := range modules.Sniffers().Modules() {
-		fmt.Fprintf(writer, "sniffer\t%s\t%s\t%s\n", listing.Name, listing.Kind, listing.Description)
+	for index, group := range groups {
+		if index > 0 {
+			fmt.Println()
+		}
+		fmt.Println(group.heading())
+		for _, listing := range group.listings {
+			fmt.Printf("  %-*s  %s\n", nameWidth, listing.Name, listing.Description)
+		}
 	}
 	return nil
 }
 
-// Names only, deduplicated: one name can hold more than one kind.
-func moduleNames(listings []registry.Listing) []string {
-	var names []string
-	for _, listing := range listings {
-		if !slices.Contains(names, listing.Name) {
-			names = append(names, listing.Name)
+// kindGroup is every registered module of one kind. A module filling several
+// kinds (trojan) appears under each.
+type kindGroup struct {
+	kind     registry.Kind
+	listings []registry.Listing
+}
+
+// Plural and capitalised: "Overlay stream transports", "Stream proxies".
+func (g kindGroup) heading() string {
+	name := g.kind.String()
+	if plural, isProxy := strings.CutSuffix(name, "proxy"); isProxy {
+		name = plural + "proxies"
+	} else {
+		name += "s"
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
+}
+
+// In the order of registry.Kind: transports base before overlay, stream
+// before datagram, then proxies, then sniffers. Kinds with no module are
+// left out; names stay sorted within a kind.
+func modulesByKind(modules *registry.Registry) []kindGroup {
+	var all []registry.Listing
+	all = append(all, modules.Transports().Modules()...)
+	all = append(all, modules.ProxyProtocols().Modules()...)
+	all = append(all, modules.Sniffers().Modules()...)
+	slices.SortStableFunc(all, func(first, second registry.Listing) int {
+		return int(first.Kind) - int(second.Kind)
+	})
+
+	var groups []kindGroup
+	for _, listing := range all {
+		if len(groups) == 0 || groups[len(groups)-1].kind != listing.Kind {
+			groups = append(groups, kindGroup{kind: listing.Kind})
 		}
+		last := &groups[len(groups)-1]
+		last.listings = append(last.listings, listing)
+	}
+	return groups
+}
+
+func (g kindGroup) names() []string {
+	names := make([]string, len(g.listings))
+	for index, listing := range g.listings {
+		names[index] = listing.Name
 	}
 	return names
 }

@@ -49,22 +49,34 @@ certificates: those are read by `run` at startup.
 
 ## `modules`
 
-Lists every transport, proxy protocol and sniffer compiled into this build, with
-the kind each fills. A `"type"` in a config file must name one of them.
+Lists every transport, proxy protocol and sniffer compiled into this build,
+grouped by the kind each fills. A `"type"` in a config file must name one of
+them. A module that fills several kinds, such as `trojan`, appears under each.
 
 ```text
-SUBSYSTEM  NAME         KIND                        DESCRIPTION
-transport  httpupgrade  overlay stream transport    HTTP/1.1 upgrade, then raw bytes, over the stream below
-transport  tcp          base stream transport       TCP over IPv4/IPv6
-transport  tls          overlay stream transport    TLS 1.2 and 1.3 over the stream below
-transport  udp          base datagram transport     UDP over IPv4/IPv6
-transport  ws           overlay stream transport    WebSocket (RFC 6455) over the stream below
-proxy      http         stream proxy                HTTP CONNECT proxy, with Basic authentication
-proxy      socks5       stream proxy                SOCKS5 proxy (RFC 1928), with UDP ASSOCIATE
-proxy      trojan       stream proxy                Trojan proxy, CONNECT and UDP framed in the stream
-proxy      trojan       datagram over stream proxy  Trojan proxy, CONNECT and UDP framed in the stream
-sniffer    http         sniffer                     sniff host from an HTTP/1 request's Host header
-sniffer    tls          sniffer                     sniff server name (SNI) from a TLS ClientHello
+Base stream transports
+  tcp          TCP over IPv4/IPv6
+
+Overlay stream transports
+  fragment     cut the TLS ClientHello into records and packets to hide the server name
+  httpupgrade  HTTP/1.1 upgrade, then raw bytes, over the stream below
+  tls          TLS 1.2 and 1.3 over the stream below, with a browser's ClientHello
+  ws           WebSocket (RFC 6455) over the stream below
+
+Base datagram transports
+  udp          UDP over IPv4/IPv6
+
+Stream proxies
+  http         HTTP CONNECT proxy, with Basic authentication
+  socks5       SOCKS5 proxy (RFC 1928), with UDP ASSOCIATE
+  trojan       Trojan proxy, CONNECT and UDP framed in the stream
+
+Datagram over stream proxies
+  trojan       Trojan proxy, CONNECT and UDP framed in the stream
+
+Sniffers
+  http         sniff host from an HTTP/1 request's Host header
+  tls          sniff server name (SNI) from a TLS ClientHello
 ```
 
 ## `generate`
@@ -82,7 +94,21 @@ authority such as Let's Encrypt).
 ## `version`
 
 Prints the version, the Go toolchain, the platform, the commit (when built from
-a checkout) and the modules compiled in.
+a checkout) and the modules compiled in, grouped by kind as `modules` groups
+them.
+
+```text
+apranik dev
+  go        go1.27.1
+  platform  linux/amd64
+
+  Base stream transports        tcp
+  Overlay stream transports     fragment, httpupgrade, tls, ws
+  Base datagram transports      udp
+  Stream proxies                http, socks5, trojan
+  Datagram over stream proxies  trojan
+  Sniffers                      http, tls
+```
 
 ## Exit status
 
