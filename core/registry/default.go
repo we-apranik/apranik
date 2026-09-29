@@ -8,6 +8,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
 	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
 	tlssniffer "github.com/The-Apranik/Apranik/module/sniffer/tls"
+	"github.com/The-Apranik/Apranik/module/transport/fragment"
 	"github.com/The-Apranik/Apranik/module/transport/httpupgrade"
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	tlstransport "github.com/The-Apranik/Apranik/module/transport/tls"
@@ -26,6 +27,7 @@ func Default() (*Registry, error) {
 		moduleRegistry.Transports().RegisterOverlayStream(tlstransport.NewOverlayStreamTransportModule),
 		moduleRegistry.Transports().RegisterOverlayStream(websocket.NewOverlayStreamTransportModule),
 		moduleRegistry.Transports().RegisterOverlayStream(httpupgrade.NewOverlayStreamTransportModule),
+		moduleRegistry.Transports().RegisterOverlayStream(fragment.NewOverlayStreamTransportModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(http.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(trojan.NewStreamProxyModule),
