@@ -46,6 +46,24 @@
       "protocol": { "type": "freedom" }
     },
     {
+      "tag": "freedom-fragment",
+      "transport": [
+        { "type": "tcp" },
+        {
+          "type": "fragment",
+          "settings": {
+            "tls_records": true,
+            "tcp_packets": true,
+            "piece_sizes": ["3-5", "10-20"],
+            "piece_delays": ["10-20ms"],
+            "max_pieces": "4-8",
+            "split_sni": true
+          }
+        }
+      ],
+      "protocol": { "type": "freedom" }
+    },
+    {
       "tag": "block",
       "protocol": { "type": "block" }
     }
