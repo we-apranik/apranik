@@ -100,7 +100,9 @@ whatever runs there (an ordinary web server on the same machine, for example).
 
 The client's `tls` sends `proxy.example.com` as the SNI and checks the server's
 certificate against the system's roots. With a self-signed certificate, add it
-under `certificate_authorities` rather than turning on `insecure`.
+under `certificate_authorities` rather than turning on `insecure`. It sends
+Chrome's ClientHello by default ([`fingerprint`](transport/tls.md#fingerprint)),
+with its ALPN narrowed to `http/1.1`.
 
 ## Trojan over WebSocket behind a CDN
 
@@ -175,7 +177,9 @@ Here the CDN terminates TLS and connects to the server over plain HTTP on
 port 8080, so the server's stack has no `tls`. If the CDN connects to the origin
 over TLS, add a `tls` layer with a certificate between `tcp` and `ws` on the
 server. `max_early_data` saves a round trip per connection; the server accepts
-it without configuration.
+it without configuration. The client's `"alpn": ["http/1.1"]` is required: a
+CDN that supports HTTP/2 would otherwise choose it, and `ws` speaks HTTP/1.1
+([why](transport/tls.md#alpn)).
 
 > [!WARNING]
 > The CDN ends the outer TLS, so it can read the Trojan request, including the

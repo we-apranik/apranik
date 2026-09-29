@@ -29,7 +29,7 @@ sing-box's `httpupgrade`; see [how it differs from `ws`](index.md#choosing-a-sta
       "server_port": 443,
       "transport": [
         { "type": "tcp" },
-        { "type": "tls", "settings": { "server_name": "cdn.example.com" } },
+        { "type": "tls", "settings": { "server_name": "cdn.example.com", "alpn": ["http/1.1"] } },
         { "type": "httpupgrade", "settings": { "path": "/up" } }
       ]
     }
@@ -93,3 +93,8 @@ one a `400`, as sing-box answers. `Connection: keep-alive, Upgrade` is
 accepted. Half-close passes through to the layer below. Behind a CDN the
 inbound sees the CDN's address as the client's; `X-Forwarded-For` is not read
 yet.
+
+Its upgrade request is HTTP/1.1, so a [`tls`](tls.md) below it must offer only
+`http/1.1`: set its `alpn` to `["http/1.1"]`, as the outbound above does.
+`apranik check` refuses a `tls` whose list includes anything else
+([why](tls.md#alpn)).

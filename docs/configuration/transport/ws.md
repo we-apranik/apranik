@@ -28,7 +28,7 @@ sing-box's WebSocket transports, early data included; see
       "server_port": 443,
       "transport": [
         { "type": "tcp" },
-        { "type": "tls", "settings": { "server_name": "cdn.example.com" } },
+        { "type": "tls", "settings": { "server_name": "cdn.example.com", "alpn": ["http/1.1"] } },
         {
           "type": "ws",
           "settings": {
@@ -99,3 +99,8 @@ Every write is one binary frame (split above 32 KiB). Pings are answered. A
 WebSocket Close ends both directions, so there is no half-close. Behind a CDN
 the inbound sees the CDN's address as the client's; `X-Forwarded-For` is not
 read yet.
+
+Its upgrade request is HTTP/1.1, so a [`tls`](tls.md) below it must offer only
+`http/1.1`: set its `alpn` to `["http/1.1"]`, as the outbound above does.
+`apranik check` refuses a `tls` whose list includes anything else
+([why](tls.md#alpn)).
