@@ -15,9 +15,21 @@ import (
 // Parse turns one config file into a *blueprint.Blueprint without checking it. The
 // config is partial when diagnostics.HasErrors is true. LoadFile and LoadURL
 // are Parse plus Check; use Parse alone only to run Check yourself.
-func Parse(data []byte, modules *registry.Registry) (*blueprint.Blueprint, Diagnostics) {
+func Parse(data []byte, modules *registry.Registry, options ...ParseOption) (*blueprint.Blueprint, Diagnostics) {
 	builder := &configBuilder{modules: modules, strict: true}
+	for _, option := range options {
+		option(builder)
+	}
 	return builder.build(data)
+}
+
+type ParseOption func(*configBuilder)
+
+// WithBaseDirectory is what relative paths in the config file, such as a
+// dataset's file, are relative to. Without it they stay relative, and are
+// read from the working directory.
+func WithBaseDirectory(directory string) ParseOption {
+	return func(b *configBuilder) { b.baseDirectory = directory }
 }
 
 // configBuilder reports what cannot be read: syntax, unknown names, values
@@ -25,9 +37,10 @@ func Parse(data []byte, modules *registry.Registry) (*blueprint.Blueprint, Diagn
 // conflicting pair, an unsafe value -- is Check's, so it holds for a
 // blueprint.Blueprint however it was made.
 type configBuilder struct {
-	modules     *registry.Registry
-	strict      bool
-	diagnostics Diagnostics
+	modules       *registry.Registry
+	strict        bool
+	baseDirectory string
+	diagnostics   Diagnostics
 }
 
 func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
@@ -68,6 +81,9 @@ func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
 	for index, outbound := range raw.Outbounds {
 		coreBlueprint.Outbounds = append(coreBlueprint.Outbounds,
 			b.buildOutbound(outbound, indexLocation("outbounds", index)))
+	}
+	if raw.Routing != nil {
+		coreBlueprint.Routing = b.buildRouting(*raw.Routing, "routing")
 	}
 
 	return coreBlueprint, b.diagnostics
