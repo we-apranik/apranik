@@ -87,24 +87,26 @@ nav:
       - Log: configuration/log.md
       - Inbound:
           - configuration/inbound/index.md
-          - "mixed": configuration/inbound/mixed.md
+          - configuration/inbound/mixed.md
       - Outbound:
           - configuration/outbound/index.md
-          - "freedom": configuration/outbound/freedom.md
-          - "block": configuration/outbound/block.md
+          - configuration/outbound/freedom.md
       - Protocols:
-          - "socks5": configuration/protocol/socks5.md
-          - "http": configuration/protocol/http.md
-          - "trojan": configuration/protocol/trojan.md
+          - configuration/protocol/socks5.md
+          - configuration/protocol/http.md
+          - configuration/protocol/trojan.md
       - Transport:
           - configuration/transport/index.md
-          - "tcp": configuration/transport/tcp.md
-          - "udp": configuration/transport/udp.md
-          - "tls": configuration/transport/tls.md
-          - "ws": configuration/transport/ws.md
-          - "httpupgrade": configuration/transport/httpupgrade.md
-          - "fragment": configuration/transport/fragment.md
-      - Sniffing: configuration/sniffing.md
+          - configuration/transport/tcp.md
+          - configuration/transport/udp.md
+          - configuration/transport/tls.md
+          - configuration/transport/ws.md
+          - configuration/transport/httpupgrade.md
+          - configuration/transport/fragment.md
+      - Routing:
+          - configuration/routing/index.md
+          - configuration/routing/datasets.md
+          - configuration/routing/sniffing.md
       - Timeouts: configuration/timeouts.md
       - Examples: configuration/examples.md
   - How it works:
