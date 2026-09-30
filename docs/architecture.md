@@ -108,7 +108,7 @@ in `core/registry/default.go` is the only place in the project that names a
 module. There is no `init()` and no global registry, so a Go program using Apranik can build a
 registry containing modules Apranik has never heard of.
 
-[![Module registration: core/registry/default.go is the only file naming modules and registers tcp, udp, tls, ws, httpupgrade, socks5, http, trojan (twice: stream and datagram-over-stream) and the tls and http sniffers into typed tables for transports, proxy protocols and sniffers. Every registration is checked; config.Parse looks modules up by name and position.](assets/diagrams/module-registry.excalidraw.svg)](assets/diagrams/module-registry.excalidraw.svg)
+[![Module registration: core/registry/default.go is the only file naming modules and registers tcp, udp, tls, ws, httpupgrade, fragment, socks5, http, trojan (twice: stream and datagram-over-stream) and the tls and http sniffers into typed tables for transports, proxy protocols and sniffers. Every registration is checked; config.Parse looks modules up by name and position.](assets/diagrams/module-registry.excalidraw.svg)](assets/diagrams/module-registry.excalidraw.svg)
 
 ## Stack composition
 
@@ -127,7 +127,7 @@ so the builder composes a stack without knowing what any layer is:
   inbound's `handshake_timeout`. A client that stalls a TLS handshake holds up
   only its own goroutine.
 
-[![Stack composition. Inbound, reading up from the wire: the client connection, the tcp base listener that returns at once, overlays (tls, ws, httpupgrade) wrapping the connection in its own goroutine within handshake_timeout, the proxy server returning payload and Metadata, optional sniffing, then the handler. Proxy outbound, writing down: the proxy client, overlays wrapping the dialed stream within dial_timeout, the tcp base transport, then the proxy server. Freedom has no stack; block refuses both.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)
+[![Stack composition. Inbound, reading up from the wire: the client connection, the tcp base listener that returns at once, overlays (tls, ws, httpupgrade) wrapping the connection in its own goroutine within handshake_timeout, the proxy server returning payload and Metadata, then core/inbound handing the stream to the handler, where the router chooses an outbound or blocks. Proxy outbound, writing down: the proxy client, overlays wrapping the dialed stream within dial_timeout, the tcp base transport, then the proxy server. Freedom has no stack. Block is not an outbound: it is a routing action.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)
 
 [![Stream overlays run per connection: the accept loop only accepts, takes a max_connections slot and starts a goroutine; that goroutine runs the tls and ws server sides, the proxy server and the handler, bounded by handshake_timeout. A silent client holds only its own goroutine. A failed overlay handshake is closed; fallback recording starts above the overlays. On a proxy outbound the same layers run after the base dials.](assets/diagrams/overlay-per-connection.excalidraw.svg)](assets/diagrams/overlay-per-connection.excalidraw.svg)
 
@@ -151,18 +151,20 @@ real modules need it:
 
 | Package | Responsibility |
 | --- | --- |
-| `core/component` | the roles core's own parts play for each other: `Inbound`, `Outbound`, `Router`, `TrafficHandler`; modules never use them |
+| `core/component` | the roles core's own parts play for each other: `Inbound`, `Outbound`, `Router` (with its `RouterTrafficInformant` and `Decision`), `TrafficHandler`; modules never use them |
 | `core/registry` | name → module constructor, per kind, with clear errors for a name used in the wrong position |
-| `core/blueprint` | a validated description of every inbound and outbound; nothing is opened |
-| `core/builder` | blueprint → `component.Inbound` / `component.Outbound`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket |
-| `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, sniffing, handing a UDP association to the handler |
+| `core/blueprint` | a validated description of every inbound, outbound and routing rule; nothing is opened |
+| `core/builder` | blueprint → `component.Inbound` / `component.Outbound` / `component.Router`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket; loads datasets for the router |
+| `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, handing a UDP association to the handler |
 | `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
-| `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers |
+| `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers; called by the handler when a rule's `sniff` action asks |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
-| `core/route/router` | `component.Router`; with no rules yet, always the default outbound |
-| `core/route/handler` | `component.TrafficHandler`: asks the router, dials, relays; owns each UDP session and its routing cache |
+| `core/route/router` | `component.Router`: rules compiled once, evaluated in order, first decision wins; shared by every inbound |
+| `core/route/match` | the lookup structures rules compile into: domains (exact, suffix by label, keyword, regex), IP ranges (sorted, merged, binary search), ports; `ip_is_private` |
+| `core/route/dataset` | loads datasets, reading each file once; `dataset/geodata` decodes V2Ray's `geosite.dat` and `geoip.dat` with the standard library |
+| `core/route/handler` | `component.TrafficHandler`: gives the router a traffic informant (and sniffs when it asks), dials, relays; owns each UDP session and its routing cache |
 | `core/relay` | `relay.Stream` copies both ways and carries half-close; `relay.Datagrams` moves packets between a client and its UDP session |
-| `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams), freedom and block |
+| `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams) and freedom |
 | `core/net/udp/session` | one UDP session: one datagram per outbound, replies merged, closed on silence |
 | `core/net/udp/nat` | freedom's UDP: which local socket carries each destination, and which senders may reply (RFC 4787) |
 | `core/logging` | eight RFC 5424 levels over `log/slog`, fanned out to stderr, file, memory or syslog |
@@ -175,7 +177,7 @@ possibly through a different outbound. Three pieces share the work:
 - **The handler routes.** For each packet the relay asks the handler which outbound
   to use. The handler caches the answer per destination for the life of the UDP
   session (`udpSessionRoutingCache`), so the router is asked once per new
-  destination. Failed routing is not cached.
+  destination. A block is cached like any decision; failed routing is not.
 - **The session holds sockets.** One `session.Session` per client flow, created by
   the handler. For each outbound the flow reaches it opens one datagram, merges
   replies from all of them, and closes everything together. It routes nothing.
@@ -193,7 +195,7 @@ session ends after the inbound's `udp_session_idle_timeout` (5 minutes), a silen
 NAT socket closes after freedom's `nat.idle_timeout` (5 minutes), and a cached
 route is forgotten after 1 minute (internal).
 
-[![One UDP session: client A's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for an outbound and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram with its local socket reaching several destinations. The router is shared. Client B has its own session and NAT, so replies never cross.](assets/diagrams/udp-session-structure.excalidraw.svg)](assets/diagrams/udp-session-structure.excalidraw.svg)
+[![One UDP session: client A's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for a decision, an outbound or a block, and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram with its local socket reaching several destinations. The router is shared. Client B has its own session and NAT, so replies never cross.](assets/diagrams/udp-session-structure.excalidraw.svg)](assets/diagrams/udp-session-structure.excalidraw.svg)
 
 ## Package dependency graph
 
@@ -203,7 +205,7 @@ package imports `spec`, nine import `core/logging` and eight import
 `core/component`. Modules are grouped, since only `core/registry` (and
 `core/builder`, for `tcp` and `udp`) imports them.
 
-[![Package dependency graph generated from go list: cmd/apranik/cli imports config and the core packages it wires; config imports registry, blueprint, config/types and nat; core/registry imports every module; core/builder imports blueprint, registry, inbound, inbound/mixed, outbound and the tcp and udp modules; inbound imports sniff, peekable and relay; the handler imports outbound, relay and session; nat, session and relay import core/net/udp. socks5 and trojan share shared/socksaddr; ws and httpupgrade share shared/websocket/handshake. Edges to spec, core/logging and core/component are left out.](assets/diagrams/package-dependencies.excalidraw.svg)](assets/diagrams/package-dependencies.excalidraw.svg)
+[![Package dependency graph generated from go list, in layers: cmd/apranik/cli imports config, core/builder, core/registry, core/blueprint and the handler; config imports registry, blueprint, config/types, nat, route/dataset and route/match; core/builder imports blueprint, registry, inbound, inbound/mixed, outbound, route/router and route/dataset; route/router imports blueprint, route/dataset and route/match; route/dataset imports blueprint, dataset/geodata and route/match; the handler imports sniff, peekable, relay and session; inbound imports peekable and relay; nat, session and relay import core/net/udp. Modules and shared packages sit below, imported only by core/registry, and core/builder for tcp and udp. Edges to spec, core/logging and core/component are left out.](assets/diagrams/package-dependencies.excalidraw.svg)](assets/diagrams/package-dependencies.excalidraw.svg)
 
 Three edges worth knowing: `core/builder` imports `module/transport/udp`
 directly, to open SOCKS5 associate sockets without a registry lookup, and
