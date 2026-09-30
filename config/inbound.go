@@ -58,29 +58,12 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 		}
 	}
 
-	if raw.Sniffing != nil {
-		inbound.Sniffing = b.buildSniffing(*raw.Sniffing, fieldLocation(loc, "sniffing"))
+	if raw.MovedSniffing != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "sniffing"),
+			`sniffing moved to a routing rule: {"match": {"inbound": [%q]}, "action": {"type": "sniff", "settings": {"sniffers": [...]}}}`, raw.Tag)
 	}
 
 	return inbound
-}
-
-func (b *configBuilder) buildSniffing(raw rawSniffing, loc string) *blueprint.Sniffing {
-	sniffing := &blueprint.Sniffing{Timeout: time.Duration(raw.Timeout)}
-
-	for index, rawSniffer := range raw.Sniffers {
-		snifferLoc := indexLocation(fieldLocation(loc, "sniffers"), index)
-		newModule, err := b.modules.Sniffers().Lookup(rawSniffer.Type)
-		if err != nil {
-			b.diagnostics.report(snifferLoc, err)
-			continue
-		}
-		sniffer := newModule()
-		if b.decodeSettings(sniffer, rawSniffer.Settings, fieldLocation(snifferLoc, "settings")) {
-			sniffing.Sniffers = append(sniffing.Sniffers, sniffer)
-		}
-	}
-	return sniffing
 }
 
 // Never inferred from the base transport: inference breaks the moment one
