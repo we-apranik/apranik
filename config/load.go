@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,7 +29,7 @@ func LoadFile(path string, modules *registry.Registry) (*blueprint.Blueprint, Di
 		diagnostics.errorf("", "reading %s: %v", path, err)
 		return nil, diagnostics
 	}
-	return load(data, modules, nil)
+	return load(data, modules, nil, filepath.Dir(path))
 }
 
 // LoadURL fetches, parses and checks a config file over http or https. A plain
@@ -45,15 +46,30 @@ func LoadURL(ctx context.Context, url string, modules *registry.Registry) (*blue
 		diagnostics.report("", err)
 		return nil, diagnostics
 	}
-	return load(data, modules, diagnostics)
+	return load(data, modules, diagnostics, executableDirectory())
 }
 
-// Parse and Check together, so no loader can forget the second half.
-func load(data []byte, modules *registry.Registry, diagnostics Diagnostics) (*blueprint.Blueprint, Diagnostics) {
-	coreBlueprint, parsed := Parse(data, modules)
+// A config fetched from a URL has no directory of its own, so its relative
+// paths are relative to the apranik binary, where Xray also looks for its geo
+// files. Empty, meaning the working directory, if that cannot be found.
+func executableDirectory() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
+	}
+	return filepath.Dir(executable)
+}
+
+// Parse and both checks together, so no loader can forget one.
+func load(data []byte, modules *registry.Registry, diagnostics Diagnostics, baseDirectory string) (*blueprint.Blueprint, Diagnostics) {
+	coreBlueprint, parsed := Parse(data, modules, WithBaseDirectory(baseDirectory))
 	diagnostics = append(diagnostics, parsed...)
 	if coreBlueprint != nil {
 		diagnostics = append(diagnostics, Check(coreBlueprint)...)
+		diagnostics = append(diagnostics, CheckDatasets(coreBlueprint)...)
 	}
 	return coreBlueprint, diagnostics
 }
