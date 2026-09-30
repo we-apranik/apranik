@@ -19,7 +19,6 @@ An inbound accepts connections from clients: it listens on an address, runs a
       "transport": [{ "type": "tcp" }],
       "protocol": { "type": "socks5", "settings": {} },
 
-      "sniffing": {},
       "fallback": {},
 
       "handshake_timeout": "10s",
@@ -93,15 +92,6 @@ run once per accepted connection, inside `handshake_timeout`.
 <span class="cfg cfg-req">Required</span>
 
 `{ "type": ..., "settings": {...} }`, one of the [protocols](#protocols) above.
-
-### `sniffing`
-
-<span class="cfg cfg-type">object</span>
-<span class="cfg cfg-def">Default: off</span>
-<span class="cfg cfg-note">TCP only</span>
-
-Recognise the protocol at the start of each connection. See
-[Sniffing](../sniffing.md).
 
 ### `fallback`
 
