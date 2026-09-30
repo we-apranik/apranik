@@ -47,12 +47,10 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 	case freedomProtocol:
 		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"), raw.Transport, transportLoc)
 	case mixedProtocol:
-		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol, freedom or block")
+		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol or freedom")
 	case blockProtocol:
-		if hasSettings(raw.Protocol.Settings) {
-			b.diagnostics.errorf(fieldLocation(protocolLoc, "settings"), "block takes no settings")
-		}
-		outbound.Block = true
+		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"),
+			`block is no longer an outbound; blocking is a routing action: {"match": {...}, "action": {"type": "block"}}`)
 	default:
 		outbound.Proxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
 		if outbound.Proxy != nil {
