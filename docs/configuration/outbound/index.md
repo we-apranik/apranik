@@ -1,11 +1,10 @@
 # Outbound
 
-An outbound is how traffic leaves: through a proxy server, straight to the
-destination, or nowhere.
-
-> [!NOTE]
-> There are no routing rules yet. Every inbound uses the **first** outbound, and
-> `apranik run` logs a warning when more are configured.
+An outbound is how traffic leaves: through a proxy server, or straight to the
+destination. Which outbound serves a request is decided by
+[routing](../routing/index.md); without a `routing` section, every request takes the
+**first** outbound. Blocking is a [routing action](../routing/index.md#block), not
+an outbound.
 
 ## Structure
 
@@ -38,12 +37,11 @@ destination, or nowhere.
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP, and UDP framed in the stream |
 | `freedom` | [Freedom](freedom.md) | TCP and UDP, straight to each destination |
-| `block` | [Block](block.md) | nothing: refuses everything |
 
-`freedom` and `block` are special protocols built by core. They reach no proxy
-server, so they take no `server`, `server_port` or `handshake_timeout`. Block
-takes no `transport`; freedom's holds only [`tcp` and transports that need no
-server side](freedom.md#transport).
+`freedom` is a special protocol built by core. It reaches no proxy server, so
+it takes no `server`, `server_port` or `handshake_timeout`, and its
+`transport` holds only [`tcp` and transports that need no server
+side](freedom.md#transport).
 
 <div class="cfg-fields" markdown>
 
@@ -100,7 +98,6 @@ transport first, then any overlays, for example
 
 How long reaching the server may take (for `freedom`, the destination),
 including every overlay's handshake (TLS, WebSocket upgrade). Negative disables.
-Not for `block`.
 
 ### `handshake_timeout`
 
