@@ -4,13 +4,14 @@
 | --- | --- |
 | **ALPN** | Application-Layer Protocol Negotiation: the list of protocols (`h2`, `http/1.1`) a TLS client offers and the one the server picks. `tls`'s `alpn` sets it; `apranik check` refuses a list the transport above cannot speak. |
 | **Base transport** | A transport that creates connections from nothing: `tcp` and `udp`. Implements `spec.BaseStreamTransportModule` or `spec.BaseDatagramTransportModule`. Also called an underlay. |
-| **Block** | The special outbound protocol that refuses every connection and drops every UDP packet. |
+| **Block** | The routing action that refuses a request: a TCP connection is closed, UDP datagrams are dropped. |
 | **Blueprint** | A `blueprint.Blueprint`: every inbound and outbound with its modules looked up, decoded and validated, but nothing opened. |
 | **Builder** | `core/builder`: turns a blueprint into running inbounds and outbounds. It builds each module's components and joins a proxy outbound's base dialer and overlay clients into one dialer. |
 | **Carrier** | A `spec.Stream` or `spec.Datagram` handed from one layer to the next. When the kind is known, Apranik says "stream" or "datagram", and "underlying stream" for the layer below. |
 | **CDN fronting** | Reaching a server through a CDN, so a censor sees the CDN's address and TLS name. `ws` and `httpupgrade` exist for it. See [Examples](configuration/examples.md#trojan-over-websocket-behind-a-cdn). |
 | **Component** | `core/component`: the roles core's own parts play for each other (`Inbound`, `Outbound`, `Router`, `TrafficHandler`). Not module contract, so not in `spec`. |
 | **Core** | Everything under `core/`: the code that composes modules. Modules never import it. |
+| **Dataset** | A named list of domains or IP ranges, read from a file such as `geosite.dat`, that routing rules look up. Values only; what to do with them is in the rules. |
 | **Datagram** | The message-oriented carrier. Apranik says "datagram", never "packet", in code. |
 | **Destination** | `spec.Destination`: exactly one of a domain or an IP, plus a port. Resolved only by a base transport. |
 | **Diagnostics** | The list of errors and warnings `config` reports, each with its location in the config file. |
@@ -32,12 +33,13 @@
 | **Payload** | What a layer returns upward: the proxied traffic with the protocol's framing removed. |
 | **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Pipelining** | `httpupgrade`'s `pipeline`: the client sends its payload right after the upgrade request, without waiting for the `101`. |
-| **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` / `block` on an outbound, or `mixed` on an inbound. |
+| **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` on an outbound, or `mixed` on an inbound. |
 | **Proxy protocol** | A module that speaks proxy semantics over a supplied carrier, such as SOCKS5, HTTP CONNECT or Trojan. It never opens a connection itself. Its server `Accept*`s requests; its client `Request*`s a payload. |
 | **Registry** | `core/registry`: maps the names used in config files to module constructors, per kind. `registry.Default()` is the only place that names modules. |
 | **Relay** | `core/relay`: the copy loops. `relay.Stream` for TCP, `relay.Datagrams` for a UDP session. |
 | **Request** | What a proxy client sends to ask the server for a payload. `Request*` methods connect nothing and may send nothing until the first write. |
-| **Router** | `core/route/router`: picks the outbound for a `Metadata`. Stateless; no rules exist yet. |
+| **Router** | `core/route/router`: runs the routing rules and decides where a request goes: an outbound, or block. Shared by every inbound, it holds no per-request state and asks the traffic informant for what it lacks. |
+| **Router traffic informant** | `component.RouterTrafficInformant`: what the router asks about the traffic it is deciding on: its `Metadata`, and a sniff done only when a rule asks. The handler makes one per connection, so the router never touches the stream. |
 | **Shared package** | A package under `shared/` that modules may import: one concept, no state, `spec` and the standard library only. |
 | **SNI** | Server Name Indication: the host name a TLS client sends in the clear. The `tls` sniffer reads it; the `tls` transport sends it. |
 | **Sniffer** | A module that recognises a protocol in the start of a payload and reports its domain, such as the TLS SNI or the HTTP `Host`. `SnifferModule` holds its settings and builds the `Sniffer`. |
