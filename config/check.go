@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -33,6 +32,7 @@ func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	for index, outbound := range coreBlueprint.Outbounds {
 		checkOutbound(&diagnostics, outbound, indexLocation("outbounds", index))
 	}
+	checkRouting(&diagnostics, coreBlueprint)
 
 	if len(coreBlueprint.Inbounds) == 0 {
 		diagnostics.warnf("inbounds", "no inbounds configured, so nothing will accept traffic")
@@ -161,54 +161,16 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 			diagnostics.errorf(fieldLocation(loc, "fallback", "server_port"), "a fallback needs a port")
 		}
 	}
-
-	if inbound.Sniffing != nil {
-		checkSniffing(diagnostics, *inbound.Sniffing, inbound.Network, fieldLocation(loc, "sniffing"))
-	}
-}
-
-func checkSniffing(diagnostics *Diagnostics, sniffing blueprint.Sniffing, network spec.Network, loc string) {
-	if network == spec.NetworkUDP {
-		diagnostics.errorf(loc, "sniffing works on tcp inbounds only for now")
-	}
-	if len(sniffing.Sniffers) == 0 {
-		diagnostics.errorf(fieldLocation(loc, "sniffers"), "sniffing needs at least one sniffer; remove the sniffing section to turn it off")
-	}
-	if sniffing.Timeout < 0 {
-		diagnostics.errorf(fieldLocation(loc, "timeout"), "timeout must not be negative")
-	} else if sniffing.Timeout > 5*time.Second {
-		diagnostics.warnf(fieldLocation(loc, "timeout"),
-			"timeout %s delays every connection whose client does not speak first, such as SSH", sniffing.Timeout)
-	}
-
-	seen := make(map[string]int, len(sniffing.Sniffers))
-	for index, sniffer := range sniffing.Sniffers {
-		snifferLoc := indexLocation(fieldLocation(loc, "sniffers"), index)
-		collectWarnings(diagnostics, sniffer, fieldLocation(snifferLoc, "settings"))
-
-		name := sniffer.Info().Name
-		if first, repeated := seen[name]; repeated {
-			diagnostics.warnf(snifferLoc, "sniffer %q already appears at index %d", name, first)
-			continue
-		}
-		seen[name] = index
-	}
 }
 
 func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
 	protocolLoc := fieldLocation(loc, "protocol")
 
-	protocolCount := 0
-	for _, isSet := range []bool{outbound.Proxy != nil, outbound.Freedom != nil, outbound.Block} {
-		if isSet {
-			protocolCount++
-		}
-	}
 	switch {
-	case protocolCount == 0:
-		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol, freedom or block")
+	case outbound.Proxy == nil && outbound.Freedom == nil:
+		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol or freedom")
 		return
-	case protocolCount > 1:
+	case outbound.Proxy != nil && outbound.Freedom != nil:
 		diagnostics.errorf(protocolLoc, "an outbound has exactly one protocol")
 		return
 	}
@@ -218,41 +180,29 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 		return
 	}
 
-	special := freedomProtocol
-	if outbound.Block {
-		special = blockProtocol
-	}
 	if outbound.Server.IsValid() {
-		diagnostics.errorf(fieldLocation(loc, "server"), "%s reaches no proxy server, so it takes no server", special)
+		diagnostics.errorf(fieldLocation(loc, "server"), "%s reaches no proxy server, so it takes no server", freedomProtocol)
 	}
-	if outbound.Block && !outbound.StreamTransport.IsZero() {
-		diagnostics.errorf(fieldLocation(loc, "transport"), "block takes no transport: it connects nowhere")
-	}
-	if outbound.Freedom != nil && !outbound.StreamTransport.IsZero() {
+	if !outbound.StreamTransport.IsZero() {
 		diagnostics.errorf(fieldLocation(loc, "transport"), "freedom's transport belongs in its own stack, Freedom.StreamTransport")
 	}
 	if outbound.HandshakeTimeout != 0 {
-		diagnostics.errorf(fieldLocation(loc, "handshake_timeout"), "%s has no proxy handshake", special)
-	}
-	if outbound.Block && outbound.DialTimeout != 0 {
-		diagnostics.errorf(fieldLocation(loc, "dial_timeout"), "block dials nothing")
+		diagnostics.errorf(fieldLocation(loc, "handshake_timeout"), "%s has no proxy handshake", freedomProtocol)
 	}
 
-	if outbound.Freedom != nil {
-		settingsLoc := fieldLocation(protocolLoc, "settings")
-		transportLoc := fieldLocation(loc, "transport")
-		checkStreamTransportStack(diagnostics, outbound.Freedom.StreamTransport, transportLoc)
-		for index, overlay := range outbound.Freedom.StreamTransport.Overlays {
-			if !needsNoServerSide(overlay) {
-				name := overlay.Info().Name
-				diagnostics.errorf(indexLocation(transportLoc, index+1),
-					"%q cannot be used with freedom. Freedom connects straight to each destination, and a destination does not run %q; only transports that need no server side work there", name, name)
-			}
+	settingsLoc := fieldLocation(protocolLoc, "settings")
+	transportLoc := fieldLocation(loc, "transport")
+	checkStreamTransportStack(diagnostics, outbound.Freedom.StreamTransport, transportLoc)
+	for index, overlay := range outbound.Freedom.StreamTransport.Overlays {
+		if !needsNoServerSide(overlay) {
+			name := overlay.Info().Name
+			diagnostics.errorf(indexLocation(transportLoc, index+1),
+				"%q cannot be used with freedom. Freedom connects straight to each destination, and a destination does not run %q; only transports that need no server side work there", name, name)
 		}
-		collectWarnings(diagnostics, outbound.Freedom.DatagramTransport.Base, fieldLocation(settingsLoc, "udp"))
-		if outbound.Freedom.NAT != nil {
-			checkUDPPolicy(diagnostics, *outbound.Freedom.NAT, fieldLocation(settingsLoc, "nat"))
-		}
+	}
+	collectWarnings(diagnostics, outbound.Freedom.DatagramTransport.Base, fieldLocation(settingsLoc, "udp"))
+	if outbound.Freedom.NAT != nil {
+		checkUDPPolicy(diagnostics, *outbound.Freedom.NAT, fieldLocation(settingsLoc, "nat"))
 	}
 }
 
