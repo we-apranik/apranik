@@ -151,7 +151,7 @@ var errTooBig = errors.New("mymodule: too big") // callers can't match spec.ErrM
 - **Never default a map field**: `encoding/json` merges into an existing map, so a
   user cannot remove the default.
 - **Name the location**: every diagnostic carries a path such as
-  `inbounds[0].sniffing.sniffers[1]`.
+  `routing.rules[0].action.settings.sniffers[1]`.
 
 ## Security-sensitive parsing
 
