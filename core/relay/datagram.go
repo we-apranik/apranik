@@ -11,6 +11,11 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
+// ErrDestinationBlocked from OutboundForDestination drops the datagram without
+// a log line: routing logged the block once for the destination, and a blocked
+// destination such as QUIC's UDP 443 can send many packets.
+var ErrDestinationBlocked = errors.New("relay: destination blocked by routing")
+
 type DatagramRelayConfig struct {
 	ClientSide    spec.Datagram
 	ClientSession *session.Session
@@ -72,6 +77,9 @@ func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayCo
 		}
 
 		outbound, err := config.OutboundForDestination(ctx, destination)
+		if errors.Is(err, ErrDestinationBlocked) {
+			continue
+		}
 		if err != nil {
 			config.Logger.Debug("Datagram dropped, no outbound", "destination", destination, "error", err)
 			continue
