@@ -62,10 +62,27 @@
         }
       ],
       "protocol": { "type": "freedom" }
-    },
-    {
-      "tag": "block",
-      "protocol": { "type": "block" }
     }
-  ]
+  ],
+
+  "routing": {
+    "rules": [
+      {
+        "match": { "inbound": ["socks-in", "http-in", "mixed-in"], "network": "tcp" },
+        "action": {
+          "type": "sniff",
+          "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }], "timeout": "300ms" }
+        }
+      },
+      {
+        "match": { "any": [{ "ip_is_private": true }, { "domain_suffix": ["ir"] }] },
+        "action": { "type": "route", "settings": { "outbound": "freedom" } }
+      },
+      {
+        "match": { "network": "udp", "port": [443] },
+        "action": { "type": "block" }
+      }
+    ],
+    "default_action": { "type": "route", "settings": { "outbound": "freedom-fragment" } }
+  }
 }
