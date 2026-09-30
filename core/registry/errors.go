@@ -20,6 +20,8 @@ func (e *DuplicateModuleError) Error() string {
 }
 
 // Special protocols built by core; a proxy module may not take their names.
+// block is no longer an outbound but stays reserved, so a config written for
+// the old block outbound is told where blocking went, not handed to a module.
 const (
 	FreedomProtocolName = "freedom"
 	BlockProtocolName   = "block"
