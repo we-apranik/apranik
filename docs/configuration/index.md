@@ -1,7 +1,8 @@
 # Introduction
 
 Apranik reads one JSON config file. It describes **inbounds** (how traffic
-arrives), **outbounds** (how it leaves) and the **log**. The format is version
+arrives), **outbounds** (how it leaves), **routing** (which outbound each
+request takes) and the **log**. The format is version
 `1`. How stable it stays over time is still an open question.
 
 ## Structure
@@ -15,7 +16,8 @@ arrives), **outbounds** (how it leaves) and the **log**. The format is version
   "strict": true,
   "log": {},
   "inbounds": [],
-  "outbounds": []
+  "outbounds": [],
+  "routing": {}
 }
 ```
 
@@ -30,6 +32,7 @@ arrives), **outbounds** (how it leaves) and the **log**. The format is version
 | `log` | [Log](log.md) |
 | `inbounds` | [Inbound](inbound/index.md) |
 | `outbounds` | [Outbound](outbound/index.md) |
+| `routing` | [Routing](routing/index.md) |
 
 ### `version`
 
@@ -81,7 +84,7 @@ These lines use the format of the config's `stderr` log output when the config
 can be read, so with [`"format": "human"`](log.md#format) they look like every
 later line.
 
-[![From config file to running components: load the file or URL, config.Parse (strict JSON, version, registry lookup, decode settings, Validate) into a blueprint, config.Check; every problem goes to Diagnostics. With errors, stop and print them all. Without, apranik check prints valid and exits, and apranik run calls builder.New, BuildOutbound, router.New, BuildInbound and Activate.](../assets/diagrams/config-pipeline.excalidraw.svg)](../assets/diagrams/config-pipeline.excalidraw.svg)
+[![From config file to running components: load the file or URL, config.Parse (strict JSON, version, registry lookup, decode settings, Validate) into a blueprint, config.Check and CheckDatasets; every problem goes to Diagnostics. With errors, stop and print them all. Without, apranik check prints valid and exits, and apranik run calls builder.New, BuildOutbound, BuildRouter, BuildInbound and Activate.](../assets/diagrams/config-pipeline.excalidraw.svg)](../assets/diagrams/config-pipeline.excalidraw.svg)
 
 The steps split along one line, **reading** and **running**:
 
@@ -90,6 +93,8 @@ The steps split along one line, **reading** and **running**:
 - `config.Check` reports what can be read but cannot run: a missing field, a
   conflicting pair, an unsafe value. It opens nothing, so `apranik check` works on
   a machine that could never run the config file.
+- `config.CheckDatasets` reads the [datasets](routing/datasets.md) routing names, so a
+  missing file or category is reported by `apranik check` too.
 - `core/builder` turns a clean config into running components. It binds
   listeners and loads files a module needs (TLS certificates, for example) at
   build time, so a port conflict or an unreadable certificate is a startup
@@ -117,8 +122,7 @@ overrides only what it names; everything else keeps the module's default.
 
     [`socks5`](protocol/socks5.md) · [`http`](protocol/http.md) ·
     [`trojan`](protocol/trojan.md), plus the special protocols
-    [`mixed`](inbound/mixed.md), [`freedom`](outbound/freedom.md) and
-    [`block`](outbound/block.md).
+    [`mixed`](inbound/mixed.md) and [`freedom`](outbound/freedom.md).
 
 -   :material-lan-connect:{ .lg .middle } **Transports**
 
@@ -133,8 +137,16 @@ overrides only what it names; everything else keeps the module's default.
 
     ---
 
-    [`tls`](sniffing.md#tls) · [`http`](sniffing.md#http): recognise the
-    protocol at the start of a connection.
+    [`tls`](routing/sniffing.md#tls) · [`http`](routing/sniffing.md#http): recognise the
+    protocol at the start of a connection, when a
+    [routing rule](routing/index.md#sniff) asks.
+
+-   :material-sign-direction:{ .lg .middle } **Routing**
+
+    ---
+
+    [Rules](routing/index.md) that send each request to an outbound or block it,
+    with [datasets](routing/datasets.md) of domains and IP ranges.
 
 -   :material-timer-outline:{ .lg .middle } **Timeouts**
 
@@ -151,11 +163,10 @@ Some findings do not stop Apranik but deserve attention, for example:
 
 - an inbound with no username: anyone who can reach it may use it;
 - `endpoint-independent` NAT filtering: an off-path sender can inject packets;
-- a sniffing timeout over 5 seconds;
+- a sniff timeout over 5 seconds, or a sniff no later rule reads;
 - TLS with `insecure` on, or a `min_version` below 1.2;
 - no log outputs;
-- more than one outbound: there are no routing rules yet, so only the first is
-  used (logged by `apranik run`).
+- more than one outbound and no `routing` section: only the first is used.
 
 Trojan has no encryption of its own; a Trojan stack without
 [`tls`](transport/tls.md) (on the stack or at a CDN in front) sends its password
@@ -165,5 +176,6 @@ hash and payload in the clear. [Examples](examples.md) has complete setups.
 
 A Go program can skip JSON entirely: fill a `blueprint.Blueprint` with module
 values (for example `tcp.NewBaseStreamTransportModule()`), run `config.Check` on
-it, and pass it to `builder.New` and `BuildInbound` / `BuildOutbound`. See
+it, and pass it to `builder.New`, `BuildOutbound`, `BuildRouter` and
+`BuildInbound`. See
 `cmd/apranik/cli/run.go` for the complete wiring.
