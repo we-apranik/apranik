@@ -5,16 +5,43 @@ package component
 
 import (
 	"context"
+	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// Router picks the outbound for one request. It holds no state, so the same
-// metadata always yields the same answer and a caller may cache it. Streams
-// ask once per connection; datagrams ask once per new destination.
+// Router decides where one request goes. It is shared by every inbound and
+// holds no per-request state; what it needs to know about the request, and
+// what it can find out on demand, it asks the informant. Streams ask once per
+// connection; datagrams ask once per new destination in a UDP session.
 type Router interface {
-	Route(ctx context.Context, metadata spec.Metadata) (Outbound, error)
+	Route(ctx context.Context, informant RouterTrafficInformant) (Decision, error)
 }
+
+// RouterTrafficInformant tells the router about the traffic it is deciding
+// on: what is known from the handshake, and what costs work to find out,
+// which it finds out only when a rule asks and then remembers. The handler
+// makes one per connection, or per destination of a UDP session, and keeps
+// the stream to itself: the router never touches traffic.
+type RouterTrafficInformant interface {
+	Metadata() spec.Metadata
+
+	// Sniff peeks at the start of the client's payload. Only the first call
+	// sniffs; later calls return its result. Nil when nothing was recognised
+	// or the traffic cannot be sniffed, such as a UDP session.
+	Sniff(ctx context.Context, sniffers []spec.Sniffer, timeout time.Duration) *spec.SniffResult
+}
+
+// Decision is the router's answer. A nil Outbound means the request is
+// blocked.
+type Decision struct {
+	Outbound Outbound
+
+	// Which rule decided, for logs: "routing.rules[3]", or "default".
+	Rule string
+}
+
+func (d Decision) IsBlock() bool { return d.Outbound == nil }
 
 // TrafficHandler receives what an inbound accepted: routes it and relays it.
 type TrafficHandler interface {
