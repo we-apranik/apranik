@@ -30,6 +30,7 @@ type rawConfig struct {
 	Log       rawLog        `json:"log"`
 	Inbounds  []rawInbound  `json:"inbounds"`
 	Outbounds []rawOutbound `json:"outbounds"`
+	Routing   *rawRouting   `json:"routing"`
 }
 
 type rawInbound struct {
@@ -53,8 +54,8 @@ type rawInbound struct {
 	Transport []rawModule `json:"transport"`
 	Protocol  rawModule   `json:"protocol"`
 
-	// Absent means no sniffing.
-	Sniffing *rawSniffing `json:"sniffing"`
+	// Moved to a routing rule's sniff action; read only to say so.
+	MovedSniffing json.RawMessage `json:"sniffing"`
 
 	// Absent means a request the proxy refuses is closed.
 	Fallback *rawFallback `json:"fallback"`
@@ -67,11 +68,6 @@ type rawFallback struct {
 	ServerPort uint16 `json:"server_port"`
 }
 
-type rawSniffing struct {
-	Sniffers []rawModule    `json:"sniffers"`
-	Timeout  types.Duration `json:"timeout"`
-}
-
 type rawOutbound struct {
 	Tag string `json:"tag"`
 
@@ -81,11 +77,10 @@ type rawOutbound struct {
 	DialTimeout      types.Duration `json:"dial_timeout"`
 	HandshakeTimeout types.Duration `json:"handshake_timeout"`
 
-	// A proxy protocol's way to its server, or freedom's to each destination;
-	// block takes none.
+	// A proxy protocol's way to its server, or freedom's to each destination.
 	Transport []rawModule `json:"transport"`
 
-	// A proxy protocol, or one of the special protocols freedom and block.
+	// A proxy protocol, or the special protocol freedom.
 	Protocol rawModule `json:"protocol"`
 }
 
