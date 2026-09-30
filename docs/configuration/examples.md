@@ -201,7 +201,8 @@ servers can drop bytes sent before their `101` answer.
 ## A local proxy with no server
 
 Useful to try Apranik or to give apps one local port that sends everything
-straight out. Sniffing fills in the domain for connections that name an IP.
+straight out. A [routing](routing/index.md) section blocks ad servers, found by
+their name even for connections that name an IP, and sends the rest out.
 
 ```json
 {
@@ -217,13 +218,26 @@ straight out. Sniffing fills in the domain for connections that name an IP.
       "protocol": {
         "type": "mixed",
         "settings": { "socks5": { "udp_relay": true }, "http": {} }
-      },
-      "sniffing": { "sniffers": [{ "type": "tls" }, { "type": "http" }] }
+      }
     }
   ],
-  "outbounds": [{ "tag": "direct", "protocol": { "type": "freedom" } }]
+  "outbounds": [{ "tag": "direct", "protocol": { "type": "freedom" } }],
+  "routing": {
+    "datasets": [
+      { "tag": "ads", "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ads-all" } }
+    ],
+    "rules": [
+      { "match": { "network": "tcp" },
+        "action": { "type": "sniff", "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }] } } },
+      { "match": { "domain_in_dataset": ["ads"] }, "action": { "type": "block" } }
+    ],
+    "default_action": { "type": "route", "settings": { "outbound": "direct" } }
+  }
 }
 ```
+
+`geosite.dat` sits next to the config file; any V2Ray or Xray `geosite.dat`
+works. See [Datasets](routing/datasets.md).
 
 ## A local proxy that hides the server name
 
