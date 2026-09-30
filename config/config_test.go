@@ -403,16 +403,6 @@ func TestFreedomsOldTCPSettingsAreRefused(t *testing.T) {
 	}
 }
 
-func TestBlockTakesNoTransport(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"protocol": {"type": "freedom"}`,
-		`"transport": [{"type": "tcp"}], "protocol": {"type": "block"}`, 1)
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].transport", "block takes no transport") {
-		t.Errorf("a block outbound with a transport was not refused: %v", diagnostics)
-	}
-}
-
 func TestATransportWithNoServerSideIsRefusedOnAnInbound(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"transport": [{"type": "tcp"}],
@@ -476,34 +466,6 @@ func TestAnOutboundNeedsAProtocol(t *testing.T) {
 	diagnostics, failed := loadAndCheck(t, document)
 	if !failed || !find(diagnostics, "outbounds[0].protocol", "type") {
 		t.Errorf("an outbound with no protocol was not refused with its path: %v", diagnostics)
-	}
-}
-
-func TestABlockOutboundDecodes(t *testing.T) {
-	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
-
-	configuration, diagnostics := config.Parse([]byte(document), modules(t))
-	requireNoErrors(t, diagnostics)
-	requireNoErrors(t, config.Check(configuration))
-
-	outbound := configuration.Outbounds[0]
-	if !outbound.Block || outbound.Freedom != nil || outbound.Proxy != nil {
-		t.Errorf("outbound = %+v, want only Block", outbound)
-	}
-}
-
-func TestBlockTakesNoSettingsServerOrDialTimeout(t *testing.T) {
-	for name, replacement := range map[string]string{
-		"outbounds[0].protocol.settings": `"protocol": {"type": "block", "settings": {"reply": "http"}}`,
-		"outbounds[0].server":            `"server": "example.com", "server_port": 443, "protocol": {"type": "block"}`,
-		"outbounds[0].dial_timeout":      `"dial_timeout": "5s", "protocol": {"type": "block"}`,
-	} {
-		document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, replacement, 1)
-
-		diagnostics, failed := loadAndCheck(t, document)
-		if !failed || !find(diagnostics, name, "") {
-			t.Errorf("%s: not refused at that path: %v", name, diagnostics)
-		}
 	}
 }
 
@@ -677,56 +639,23 @@ func TestFileOutputNeedsAPath(t *testing.T) {
 	}
 }
 
-// ---------- sniffing ----------
+// ---------- removed fields ----------
 
-func withSniffing(sniffing string) string {
-	return strings.Replace(goodDocument,
+func TestInboundSniffingPointsToTheSniffAction(t *testing.T) {
+	document := strings.Replace(goodDocument,
 		`"protocol": {"type": "socks5",`,
-		`"sniffing": `+sniffing+`, "protocol": {"type": "socks5",`, 1)
-}
-
-func TestSniffingIsOffWhenAbsent(t *testing.T) {
-	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
-	requireNoErrors(t, diagnostics)
-
-	if configuration.Inbounds[0].Sniffing != nil {
-		t.Errorf("sniffing = %+v, want nil", configuration.Inbounds[0].Sniffing)
+		`"sniffing": {"sniffers": [{"type": "tls"}]}, "protocol": {"type": "socks5",`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].sniffing", `"type": "sniff"`) {
+		t.Errorf("inbound sniffing was not refused with a pointer to the sniff action: %v", diagnostics)
 	}
 }
 
-func TestSniffingDecodes(t *testing.T) {
-	document := withSniffing(`{"sniffers": [{"type": "tls"}, {"type": "http"}], "timeout": "250ms"}`)
-
-	configuration, diagnostics := config.Parse([]byte(document), modules(t))
-	requireNoErrors(t, diagnostics)
-	requireNoErrors(t, config.Check(configuration))
-
-	sniffing := configuration.Inbounds[0].Sniffing
-	if sniffing == nil || len(sniffing.Sniffers) != 2 || sniffing.Timeout != 250*time.Millisecond {
-		t.Fatalf("sniffing = %+v, want two sniffers and 250ms", sniffing)
-	}
-	if sniffing.Sniffers[0].Info().Name != "tls" || sniffing.Sniffers[1].Info().Name != "http" {
-		t.Errorf("sniffers are %q and %q, want tls then http", sniffing.Sniffers[0].Info().Name, sniffing.Sniffers[1].Info().Name)
-	}
-}
-
-func TestUnknownSnifferIsReportedWithItsPath(t *testing.T) {
-	diagnostics, failed := loadAndCheck(t, withSniffing(`{"sniffers": [{"type": "tls"}, {"type": "bittorrent"}]}`))
-	if !failed {
-		t.Fatal("an unknown sniffer was accepted")
-	}
-	if !find(diagnostics, "inbounds[0].sniffing.sniffers[1]", "bittorrent") {
-		t.Errorf("diagnostics do not name the unknown sniffer: %v", diagnostics)
-	}
-}
-
-func TestSniffingWithoutSniffersIsRefused(t *testing.T) {
-	diagnostics, failed := loadAndCheck(t, withSniffing(`{}`))
-	if !failed {
-		t.Fatal("sniffing with no sniffers was accepted")
-	}
-	if !find(diagnostics, "inbounds[0].sniffing.sniffers", "at least one sniffer") {
-		t.Errorf("diagnostics do not explain the missing sniffers: %v", diagnostics)
+func TestBlockOutboundPointsToTheBlockAction(t *testing.T) {
+	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].protocol.type", "routing action") {
+		t.Errorf("a block outbound was not refused with a pointer to the block action: %v", diagnostics)
 	}
 }
 
@@ -917,7 +846,7 @@ func TestAMixedInboundNeedsBothModulesRegistered(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	document := strings.Replace(mixedDocument(`"protocol": {"type": "mixed"}`), `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
+	document := mixedDocument(`"protocol": {"type": "mixed"}`)
 
 	_, diagnostics := config.Parse([]byte(document), withoutHTTP)
 	if !diagnostics.HasErrors() || !find(diagnostics, "inbounds[0].protocol.settings.http", "http") {
