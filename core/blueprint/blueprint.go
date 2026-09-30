@@ -23,6 +23,9 @@ type Blueprint struct {
 	Log       Log
 	Inbounds  []Inbound
 	Outbounds []Outbound
+
+	// Nil means every request takes the first outbound.
+	Routing *Routing
 }
 
 // Log's zero value is a silent logger.
@@ -84,29 +87,17 @@ type Inbound struct {
 	// Connections held at once; one more is closed as soon as it is accepted.
 	// Zero means no limit.
 	MaxConnections int
-
-	// Nil means no sniffing, the default.
-	Sniffing *Sniffing
 }
 
-// Sniffing runs after the handshake and before routing, and only fills
-// Metadata.Sniffed: the destination is never rewritten.
-type Sniffing struct {
-	Sniffers []spec.SnifferModule
-
-	// Zero means sniff.DefaultTimeout.
-	Timeout time.Duration
-}
-
-// Exactly one of Proxy, Freedom and Block is set; config.Check refuses
-// anything else.
+// Exactly one of Proxy and Freedom is set; config.Check refuses anything
+// else. Blocking is a routing action, not an outbound.
 type Outbound struct {
 	Tag string
 
 	// The proxy server's address, not the user's destination. Only with Proxy.
 	Server spec.Destination
 
-	// Only with Proxy: freedom and block reach no server.
+	// Only with Proxy: freedom reaches no server.
 	StreamTransport StreamTransportStack
 
 	Proxy spec.StreamProxyModule
@@ -116,10 +107,8 @@ type Outbound struct {
 	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	Freedom *Freedom
-	Block   bool
 
-	// Zero means outbound.DefaultDialTimeout; negative means no bound. Not
-	// with Block, which dials nothing.
+	// Zero means outbound.DefaultDialTimeout; negative means no bound.
 	DialTimeout time.Duration
 
 	// The proxy handshake with the server; only with Proxy. Zero means
