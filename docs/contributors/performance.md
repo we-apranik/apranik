@@ -271,6 +271,8 @@ Every hot path has a benchmark in the package it measures:
 | --- | --- |
 | TCP relay | `core/relay`: `BenchmarkStreamRelayOneShortExchange` |
 | Sniffing | `core/sniff`: `BenchmarkSniffTLSClientHello` |
+| Routing | `core/route/router`: `BenchmarkRouteRealisticConfig`; `core/route/handler`: `BenchmarkRouteStreamWithoutRules` |
+| Matchers and datasets | `core/route/match`: domain, prefix and `ip_is_private` lookups; `core/route/dataset/geodata`: `BenchmarkReadOneCategoryOfMany` |
 | HTTP handshake | `module/proxy/http`: `BenchmarkAcceptConnect` |
 | UDP socket | `module/transport/udp`: `BenchmarkSocketWriteToIP`, `…CachedDomain`, `BenchmarkSocketReadFrom` |
 | SOCKS5 UDP | `module/proxy/socks5`: `BenchmarkAssociationReadFrom`, `…WriteTo` |
@@ -331,3 +333,4 @@ Candidates for future work. Each needs a benchmark before it is started.
 | `module/transport/tls` | With a fingerprint, the ClientHello is built from the preset on every dial, twice when `alpn` is set. | Around 300 extra allocations per handshake against Go's own; caching the built extensions is not safe as-is (key shares are per connection). |
 | `module/transport/websocket` | Every frame is copied into a pooled buffer, header and payload together, so it goes out in one write. On the server, which does not mask, a vectored write could skip the copy. | A copy per write on the server's data path. |
 | `module/transport/websocket` | The client draws a fresh masking key from `crypto/rand` for every frame. | Cheap on Linux with the vDSO `getrandom`; unmeasured elsewhere. |
+| `config`, `cmd/apranik/cli` | `run` loads routing datasets twice: once in `config.CheckDatasets`, once to build the router. | A large `geosite.dat` is decoded twice at startup; `Check` could hand its loaded datasets to the build. |
