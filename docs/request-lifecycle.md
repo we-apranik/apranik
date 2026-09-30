@@ -10,20 +10,23 @@ Every function named here exists in the repository today.
 `cmd/apranik/cli/run.go` does the wiring:
 
 1. `load` calls `registry.Default()`, then `config.LoadFile` (or `config.LoadURL`),
-   which parses the config file into a `blueprint.Blueprint` and runs `config.Check`.
+   which parses the config file into a `blueprint.Blueprint`, runs `config.Check`,
+   and reads the routing datasets with `config.CheckDatasets`.
 2. `serve` creates a `builder.Builder` with `builder.New`, which starts logging.
 3. Each outbound is built with `Builder.BuildOutbound`. A `freedom` protocol
-   returns `outbound.NewFreedom`, `block` returns `outbound.NewBlock`, and a proxy
-   protocol returns `outbound.NewStream`.
-4. There are no routing rules yet, so the first outbound becomes the default:
-   `router.New(defaultOutbound)`.
+   returns `outbound.NewFreedom`, and a proxy protocol returns
+   `outbound.NewStream`.
+4. `Builder.BuildRouter` loads the datasets (`dataset.LoadAll`) and compiles the
+   rules with `router.New`, every tag already turned into its outbound or
+   dataset. Without a `routing` section, `router.NewWithDefaultOutbound` sends
+   everything to the first outbound. One router serves every inbound.
 5. Each inbound is built with `Builder.BuildInbound` and started with
    `Activate(ctx, handler.New(router, handler.Config{...}))`, the config carrying
    that inbound's `tcp_idle_timeout` and `udp_session_idle_timeout`.
 
 ## One TCP connection
 
-[![Sequence of one TCP connection: the client connects to core/inbound, the socks5 server negotiates and returns the payload stream and Metadata, core/sniff optionally peeks and replays, the handler asks the router, freedom dials the destination through the tcp module, and core/relay copies bytes both ways with half-close.](assets/diagrams/tcp-lifecycle.excalidraw.svg)](assets/diagrams/tcp-lifecycle.excalidraw.svg)
+[![Sequence of one TCP connection: the client connects to core/inbound, the socks5 server negotiates and returns the payload stream and Metadata, and core/inbound hands them to the handler. The handler calls Route with an informant; the router walks the rules and, only if a rule's action is sniff, asks the informant, which has core/sniff peek at the first bytes and replay them. The router returns a Decision, an outbound or block. For an outbound, freedom dials the destination through the tcp module and core/relay copies bytes both ways with half-close.](assets/diagrams/tcp-lifecycle.excalidraw.svg)](assets/diagrams/tcp-lifecycle.excalidraw.svg)
 
 Step by step:
 
@@ -44,13 +47,18 @@ Step by step:
    protocol refuses the request with `spec.ErrFallbackRequested` and the inbound
    has a `fallback`, the inbound replays every byte read so far to that address
    and relays, and the steps below do not happen.
-3. **Sniff (optional).** If the inbound has sniffers, it makes the payload a
-   `peekable.Stream` and `sniff.Recognise` peeks at the first bytes with a read
-   deadline and shows each sniffer everything buffered. Nothing is consumed, so
-   the same stream carries on to the outbound. The result goes into
-   `metadata.Sniffed`; the destination is not changed.
-4. **Route.** `Handler.HandleStream` in `core/route/handler/handler.go` calls
-   `router.Route`. Today `Router.Route` returns the default outbound.
+3. **Route.** The inbound hands the payload and `Metadata` to
+   `Handler.HandleStream` in `core/route/handler/handler.go`, which wraps them
+   in a `streamTrafficInformant` and calls `Router.Route`. The router walks the
+   rules in order and returns a `Decision`: an outbound, or block, which closes
+   the stream.
+4. **Sniff (when a rule asks).** A rule whose action is `sniff` calls the
+   informant's `Sniff`. Only then does the handler make the payload a
+   `peekable.Stream`; `sniff.Recognise` peeks at the first bytes with a read
+   deadline and shows each sniffer everything buffered. Nothing is consumed:
+   the handler relays from the same wrapper, so the peeked bytes are replayed.
+   The result goes into `Metadata.Sniffed` for the later rules; the
+   destination is not changed.
 5. **Dial.** `freedomOutbound.DialStream` in `core/outbound/freedom.go` passes the
    destination to the stream dialer, bounded by the outbound's `dial_timeout`. The TCP module's `streamDialer.DialStream`
    joins host and port; if the destination is a domain, this is the only place
@@ -66,7 +74,7 @@ Step by step:
 
 ## One UDP session (SOCKS5 UDP ASSOCIATE)
 
-[![Sequence of one UDP session: the client sends UDP ASSOCIATE, socks5 hands off with ErrUDPAssociationRequested, binds the second socket and replies; the handler creates the session and runs relay.Datagrams. Each packet asks the routing cache (the router on a miss), then Session.Send writes through freedom's NAT; replies come back through the session to the client. Closing the control connection ends the session.](assets/diagrams/udp-lifecycle.excalidraw.svg)](assets/diagrams/udp-lifecycle.excalidraw.svg)
+[![Sequence of one UDP session: the client sends UDP ASSOCIATE, socks5 hands off with ErrUDPAssociationRequested, binds the second socket and replies; the handler creates the session and runs relay.Datagrams. Each packet asks the routing cache, which asks the router on a miss; the cached decision is an outbound or a block. Session.Send writes through freedom's NAT; replies come back through the session to the client. Closing the control connection ends the session.](assets/diagrams/udp-lifecycle.excalidraw.svg)](assets/diagrams/udp-lifecycle.excalidraw.svg)
 
 Step by step:
 
@@ -82,9 +90,10 @@ Step by step:
    `udpSessionRoutingCache`, then runs `relay.Datagrams`.
 4. **Client → destination.** `forwardClientDatagramsToSession` reads a packet,
    asks `OutboundForDestination` (the cache's `route` method, which calls
-   `Handler.routeUDPDestination` on a miss), then calls `Session.Send`. A packet
-   that cannot be routed or sent is dropped and logged at Debug; the session
-   continues.
+   `Handler.routeUDPDestination` on a miss with a `udpSessionTrafficInformant`,
+   which sniffs nothing), then calls `Session.Send`. The cache keeps each
+   destination's decision, block included. A packet that is blocked, or cannot
+   be routed or sent, is dropped and logged at Debug; the session continues.
 5. **Opening an outbound datagram.** On the first send through an outbound,
    `Session.openOrReuseOutboundDatagram` calls the outbound's `CreateDatagram`. For
    freedom that is `nat.New`, a `nat.Datagram` that opens real sockets lazily in
