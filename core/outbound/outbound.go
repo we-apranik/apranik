@@ -1,5 +1,6 @@
-// Package outbound is where traffic leaves Apranik: through a proxy server,
-// straight to the destination with freedom, or nowhere with block. Each outbound states in advance
+// Package outbound is where traffic leaves Apranik: through a proxy server, or
+// straight to the destination with freedom. Blocking is a routing action, not
+// an outbound. Each outbound states in advance
 // which networks it can carry, so nothing is routed to it that it cannot serve.
 package outbound
 

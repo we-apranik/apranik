@@ -195,20 +195,6 @@ func TestAServerThatNeverAnswersTheHandshakeIsBounded(t *testing.T) {
 	}
 }
 
-func TestBlockRefusesBothNetworks(t *testing.T) {
-	block := outbound.NewBlock("block")
-
-	if networks := block.Networks(); len(networks) != 2 {
-		t.Errorf("Networks() = %v, want tcp and udp", networks)
-	}
-	if _, err := block.DialStream(context.Background(), spec.Metadata{Network: spec.NetworkTCP}); !errors.Is(err, outbound.ErrBlocked) {
-		t.Errorf("DialStream: %v, want ErrBlocked", err)
-	}
-	if _, err := block.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP}); !errors.Is(err, outbound.ErrBlocked) {
-		t.Errorf("CreateDatagram: %v, want ErrBlocked", err)
-	}
-}
-
 // recordingDialer hands out one stream and remembers where it was asked to go.
 type recordingDialer struct {
 	serverStream spec.Stream
