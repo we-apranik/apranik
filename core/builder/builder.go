@@ -17,6 +17,8 @@ import (
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/The-Apranik/Apranik/core/route/dataset"
+	"github.com/The-Apranik/Apranik/core/route/router"
 	"github.com/The-Apranik/Apranik/module/transport/tcp"
 	"github.com/The-Apranik/Apranik/module/transport/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -56,14 +58,8 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 			inboundBlueprint.Tag, spec.ErrUnsupportedNetwork)
 	}
 
-	// Before the listener, so a sniffer that fails to build leaves no port open.
-	sniffing, err := buildSniffing(inboundBlueprint.Sniffing)
-	if err != nil {
-		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
-	}
-
-	// Before the listener too: a certificate that fails to load leaves no
-	// port open.
+	// Before the listener: a certificate that fails to load leaves no port
+	// open.
 	overlays, err := buildStreamOverlayServers(inboundBlueprint.StreamTransport)
 	if err != nil {
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
@@ -109,7 +105,6 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 
 	return inbound.NewStream(inbound.StreamConfig{
 		Tag:                      inboundBlueprint.Tag,
-		Sniffing:                 sniffing,
 		Listener:                 listener,
 		Overlays:                 overlays,
 		ProxyServer:              proxyServer,
@@ -148,21 +143,6 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	return mixed.NewStreamServer(socks5Server, httpServer), nil
 }
 
-func buildSniffing(sniffingBlueprint *blueprint.Sniffing) (inbound.Sniffing, error) {
-	if sniffingBlueprint == nil {
-		return inbound.Sniffing{}, nil
-	}
-	sniffers := make([]spec.Sniffer, 0, len(sniffingBlueprint.Sniffers))
-	for _, snifferModule := range sniffingBlueprint.Sniffers {
-		sniffer, err := snifferModule.NewSniffer()
-		if err != nil {
-			return inbound.Sniffing{}, fmt.Errorf("sniffer %q: %w", snifferModule.Info().Name, err)
-		}
-		sniffers = append(sniffers, sniffer)
-	}
-	return inbound.Sniffing{Sniffers: sniffers, Timeout: sniffingBlueprint.Timeout}, nil
-}
-
 func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 	if inboundBlueprint.Mixed != nil {
 		return registry.MixedProtocolName
@@ -172,8 +152,6 @@ func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 
 func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
 	switch {
-	case outboundBlueprint.Block:
-		return outbound.NewBlock(outboundBlueprint.Tag), nil
 	case outboundBlueprint.Freedom != nil:
 		return b.buildFreedomOutbound(outboundBlueprint)
 	case outboundBlueprint.Proxy != nil:
@@ -394,4 +372,30 @@ func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.End
 		listener = wrapped
 	}
 	return listener, nil
+}
+
+// BuildRouter loads the routing section's datasets and compiles its rules
+// against the outbounds already built. With no routing section, every
+// request takes the first outbound.
+func (b *Builder) BuildRouter(routing *blueprint.Routing, outbounds []component.Outbound) (component.Router, error) {
+	if len(outbounds) == 0 {
+		return nil, errors.New("router: no outbounds to route to")
+	}
+	if routing == nil {
+		return router.NewWithDefaultOutbound(outbounds[0]), nil
+	}
+
+	datasets, errs := dataset.LoadAll(routing.Datasets)
+	if err := dataset.Joined(routing.Datasets, errs); err != nil {
+		return nil, fmt.Errorf("router: %w", err)
+	}
+	for _, declaration := range routing.Datasets {
+		b.logger.Debug("Dataset loaded", "tag", declaration.Tag, "entries", datasets[declaration.Tag].Len())
+	}
+
+	outboundsByTag := make(map[string]component.Outbound, len(outbounds))
+	for _, outbound := range outbounds {
+		outboundsByTag[outbound.Tag()] = outbound
+	}
+	return router.New(router.Config{Routing: *routing, Outbounds: outboundsByTag, Datasets: datasets})
 }
