@@ -60,7 +60,7 @@ and one registry line) without touching anything else.
 
 ## The system at a glance
 
-[![System overview: a JSON config file is parsed and checked into a blueprint, which the builder turns into inbounds and outbounds. At run time a client connects to an inbound, the handler asks the router for an outbound and the relay copies traffic to the destination.](assets/diagrams/system-overview.excalidraw.svg)](assets/diagrams/system-overview.excalidraw.svg)
+[![System overview: a JSON config file is parsed and checked into a blueprint, which the builder turns into inbounds, outbounds and a router. At run time a client connects to an inbound, the handler asks the router, which runs the routing rules and picks an outbound or blocks, and the relay copies traffic to the destination.](assets/diagrams/system-overview.excalidraw.svg)](assets/diagrams/system-overview.excalidraw.svg)
 
 
 ## Status at a glance
@@ -69,12 +69,12 @@ and one registry line) without touching anything else.
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram), `tls`, `ws` and `httpupgrade` (stream overlays) |
 | Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, username/password), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP in the stream, named users, fallback for refused requests) |
-| Outbounds | proxy outbound over a stream transport stack, TCP and (for Trojan) UDP; `freedom` (straight to the destination, TCP and UDP); `block` (refuses everything) |
-| Sniffers | `tls` (SNI), `http` (Host and port); per inbound, off by default |
-| Routing | the interface and the call sites exist; there are no rules yet, so every request takes the first outbound |
+| Outbounds | proxy outbound over a stream transport stack, TCP and (for Trojan) UDP; `freedom` (straight to the destination, TCP and UDP) |
+| Sniffers | `tls` (SNI), `http` (Host and port); run by a routing rule's `sniff` action, only when a request reaches it |
+| Routing | ordered `{match, action}` rules with `any`/`all`/`not`; domain, IP, port, source, inbound, user and sniffed-protocol fields; `route`, `block` and `sniff` actions; datasets from V2Ray's `geosite.dat` and `geoip.dat` |
 | Configuration | versioned JSON config file, checked in full before anything starts |
 | Interop | Trojan over `ws`, `httpupgrade` and `tls` tested by hand against Xray 26.7, both directions, TCP and UDP |
 
-Not built yet: multiplexing transports (HTTP/2, gRPC), VLESS, routing rules, UDP
-inbounds, UDP sniffing and QUIC. For a working setup, start with the
+Not built yet: multiplexing transports (HTTP/2, gRPC), VLESS, DNS (and resolving
+for IP rules), outbound groups, UDP inbounds, UDP sniffing and QUIC. For a working setup, start with the
 [deployment examples](configuration/examples.md).
