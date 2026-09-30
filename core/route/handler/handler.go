@@ -1,7 +1,8 @@
 // Package handler is the component.TrafficHandler core gives every inbound. It
-// asks the router for an outbound and hands the carriers to the relay:
+// asks the router where traffic goes and hands the carriers to the relay:
 // once per TCP connection, and once per new destination in a UDP session,
-// whose answers it caches for the life of that session.
+// whose answers it caches for the life of that session. It keeps the client's
+// stream to itself; the router learns about it through a traffic informant.
 package handler
 
 import (
@@ -13,13 +14,12 @@ import (
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/core/relay"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // Handler is component.TrafficHandler. It decides nothing itself, asking the
-// router for every outbound.
+// router about every connection and every new UDP destination.
 type Handler struct {
 	router                component.Router
 	streamIdleTimeout     time.Duration
@@ -57,24 +57,27 @@ func New(router component.Router, config Config) *Handler {
 }
 
 func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, metadata spec.Metadata) error {
-	selected, err := h.router.Route(ctx, metadata)
+	informant := newStreamTrafficInformant(metadata, clientStream)
+	decision, err := h.router.Route(ctx, informant)
+	clientStream = informant.streamToRelay()
+	metadata = informant.Metadata()
 	if err != nil {
 		clientStream.Close()
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
 	}
-
-	outboundStream, err := selected.DialStream(ctx, metadata)
-	if errors.Is(err, outbound.ErrBlocked) {
+	if decision.IsBlock() {
 		clientStream.Close()
-		h.logger.Debug("Stream blocked", "inbound", metadata.InboundTag, "outbound", selected.Tag())
+		h.logger.Debug("Stream blocked", "inbound", metadata.InboundTag, "rule", decision.Rule)
 		return nil
 	}
+
+	outboundStream, err := decision.Outbound.DialStream(ctx, metadata)
 	if err != nil {
 		clientStream.Close()
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
 	}
 
-	h.logger.Debug("Relaying stream", "inbound", metadata.InboundTag, "outbound", selected.Tag())
+	h.logger.Debug("Relaying stream", "inbound", metadata.InboundTag, "outbound", decision.Outbound.Tag(), "rule", decision.Rule)
 	relayErr := relay.Stream(ctx, clientStream, outboundStream, h.streamIdleTimeout)
 	if errors.Is(relayErr, relay.ErrStreamIdle) {
 		return nil
@@ -88,7 +91,7 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
 	udpSession := session.New(ctx, session.Config{Metadata: metadata, IdleTimeout: h.udpSessionIdleTimeout, Logger: h.logger})
 
-	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
+	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Decision, error) {
 		return h.routeUDPDestination(ctx, metadata, destination)
 	}, cachedRouteIdleTimeout)
 	defer routingCache.close()
@@ -96,10 +99,19 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	h.logger.Debug("Relaying datagrams", "inbound", metadata.InboundTag)
 
 	relayErr := relay.Datagrams(ctx, relay.DatagramRelayConfig{
-		ClientSide:             clientDatagram,
-		ClientSession:          udpSession,
-		OutboundForDestination: routingCache.route,
-		Logger:                 h.logger,
+		ClientSide:    clientDatagram,
+		ClientSession: udpSession,
+		OutboundForDestination: func(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
+			decision, err := routingCache.route(ctx, destination)
+			if err != nil {
+				return nil, err
+			}
+			if decision.IsBlock() {
+				return nil, relay.ErrDestinationBlocked
+			}
+			return decision.Outbound, nil
+		},
+		Logger: h.logger,
 	})
 	switch {
 	case errors.Is(relayErr, session.ErrIdle), errors.Is(relayErr, session.ErrClosed):
@@ -109,17 +121,15 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	}
 }
 
-func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.Metadata, destination spec.Destination) (component.Outbound, error) {
+func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.Metadata, destination spec.Destination) (component.Decision, error) {
 	packetMetadata := sessionMetadata
 	packetMetadata.Network = spec.NetworkUDP
 	packetMetadata.Destination = destination
 
-	selected, err := h.router.Route(ctx, packetMetadata)
+	decision, err := h.router.Route(ctx, udpSessionTrafficInformant{metadata: packetMetadata})
 	if err != nil {
-		return nil, fmt.Errorf("handler: routing %s: %w", destination, err)
+		return component.Decision{}, fmt.Errorf("handler: routing %s: %w", destination, err)
 	}
-	if selected == nil {
-		return nil, fmt.Errorf("handler: routing %s: no outbound", destination)
-	}
-	return selected, nil
+	h.logger.Debug("Routed UDP destination", "inbound", sessionMetadata.InboundTag, "rule", decision.Rule, "blocked", decision.IsBlock())
+	return decision, nil
 }
