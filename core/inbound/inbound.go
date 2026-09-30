@@ -17,7 +17,6 @@ import (
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/core/relay"
-	"github.com/The-Apranik/Apranik/core/sniff"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -33,13 +32,6 @@ const fallbackDialTimeout = 10 * time.Second
 
 // PROVISIONAL: a flood of refused connections is one warning per 10 seconds.
 const refusedConnectionLogInterval = 10 * time.Second
-
-type Sniffing struct {
-	Sniffers []spec.Sniffer
-
-	// Zero means sniff.DefaultTimeout.
-	Timeout time.Duration
-}
 
 // Fallback is where a stream goes when the proxy refuses it with
 // spec.ErrFallbackRequested: every byte the handshake read is replayed there.
@@ -89,9 +81,6 @@ type StreamConfig struct {
 	// means no limit.
 	MaxConnections int
 
-	// No sniffers means no sniffing.
-	Sniffing Sniffing
-
 	// Nil is allowed: NewStream substitutes a silent logger.
 	Logger *logging.Logger
 }
@@ -129,7 +118,6 @@ func NewStream(config StreamConfig) component.Inbound {
 		fallback:           config.Fallback,
 		udpAssociateSocket: config.AssociateSocket,
 		handshakeTimeout:   handshakeTimeout,
-		sniffing:           config.Sniffing,
 		logger:             logger.With("inbound", config.Tag),
 	}
 }
@@ -143,7 +131,6 @@ type streamInbound struct {
 	fallback           *Fallback
 	udpAssociateSocket spec.UDPAssociateSocketFunc
 	handshakeTimeout   time.Duration
-	sniffing           Sniffing
 	logger             *logging.Logger
 
 	// Nil means no limit. Full means the next connection is refused.
@@ -338,18 +325,6 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 	}
 
 	metadata.InboundTag = i.tag
-	if len(i.sniffing.Sniffers) > 0 {
-		peekablePayload, alreadyPeekable := payload.(*peekable.Stream)
-		if !alreadyPeekable {
-			peekablePayload = peekable.NewStream(payload)
-		}
-		payload = peekablePayload
-		metadata.Sniffed = sniff.Recognise(peekablePayload, i.sniffing.Sniffers, i.sniffing.Timeout)
-		if metadata.Sniffed != nil {
-			i.logger.Debug("Sniffed", "protocol", metadata.Sniffed.Protocol, "domain", metadata.Sniffed.Domain)
-		}
-	}
-
 	if err := handler.HandleStream(ctx, payload, metadata); err != nil {
 		i.logger.Warn("Stream ended in error", "error", err)
 	}
