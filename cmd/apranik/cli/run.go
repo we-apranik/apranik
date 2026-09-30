@@ -18,7 +18,6 @@ import (
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
 )
 
 const defaultConfigSource = "config.json"
@@ -88,11 +87,10 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		outbounds = append(outbounds, built)
 	}
 
-	// The router has no rules yet: every inbound uses the first outbound.
-	defaultOutbound := outbounds[0]
-	if len(outbounds) > 1 {
-		logger.Warn("This build has no router, so only the first outbound is used",
-			"using", defaultOutbound.Tag(), "configured", len(outbounds))
+	// One router for every inbound: it holds no per-connection state.
+	trafficRouter, err := stackBuilder.BuildRouter(coreBlueprint.Routing, outbounds)
+	if err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -105,7 +103,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		}
 		defer built.Close()
 
-		trafficHandler := handler.New(router.New(defaultOutbound), handler.Config{
+		trafficHandler := handler.New(trafficRouter, handler.Config{
 			StreamIdleTimeout:     inboundBlueprint.TCPIdleTimeout,
 			UDPSessionIdleTimeout: inboundBlueprint.UDPSessionIdleTimeout,
 			Logger:                logger,
