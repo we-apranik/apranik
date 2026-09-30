@@ -191,7 +191,7 @@ func startTrojanServer(t *testing.T, transport string) (port uint16, fallbackRec
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inbound.Close() })
-	if err := inbound.Activate(context.Background(), handler.New(router.New(freedom), handler.Config{})); err != nil {
+	if err := inbound.Activate(context.Background(), handler.New(router.NewWithDefaultOutbound(freedom), handler.Config{})); err != nil {
 		t.Fatal(err)
 	}
 	return port, received
