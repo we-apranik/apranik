@@ -29,7 +29,7 @@ func newRoutingCacheForTest(t *testing.T, idleTimeout time.Duration, routeWithou
 	t.Helper()
 
 	var routerCalls atomic.Int32
-	cache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
+	cache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Decision, error) {
 		routerCalls.Add(1)
 		return routeWithoutCache(ctx, destination)
 	}, idleTimeout)
@@ -39,8 +39,8 @@ func newRoutingCacheForTest(t *testing.T, idleTimeout time.Duration, routeWithou
 
 func TestEachDestinationIsRoutedOnce(t *testing.T) {
 	outbound := stubOutbound{}
-	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Outbound, error) {
-		return outbound, nil
+	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Decision, error) {
+		return component.Decision{Outbound: outbound}, nil
 	})
 
 	first := destinationForTest(t, "192.0.2.1", 53)
@@ -56,9 +56,9 @@ func TestEachDestinationIsRoutedOnce(t *testing.T) {
 }
 
 func TestRacingFirstLookupsShareOneRouting(t *testing.T) {
-	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Outbound, error) {
+	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Decision, error) {
 		time.Sleep(30 * time.Millisecond)
-		return stubOutbound{}, nil
+		return component.Decision{Outbound: stubOutbound{}}, nil
 	})
 
 	target := destinationForTest(t, "192.0.2.1", 53)
@@ -75,8 +75,8 @@ func TestRacingFirstLookupsShareOneRouting(t *testing.T) {
 
 func TestAFailedRoutingIsNotCached(t *testing.T) {
 	refused := errors.New("refused")
-	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Outbound, error) {
-		return nil, refused
+	cache, routerCalls := newRoutingCacheForTest(t, time.Minute, func(context.Context, spec.Destination) (component.Decision, error) {
+		return component.Decision{}, refused
 	})
 
 	target := destinationForTest(t, "192.0.2.1", 53)
@@ -92,8 +92,8 @@ func TestAFailedRoutingIsNotCached(t *testing.T) {
 }
 
 func TestAnIdleDestinationIsRoutedAgain(t *testing.T) {
-	cache, routerCalls := newRoutingCacheForTest(t, 50*time.Millisecond, func(context.Context, spec.Destination) (component.Outbound, error) {
-		return stubOutbound{}, nil
+	cache, routerCalls := newRoutingCacheForTest(t, 50*time.Millisecond, func(context.Context, spec.Destination) (component.Decision, error) {
+		return component.Decision{Outbound: stubOutbound{}}, nil
 	})
 
 	target := destinationForTest(t, "192.0.2.1", 53)

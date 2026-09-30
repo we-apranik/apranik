@@ -13,10 +13,10 @@ import (
 // PROVISIONAL: 1 minute.
 const cachedRouteIdleTimeout = time.Minute
 
-type uncachedRouteFunc func(ctx context.Context, destination spec.Destination) (component.Outbound, error)
+type uncachedRouteFunc func(ctx context.Context, destination spec.Destination) (component.Decision, error)
 
 type cachedRoute struct {
-	outbound           component.Outbound
+	decision           component.Decision
 	lastActiveUnixNano atomic.Int64
 }
 
@@ -56,15 +56,16 @@ func (c *udpSessionRoutingCache) close() {
 	c.stopEvictionOnce.Do(func() { close(c.stopEviction) })
 }
 
-// Racing first packets to one destination wait for a single routing. A
-// failure is not cached, so a transient one is not pinned for the idle window.
-func (c *udpSessionRoutingCache) route(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
+// Racing first packets to one destination wait for a single routing. A block
+// is cached like any decision; a failure is not, so a transient one is not
+// pinned for the idle window.
+func (c *udpSessionRoutingCache) route(ctx context.Context, destination spec.Destination) (component.Decision, error) {
 	for {
 		c.mu.Lock()
 		if cached, found := c.routeByDestination[destination]; found {
 			c.mu.Unlock()
 			cached.markActive()
-			return cached.outbound, nil
+			return cached.decision, nil
 		}
 		if inProgressRouting, found := c.routingInProgress[destination]; found {
 			c.mu.Unlock()
@@ -75,19 +76,19 @@ func (c *udpSessionRoutingCache) route(ctx context.Context, destination spec.Des
 		c.routingInProgress[destination] = routingFinished
 		c.mu.Unlock()
 
-		outbound, err := c.routeWithoutCache(ctx, destination)
+		decision, err := c.routeWithoutCache(ctx, destination)
 
 		c.mu.Lock()
 		delete(c.routingInProgress, destination)
 		if err == nil {
-			cached := &cachedRoute{outbound: outbound}
+			cached := &cachedRoute{decision: decision}
 			cached.markActive()
 			c.routeByDestination[destination] = cached
 		}
 		c.mu.Unlock()
 		close(routingFinished)
 
-		return outbound, err
+		return decision, err
 	}
 }
 
