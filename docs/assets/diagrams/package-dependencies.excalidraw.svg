@@ -50,17 +50,17 @@
 <polyline points="125,169 125,425" fill="none" stroke="#495057" stroke-width="2" marker-end="url(#h0)"/>
 <polyline points="140.8,169 324.2,425" fill="none" stroke="#495057" stroke-width="2" marker-end="url(#h0)"/>
 <rect x="40" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="130" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/tcp</text>
+<text x="130" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/base/tcp</text>
 <rect x="230" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="320" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/udp</text>
+<text x="320" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/base/udp</text>
 <rect x="420" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="510" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/tls</text>
+<text x="510" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/overlay/tls</text>
 <rect x="610" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="700" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/websocket</text>
+<text x="700" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/overlay/websocket</text>
 <rect x="800" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="890" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/httpupgrade</text>
+<text x="890" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/overlay/httpupgrade</text>
 <rect x="990" y="660" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
-<text x="1080" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/fragment</text>
+<text x="1080" y="685.6" text-anchor="middle" font-size="12" font-weight="bold">module/transport/overlay/fragment</text>
 <rect x="40" y="740" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>
 <text x="130" y="765.6" text-anchor="middle" font-size="12" font-weight="bold">module/proxy/socks5</text>
 <rect x="230" y="740" width="180" height="44" rx="10" fill="#b2f2bb" stroke="#1e1e1e" stroke-width="2"/>

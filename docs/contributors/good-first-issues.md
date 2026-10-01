@@ -8,15 +8,15 @@ straight into a GitHub issue. Before starting one, read [Practices](practices.md
 ## 1. Fuzz the WebSocket and HTTPUpgrade server handshakes
 
 **Description.** A `ws` or `httpupgrade` inbound reads an HTTP request from
-anyone who connects (or from a CDN). `module/transport/websocket` fuzzes its frame
+anyone who connects (or from a CDN). `module/transport/overlay/websocket` fuzzes its frame
 reader, but neither module fuzzes the request handling in `WrapServerStream`.
 Add a fuzz target per module that feeds arbitrary bytes, as a client would send
 them, to `WrapServerStream` over a loopback or in-memory stream, and checks that
 it never panics, never reads past the 64 KiB handshake limit, and either
 succeeds or returns an error.
 
-**Files.** `module/transport/websocket/*_test.go`,
-`module/transport/httpupgrade/*_test.go`
+**Files.** `module/transport/overlay/websocket/*_test.go`,
+`module/transport/overlay/httpupgrade/*_test.go`
 
 **Acceptance criteria.** `go test -fuzz` runs for a minute without a failure;
 seed inputs include a valid upgrade, a wrong path and an oversized header.

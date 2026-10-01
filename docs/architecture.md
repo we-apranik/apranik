@@ -94,8 +94,8 @@ A module is a package under `module/` that exports one constructor per kind it
 fills:
 
 ```go
-func NewBaseStreamTransportModule() spec.BaseStreamTransportModule       // module/transport/tcp
-func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule // module/transport/tls
+func NewBaseStreamTransportModule() spec.BaseStreamTransportModule       // module/transport/base/tcp
+func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule // module/transport/overlay/tls
 func NewStreamProxyModule() spec.StreamProxyModule                       // module/proxy/socks5
 func NewSnifferModule() spec.SnifferModule                               // module/sniffer/tls
 ```
@@ -207,8 +207,8 @@ package imports `spec`, nine import `core/logging` and eight import
 
 [![Package dependency graph generated from go list, in layers: cmd/apranik/cli imports config, core/builder, core/registry, core/blueprint and the handler; config imports registry, blueprint, config/types, nat, route/dataset and route/match; core/builder imports blueprint, registry, inbound, inbound/mixed, outbound, route/router and route/dataset; route/router imports blueprint, route/dataset and route/match; route/dataset imports blueprint, dataset/geodata and route/match; the handler imports sniff, peekable, relay and session; inbound imports peekable and relay; nat, session and relay import core/net/udp. Modules and shared packages sit below, imported only by core/registry, and core/builder for tcp and udp. Edges to spec, core/logging and core/component are left out.](assets/diagrams/package-dependencies.excalidraw.svg)](assets/diagrams/package-dependencies.excalidraw.svg)
 
-Three edges worth knowing: `core/builder` imports `module/transport/udp`
+Three edges worth knowing: `core/builder` imports `module/transport/base/udp`
 directly, to open SOCKS5 associate sockets without a registry lookup, and
-`module/transport/tcp`, because a fallback is always dialed over plain TCP;
+`module/transport/base/tcp`, because a fallback is always dialed over plain TCP;
 `cmd/apranik/cli` imports the router and handler because it wires them
 together.

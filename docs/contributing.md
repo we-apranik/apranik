@@ -58,14 +58,14 @@ See [Architecture](architecture.md) for the full map.
 
 ## Adding a new base stream transport
 
-The existing example is `module/transport/tcp`. A new base stream transport,
+The existing example is `module/transport/base/tcp`. A new base stream transport,
 say `unix` for Unix domain sockets, touches these files:
 
 | File | Change |
 | --- | --- |
-| `module/transport/unix/settings.go` (new) | `Settings` struct with JSON tags, `Validate`, `Warnings` |
-| `module/transport/unix/transport.go` (new) | `Transport` type, `Info`, `NewStreamDialer`, `NewStreamListener`, and `NewBaseStreamTransportModule` |
-| `module/transport/unix/unix_test.go` (new) | tests that run without core |
+| `module/transport/base/unix/settings.go` (new) | `Settings` struct with JSON tags, `Validate`, `Warnings` |
+| `module/transport/base/unix/transport.go` (new) | `Transport` type, `Info`, `NewStreamDialer`, `NewStreamListener`, and `NewBaseStreamTransportModule` |
+| `module/transport/base/unix/unix_test.go` (new) | tests that run without core |
 | `core/registry/default.go` | one line: `moduleRegistry.Transports().RegisterBaseStream(unix.NewBaseStreamTransportModule)` |
 
 Steps:
@@ -95,17 +95,17 @@ Steps:
 ## Adding an overlay transport
 
 An overlay wraps one connection at a time: TLS, WebSocket, HTTPUpgrade, or a
-new obfuscation. The examples are `module/transport/tls` (a handshake, then
-`crypto/tls` does the rest), `module/transport/websocket` (a handshake, then
-framing) and `module/transport/httpupgrade` (a handshake only). A new one,
+new obfuscation. The examples are `module/transport/overlay/tls` (a handshake, then
+`crypto/tls` does the rest), `module/transport/overlay/websocket` (a handshake, then
+framing) and `module/transport/overlay/httpupgrade` (a handshake only). A new one,
 say `obfs`, touches:
 
 | File | Change |
 | --- | --- |
-| `module/transport/obfs/settings.go` (new) | `Settings`, `Validate`, `Warnings` |
-| `module/transport/obfs/transport.go` (new) | `Transport{Settings}`, `Info`, `NewStreamOverlayClient`, `NewStreamOverlayServer`, `NewOverlayStreamTransportModule` |
-| `module/transport/obfs/client.go`, `server.go`, `stream.go` (new) | the two roles and the stream they return |
-| `module/transport/obfs/obfs_test.go` (new) | both roles over a loopback TCP pair, no core |
+| `module/transport/overlay/obfs/settings.go` (new) | `Settings`, `Validate`, `Warnings` |
+| `module/transport/overlay/obfs/transport.go` (new) | `Transport{Settings}`, `Info`, `NewStreamOverlayClient`, `NewStreamOverlayServer`, `NewOverlayStreamTransportModule` |
+| `module/transport/overlay/obfs/client.go`, `server.go`, `stream.go` (new) | the two roles and the stream they return |
+| `module/transport/overlay/obfs/obfs_test.go` (new) | both roles over a loopback TCP pair, no core |
 | `core/registry/default.go` | one line: `RegisterOverlayStream(obfs.NewOverlayStreamTransportModule)` |
 
 The shape:

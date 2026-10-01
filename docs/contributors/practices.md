@@ -12,7 +12,7 @@ Counter-examples are illustrative unless they name a file.
 imports `core/` can no longer be reviewed, tested or moved on its own, and every
 change to core becomes a change to it.
 
-**Good**: `module/transport/tcp/transport.go` imports `config/types` and `spec`,
+**Good**: `module/transport/base/tcp/transport.go` imports `config/types` and `spec`,
 and nothing else from the project. `module/proxy/trojan` also imports
 `shared/socksaddr`, the address codec it shares with SOCKS5, never
 `module/proxy/socks5`.

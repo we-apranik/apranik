@@ -221,7 +221,7 @@ Parts of the goperf TLS page are wrong for Apranik and must not be followed:
   latency, and Go's defaults are already fast (the goperf tracking reports
   about 58% faster TLS handshakes in Go 1.25 than in 1.23).
 
-Applied in `module/transport/tls`: the client sends a browser's ClientHello
+Applied in `module/transport/overlay/tls`: the client sends a browser's ClientHello
 through uTLS (Chrome by default), whose cipher suites, curves and extensions are
 the preset's and are never tuned; the server loads its certificates once, at
 startup, not per connection. Each outbound shares one resumption cache across
@@ -274,16 +274,16 @@ Every hot path has a benchmark in the package it measures:
 | Routing | `core/route/router`: `BenchmarkRouteRealisticConfig`; `core/route/handler`: `BenchmarkRouteStreamWithoutRules` |
 | Matchers and datasets | `core/route/match`: domain, prefix and `ip_is_private` lookups; `core/route/dataset/geodata`: `BenchmarkReadOneCategoryOfMany` |
 | HTTP handshake | `module/proxy/http`: `BenchmarkAcceptConnect` |
-| UDP socket | `module/transport/udp`: `BenchmarkSocketWriteToIP`, `…CachedDomain`, `BenchmarkSocketReadFrom` |
+| UDP socket | `module/transport/base/udp`: `BenchmarkSocketWriteToIP`, `…CachedDomain`, `BenchmarkSocketReadFrom` |
 | SOCKS5 UDP | `module/proxy/socks5`: `BenchmarkAssociationReadFrom`, `…WriteTo` |
 | Trojan UDP | `module/proxy/trojan`: `BenchmarkStreamDatagramReadFrom`, `…WriteTo` |
 | Address codec | `shared/socksaddr`: `BenchmarkReadAddressIPv4`, `BenchmarkParseAddressIPv4` |
 | UDP session | `core/net/udp/session`: `BenchmarkSessionSend`, `BenchmarkSessionReply` |
 | NAT | `core/net/udp/nat`: `BenchmarkNATWriteTo`, `BenchmarkNATReadFrom` |
 | Peer address | `spec`: `BenchmarkNewEndpointFromTCPAddr` |
-| WebSocket framing | `module/transport/websocket`: `BenchmarkClientToServer1KiB`, `…16KiB`, `…64KiB`, `BenchmarkServerToClient16KiB`, `BenchmarkMask16KiB` |
-| HTTPUpgrade | `module/transport/httpupgrade`: `BenchmarkClientToServer16KiB` against `BenchmarkBareTCP16KiB` |
-| TLS handshake | `module/transport/tls`: `BenchmarkClientHandshake/none`, `…/chrome`, `…/firefox`, `…/randomized` |
+| WebSocket framing | `module/transport/overlay/websocket`: `BenchmarkClientToServer1KiB`, `…16KiB`, `…64KiB`, `BenchmarkServerToClient16KiB`, `BenchmarkMask16KiB` |
+| HTTPUpgrade | `module/transport/overlay/httpupgrade`: `BenchmarkClientToServer16KiB` against `BenchmarkBareTCP16KiB` |
+| TLS handshake | `module/transport/overlay/tls`: `BenchmarkClientHandshake/none`, `…/chrome`, `…/firefox`, `…/randomized` |
 
 The UDP ones use stand-ins below the layer they measure, so they report that
 layer's cost alone. A new hot path gets a benchmark in the same change.
@@ -307,7 +307,7 @@ Measured with the benchmarks above (`benchstat`, 5 runs each), 2026-09-27:
 
 | Where | Change | Before → after, per operation |
 | --- | --- | --- |
-| `module/transport/udp` | `netip.AddrPort` end to end, `WriteToUDPAddrPort` | send to an IP: 5 → 0 allocations (the benchmark's own reader made the 6th) |
+| `module/transport/base/udp` | `netip.AddrPort` end to end, `WriteToUDPAddrPort` | send to an IP: 5 → 0 allocations (the benchmark's own reader made the 6th) |
 | `module/proxy/socks5` | address parsed in place; one reply buffer per association | read 4 → 0, write 4 → 0 allocations; write 357 → 104 ns |
 | `module/proxy/trojan` | frame header peeked whole; one frame buffer reused under the write lock | read 5 → 0, write 3 → 0 allocations; write 365 → 89 ns |
 | `shared/socksaddr` | `ParseAddress`, a slice-based decoder | 3 → 0 allocations, 86 → 22 ns |
@@ -316,11 +316,11 @@ Measured with the benchmarks above (`benchstat`, 5 runs each), 2026-09-27:
 | `spec` | `NewEndpointFromNetAddr` reads TCP and UDP addresses directly | 215 → 11 ns, 3 → 0 allocations |
 | `core/inbound` | `max_connections`: refuse beyond the limit before any handshake | new |
 | `core/net/udp/nat`, `core/inbound` | refusal and rejection logs sampled once per 10 s (`logging.Sampler`) | a sprayer's 20 packets: 20 notices → 1 |
-| `module/transport/tcp` | `net.KeepAliveConfig`: interval and count, both directions | new settings |
-| `module/transport/websocket` | frame headers read with `Peek`/`Discard` instead of into local arrays, which escaped | 3 → 0 allocations per frame (2026-09-28) |
-| `module/transport/websocket` | masking eight bytes at a time | 1.2 → 8.6 GB/s for 16 KiB |
-| `module/transport/httpupgrade` | after the handshake, reads go straight to the stream below once its buffer is drained | 0 allocations; no measurable cost against bare TCP |
-| `module/transport/tls` | browser ClientHello through uTLS (2026-09-29; a feature, not an optimisation) | full handshake over loopback, client and server together: `none` 2.2–2.6 ms, 977 allocs (resumed); `chrome` 3.4–4.5 ms, 1,277 allocs; `firefox` 3.0–4.3 ms; `randomized` 2.9–3.9 ms (3 runs of 200) |
+| `module/transport/base/tcp` | `net.KeepAliveConfig`: interval and count, both directions | new settings |
+| `module/transport/overlay/websocket` | frame headers read with `Peek`/`Discard` instead of into local arrays, which escaped | 3 → 0 allocations per frame (2026-09-28) |
+| `module/transport/overlay/websocket` | masking eight bytes at a time | 1.2 → 8.6 GB/s for 16 KiB |
+| `module/transport/overlay/httpupgrade` | after the handshake, reads go straight to the stream below once its buffer is drained | 0 allocations; no measurable cost against bare TCP |
+| `module/transport/overlay/tls` | browser ClientHello through uTLS (2026-09-29; a feature, not an optimisation) | full handshake over loopback, client and server together: `none` 2.2–2.6 ms, 977 allocs (resumed); `chrome` 3.4–4.5 ms, 1,277 allocs; `firefox` 3.0–4.3 ms; `randomized` 2.9–3.9 ms (3 runs of 200) |
 
 ## Known opportunities (not yet done)
 
@@ -328,9 +328,9 @@ Candidates for future work. Each needs a benchmark before it is started.
 
 | Where | What | Why it might matter |
 | --- | --- | --- |
-| `module/transport/tcp` | No DNS cache: freedom resolves a domain on every TCP dial. | Every new connection to a domain pays a lookup. The `udp` module already caches. |
-| `module/transport/tls` | The client clones its `tls.Config` (or uTLS's) on every dial to set the server name. | One allocation per connection; a small per-server-name cache would remove it. |
-| `module/transport/tls` | With a fingerprint, the ClientHello is built from the preset on every dial, twice when `alpn` is set. | Around 300 extra allocations per handshake against Go's own; caching the built extensions is not safe as-is (key shares are per connection). |
-| `module/transport/websocket` | Every frame is copied into a pooled buffer, header and payload together, so it goes out in one write. On the server, which does not mask, a vectored write could skip the copy. | A copy per write on the server's data path. |
-| `module/transport/websocket` | The client draws a fresh masking key from `crypto/rand` for every frame. | Cheap on Linux with the vDSO `getrandom`; unmeasured elsewhere. |
+| `module/transport/base/tcp` | No DNS cache: freedom resolves a domain on every TCP dial. | Every new connection to a domain pays a lookup. The `udp` module already caches. |
+| `module/transport/overlay/tls` | The client clones its `tls.Config` (or uTLS's) on every dial to set the server name. | One allocation per connection; a small per-server-name cache would remove it. |
+| `module/transport/overlay/tls` | With a fingerprint, the ClientHello is built from the preset on every dial, twice when `alpn` is set. | Around 300 extra allocations per handshake against Go's own; caching the built extensions is not safe as-is (key shares are per connection). |
+| `module/transport/overlay/websocket` | Every frame is copied into a pooled buffer, header and payload together, so it goes out in one write. On the server, which does not mask, a vectored write could skip the copy. | A copy per write on the server's data path. |
+| `module/transport/overlay/websocket` | The client draws a fresh masking key from `crypto/rand` for every frame. | Cheap on Linux with the vDSO `getrandom`; unmeasured elsewhere. |
 | `config`, `cmd/apranik/cli` | `run` loads routing datasets twice: once in `config.CheckDatasets`, once to build the router. | A large `geosite.dat` is decoded twice at startup; `Check` could hand its loaded datasets to the build. |
