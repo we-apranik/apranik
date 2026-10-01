@@ -28,6 +28,11 @@ const (
 
 	ReplySucceeded           = 0x00
 	ReplyGeneralFailure      = 0x01
+	ReplyNotAllowed          = 0x02
+	ReplyNetworkUnreachable  = 0x03
+	ReplyHostUnreachable     = 0x04
+	ReplyConnectionRefused   = 0x05
+	ReplyTTLExpired          = 0x06
 	ReplyCommandNotSupported = 0x07
 	ReplyAddressNotSupported = 0x08
 )
@@ -48,15 +53,15 @@ func ReplyText(code byte) string {
 		return "succeeded"
 	case ReplyGeneralFailure:
 		return "general SOCKS server failure"
-	case 0x02:
+	case ReplyNotAllowed:
 		return "connection not allowed by ruleset"
-	case 0x03:
+	case ReplyNetworkUnreachable:
 		return "network unreachable"
-	case 0x04:
+	case ReplyHostUnreachable:
 		return "host unreachable"
-	case 0x05:
+	case ReplyConnectionRefused:
 		return "connection refused"
-	case 0x06:
+	case ReplyTTLExpired:
 		return "TTL expired"
 	case ReplyCommandNotSupported:
 		return "command not supported"

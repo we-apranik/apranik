@@ -12,10 +12,10 @@ import (
 	"io"
 	"net"
 	"slices"
-	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
 	"github.com/The-Apranik/Apranik/shared/socksaddr"
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -39,10 +39,7 @@ func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) { 
 // UDP ASSOCIATE returns a nil Stream with Network NetworkUDP, since
 // AcceptStream cannot return a Datagram; Associate binds and replies.
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
-	if deadline, ok := ctx.Deadline(); ok {
-		underlyingStream.SetDeadline(deadline)
-		defer underlyingStream.SetDeadline(time.Time{})
-	}
+	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
 	if err := s.authenticate(underlyingStream); err != nil {
 		return nil, spec.Metadata{}, err
@@ -88,10 +85,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 // Reads the declared address AcceptStream left unread, opens the socket, and
 // replies. Does not wait for the session: core owns the relay from here.
 func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
-	if deadline, ok := ctx.Deadline(); ok {
-		controlStream.SetDeadline(deadline)
-		defer controlStream.SetDeadline(time.Time{})
-	}
+	defer streamdeadline.ApplyContextDeadline(ctx, controlStream)()
 
 	declaredClient, err := socksaddr.ReadAddress(controlStream)
 	if err != nil {
@@ -181,18 +175,17 @@ func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
 		return fmt.Errorf("socks5: credential version X'%02X', want X'01'", header[0])
 	}
 
-	username := make([]byte, header[1])
-	if _, err := io.ReadFull(underlyingStream, username); err != nil {
-		return fmt.Errorf("socks5: reading username: %w", err)
+	username, err := readLengthPrefixed(underlyingStream, header[1], "username")
+	if err != nil {
+		return err
 	}
-
 	var passwordLength [1]byte
 	if _, err := io.ReadFull(underlyingStream, passwordLength[:]); err != nil {
 		return fmt.Errorf("socks5: reading password length: %w", err)
 	}
-	password := make([]byte, passwordLength[0])
-	if _, err := io.ReadFull(underlyingStream, password); err != nil {
-		return fmt.Errorf("socks5: reading password: %w", err)
+	password, err := readLengthPrefixed(underlyingStream, passwordLength[0], "password")
+	if err != nil {
+		return err
 	}
 
 	// Both compared before deciding, so a wrong username and a wrong password
@@ -208,4 +201,12 @@ func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
 		return fmt.Errorf("socks5: accepting credentials: %w", err)
 	}
 	return nil
+}
+
+func readLengthPrefixed(underlyingStream spec.Stream, length byte, fieldName string) ([]byte, error) {
+	field := make([]byte, length)
+	if _, err := io.ReadFull(underlyingStream, field); err != nil {
+		return nil, fmt.Errorf("socks5: reading %s: %w", fieldName, err)
+	}
+	return field, nil
 }

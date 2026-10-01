@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -30,10 +30,7 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, err
 	}
 
-	if deadline, ok := ctx.Deadline(); ok {
-		underlyingStream.SetDeadline(deadline)
-		defer underlyingStream.SetDeadline(time.Time{})
-	}
+	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
 	var request bytes.Buffer
 	fmt.Fprintf(&request, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", target, target)

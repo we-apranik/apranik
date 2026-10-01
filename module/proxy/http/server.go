@@ -4,17 +4,20 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/spec"
 )
+
+const statusBadRequest = "400 Bad Request"
 
 type streamServer struct {
 	username string
@@ -27,10 +30,7 @@ type streamServer struct {
 // As with SOCKS5, the 200 goes out before core has dialled, so a dial failure
 // reaches the client as an EOF rather than a 502.
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
-	if deadline, ok := ctx.Deadline(); ok {
-		underlyingStream.SetDeadline(deadline)
-		defer underlyingStream.SetDeadline(time.Time{})
-	}
+	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
 	reader := wire.AcquireHeadReader(underlyingStream)
 	defer wire.ReleaseHeadReader(reader)
@@ -41,46 +41,61 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 
 	method, target, version, err := parseRequestLine(requestLine)
 	if err != nil {
-		writeStatus(underlyingStream, "HTTP/1.1", "400 Bad Request")
+		writeStatus(underlyingStream, "HTTP/1.1", statusBadRequest)
 		return nil, spec.Metadata{}, err
 	}
 
-	if s.username != "" {
-		offered := wire.HeaderValue(headers, "Proxy-Authorization")
-		if !wire.CredentialsMatch(offered, wire.BasicCredentials(s.username, s.password)) {
-			writeStatus(underlyingStream, version, "407 Proxy Authentication Required", `Proxy-Authenticate: Basic realm="apranik"`)
-			return nil, spec.Metadata{}, errors.New("http: missing or bad proxy credentials")
-		}
+	if err := s.authorize(underlyingStream, version, headers); err != nil {
+		return nil, spec.Metadata{}, err
 	}
 
 	metadata := spec.Metadata{Network: spec.NetworkTCP, Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: s.username}
 
 	if strings.EqualFold(method, "CONNECT") {
-		destination, err := wire.ParseAddress(target, 0)
-		if err != nil {
-			writeStatus(underlyingStream, version, "400 Bad Request")
-			return nil, spec.Metadata{}, err
-		}
-		if err := writeStatus(underlyingStream, version, "200 Connection established"); err != nil {
-			return nil, spec.Metadata{}, fmt.Errorf("http: sending reply: %w", err)
-		}
-		metadata.Destination = destination
-		return wire.PrefixStream(underlyingStream, nil, reader), metadata, nil
+		return acceptConnect(underlyingStream, reader, metadata, version, target)
 	}
+	return acceptAbsoluteForm(underlyingStream, reader, metadata, version, method, target, headers)
+}
 
+func (s *streamServer) authorize(underlyingStream spec.Stream, version string, headers []string) error {
+	if s.username == "" {
+		return nil
+	}
+	offered := wire.HeaderValue(headers, "Proxy-Authorization")
+	if wire.CredentialsMatch(offered, wire.BasicCredentials(s.username, s.password)) {
+		return nil
+	}
+	writeStatus(underlyingStream, version, "407 Proxy Authentication Required", `Proxy-Authenticate: Basic realm="apranik"`)
+	return errors.New("http: missing or bad proxy credentials")
+}
+
+func acceptConnect(underlyingStream spec.Stream, reader *bufio.Reader, metadata spec.Metadata, version, target string) (spec.Stream, spec.Metadata, error) {
+	destination, err := wire.ParseAddress(target, 0)
+	if err != nil {
+		writeStatus(underlyingStream, version, statusBadRequest)
+		return nil, spec.Metadata{}, err
+	}
+	if err := writeStatus(underlyingStream, version, "200 Connection established"); err != nil {
+		return nil, spec.Metadata{}, fmt.Errorf("http: sending reply: %w", err)
+	}
+	metadata.Destination = destination
+	return wire.PrefixStream(underlyingStream, nil, reader), metadata, nil
+}
+
+func acceptAbsoluteForm(underlyingStream spec.Stream, reader *bufio.Reader, metadata spec.Metadata, version, method, target string, headers []string) (spec.Stream, spec.Metadata, error) {
 	absolute, err := url.Parse(target)
 	if err != nil || absolute.Scheme == "" || absolute.Host == "" {
-		writeStatus(underlyingStream, version, "400 Bad Request")
+		writeStatus(underlyingStream, version, statusBadRequest)
 		return nil, spec.Metadata{}, fmt.Errorf("http: %s %q is neither CONNECT nor an absolute-form request", method, target)
 	}
 	if !strings.EqualFold(absolute.Scheme, "http") {
-		writeStatus(underlyingStream, version, "400 Bad Request")
+		writeStatus(underlyingStream, version, statusBadRequest)
 		return nil, spec.Metadata{}, fmt.Errorf("http: cannot forward scheme %q, use CONNECT", absolute.Scheme)
 	}
 
 	destination, err := wire.ParseAddress(absolute.Host, 80)
 	if err != nil {
-		writeStatus(underlyingStream, version, "400 Bad Request")
+		writeStatus(underlyingStream, version, statusBadRequest)
 		return nil, spec.Metadata{}, err
 	}
 	metadata.Destination = destination

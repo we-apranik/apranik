@@ -34,11 +34,11 @@ type association struct {
 // 0.0.0.0:0, in which case the first packet teaches us instead, and everything
 // after it is filtered against that.
 func newAssociation(socket spec.Datagram, declared spec.Destination) *association {
-	session := &association{socket: socket, readBuffer: make([]byte, maxDatagram)}
+	newlyBound := &association{socket: socket, readBuffer: make([]byte, maxDatagram)}
 	if ip, ok := declared.IP(); ok && !ip.IsUnspecified() && declared.Port() != 0 {
-		session.clientAddress, session.clientKnown = declared, true
+		newlyBound.clientAddress, newlyBound.clientKnown = declared, true
 	}
-	return session
+	return newlyBound
 }
 
 func (a *association) ReadFrom(payload []byte) (int, spec.Destination, error) {
