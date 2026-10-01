@@ -14,8 +14,8 @@ import (
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	proxyhttp "github.com/The-Apranik/Apranik/module/proxy/http"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
-	"github.com/The-Apranik/Apranik/module/transport/tcp"
-	"github.com/The-Apranik/Apranik/module/transport/udp"
+	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
+	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 

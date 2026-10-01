@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/transport/udp"
+	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 

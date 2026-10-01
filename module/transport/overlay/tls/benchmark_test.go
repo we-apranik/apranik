@@ -3,7 +3,7 @@ package tls_test
 import (
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/transport/tls"
+	"github.com/The-Apranik/Apranik/module/transport/overlay/tls"
 )
 
 // One full client handshake against a crypto/tls server over loopback TCP,

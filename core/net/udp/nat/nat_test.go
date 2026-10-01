@@ -16,7 +16,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/module/transport/udp"
+	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -402,7 +402,7 @@ func TestNewPolicyRefusesNonsense(t *testing.T) {
 	}
 }
 
-// Table and module/transport/udp both implement spec.Datagram, so they must
+// Table and module/transport/base/udp both implement spec.Datagram, so they must
 // agree that a short buffer is an error rather than a silent truncation.
 func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 	dial, _ := countingDialer(t)

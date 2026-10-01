@@ -19,8 +19,8 @@ import (
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
 	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/module/transport/tcp"
-	"github.com/The-Apranik/Apranik/module/transport/udp"
+	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
+	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 

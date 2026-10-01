@@ -12,7 +12,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/module/transport/tcp"
+	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 

@@ -445,7 +445,7 @@ func (d *Datagram) insert(key mappingKey, datagram spec.Datagram) (*mapping, err
 }
 
 // A datagram longer than buffer is reported as spec.ErrMessageTooLong and
-// dropped, not truncated: module/transport/udp does the same, and two
+// dropped, not truncated: module/transport/base/udp does the same, and two
 // implementations of one contract disagreeing about truncation is worse than
 // either rule. relay.Datagram treats it as a dropped packet, not a dead
 // session.

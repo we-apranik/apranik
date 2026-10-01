@@ -8,12 +8,12 @@ import (
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
 	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
 	tlssniffer "github.com/The-Apranik/Apranik/module/sniffer/tls"
-	"github.com/The-Apranik/Apranik/module/transport/fragment"
-	"github.com/The-Apranik/Apranik/module/transport/httpupgrade"
-	"github.com/The-Apranik/Apranik/module/transport/tcp"
-	tlstransport "github.com/The-Apranik/Apranik/module/transport/tls"
-	"github.com/The-Apranik/Apranik/module/transport/udp"
-	"github.com/The-Apranik/Apranik/module/transport/websocket"
+	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
+	"github.com/The-Apranik/Apranik/module/transport/base/udp"
+	"github.com/The-Apranik/Apranik/module/transport/overlay/fragment"
+	"github.com/The-Apranik/Apranik/module/transport/overlay/httpupgrade"
+	tlstransport "github.com/The-Apranik/Apranik/module/transport/overlay/tls"
+	"github.com/The-Apranik/Apranik/module/transport/overlay/websocket"
 )
 
 // Default is the only place in the project that names a module. Adding one is

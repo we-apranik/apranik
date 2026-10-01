@@ -10,7 +10,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
-	"github.com/The-Apranik/Apranik/module/transport/tcp"
+	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
