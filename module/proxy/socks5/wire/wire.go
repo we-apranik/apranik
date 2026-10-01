@@ -37,6 +37,10 @@ const (
 	ReplyAddressNotSupported = 0x08
 )
 
+// UDPHeaderStart opens every UDP request header: two reserved bytes, then
+// FRAG, which is zero for a datagram that is not a fragment.
+var UDPHeaderStart = [3]byte{0x00, 0x00, 0x00}
+
 // ReplyError is a SOCKS5 reply the server refused with, kept distinct so a
 // caller can tell "command not supported" from "host unreachable".
 type ReplyError struct {

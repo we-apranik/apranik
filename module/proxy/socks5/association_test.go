@@ -9,15 +9,15 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// endlessDatagram hands out the same packet from the same sender forever and
+// endlessDatagram hands out the same datagram from the same sender forever and
 // discards writes, so a benchmark measures only the layer above it.
 type endlessDatagram struct {
-	packet []byte
-	from   spec.Destination
+	datagram []byte
+	from     spec.Destination
 }
 
 func (d endlessDatagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
-	return copy(buffer, d.packet), d.from, nil
+	return copy(buffer, d.datagram), d.from, nil
 }
 func (endlessDatagram) WriteTo(payload []byte, _ spec.Destination) (int, error) {
 	return len(payload), nil
@@ -36,17 +36,17 @@ func benchmarkDestination(b *testing.B, ip string, port uint16) spec.Destination
 
 func BenchmarkAssociationReadFrom(b *testing.B) {
 	client := benchmarkDestination(b, "127.0.0.1", 40000)
-	packet, err := socksaddr.AppendAddress([]byte{0, 0, 0}, benchmarkDestination(b, "1.1.1.1", 53))
+	datagram, err := socksaddr.AppendAddress([]byte{0, 0, 0}, benchmarkDestination(b, "1.1.1.1", 53))
 	if err != nil {
 		b.Fatal(err)
 	}
-	packet = append(packet, make([]byte, 512)...)
-	session := newAssociation(endlessDatagram{packet: packet, from: client}, spec.Destination{})
-	payload := make([]byte, maxDatagram)
+	datagram = append(datagram, make([]byte, 512)...)
+	udpAssociation := newAssociation(endlessDatagram{datagram: datagram, from: client}, spec.Destination{})
+	payload := make([]byte, maxDatagramSize)
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := session.ReadFrom(payload); err != nil {
+		if _, _, err := udpAssociation.ReadFrom(payload); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -54,13 +54,13 @@ func BenchmarkAssociationReadFrom(b *testing.B) {
 
 func BenchmarkAssociationWriteTo(b *testing.B) {
 	client := benchmarkDestination(b, "127.0.0.1", 40000)
-	session := newAssociation(endlessDatagram{from: client}, client)
+	udpAssociation := newAssociation(endlessDatagram{from: client}, client)
 	source := benchmarkDestination(b, "1.1.1.1", 53)
 	reply := make([]byte, 512)
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := session.WriteTo(reply, source); err != nil {
+		if _, err := udpAssociation.WriteTo(reply, source); err != nil {
 			b.Fatal(err)
 		}
 	}

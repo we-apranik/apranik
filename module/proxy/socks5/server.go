@@ -167,15 +167,15 @@ func (s *streamServer) authenticate(underlyingStream spec.Stream) error {
 }
 
 func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
-	var header [2]byte
-	if _, err := io.ReadFull(underlyingStream, header[:]); err != nil {
+	var versionAndUsernameLength [2]byte
+	if _, err := io.ReadFull(underlyingStream, versionAndUsernameLength[:]); err != nil {
 		return fmt.Errorf("socks5: reading credentials: %w", err)
 	}
-	if header[0] != wire.AuthVersion {
-		return fmt.Errorf("socks5: credential version X'%02X', want X'01'", header[0])
+	if versionAndUsernameLength[0] != wire.AuthVersion {
+		return fmt.Errorf("socks5: credential version X'%02X', want X'01'", versionAndUsernameLength[0])
 	}
 
-	username, err := readLengthPrefixed(underlyingStream, header[1], "username")
+	username, err := readLengthPrefixed(underlyingStream, versionAndUsernameLength[1], "username")
 	if err != nil {
 		return err
 	}
