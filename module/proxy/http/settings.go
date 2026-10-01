@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/The-Apranik/Apranik/config/types"
 )
@@ -16,6 +17,9 @@ type Settings struct {
 func (s *Settings) Validate() error {
 	if (s.Username == "") != (s.Password == "") {
 		return errors.New("http: username and password must be set together or not at all")
+	}
+	if strings.Contains(s.Username, ":") {
+		return errors.New("http: username may not contain ':', which Basic authentication uses to separate it from the password")
 	}
 	return nil
 }

@@ -12,6 +12,17 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
+// ConnectRefusedError is a CONNECT the upstream proxy answered with a status
+// other than 2xx.
+type ConnectRefusedError struct {
+	StatusCode int
+	StatusLine string
+}
+
+func (e *ConnectRefusedError) Error() string {
+	return fmt.Sprintf("http: proxy answered CONNECT with %q", e.StatusLine)
+}
+
 type streamClient struct {
 	username string
 	password string
@@ -32,44 +43,42 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 
 	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
-	var request bytes.Buffer
-	fmt.Fprintf(&request, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", connectTarget, connectTarget)
+	var connectRequest bytes.Buffer
+	fmt.Fprintf(&connectRequest, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", connectTarget, connectTarget)
 	if c.username != "" {
-		fmt.Fprintf(&request, "Proxy-Authorization: %s\r\n", wire.BasicAuthorizationValue(c.username, c.password))
+		fmt.Fprintf(&connectRequest, "Proxy-Authorization: %s\r\n", wire.BasicAuthorizationValue(c.username, c.password))
 	}
-	request.WriteString("\r\n")
+	connectRequest.WriteString("\r\n")
 
-	if _, err := underlyingStream.Write(request.Bytes()); err != nil {
+	if _, err := underlyingStream.Write(connectRequest.Bytes()); err != nil {
 		return nil, fmt.Errorf("http: sending CONNECT: %w", err)
 	}
 
-	headReader := wire.AcquireHeadReader(underlyingStream)
-	defer wire.ReleaseHeadReader(headReader)
-	statusLine, _, err := wire.ReadMessageHead(headReader)
+	head, streamAfterHead, err := wire.ReadHead(underlyingStream)
 	if err != nil {
 		return nil, err
 	}
 
-	code, err := parseConnectStatusCode(statusLine)
+	statusCode, err := parseConnectStatusCode(head.StartLine)
 	if err != nil {
 		return nil, err
 	}
-	if code < 200 || code > 299 {
-		return nil, &wire.ConnectRefusedError{StatusCode: code, StatusLine: statusLine}
+	if statusCode < 200 || statusCode > 299 {
+		return nil, &ConnectRefusedError{StatusCode: statusCode, StatusLine: head.StartLine}
 	}
 
-	return wire.ReplayStream(underlyingStream, nil, headReader), nil
+	return streamAfterHead, nil
 }
 
-func parseConnectStatusCode(line string) (int, error) {
-	fields := strings.SplitN(line, " ", 3)
+func parseConnectStatusCode(statusLine string) (int, error) {
+	fields := strings.SplitN(statusLine, " ", 3)
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "HTTP/") {
-		return 0, fmt.Errorf("http: malformed status line %q", line)
+		return 0, fmt.Errorf("http: malformed status line %q", statusLine)
 	}
 
-	code, err := strconv.Atoi(fields[1])
+	statusCode, err := strconv.Atoi(fields[1])
 	if err != nil {
-		return 0, fmt.Errorf("http: malformed status code in %q", line)
+		return 0, fmt.Errorf("http: malformed status code in %q", statusLine)
 	}
-	return code, nil
+	return statusCode, nil
 }

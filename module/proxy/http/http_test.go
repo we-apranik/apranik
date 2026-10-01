@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	proxyhttp "github.com/The-Apranik/Apranik/module/proxy/http"
-	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -255,9 +254,9 @@ func TestProxyAuthentication(t *testing.T) {
 			Destination: domainDst("example.com", 443),
 		})
 
-		var status *wire.ConnectRefusedError
+		var status *proxyhttp.ConnectRefusedError
 		if !errors.As(err, &status) {
-			t.Fatalf("RequestStream error is %v, want *wire.ConnectRefusedError", err)
+			t.Fatalf("RequestStream error is %v, want *proxyhttp.ConnectRefusedError", err)
 		}
 		if status.StatusCode != 403 {
 			t.Errorf("StatusCode = %d, want 403", status.StatusCode)
@@ -321,6 +320,12 @@ func TestValidateRefusesHalfCredentials(t *testing.T) {
 	}
 	if err := (&proxyhttp.Settings{Password: "p"}).Validate(); err == nil {
 		t.Error("a password with no username was accepted, want an error")
+	}
+}
+
+func TestValidateRefusesAColonInTheUsername(t *testing.T) {
+	if err := (&proxyhttp.Settings{Username: "a:b", Password: "p"}).Validate(); err == nil {
+		t.Error("a username containing ':' was accepted, want an error")
 	}
 }
 

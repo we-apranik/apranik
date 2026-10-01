@@ -15,7 +15,11 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-const statusBadRequest = "400 Bad Request"
+const (
+	statusConnectionEstablished       = "200 Connection established"
+	statusBadRequest                  = "400 Bad Request"
+	statusProxyAuthenticationRequired = "407 Proxy Authentication Required"
+)
 
 type streamServer struct {
 	username string
@@ -27,47 +31,44 @@ type streamServer struct {
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
-	headReader := wire.AcquireHeadReader(underlyingStream)
-	defer wire.ReleaseHeadReader(headReader)
-	requestLine, headerLines, err := wire.ReadMessageHead(headReader)
+	head, streamAfterHead, err := wire.ReadHead(underlyingStream)
 	if err != nil {
 		return nil, spec.Metadata{}, err
 	}
 
-	requestMethod, requestTarget, httpVersion, err := parseRequestLine(requestLine)
+	requestMethod, requestTarget, httpVersion, err := parseRequestLine(head.StartLine)
 	if err != nil {
 		writeStatusResponse(underlyingStream, "HTTP/1.1", statusBadRequest)
 		return nil, spec.Metadata{}, err
 	}
 
-	if err := s.requireProxyCredentials(underlyingStream, httpVersion, headerLines); err != nil {
+	if err := s.requireProxyCredentials(underlyingStream, httpVersion, head); err != nil {
 		return nil, spec.Metadata{}, err
 	}
 
 	metadata := spec.Metadata{Network: spec.NetworkTCP, Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: s.username}
 
 	if strings.EqualFold(requestMethod, "CONNECT") {
-		return acceptConnectTunnel(underlyingStream, headReader, metadata, httpVersion, requestTarget)
+		return acceptConnectTunnel(streamAfterHead, metadata, httpVersion, requestTarget)
 	}
-	return acceptAbsoluteFormRequest(underlyingStream, headReader, metadata, httpVersion, requestMethod, requestTarget, headerLines)
+	return acceptAbsoluteFormRequest(streamAfterHead, metadata, httpVersion, requestMethod, requestTarget, head.HeaderLines)
 }
 
-func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, httpVersion string, headerLines []string) error {
+func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, httpVersion string, head wire.Head) error {
 	if s.username == "" {
 		return nil
 	}
-	offered := wire.FindHeaderValue(headerLines, "Proxy-Authorization")
-	if wire.AuthorizationValuesMatch(offered, wire.BasicAuthorizationValue(s.username, s.password)) {
+	if wire.BasicCredentialsMatch(head.HeaderValue("Proxy-Authorization"), s.username, s.password) {
 		return nil
 	}
-	writeStatusResponse(underlyingStream, httpVersion, "407 Proxy Authentication Required", `Proxy-Authenticate: Basic realm="apranik"`)
+	writeStatusResponse(underlyingStream, httpVersion, statusProxyAuthenticationRequired, `Proxy-Authenticate: Basic realm="apranik"`)
 	return errors.New("http: missing or bad proxy credentials")
 }
 
-func parseRequestLine(line string) (method, target, version string, err error) {
-	fields := strings.Fields(line)
+func parseRequestLine(requestLine string) (requestMethod, requestTarget, httpVersion string, err error) {
+	fields := strings.Fields(requestLine)
 	if len(fields) != 3 {
-		return "", "", "", fmt.Errorf("http: malformed request line %q", line)
+		return "", "", "", fmt.Errorf("http: malformed request line %q", requestLine)
 	}
 	switch fields[2] {
 	case "HTTP/1.0", "HTTP/1.1":

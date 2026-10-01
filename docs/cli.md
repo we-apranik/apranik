@@ -67,7 +67,7 @@ Base datagram transports
   udp          UDP over IPv4/IPv6
 
 Stream proxies
-  http         HTTP CONNECT proxy, with Basic authentication
+  http         HTTP proxy (CONNECT and plain http:// requests), with Basic authentication
   socks5       SOCKS5 proxy (RFC 1928), with UDP ASSOCIATE
   trojan       Trojan proxy, CONNECT and UDP framed in the stream
 

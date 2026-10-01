@@ -2,12 +2,12 @@ package http
 
 import "github.com/The-Apranik/Apranik/spec"
 
-// Proxy fills StreamProxyModule only: HTTP CONNECT tunnels a stream and has no
+// Proxy fills StreamProxyModule only: HTTP proxying carries TCP and has no
 // datagram form.
 type Proxy struct{ Settings }
 
 func (*Proxy) Info() spec.ModuleInfo {
-	return spec.ModuleInfo{Name: "http", Description: "HTTP CONNECT proxy, with Basic authentication"}
+	return spec.ModuleInfo{Name: "http", Description: "HTTP proxy (CONNECT and plain http:// requests), with Basic authentication"}
 }
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {

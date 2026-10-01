@@ -78,9 +78,9 @@ panic; seed corpus covers IPv4, IPv6 and domain forms.
 
 ## 5. Fuzz the HTTP request-head reader
 
-**Description.** `wire.ReadMessageHead` and `wire.ParseHostPort` in
-`module/proxy/http/wire/wire.go` parse untrusted input. Add fuzz tests checking
-that they never panic and that `ReadMessageHead` never returns more than its documented
+**Description.** `wire.ReadHead` and `wire.ParseHostPort` in
+`module/proxy/http/wire/head.go` and `host_port.go` parse untrusted input. Add fuzz tests checking
+that they never panic and that `ReadHead` never returns more than its documented
 head and header limits.
 
 **Files.** `module/proxy/http/wire/wire_test.go` (new)
