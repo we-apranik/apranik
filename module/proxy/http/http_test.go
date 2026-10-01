@@ -255,12 +255,12 @@ func TestProxyAuthentication(t *testing.T) {
 			Destination: domainDst("example.com", 443),
 		})
 
-		var status *wire.StatusError
+		var status *wire.ConnectRefusedError
 		if !errors.As(err, &status) {
-			t.Fatalf("RequestStream error is %v, want *wire.StatusError", err)
+			t.Fatalf("RequestStream error is %v, want *wire.ConnectRefusedError", err)
 		}
-		if status.Code != 403 {
-			t.Errorf("Code = %d, want 403", status.Code)
+		if status.StatusCode != 403 {
+			t.Errorf("StatusCode = %d, want 403", status.StatusCode)
 		}
 	})
 }

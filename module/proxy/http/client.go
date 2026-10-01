@@ -25,7 +25,7 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, fmt.Errorf("http: %w: CONNECT carries TCP only", spec.ErrUnsupportedNetwork)
 	}
 
-	target, err := wire.FormatAddress(metadata.Destination)
+	connectTarget, err := wire.FormatHostPort(metadata.Destination)
 	if err != nil {
 		return nil, err
 	}
@@ -33,9 +33,9 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
 
 	var request bytes.Buffer
-	fmt.Fprintf(&request, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", target, target)
+	fmt.Fprintf(&request, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", connectTarget, connectTarget)
 	if c.username != "" {
-		fmt.Fprintf(&request, "Proxy-Authorization: %s\r\n", wire.BasicCredentials(c.username, c.password))
+		fmt.Fprintf(&request, "Proxy-Authorization: %s\r\n", wire.BasicAuthorizationValue(c.username, c.password))
 	}
 	request.WriteString("\r\n")
 
@@ -43,25 +43,25 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, fmt.Errorf("http: sending CONNECT: %w", err)
 	}
 
-	reader := wire.AcquireHeadReader(underlyingStream)
-	defer wire.ReleaseHeadReader(reader)
-	statusLine, _, err := wire.ReadHead(reader)
+	headReader := wire.AcquireHeadReader(underlyingStream)
+	defer wire.ReleaseHeadReader(headReader)
+	statusLine, _, err := wire.ReadMessageHead(headReader)
 	if err != nil {
 		return nil, err
 	}
 
-	code, err := parseStatusCode(statusLine)
+	code, err := parseConnectStatusCode(statusLine)
 	if err != nil {
 		return nil, err
 	}
 	if code < 200 || code > 299 {
-		return nil, &wire.StatusError{Code: code, Status: statusLine}
+		return nil, &wire.ConnectRefusedError{StatusCode: code, StatusLine: statusLine}
 	}
 
-	return wire.PrefixStream(underlyingStream, nil, reader), nil
+	return wire.ReplayStream(underlyingStream, nil, headReader), nil
 }
 
-func parseStatusCode(line string) (int, error) {
+func parseConnectStatusCode(line string) (int, error) {
 	fields := strings.SplitN(line, " ", 3)
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "HTTP/") {
 		return 0, fmt.Errorf("http: malformed status line %q", line)

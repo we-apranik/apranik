@@ -20,21 +20,21 @@ import (
 )
 
 const (
-	// BufferSize is the reader size used for a head. Anything past the head is
-	// payload and must survive, which is what PrefixStream is for.
-	BufferSize = 8 << 10
+	// HeadReaderSize is the reader size used for a head. Anything past the head is
+	// payload and must survive, which is what ReplayStream is for.
+	HeadReaderSize = 8 << 10
 
-	maxHeadSize = 64 << 10
-	maxHeaders  = 128
+	maxMessageHeadBytes = 64 << 10
+	maxHeaderLines      = 128
 )
 
-// Every connection reads its head through one of these and PrefixStream copies
+// Every connection reads its head through one of these and ReplayStream copies
 // out whatever is left, so the reader can serve the next connection instead of
 // becoming garbage.
-var headReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, BufferSize) }}
+var headReaders = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, HeadReaderSize) }}
 
 // AcquireHeadReader returns a pooled reader over underlyingReader. The caller must
-// ReleaseHeadReader it once the head is read and PrefixStream has been called.
+// ReleaseHeadReader it once the head is read and ReplayStream has been called.
 func AcquireHeadReader(underlyingReader io.Reader) *bufio.Reader {
 	reader := headReaders.Get().(*bufio.Reader)
 	reader.Reset(underlyingReader)
@@ -48,32 +48,32 @@ func ReleaseHeadReader(reader *bufio.Reader) {
 	headReaders.Put(reader)
 }
 
-type StatusError struct {
-	Code   int
-	Status string
+type ConnectRefusedError struct {
+	StatusCode int
+	StatusLine string
 }
 
-func (e *StatusError) Error() string {
-	return fmt.Sprintf("http: proxy answered CONNECT with %q", e.Status)
+func (e *ConnectRefusedError) Error() string {
+	return fmt.Sprintf("http: proxy answered CONNECT with %q", e.StatusLine)
 }
 
-// prefixStream replays bytes already read off the underlying stream before handing over
+// replayingStream replays bytes already read off the underlying stream before handing over
 // the rest. Both halves need it: clients pipeline payload straight after
 // CONNECT, and the reader used for the head will have swallowed it.
-type prefixStream struct {
+type replayingStream struct {
 	spec.Stream
 	reader io.Reader
 }
 
-func (s *prefixStream) Read(buffer []byte) (int, error) { return s.reader.Read(buffer) }
+func (s *replayingStream) Read(buffer []byte) (int, error) { return s.reader.Read(buffer) }
 
-// PrefixStream returns a stream that yields head, then whatever the reader
+// ReplayStream returns a stream that yields replayedHead, then whatever the reader
 // buffered, then the underlying stream itself. The buffered bytes are copied, so the
 // reader can be released and reused.
-func PrefixStream(underlyingStream spec.Stream, head []byte, buffered *bufio.Reader) spec.Stream {
+func ReplayStream(underlyingStream spec.Stream, replayedHead []byte, buffered *bufio.Reader) spec.Stream {
 	var readers []io.Reader
-	if len(head) > 0 {
-		readers = append(readers, bytes.NewReader(head))
+	if len(replayedHead) > 0 {
+		readers = append(readers, bytes.NewReader(replayedHead))
 	}
 	if pending := buffered.Buffered(); pending > 0 {
 		leftover, _ := buffered.Peek(pending)
@@ -82,20 +82,20 @@ func PrefixStream(underlyingStream spec.Stream, head []byte, buffered *bufio.Rea
 	if len(readers) == 0 {
 		return underlyingStream
 	}
-	return &prefixStream{Stream: underlyingStream, reader: io.MultiReader(append(readers, underlyingStream)...)}
+	return &replayingStream{Stream: underlyingStream, reader: io.MultiReader(append(readers, underlyingStream)...)}
 }
 
-func ReadHead(reader *bufio.Reader) (string, []string, error) {
+func ReadMessageHead(reader *bufio.Reader) (string, []string, error) {
 	size := 0
 
-	first, err := readLine(reader, &size)
+	first, err := readHeadLine(reader, &size)
 	if err != nil {
 		return "", nil, err
 	}
 
 	var headers []string
 	for {
-		line, err := readLine(reader, &size)
+		line, err := readHeadLine(reader, &size)
 		if err != nil {
 			return "", nil, err
 		}
@@ -105,25 +105,25 @@ func ReadHead(reader *bufio.Reader) (string, []string, error) {
 		if !strings.Contains(line, ":") {
 			return "", nil, fmt.Errorf("http: malformed header line %q", line)
 		}
-		if len(headers) == maxHeaders {
-			return "", nil, fmt.Errorf("http: more than %d header lines", maxHeaders)
+		if len(headers) == maxHeaderLines {
+			return "", nil, fmt.Errorf("http: more than %d header lines", maxHeaderLines)
 		}
 		headers = append(headers, line)
 	}
 }
 
-func readLine(reader *bufio.Reader, size *int) (string, error) {
+func readHeadLine(reader *bufio.Reader, size *int) (string, error) {
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", fmt.Errorf("http: reading head: %w", err)
 	}
-	if *size += len(line); *size > maxHeadSize {
-		return "", fmt.Errorf("http: head longer than %d bytes", maxHeadSize)
+	if *size += len(line); *size > maxMessageHeadBytes {
+		return "", fmt.Errorf("http: head longer than %d bytes", maxMessageHeadBytes)
 	}
 	return strings.TrimRight(line, "\r\n"), nil
 }
 
-func HeaderValue(headers []string, name string) string {
+func FindHeaderValue(headers []string, name string) string {
 	for _, header := range headers {
 		colon := strings.IndexByte(header, ':')
 		if colon > 0 && strings.EqualFold(strings.TrimSpace(header[:colon]), name) {
@@ -133,24 +133,24 @@ func HeaderValue(headers []string, name string) string {
 	return ""
 }
 
-func HeaderName(header string) string {
+func HeaderFieldName(header string) string {
 	if colon := strings.IndexByte(header, ':'); colon > 0 {
 		return strings.TrimSpace(header[:colon])
 	}
 	return ""
 }
 
-func BasicCredentials(username, password string) string {
+func BasicAuthorizationValue(username, password string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
 }
 
-// CredentialsMatch compares in constant time.
-func CredentialsMatch(offered, expected string) bool {
+// AuthorizationValuesMatch compares in constant time.
+func AuthorizationValuesMatch(offered, expected string) bool {
 	return subtle.ConstantTimeCompare([]byte(offered), []byte(expected)) == 1
 }
 
-// ParseAddress keeps a domain unresolved: only the base transport resolves.
-func ParseAddress(hostPort string, defaultPort uint16) (spec.Destination, error) {
+// ParseHostPort keeps a domain unresolved: only the base transport resolves.
+func ParseHostPort(hostPort string, defaultPort uint16) (spec.Destination, error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		if defaultPort == 0 {
@@ -173,7 +173,7 @@ func ParseAddress(hostPort string, defaultPort uint16) (spec.Destination, error)
 	return spec.NewDestinationFromDomain(host, uint16(number))
 }
 
-func FormatAddress(address spec.Destination) (string, error) {
+func FormatHostPort(address spec.Destination) (string, error) {
 	switch {
 	case !address.IsValid():
 		return "", fmt.Errorf("http: address has neither domain nor IP")
