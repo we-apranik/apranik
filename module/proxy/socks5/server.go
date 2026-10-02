@@ -72,6 +72,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 
 	case command == wire.CommandUDPAssociate && s.udpRelay && s.socket != nil:
 		metadata.Network = spec.NetworkUDP
+		// Inform core that we need an UDP association
 		return nil, metadata, spec.ErrUDPAssociationRequested
 
 	default:
