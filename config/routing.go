@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/netip"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -53,6 +55,9 @@ type rawMatch struct {
 	User            []string `json:"user"`
 	SniffedProtocol []string `json:"sniffed_protocol"`
 
+	SniffedRequestHeader map[string]string `json:"sniffed_request_header"`
+	SniffedBrowserFamily []string          `json:"sniffed_browser_family"`
+
 	Domain        []string `json:"domain"`
 	DomainSuffix  []string `json:"domain_suffix"`
 	DomainKeyword []string `json:"domain_keyword"`
@@ -60,11 +65,18 @@ type rawMatch struct {
 
 	IP          []string `json:"ip"`
 	IPIsPrivate *bool    `json:"ip_is_private"`
+	IPVersion   []int    `json:"ip_version"`
 	Port        []uint16 `json:"port"`
 	PortRange   []string `json:"port_range"`
 
-	SourceIP   []string `json:"source_ip"`
-	SourcePort []uint16 `json:"source_port"`
+	SourceIP          []string `json:"source_ip"`
+	SourceIPIsPrivate *bool    `json:"source_ip_is_private"`
+	SourcePort        []uint16 `json:"source_port"`
+	SourcePortRange   []string `json:"source_port_range"`
+
+	InboundLocalIP        []string `json:"inbound_local_ip"`
+	InboundLocalPort      []uint16 `json:"inbound_local_port"`
+	InboundLocalPortRange []string `json:"inbound_local_port_range"`
 
 	DomainInDataset   []string `json:"domain_in_dataset"`
 	IPInDataset       []string `json:"ip_in_dataset"`
@@ -135,14 +147,16 @@ func (b *configBuilder) buildDataset(raw rawDataset, loc string) blueprint.Datas
 
 func (b *configBuilder) buildMatch(raw rawMatch, loc string) blueprint.Match {
 	built := blueprint.Match{
-		Inbounds:         raw.Inbound,
-		Users:            raw.User,
-		SniffedProtocols: raw.SniffedProtocol,
-		DomainKeywords:   lowercase(raw.DomainKeyword),
-		IPIsPrivate:      raw.IPIsPrivate,
-		DomainDatasets:   raw.DomainInDataset,
-		IPDatasets:       raw.IPInDataset,
-		SourceIPDatasets: raw.SourceIPInDataset,
+		Inbounds:               raw.Inbound,
+		Users:                  raw.User,
+		SniffedProtocols:       raw.SniffedProtocol,
+		SniffedBrowserFamilies: lowercase(raw.SniffedBrowserFamily),
+		DomainKeywords:         lowercase(raw.DomainKeyword),
+		IPIsPrivate:            raw.IPIsPrivate,
+		SourceIPIsPrivate:      raw.SourceIPIsPrivate,
+		DomainDatasets:         raw.DomainInDataset,
+		IPDatasets:             raw.IPInDataset,
+		SourceIPDatasets:       raw.SourceIPInDataset,
 	}
 
 	if raw.Network != "" {
@@ -162,20 +176,32 @@ func (b *configBuilder) buildMatch(raw rawMatch, loc string) blueprint.Match {
 
 	built.IPs = b.parseAddressesOrRanges(raw.IP, fieldLocation(loc, "ip"))
 	built.SourceIPs = b.parseAddressesOrRanges(raw.SourceIP, fieldLocation(loc, "source_ip"))
+	built.InboundLocalIPs = b.parseAddressesOrRanges(raw.InboundLocalIP, fieldLocation(loc, "inbound_local_ip"))
 
-	for _, port := range raw.Port {
-		built.Ports = append(built.Ports, blueprint.PortRange{First: port, Last: port})
-	}
-	for index, text := range raw.PortRange {
-		portRange, err := parsePortRange(text)
-		if err != nil {
-			b.diagnostics.report(indexLocation(fieldLocation(loc, "port_range"), index), err)
+	for index, version := range raw.IPVersion {
+		if version != 4 && version != 6 {
+			b.diagnostics.errorf(indexLocation(fieldLocation(loc, "ip_version"), index), "ip_version %d is neither 4 nor 6", version)
 			continue
 		}
-		built.Ports = append(built.Ports, portRange)
+		built.IPVersions = append(built.IPVersions, version)
 	}
-	for _, port := range raw.SourcePort {
-		built.SourcePorts = append(built.SourcePorts, blueprint.PortRange{First: port, Last: port})
+
+	built.Ports = b.parsePortsAndRanges(raw.Port, raw.PortRange, fieldLocation(loc, "port_range"))
+	built.SourcePorts = b.parsePortsAndRanges(raw.SourcePort, raw.SourcePortRange, fieldLocation(loc, "source_port_range"))
+	built.InboundLocalPorts = b.parsePortsAndRanges(raw.InboundLocalPort, raw.InboundLocalPortRange, fieldLocation(loc, "inbound_local_port_range"))
+
+	if len(raw.SniffedRequestHeader) > 0 {
+		built.SniffedRequestHeaders = make(map[string]*regexp.Regexp, len(raw.SniffedRequestHeader))
+		headersLoc := fieldLocation(loc, "sniffed_request_header")
+		for _, name := range slices.Sorted(maps.Keys(raw.SniffedRequestHeader)) {
+			pattern := raw.SniffedRequestHeader[name]
+			regex, err := regexp.Compile(pattern)
+			if err != nil {
+				b.diagnostics.report(fieldLocation(headersLoc, name), err)
+				continue
+			}
+			built.SniffedRequestHeaders[strings.ToLower(name)] = regex
+		}
 	}
 
 	for index, alternative := range raw.Any {
@@ -234,11 +260,28 @@ func (b *configBuilder) parseAddressesOrRanges(values []string, loc string) []ne
 	return prefixes
 }
 
+// Single ports and "first-last" ranges, merged into one list.
+func (b *configBuilder) parsePortsAndRanges(ports []uint16, rangeTexts []string, rangesLoc string) []blueprint.PortRange {
+	var portRanges []blueprint.PortRange
+	for _, port := range ports {
+		portRanges = append(portRanges, blueprint.PortRange{First: port, Last: port})
+	}
+	for index, text := range rangeTexts {
+		portRange, err := parsePortRange(text)
+		if err != nil {
+			b.diagnostics.report(indexLocation(rangesLoc, index), err)
+			continue
+		}
+		portRanges = append(portRanges, portRange)
+	}
+	return portRanges
+}
+
 // "1000-2000", inclusive.
 func parsePortRange(text string) (blueprint.PortRange, error) {
 	firstText, lastText, found := strings.Cut(text, "-")
 	if !found {
-		return blueprint.PortRange{}, fmt.Errorf("%q is not a range; write \"first-last\", or put a single port in port", text)
+		return blueprint.PortRange{}, fmt.Errorf("%q is not a range; write \"first-last\", or list a single port in the field without _range", text)
 	}
 	first, firstErr := strconv.ParseUint(strings.TrimSpace(firstText), 10, 16)
 	last, lastErr := strconv.ParseUint(strings.TrimSpace(lastText), 10, 16)

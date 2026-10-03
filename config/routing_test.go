@@ -38,6 +38,11 @@ const everyField = `{
     {"match": {"source_ip": ["192.168.1.50"], "source_port": [5353], "user": ["alice"], "sniffed_protocol": ["tls"]},
      "action": {"type": "route", "settings": {"outbound": "proxy"}}},
     {"match": {"any": [{"network": "udp"}, {"all": [{"port": [53]}]}], "not": {"port": [22]}},
+     "action": {"type": "block"}},
+    {"match": {"ip_version": [6], "source_ip_is_private": true, "source_port": [53], "source_port_range": ["5000-6000"],
+               "inbound_local_ip": ["198.51.100.20"], "inbound_local_port": [8443], "inbound_local_port_range": ["10800-10899"]},
+     "action": {"type": "block"}},
+    {"match": {"sniffed_request_header": {"User-Agent": "^curl/", ":method": "^POST$"}, "sniffed_browser_family": ["Chromium", "firefox"]},
      "action": {"type": "block"}}
   ],
   "default_action": {"type": "route", "settings": {"outbound": "freedom"}}
@@ -49,8 +54,8 @@ func TestEveryRoutingFieldDecodes(t *testing.T) {
 	requireNoErrors(t, config.Check(configuration))
 
 	routing := configuration.Routing
-	if routing == nil || len(routing.Rules) != 5 {
-		t.Fatalf("routing = %+v, want five rules", routing)
+	if routing == nil || len(routing.Rules) != 7 {
+		t.Fatalf("routing = %+v, want seven rules", routing)
 	}
 
 	sniff := routing.Rules[0].Action.Sniff
@@ -97,6 +102,28 @@ func TestEveryRoutingFieldDecodes(t *testing.T) {
 		t.Errorf("rule 4 match = %+v", logic)
 	}
 
+	local := routing.Rules[5].Match
+	if len(local.IPVersions) != 1 || local.IPVersions[0] != 6 || local.SourceIPIsPrivate == nil || !*local.SourceIPIsPrivate {
+		t.Errorf("rule 5 ip_version / source_ip_is_private = %+v", local)
+	}
+	if len(local.SourcePorts) != 2 || local.SourcePorts[0] != (blueprint.PortRange{First: 53, Last: 53}) || local.SourcePorts[1] != (blueprint.PortRange{First: 5000, Last: 6000}) {
+		t.Errorf("source ports = %+v, want source_port and source_port_range merged", local.SourcePorts)
+	}
+	if len(local.InboundLocalIPs) != 1 || local.InboundLocalIPs[0] != netip.MustParsePrefix("198.51.100.20/32") {
+		t.Errorf("inbound local ips = %+v", local.InboundLocalIPs)
+	}
+	if len(local.InboundLocalPorts) != 2 || local.InboundLocalPorts[0].First != 8443 || local.InboundLocalPorts[1] != (blueprint.PortRange{First: 10800, Last: 10899}) {
+		t.Errorf("inbound local ports = %+v", local.InboundLocalPorts)
+	}
+
+	sniffed := routing.Rules[6].Match
+	if len(sniffed.SniffedRequestHeaders) != 2 || sniffed.SniffedRequestHeaders["user-agent"] == nil || sniffed.SniffedRequestHeaders[":method"] == nil {
+		t.Errorf("sniffed request headers = %+v, want names lowercased", sniffed.SniffedRequestHeaders)
+	}
+	if len(sniffed.SniffedBrowserFamilies) != 2 || sniffed.SniffedBrowserFamilies[0] != "chromium" {
+		t.Errorf("sniffed browser families = %+v, want lowercased", sniffed.SniffedBrowserFamilies)
+	}
+
 	if routing.DefaultAction.Route == nil || routing.DefaultAction.Route.Outbound != "freedom" {
 		t.Errorf("default_action = %+v", routing.DefaultAction)
 	}
@@ -118,6 +145,11 @@ func TestRoutingRefusals(t *testing.T) {
 		{"bad ip", `{"rules": [{"match": {"ip": ["300.1.1.1"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.ip[0]", "neither"},
 		{"bad port range", `{"rules": [{"match": {"port_range": ["2000-1000"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.port_range[0]", "starts after"},
 		{"port range without dash", `{"rules": [{"match": {"port_range": ["443"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.port_range[0]", "not a range"},
+		{"bad ip version", `{"rules": [{"match": {"ip_version": [5]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.ip_version[0]", "neither 4 nor 6"},
+		{"bad source port range", `{"rules": [{"match": {"source_port_range": ["9-1"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.source_port_range[0]", "starts after"},
+		{"bad inbound local ip", `{"rules": [{"match": {"inbound_local_ip": ["nowhere"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.inbound_local_ip[0]", "neither"},
+		{"bad inbound local port range", `{"rules": [{"match": {"inbound_local_port_range": ["8443"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.inbound_local_port_range[0]", "not a range"},
+		{"bad request header regex", `{"rules": [{"match": {"sniffed_request_header": {"user-agent": "("}}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.sniffed_request_header.user-agent", "missing closing"},
 		{"bad network", `{"rules": [{"match": {"network": "sctp"}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.network", "sctp"},
 		{"nested location", `{"rules": [{"match": {"any": [{}, {"not": {"ip": ["x"]}}]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.any[1].not.ip[0]", "neither"},
 		{"unknown inbound", `{"rules": [{"match": {"inbound": ["ghost"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.inbound[0]", `"ghost"`},
@@ -152,6 +184,9 @@ func TestRoutingWarnings(t *testing.T) {
 		name, routing, location, message string
 	}{
 		{"sniffed protocol before sniff", `{"rules": [{"match": {"sniffed_protocol": ["tls"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match", "never matches"},
+		{"request header before sniff", `{"rules": [{"match": {"sniffed_request_header": {"host": "a"}}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match", "never matches"},
+		{"browser family before sniff", `{"rules": [{"match": {"sniffed_browser_family": ["firefox"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match", "never matches"},
+		{"unknown browser family", `{"rules": [{"action": {"type": "sniff", "settings": {"sniffers": [{"type": "tls"}]}}}, {"match": {"sniffed_browser_family": ["opera"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[1].match.sniffed_browser_family[0]", `"opera"`},
 		{"sniff nobody reads", `{"rules": [{"action": {"type": "sniff", "settings": {"sniffers": [{"type": "tls"}]}}}, {"match": {"port": [22]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].action", "only delays"},
 		{"long sniff timeout", `{"rules": [{"action": {"type": "sniff", "settings": {"sniffers": [{"type": "tls"}], "timeout": "10s"}}}, {"match": {"domain_suffix": ["ir"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].action.settings.timeout", "SSH"},
 		{"udp to a proxy without udp", `{"rules": [{"match": {"network": "udp"}, "action": {"type": "route", "settings": {"outbound": "proxy"}}}], "default_action": {"type": "block"}}`, "routing.rules[0].action.settings.outbound", "cannot carry UDP"},

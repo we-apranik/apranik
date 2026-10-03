@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/netip"
+	"regexp"
 	"slices"
 
 	"github.com/The-Apranik/Apranik/core/route/match"
@@ -121,4 +122,64 @@ type sourcePortCondition struct{ ports *match.PortMatcher }
 
 func (c sourcePortCondition) matches(request *routedRequest) bool {
 	return request.metadata.Source.IsValid() && c.ports.Contains(request.metadata.Source.Port())
+}
+
+// Every named header must be present and match; header names are lowercase.
+type sniffedRequestHeaderCondition map[string]*regexp.Regexp
+
+func (c sniffedRequestHeaderCondition) matches(request *routedRequest) bool {
+	sniffed := request.metadata.Sniffed
+	if sniffed == nil {
+		return false
+	}
+	for name, pattern := range c {
+		value, present := sniffed.RequestHeaders[name]
+		if !present || !pattern.MatchString(value) {
+			return false
+		}
+	}
+	return true
+}
+
+type sniffedBrowserFamilyCondition []string
+
+func (c sniffedBrowserFamilyCondition) matches(request *routedRequest) bool {
+	sniffed := request.metadata.Sniffed
+	return sniffed != nil && sniffed.BrowserFamily != "" && slices.Contains(c, sniffed.BrowserFamily)
+}
+
+// A domain destination matches no version: the router does not resolve.
+type ipVersionCondition []int
+
+func (c ipVersionCondition) matches(request *routedRequest) bool {
+	address, isIP := request.destinationIP()
+	if !isIP {
+		return false
+	}
+	version := 6
+	if address.Unmap().Is4() {
+		version = 4
+	}
+	return slices.Contains(c, version)
+}
+
+type sourceIPIsPrivateCondition bool
+
+func (c sourceIPIsPrivateCondition) matches(request *routedRequest) bool {
+	address, valid := request.sourceIP()
+	return valid && match.IsPrivateAddress(address) == bool(c)
+}
+
+type inboundLocalIPCondition []*match.PrefixMatcher
+
+func (c inboundLocalIPCondition) matches(request *routedRequest) bool {
+	address := request.metadata.InboundLocalEndpoint.Addr()
+	return address.IsValid() && containedInAny(c, address)
+}
+
+type inboundLocalPortCondition struct{ ports *match.PortMatcher }
+
+func (c inboundLocalPortCondition) matches(request *routedRequest) bool {
+	localEndpoint := request.metadata.InboundLocalEndpoint
+	return localEndpoint.IsValid() && c.ports.Contains(localEndpoint.Port())
 }

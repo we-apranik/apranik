@@ -33,6 +33,10 @@ type Match struct {
 	Users            []string
 	SniffedProtocols []string
 
+	// Every header named must be present and match its pattern.
+	SniffedRequestHeaders  map[string]*regexp.Regexp
+	SniffedBrowserFamilies []string
+
 	// Lowercase, without a trailing dot; suffixes also without a leading one.
 	Domains        []string
 	DomainSuffixes []string
@@ -42,10 +46,16 @@ type Match struct {
 	// A single address is a /32 or /128.
 	IPs         []netip.Prefix
 	IPIsPrivate *bool
+	IPVersions  []int // 4 or 6; a domain destination matches neither
 	Ports       []PortRange
 
-	SourceIPs   []netip.Prefix
-	SourcePorts []PortRange
+	SourceIPs         []netip.Prefix
+	SourceIPIsPrivate *bool
+	SourcePorts       []PortRange
+
+	// The local end of the accepted inbound socket (spec.Metadata.InboundLocalEndpoint).
+	InboundLocalIPs   []netip.Prefix
+	InboundLocalPorts []PortRange
 
 	// Dataset tags, each of the kind the field compares.
 	DomainDatasets   []string

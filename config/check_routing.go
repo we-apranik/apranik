@@ -2,6 +2,7 @@ package config
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
@@ -12,6 +13,8 @@ import (
 // Beyond this a sniff delays every connection whose client does not speak
 // first, such as SSH, for longer than anyone would choose.
 const longSniffTimeout = 5 * time.Second
+
+var knownBrowserFamilies = []string{spec.BrowserFamilyChromium, spec.BrowserFamilyFirefox, spec.BrowserFamilySafari}
 
 func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	routing := coreBlueprint.Routing
@@ -46,8 +49,8 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 		actionLoc := fieldLocation(ruleLoc, "action")
 
 		checker.checkMatch(rule.Match, matchLoc)
-		if !sniffedBefore && readsSniffProtocol(rule.Match) {
-			diagnostics.warnf(matchLoc, "sniffed_protocol is read before any sniff action, so it never matches")
+		if !sniffedBefore && readsOnlySniffedFields(rule.Match) {
+			diagnostics.warnf(matchLoc, "sniffed_protocol, sniffed_request_header or sniffed_browser_family is read before any sniff action, so it never matches")
 		}
 		if pendingSniffLoc != "" && readsSniffedData(rule.Match) {
 			pendingSniffLoc = ""
@@ -65,7 +68,7 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 		}
 	}
 	if pendingSniffLoc != "" {
-		diagnostics.warnf(pendingSniffLoc, "no rule after this sniff reads a domain or sniffed_protocol, so sniffing only delays connections")
+		diagnostics.warnf(pendingSniffLoc, "no rule after this sniff reads a domain or a sniffed_* field, so sniffing only delays connections")
 	}
 
 	defaultLoc := fieldLocation("routing", "default_action")
@@ -126,6 +129,12 @@ func (c routingChecker) checkMatch(fields blueprint.Match, loc string) {
 	for index, tag := range fields.Inbounds {
 		if !c.inbounds[tag] {
 			c.diagnostics.errorf(indexLocation(fieldLocation(loc, "inbound"), index), "no inbound is tagged %q", tag)
+		}
+	}
+	for index, family := range fields.SniffedBrowserFamilies {
+		if !slices.Contains(knownBrowserFamilies, family) {
+			c.diagnostics.warnf(indexLocation(fieldLocation(loc, "sniffed_browser_family"), index),
+				"no sniffer reports browser family %q yet; known: %s", family, strings.Join(knownBrowserFamilies, ", "))
 		}
 	}
 	c.checkDatasetReferences(fields.DomainDatasets, blueprint.DatasetKindDomain, fieldLocation(loc, "domain_in_dataset"))
@@ -209,22 +218,28 @@ func endsEvaluation(action blueprint.Action) bool {
 }
 
 func isEmptyMatch(fields blueprint.Match) bool {
-	return len(fields.Inbounds) == 0 && fields.Network == "" && len(fields.Users) == 0 && len(fields.SniffedProtocols) == 0 &&
+	return len(fields.Inbounds) == 0 && fields.Network == "" && len(fields.Users) == 0 && !readsSniffResultField(fields) &&
 		len(fields.Domains) == 0 && len(fields.DomainSuffixes) == 0 && len(fields.DomainKeywords) == 0 && len(fields.DomainRegexes) == 0 &&
-		len(fields.IPs) == 0 && fields.IPIsPrivate == nil && len(fields.Ports) == 0 &&
-		len(fields.SourceIPs) == 0 && len(fields.SourcePorts) == 0 &&
+		len(fields.IPs) == 0 && fields.IPIsPrivate == nil && len(fields.IPVersions) == 0 && len(fields.Ports) == 0 &&
+		len(fields.SourceIPs) == 0 && fields.SourceIPIsPrivate == nil && len(fields.SourcePorts) == 0 &&
+		len(fields.InboundLocalIPs) == 0 && len(fields.InboundLocalPorts) == 0 &&
 		len(fields.DomainDatasets) == 0 && len(fields.IPDatasets) == 0 && len(fields.SourceIPDatasets) == 0 &&
 		len(fields.Any) == 0 && len(fields.All) == 0 && fields.Not == nil
 }
 
-func readsSniffProtocol(fields blueprint.Match) bool {
-	return anyNestedMatch(fields, func(each blueprint.Match) bool { return len(each.SniffedProtocols) > 0 })
+// Fields only a sniff fills; domain fields also read the destination.
+func readsOnlySniffedFields(fields blueprint.Match) bool {
+	return anyNestedMatch(fields, readsSniffResultField)
+}
+
+func readsSniffResultField(fields blueprint.Match) bool {
+	return len(fields.SniffedProtocols) > 0 || len(fields.SniffedRequestHeaders) > 0 || len(fields.SniffedBrowserFamilies) > 0
 }
 
 // Domain fields read the sniffed name when there is one.
 func readsSniffedData(fields blueprint.Match) bool {
 	return anyNestedMatch(fields, func(each blueprint.Match) bool {
-		return len(each.SniffedProtocols) > 0 || len(each.Domains) > 0 || len(each.DomainSuffixes) > 0 ||
+		return readsSniffResultField(each) || len(each.Domains) > 0 || len(each.DomainSuffixes) > 0 ||
 			len(each.DomainKeywords) > 0 || len(each.DomainRegexes) > 0 || len(each.DomainDatasets) > 0
 	})
 }

@@ -38,6 +38,12 @@ func (c ruleCompiler) compileMatch(fields blueprint.Match) (condition, error) {
 	if len(fields.SniffedProtocols) > 0 {
 		add(sniffedProtocolCondition(fields.SniffedProtocols))
 	}
+	if len(fields.SniffedRequestHeaders) > 0 {
+		add(sniffedRequestHeaderCondition(fields.SniffedRequestHeaders))
+	}
+	if len(fields.SniffedBrowserFamilies) > 0 {
+		add(sniffedBrowserFamilyCondition(fields.SniffedBrowserFamilies))
+	}
 
 	for _, list := range []match.DomainList{
 		{Exact: fields.Domains},
@@ -66,6 +72,9 @@ func (c ruleCompiler) compileMatch(fields blueprint.Match) (condition, error) {
 	if fields.IPIsPrivate != nil {
 		add(ipIsPrivateCondition(*fields.IPIsPrivate))
 	}
+	if len(fields.IPVersions) > 0 {
+		add(ipVersionCondition(fields.IPVersions))
+	}
 	if len(fields.Ports) > 0 {
 		add(destinationPortCondition{match.NewPortMatcher(portRanges(fields.Ports))})
 	}
@@ -80,6 +89,16 @@ func (c ruleCompiler) compileMatch(fields blueprint.Match) (condition, error) {
 	}
 	if len(fields.SourcePorts) > 0 {
 		add(sourcePortCondition{match.NewPortMatcher(portRanges(fields.SourcePorts))})
+	}
+	if fields.SourceIPIsPrivate != nil {
+		add(sourceIPIsPrivateCondition(*fields.SourceIPIsPrivate))
+	}
+
+	if len(fields.InboundLocalIPs) > 0 {
+		add(inboundLocalIPCondition{match.NewPrefixMatcher(fields.InboundLocalIPs)})
+	}
+	if len(fields.InboundLocalPorts) > 0 {
+		add(inboundLocalPortCondition{match.NewPortMatcher(portRanges(fields.InboundLocalPorts))})
 	}
 
 	if len(fields.Any) > 0 {

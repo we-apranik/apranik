@@ -146,6 +146,28 @@ func TestEachFieldMatches(t *testing.T) {
 		{"source ip", blueprint.Match{SourceIPs: []netip.Prefix{netip.MustParsePrefix("192.168.1.50/32")}}, tcpTo(toDomain("a.com", 443)), true},
 		{"source ip dataset", blueprint.Match{SourceIPDatasets: []string{"lan"}}, tcpTo(toDomain("a.com", 443)), true},
 		{"source port", blueprint.Match{SourcePorts: portRange(49152, 65535)}, tcpTo(toDomain("a.com", 443)), true},
+		{"source port range", blueprint.Match{SourcePorts: portRange(40000, 49999)}, tcpTo(toDomain("a.com", 443)), false},
+		{"source ip is private", blueprint.Match{SourceIPIsPrivate: &yes}, tcpTo(toDomain("a.com", 443)), true},
+		{"source ip is not private", blueprint.Match{SourceIPIsPrivate: &no}, tcpTo(toDomain("a.com", 443)), false},
+		{"source ip is private, public source", blueprint.Match{SourceIPIsPrivate: &yes}, withSource(tcpTo(toDomain("a.com", 443)), from("8.8.8.8", 50000)), false},
+		{"ip version 4", blueprint.Match{IPVersions: []int{4}}, tcpTo(toIP("8.8.8.8", 443)), true},
+		{"ip version 4, mapped", blueprint.Match{IPVersions: []int{4}}, tcpTo(toIP("::ffff:8.8.8.8", 443)), true},
+		{"ip version 6", blueprint.Match{IPVersions: []int{6}}, tcpTo(toIP("2001:db8::1", 443)), true},
+		{"ip version 6, v4 destination", blueprint.Match{IPVersions: []int{6}}, tcpTo(toIP("8.8.8.8", 443)), false},
+		{"ip version, domain destination", blueprint.Match{IPVersions: []int{4, 6}}, tcpTo(toDomain("a.com", 443)), false},
+		{"inbound local ip", blueprint.Match{InboundLocalIPs: []netip.Prefix{netip.MustParsePrefix("198.51.100.0/24")}}, withLocal(tcpTo(toDomain("a.com", 443)), from("198.51.100.20", 8443)), true},
+		{"inbound local ip, other", blueprint.Match{InboundLocalIPs: []netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")}}, withLocal(tcpTo(toDomain("a.com", 443)), from("198.51.100.20", 8443)), false},
+		{"inbound local ip, unknown", blueprint.Match{InboundLocalIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}}, tcpTo(toDomain("a.com", 443)), false},
+		{"inbound local port", blueprint.Match{InboundLocalPorts: portRange(8443, 8443)}, withLocal(tcpTo(toDomain("a.com", 443)), from("198.51.100.20", 8443)), true},
+		{"inbound local port, other", blueprint.Match{InboundLocalPorts: portRange(1080, 1080)}, withLocal(tcpTo(toDomain("a.com", 443)), from("198.51.100.20", 8443)), false},
+		{"inbound local port, unknown", blueprint.Match{InboundLocalPorts: portRange(0, 65535)}, tcpTo(toDomain("a.com", 443)), false},
+		{"request header", blueprint.Match{SniffedRequestHeaders: headers("user-agent", "^curl/", ":method", "^GET$")}, withSniffed(tcpTo(toDomain("a.com", 80)), curlRequest), true},
+		{"request header, value differs", blueprint.Match{SniffedRequestHeaders: headers("user-agent", "^Mozilla/")}, withSniffed(tcpTo(toDomain("a.com", 80)), curlRequest), false},
+		{"request header, absent", blueprint.Match{SniffedRequestHeaders: headers("cookie", "")}, withSniffed(tcpTo(toDomain("a.com", 80)), curlRequest), false},
+		{"request header, not sniffed", blueprint.Match{SniffedRequestHeaders: headers("user-agent", "")}, tcpTo(toDomain("a.com", 80)), false},
+		{"browser family", blueprint.Match{SniffedBrowserFamilies: []string{"firefox", "chromium"}}, withSniffed(tcpTo(toDomain("a.com", 443)), &spec.SniffResult{Protocol: "tls", BrowserFamily: "chromium"}), true},
+		{"browser family, other", blueprint.Match{SniffedBrowserFamilies: []string{"firefox"}}, withSniffed(tcpTo(toDomain("a.com", 443)), &spec.SniffResult{Protocol: "tls", BrowserFamily: "safari"}), false},
+		{"browser family, unknown", blueprint.Match{SniffedBrowserFamilies: []string{""}}, withSniffed(tcpTo(toDomain("a.com", 443)), &spec.SniffResult{Protocol: "tls"}), false},
 		{"user", blueprint.Match{Users: []string{"alice"}}, withUser(tcpTo(toDomain("a.com", 443)), "alice"), true},
 		{"user, no user", blueprint.Match{Users: []string{"alice"}}, tcpTo(toDomain("a.com", 443)), false},
 		{"fields AND", blueprint.Match{Network: spec.NetworkTCP, Ports: portRange(80, 80)}, tcpTo(toDomain("a.com", 443)), false},
@@ -168,6 +190,31 @@ func TestEachFieldMatches(t *testing.T) {
 			}
 		})
 	}
+}
+
+var curlRequest = &spec.SniffResult{Protocol: "http", RequestHeaders: map[string]string{":method": "GET", ":path": "/", "user-agent": "curl/8.9.1"}}
+
+func headers(nameThenPattern ...string) map[string]*regexp.Regexp {
+	compiled := make(map[string]*regexp.Regexp)
+	for index := 0; index < len(nameThenPattern); index += 2 {
+		compiled[nameThenPattern[index]] = regexp.MustCompile(nameThenPattern[index+1])
+	}
+	return compiled
+}
+
+func withSource(metadata spec.Metadata, source spec.Endpoint) spec.Metadata {
+	metadata.Source = source
+	return metadata
+}
+
+func withLocal(metadata spec.Metadata, local spec.Endpoint) spec.Metadata {
+	metadata.InboundLocalEndpoint = local
+	return metadata
+}
+
+func withSniffed(metadata spec.Metadata, sniffed *spec.SniffResult) spec.Metadata {
+	metadata.Sniffed = sniffed
+	return metadata
 }
 
 func withUser(metadata spec.Metadata, user string) spec.Metadata {
