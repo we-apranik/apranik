@@ -54,13 +54,13 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 	if host == "" {
 		host = handshake.HostHeaderFor(server)
 	}
-	deferredHandshake := &clientHandshake{client: c, host: host}
+	upgradeHandshake := &clientHandshake{client: c, host: host}
 
 	limiter, reader := handshake.NewReader(underlyingStream)
 	wrapped := &stream{underlyingStream: underlyingStream, reader: reader, isClient: true}
 
 	if c.maxEarlyData > 0 {
-		wrapped.pendingHandshake = deferredHandshake
+		wrapped.pendingHandshake = upgradeHandshake
 		wrapped.handshakeLimiter = limiter
 		wrapped.handshakeFinished = make(chan struct{})
 		return wrapped, nil
@@ -69,7 +69,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
 	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
-	err := deferredHandshake.run(underlyingStream, reader, nil)
+	err := upgradeHandshake.sendUpgradeRequestAndCheckResponse(underlyingStream, reader, nil)
 	if releaseErr := release(); err == nil {
 		err = releaseErr
 	}
@@ -81,9 +81,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 	return wrapped, nil
 }
 
-// run sends the upgrade request, with earlyData in it if any, and checks the
-// answer.
-func (h *clientHandshake) run(underlyingStream spec.Stream, reader *bufio.Reader, earlyData []byte) error {
+func (h *clientHandshake) sendUpgradeRequestAndCheckResponse(underlyingStream spec.Stream, reader *bufio.Reader, earlyData []byte) error {
 	key := newKey()
 	path := h.client.path
 	var earlyDataLine string
@@ -147,7 +145,7 @@ func (s *stream) completeHandshakeWithEarlyData(p []byte) (int, error) {
 
 	early := p[:min(len(p), s.pendingHandshake.client.maxEarlyData)]
 	restoreCallerDeadlines := s.boundByHandshakeTimeout(s.pendingHandshake.client.handshakeTimeout)
-	err := s.pendingHandshake.run(s.underlyingStream, s.reader, early)
+	err := s.pendingHandshake.sendUpgradeRequestAndCheckResponse(s.underlyingStream, s.reader, early)
 	restoreCallerDeadlines()
 	if err != nil {
 		s.finishHandshake(fmt.Errorf("websocket: handshake: %w", err))
