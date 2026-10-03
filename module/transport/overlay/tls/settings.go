@@ -4,6 +4,7 @@ import (
 	cryptotls "crypto/tls"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/spec"
@@ -41,6 +42,20 @@ type Settings struct {
 	// Client: whose ClientHello to imitate, through uTLS. Empty means
 	// "chrome"; "none" means Go's own.
 	Fingerprint string `json:"fingerprint"`
+
+	// Both: how long the TLS handshake may take. Zero means
+	// defaultHandshakeTimeout.
+	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+}
+
+// PROVISIONAL.
+const defaultHandshakeTimeout = 10 * time.Second
+
+func (s *Settings) handshakeTimeout() time.Duration {
+	if s.HandshakeTimeout == 0 {
+		return defaultHandshakeTimeout
+	}
+	return time.Duration(s.HandshakeTimeout)
 }
 
 // A PEM certificate, from a file or inline: exactly one of the two.
@@ -68,6 +83,9 @@ var versionsByName = map[string]uint16{
 const maxALPNProtocolLength = 255
 
 func (s *Settings) Validate() error {
+	if s.HandshakeTimeout < 0 {
+		return fmt.Errorf("tls: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	}
 	minVersion, known := versionsByName[s.MinVersion]
 	if !known {
 		return fmt.Errorf("tls: min_version %q is not one of 1.0, 1.1, 1.2, 1.3", s.MinVersion)

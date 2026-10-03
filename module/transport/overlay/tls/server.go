@@ -5,6 +5,7 @@ import (
 	cryptotls "crypto/tls"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -12,7 +13,8 @@ import (
 var errServerNeedsCertificate = errors.New("tls: a server needs at least one entry in certificates")
 
 type server struct {
-	config *cryptotls.Config
+	config           *cryptotls.Config
+	handshakeTimeout time.Duration
 }
 
 // Reads every certificate now, so a missing file or a key that does not
@@ -30,10 +32,12 @@ func newServer(settings *Settings) (*server, error) {
 		NextProtos:   settings.ALPN,
 		MinVersion:   versionsByName[settings.MinVersion],
 		MaxVersion:   versionsByName[settings.MaxVersion],
-	}}, nil
+	}, handshakeTimeout: settings.handshakeTimeout()}, nil
 }
 
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	connection := cryptotls.Server(underlyingStream, s.config)
 	if err := connection.HandshakeContext(ctx); err != nil {
 		return nil, fmt.Errorf("tls: handshake with %s: %w", underlyingStream.RemoteAddr(), err)

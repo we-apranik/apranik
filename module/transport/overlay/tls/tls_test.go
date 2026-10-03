@@ -484,3 +484,26 @@ func TestInfoIsTheSameForEveryValue(t *testing.T) {
 		t.Errorf("Info %v and %v", first.Info(), second.Info())
 	}
 }
+
+func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
+	serverModule := serverFor(t, newTestAuthority(t), []string{"proxy.example"}, nil)
+	serverModule.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+	overlayServer, err := serverModule.NewStreamOverlayServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, serverSide := tcpPair(t)
+	result := make(chan error, 1)
+	go func() {
+		_, err := overlayServer.WrapServerStream(context.Background(), serverSide)
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Error("a silent client completed a handshake")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a silent client held the handshake past handshake_timeout")
+	}
+}

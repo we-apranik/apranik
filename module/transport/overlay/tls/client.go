@@ -5,6 +5,7 @@ import (
 	cryptotls "crypto/tls"
 	"errors"
 	"fmt"
+	"time"
 
 	utls "github.com/refraction-networking/utls"
 
@@ -18,7 +19,8 @@ const sessionCacheCapacity = 64
 var errVersionsNeedNoFingerprint = errors.New("tls: min_version and max_version cannot be used with fingerprint \"chrome\" (the default), whose ClientHello fixes the versions; set fingerprint to \"none\" to use them")
 
 type client struct {
-	serverName string
+	serverName       string
+	handshakeTimeout time.Duration
 	// Exactly one is set: Go's own ClientHello, or a browser's through uTLS.
 	goClient          *cryptotls.Config
 	fingerprintClient *fingerprintClient
@@ -37,7 +39,7 @@ func newClient(settings *Settings) (*client, error) {
 	if err != nil {
 		return nil, err
 	}
-	built := &client{serverName: settings.ServerName}
+	built := &client{serverName: settings.ServerName, handshakeTimeout: settings.handshakeTimeout()}
 
 	fingerprint := effectiveFingerprint(settings.Fingerprint)
 	if fingerprint == fingerprintNone {
@@ -78,6 +80,8 @@ func newClient(settings *Settings) (*client, error) {
 // protocol. No SNI is sent for an IP; the certificate's IP entries are
 // checked instead.
 func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Stream, server spec.Destination) (spec.Stream, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
+	defer cancel()
 	serverName := c.serverName
 	if serverName == "" {
 		serverName = server.Host()
