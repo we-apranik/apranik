@@ -58,6 +58,10 @@ rule. Must not be negative; over 5 seconds is accepted with a warning.
 
 - [`sniffed_protocol`](index.md#the-request) reads the protocol: `tls` or
   `http`.
+- [`sniffed_request_header`](index.md#the-request) reads an HTTP request's
+  headers, `:method` and `:path`.
+- [`sniffed_browser_family`](index.md#the-request) reads the browser a TLS
+  ClientHello looks like.
 - [Domain fields](index.md#domains) read the sniffed name when there is one,
   and the destination's domain otherwise.
 
@@ -67,8 +71,13 @@ Neither takes settings yet.
 
 ### `tls`
 
-Reads the server name (SNI) from a TLS ClientHello.
+Reads the server name (SNI) from a TLS ClientHello, and guesses the browser
+family from its extensions: GREASE values and a `session_ticket` extension
+mean `chromium`; GREASE without `session_ticket` means `safari`; no GREASE
+and a `record_size_limit` extension mean `firefox`. Anything else is left
+unguessed.
 
 ### `http`
 
-Reads the `Host` header, and its port, from an HTTP/1 request.
+Reads the `Host` header, and its port, from an HTTP/1 request, and reports
+every header, lowercased, with `:method` and `:path`.

@@ -321,6 +321,7 @@ Measured with the benchmarks above (`benchstat`, 5 runs each), 2026-09-27:
 | `module/transport/overlay/websocket` | masking eight bytes at a time | 1.2 → 8.6 GB/s for 16 KiB |
 | `module/transport/overlay/httpupgrade` | after the handshake, reads go straight to the stream below once its buffer is drained | 0 allocations; no measurable cost against bare TCP |
 | `module/transport/overlay/tls` | browser ClientHello through uTLS (2026-09-29; a feature, not an optimisation) | full handshake over loopback, client and server together: `none` 2.2–2.6 ms, 977 allocs (resumed); `chrome` 3.4–4.5 ms, 1,277 allocs; `firefox` 3.0–4.3 ms; `randomized` 2.9–3.9 ms (3 runs of 200) |
+| `module/sniffer/http` | reports the request headers too (`sniffed_request_header`, 2026-10-03; a feature) | a 7-header browser request: 0.6 → 3.0 µs, 3 → 13 allocations, once per sniffed connection; the header block is converted to a string once and sliced |
 
 ## Known opportunities (not yet done)
 
