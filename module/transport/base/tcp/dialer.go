@@ -7,13 +7,15 @@ import (
 	"net"
 	"net/netip"
 	"strconv"
+	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 type streamDialer struct {
-	dialer  net.Dialer
-	noDelay bool
+	dialer      net.Dialer
+	noDelay     bool
+	dialTimeout time.Duration
 }
 
 // *net.TCPConn is returned unwrapped: it's already a spec.Stream, since
@@ -24,6 +26,8 @@ func (d *streamDialer) DialStream(ctx context.Context, destination spec.Destinat
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, d.dialTimeout)
+	defer cancel()
 	connection, err := d.dialer.DialContext(ctx, "tcp", target)
 	if err != nil {
 		return nil, fmt.Errorf("tcp: dial %s: %w", target, err)

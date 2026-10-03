@@ -22,12 +22,19 @@ type Settings struct {
 	KeepAliveInterval types.Duration `json:"keep_alive_interval"`
 	KeepAliveCount    int            `json:"keep_alive_count"`
 
+	// How long a dial may take, name resolution included. Zero means
+	// defaultDialTimeout.
+	DialTimeout types.Duration `json:"dial_timeout"`
+
 	// Disables Nagle's algorithm. On by default: a proxy carries interactive
 	// traffic, where coalescing small writes shows up as lag.
 	NoDelay bool `json:"no_delay"`
 }
 
 func (s *Settings) Validate() error {
+	if s.DialTimeout < 0 {
+		return fmt.Errorf("tcp: dial_timeout %s must not be negative", s.DialTimeout)
+	}
 	if time.Duration(s.KeepAlive) > 24*time.Hour {
 		return fmt.Errorf("tcp: keep_alive %s is longer than a day, which is almost certainly a mistake", s.KeepAlive)
 	}
@@ -38,6 +45,16 @@ func (s *Settings) Validate() error {
 		return fmt.Errorf("tcp: keep_alive_count %d must be between 0 and 255", s.KeepAliveCount)
 	}
 	return nil
+}
+
+// PROVISIONAL.
+const defaultDialTimeout = 10 * time.Second
+
+func (s *Settings) dialTimeout() time.Duration {
+	if s.DialTimeout == 0 {
+		return defaultDialTimeout
+	}
+	return time.Duration(s.DialTimeout)
 }
 
 func (s *Settings) keepAliveConfig() net.KeepAliveConfig {

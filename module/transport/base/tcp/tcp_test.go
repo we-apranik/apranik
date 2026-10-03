@@ -327,9 +327,10 @@ func TestListenerBindsWhereItWasTold(t *testing.T) {
 
 func TestValidateRefusesNegativeKeepAliveIntervalAndCount(t *testing.T) {
 	for name, settings := range map[string]tcp.Settings{
-		"negative interval": {KeepAliveInterval: types.Duration(-time.Second)},
-		"negative count":    {KeepAliveCount: -1},
-		"absurd count":      {KeepAliveCount: 1000},
+		"negative interval":     {KeepAliveInterval: types.Duration(-time.Second)},
+		"negative count":        {KeepAliveCount: -1},
+		"absurd count":          {KeepAliveCount: 1000},
+		"negative dial timeout": {DialTimeout: types.Duration(-time.Second)},
 	} {
 		if err := settings.Validate(); err == nil {
 			t.Errorf("%s: accepted", name)

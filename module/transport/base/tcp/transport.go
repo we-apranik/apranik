@@ -21,8 +21,9 @@ func (*Transport) Info() spec.ModuleInfo {
 
 func (t *Transport) NewStreamDialer() (spec.StreamDialer, error) {
 	return &streamDialer{
-		dialer:  net.Dialer{KeepAlive: time.Duration(t.KeepAlive), KeepAliveConfig: t.keepAliveConfig()},
-		noDelay: t.NoDelay,
+		dialer:      net.Dialer{KeepAlive: time.Duration(t.KeepAlive), KeepAliveConfig: t.keepAliveConfig()},
+		noDelay:     t.NoDelay,
+		dialTimeout: t.dialTimeout(),
 	}, nil
 }
 
