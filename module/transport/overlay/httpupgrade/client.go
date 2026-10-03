@@ -13,11 +13,6 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// A pipelining client reads the 101 on its first Read, outside any context,
-// so this bounds the wait. PROVISIONAL: the outbound's default handshake
-// timeout.
-const pipelinedResponseTimeout = 10 * time.Second
-
 var errUpgradeRefused = errors.New("httpupgrade: the server did not switch protocols")
 
 type client struct {
@@ -25,6 +20,7 @@ type client struct {
 	host             string
 	extraHeaderLines string
 	pipeline         bool
+	handshakeTimeout time.Duration
 }
 
 func newClient(settings *Settings) *client {
@@ -33,6 +29,7 @@ func newClient(settings *Settings) *client {
 		host:             settings.Host,
 		extraHeaderLines: handshake.RequestHeaderLines(settings.Headers),
 		pipeline:         settings.Pipeline,
+		handshakeTimeout: settings.handshakeTimeout(),
 	}
 }
 
@@ -50,6 +47,8 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 		"Connection: Upgrade\r\n" +
 		"Upgrade: websocket\r\n\r\n"
 
+	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
+	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	_, err := underlyingStream.Write([]byte(request))
@@ -65,7 +64,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 
 	wrapped := &stream{Stream: underlyingStream, handshakeReader: reader}
 	if c.pipeline {
-		wrapped.pendingResponse = &pendingResponse{limiter: limiter}
+		wrapped.pendingResponse = &pendingResponse{limiter: limiter, timeout: c.handshakeTimeout}
 	} else {
 		limiter.LiftLimit()
 	}
@@ -92,14 +91,27 @@ func checkResponse(reader *bufio.Reader) error {
 // pendingResponse is the 101 a pipelining client has not read yet.
 type pendingResponse struct {
 	limiter *handshake.LimitedReader
+	timeout time.Duration
 }
 
 // Only the read deadline is touched: a Write may be in flight, and its own
-// deadline is not this method's to change.
-func (p *pendingResponse) read(underlyingStream spec.Stream, reader *bufio.Reader) error {
-	underlyingStream.SetReadDeadline(time.Now().Add(pipelinedResponseTimeout))
-	err := checkResponse(reader)
-	underlyingStream.SetReadDeadline(time.Time{})
+// deadline is not this method's to change. The caller's read deadline, if
+// earlier, bounds the wait too, and is put back afterwards rather than
+// cleared.
+func (p *pendingResponse) read(s *stream) error {
+	responseDeadline := time.Now().Add(p.timeout)
+	s.callerReadDeadlineMutex.Lock()
+	callerReadDeadline := s.callerReadDeadline
+	s.callerReadDeadlineMutex.Unlock()
+	if !callerReadDeadline.IsZero() && callerReadDeadline.Before(responseDeadline) {
+		responseDeadline = callerReadDeadline
+	}
+
+	s.Stream.SetReadDeadline(responseDeadline)
+	err := checkResponse(s.handshakeReader)
+	s.callerReadDeadlineMutex.Lock()
+	s.Stream.SetReadDeadline(s.callerReadDeadline)
+	s.callerReadDeadlineMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("httpupgrade: handshake: %w", err)
 	}

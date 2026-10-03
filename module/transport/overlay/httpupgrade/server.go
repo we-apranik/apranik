@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
@@ -27,6 +28,7 @@ type server struct {
 	requiredHost       string
 	path               string
 	acceptWebSocketKey bool
+	handshakeTimeout   time.Duration
 }
 
 func newServer(settings *Settings) *server {
@@ -34,6 +36,7 @@ func newServer(settings *Settings) *server {
 		requiredHost:       settings.Host,
 		path:               settings.Path,
 		acceptWebSocketKey: settings.AcceptWebSocketKey,
+		handshakeTimeout:   settings.handshakeTimeout(),
 	}
 }
 
@@ -41,6 +44,8 @@ func newServer(settings *Settings) *server {
 // already sit in it, behind the request. Xray's and sing-box's servers drop
 // those bytes; this one hands them on.
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	err := s.acceptUpgrade(underlyingStream, reader)
