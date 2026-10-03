@@ -3,6 +3,7 @@ package trojan
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
@@ -19,6 +20,21 @@ type Settings struct {
 	// Who an inbound accepts. The matched user's name lands in Metadata.User.
 	// PROVISIONAL: user management is not designed yet, and this list may move.
 	Users []User `json:"users"`
+
+	// Server: how long a client may take to send its request. A client sends
+	// its request with the first payload and waits for no answer, so it has
+	// nothing to bound. Zero means defaultHandshakeTimeout.
+	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+}
+
+// PROVISIONAL.
+const defaultHandshakeTimeout = 10 * time.Second
+
+func (s *Settings) handshakeTimeout() time.Duration {
+	if s.HandshakeTimeout == 0 {
+		return defaultHandshakeTimeout
+	}
+	return time.Duration(s.HandshakeTimeout)
 }
 
 type User struct {
@@ -27,6 +43,9 @@ type User struct {
 }
 
 func (s *Settings) Validate() error {
+	if s.HandshakeTimeout < 0 {
+		return fmt.Errorf("trojan: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	}
 	if s.Password == "" && len(s.Users) == 0 {
 		return errors.New("trojan: set password for an outbound, or users for an inbound")
 	}

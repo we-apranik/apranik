@@ -35,7 +35,7 @@ func (p *Proxy) newServer() (*server, error) {
 	for index, configured := range p.Users {
 		users[index] = user{name: configured.Name, passwordHash: wire.HashPassword(configured.Password.Reveal())}
 	}
-	return &server{users: users}, nil
+	return &server{users: users, handshakeTimeout: p.handshakeTimeout()}, nil
 }
 
 func (p *Proxy) newClient() (*client, error) {

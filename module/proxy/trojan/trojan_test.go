@@ -455,3 +455,26 @@ func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
 		t.Error("the request was sent twice")
 	}
 }
+
+func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
+	settings := serverSettings
+	settings.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+	server, err := (&trojan.Proxy{Settings: settings}).NewStreamServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, serverSide := pipe(t)
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := server.AcceptStream(context.Background(), serverSide)
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Error("a silent client was accepted")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a silent client held the handshake past handshake_timeout")
+	}
+}

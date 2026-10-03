@@ -21,7 +21,8 @@ type user struct {
 }
 
 type server struct {
-	users []user
+	users            []user
+	handshakeTimeout time.Duration
 }
 
 // The command byte sits at a fixed offset, so the kind of request is known
@@ -29,6 +30,8 @@ type server struct {
 const commandOffset = wire.PasswordHashLength + 2
 
 func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec.PeekableStream) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	if deadline, ok := ctx.Deadline(); ok {
 		underlyingStream.SetReadDeadline(deadline)
 		defer underlyingStream.SetReadDeadline(time.Time{})
@@ -60,6 +63,8 @@ func (s *server) AcceptDatagramOverStream(ctx context.Context, underlyingStream 
 }
 
 func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wantedCommand byte) (spec.Metadata, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	if deadline, ok := ctx.Deadline(); ok {
 		underlyingStream.SetReadDeadline(deadline)
 		defer underlyingStream.SetReadDeadline(time.Time{})
