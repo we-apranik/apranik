@@ -11,11 +11,11 @@ func (*Proxy) Info() spec.ModuleInfo {
 }
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {
-	return &streamServer{username: p.Username, password: p.Password.Reveal()}, nil
+	return &streamServer{username: p.Username, password: p.Password.Reveal(), handshakeTimeout: p.handshakeTimeout()}, nil
 }
 
 func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
-	return &streamClient{username: p.Username, password: p.Password.Reveal()}, nil
+	return &streamClient{username: p.Username, password: p.Password.Reveal(), handshakeTimeout: p.handshakeTimeout()}, nil
 }
 
 func NewStreamProxyModule() spec.StreamProxyModule { return &Proxy{} }

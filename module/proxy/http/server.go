@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
 	"github.com/The-Apranik/Apranik/shared/streamdeadline"
@@ -22,13 +23,16 @@ const (
 )
 
 type streamServer struct {
-	username string
-	password string
+	username         string
+	password         string
+	handshakeTimeout time.Duration
 }
 
 // A CONNECT request becomes a tunnel (server_connect.go); an absolute-form
 // request is rewritten for the origin (server_absolute_form.go).
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	head, streamAfterHead, err := wire.ReadHead(underlyingStream)

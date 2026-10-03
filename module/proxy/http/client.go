@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
 	"github.com/The-Apranik/Apranik/shared/streamdeadline"
@@ -24,8 +25,9 @@ func (e *ConnectRefusedError) Error() string {
 }
 
 type streamClient struct {
-	username string
-	password string
+	username         string
+	password         string
+	handshakeTimeout time.Duration
 }
 
 // RequestStream issues CONNECT and nothing else. Forwarding an absolute-form
@@ -41,6 +43,8 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
+	defer cancel()
 	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	var connectRequest bytes.Buffer

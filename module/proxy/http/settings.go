@@ -2,7 +2,9 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
 )
@@ -12,9 +14,26 @@ type Settings struct {
 	// server the accepted name lands in Metadata.User.
 	Username string       `json:"username"`
 	Password types.Secret `json:"password"`
+
+	// Both: how long the request and its answer may take. Zero means
+	// defaultHandshakeTimeout.
+	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+}
+
+// PROVISIONAL.
+const defaultHandshakeTimeout = 10 * time.Second
+
+func (s *Settings) handshakeTimeout() time.Duration {
+	if s.HandshakeTimeout == 0 {
+		return defaultHandshakeTimeout
+	}
+	return time.Duration(s.HandshakeTimeout)
 }
 
 func (s *Settings) Validate() error {
+	if s.HandshakeTimeout < 0 {
+		return fmt.Errorf("http: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	}
 	if (s.Username == "") != (s.Password == "") {
 		return errors.New("http: username and password must be set together or not at all")
 	}
