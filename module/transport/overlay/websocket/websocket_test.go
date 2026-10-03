@@ -667,3 +667,94 @@ func TestTheDeferredHandshakeIsBoundedByItsTimeout(t *testing.T) {
 		t.Fatal("a server that never answers held the handshake past its timeout")
 	}
 }
+
+func TestACloseDoesNotStopReadsWhileAWriteIsStalled(t *testing.T) {
+	server, clientSide, _ := acceptedByHand(t)
+	go server.Write(make([]byte, 64<<20))
+	writerHoldsTheLock := func() bool {
+		if server.(*stream).writeMutex.TryLock() {
+			server.(*stream).writeMutex.Unlock()
+			return false
+		}
+		return true
+	}
+	for !writerHoldsTheLock() {
+		time.Sleep(time.Millisecond)
+	}
+
+	clientSide.Write(maskedFrame(opcodeClose, true, []byte{3, 232}))
+	readDone := make(chan error, 1)
+	go func() {
+		_, err := server.Read(make([]byte, 1))
+		readDone <- err
+	}()
+	select {
+	case err := <-readDone:
+		if err != io.EOF {
+			t.Errorf("read: %v, want EOF", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the read waited for the stalled write to echo the Close")
+	}
+}
+
+func TestAReadWaitingForTheHandshakeObeysTheReadDeadline(t *testing.T) {
+	for name, setDeadline := range map[string]func(spec.Stream){
+		"set before the read": func(client spec.Stream) {
+			client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		},
+		"set while waiting": func(client spec.Stream) {
+			go func() {
+				time.Sleep(50 * time.Millisecond)
+				client.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+			}()
+		},
+	} {
+		client, _ := connect(t, newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }), newModule(t, nil))
+		setDeadline(client)
+		readDone := make(chan error, 1)
+		go func() {
+			_, err := client.Read(make([]byte, 1))
+			readDone <- err
+		}()
+		select {
+		case err := <-readDone:
+			if !errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Errorf("%s: Read: %v, want the read deadline", name, err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("%s: a Read waiting for the handshake ignored the read deadline", name)
+		}
+	}
+}
+
+// A caller clearing its deadlines mid-handshake must not lift the handshake's
+// own bound.
+func TestADeadlineSetDuringTheDeferredHandshakeKeepsItsTimeout(t *testing.T) {
+	clientSide, serverSide := tcpPair(t)
+	go io.Copy(io.Discard, serverSide)
+	module := newModule(t, func(s *Settings) {
+		s.EarlyData = &EarlyData{MaxBytes: 64}
+		s.HandshakeTimeout = types.Duration(200 * time.Millisecond)
+	})
+	overlayClient, _ := module.NewStreamOverlayClient()
+	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := client.Write([]byte("hello"))
+		writeDone <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	client.SetDeadline(time.Time{})
+	select {
+	case err := <-writeDone:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("Write: %v, want the handshake timed out", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("clearing the caller's deadline lifted the handshake's timeout")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -63,6 +64,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 		wrapped.pendingHandshake = upgradeHandshake
 		wrapped.handshakeLimiter = limiter
 		wrapped.handshakeFinished = make(chan struct{})
+		wrapped.callerReadDeadlineChanged = make(chan struct{})
 		return wrapped, nil
 	}
 
@@ -144,9 +146,9 @@ func (s *stream) completeHandshakeWithEarlyData(p []byte) (int, error) {
 	}
 
 	early := p[:min(len(p), s.pendingHandshake.client.maxEarlyData)]
-	restoreCallerDeadlines := s.boundByHandshakeTimeout(s.pendingHandshake.client.handshakeTimeout)
+	s.setHandshakeDeadline(time.Now().Add(s.pendingHandshake.client.handshakeTimeout))
 	err := s.pendingHandshake.sendUpgradeRequestAndCheckResponse(s.underlyingStream, s.reader, early)
-	restoreCallerDeadlines()
+	s.setHandshakeDeadline(time.Time{})
 	if err != nil {
 		s.finishHandshake(fmt.Errorf("websocket: handshake: %w", err))
 		return 0, s.handshakeErr
@@ -171,43 +173,67 @@ func (s *stream) finishHandshake(err error) {
 }
 
 // A Read before any Write waits for the Write to do the handshake, so the
-// first payload still rides in it, as Xray and sing-box clients behave. A
-// protocol that reads before it writes would wait forever; none of Apranik's
-// does.
+// first payload still rides in it, as Xray and sing-box clients behave. The
+// wait obeys the caller's read deadline, including one set while waiting,
+// as a read on the stream below would.
 func (s *stream) completeHandshake() error {
 	if s.handshakeDone.Load() {
 		return nil
 	}
-	<-s.handshakeFinished
-	s.handshakeMutex.Lock()
-	defer s.handshakeMutex.Unlock()
-	return s.handshakeErr
+	for {
+		s.deadlinesMutex.Lock()
+		readDeadline, readDeadlineChanged := s.callerReadDeadline, s.callerReadDeadlineChanged
+		s.deadlinesMutex.Unlock()
+
+		if !readDeadline.IsZero() && !time.Now().Before(readDeadline) {
+			return os.ErrDeadlineExceeded
+		}
+		if finished, err := s.waitForHandshakeUntil(readDeadline, readDeadlineChanged); finished {
+			return err
+		}
+	}
 }
 
-// boundByHandshakeTimeout gives the stream below the earlier of the caller's
-// deadlines and the handshake's own, and returns a func that puts the
-// caller's back, rather than clearing them: a deadline set before the first
-// Write, an idle bound for example, must outlive the handshake.
-func (s *stream) boundByHandshakeTimeout(timeout time.Duration) (restoreCallerDeadlines func()) {
-	handshakeDeadline := time.Now().Add(timeout)
-	s.callerDeadlinesMutex.Lock()
-	callerReadDeadline, callerWriteDeadline := s.callerReadDeadline, s.callerWriteDeadline
-	s.callerDeadlinesMutex.Unlock()
-
-	s.underlyingStream.SetReadDeadline(earlierDeadline(callerReadDeadline, handshakeDeadline))
-	s.underlyingStream.SetWriteDeadline(earlierDeadline(callerWriteDeadline, handshakeDeadline))
-	return func() {
-		s.callerDeadlinesMutex.Lock()
-		defer s.callerDeadlinesMutex.Unlock()
-		s.underlyingStream.SetReadDeadline(s.callerReadDeadline)
-		s.underlyingStream.SetWriteDeadline(s.callerWriteDeadline)
+// waitForHandshakeUntil reports finished as false when the read deadline
+// changed before the handshake ended, so the caller waits again with the new
+// one.
+func (s *stream) waitForHandshakeUntil(readDeadline time.Time, readDeadlineChanged <-chan struct{}) (finished bool, err error) {
+	var readDeadlinePassed <-chan time.Time
+	if !readDeadline.IsZero() {
+		readDeadlineTimer := time.NewTimer(time.Until(readDeadline))
+		defer readDeadlineTimer.Stop()
+		readDeadlinePassed = readDeadlineTimer.C
 	}
+	select {
+	case <-s.handshakeFinished:
+		s.handshakeMutex.Lock()
+		defer s.handshakeMutex.Unlock()
+		return true, s.handshakeErr
+	case <-readDeadlinePassed:
+		return true, os.ErrDeadlineExceeded
+	case <-readDeadlineChanged:
+		return false, nil
+	}
+}
+
+// The zero time ends the handshake's bound. Either way the caller's own
+// deadlines stay in force: one set before the first Write, an idle bound for
+// example, must outlive the handshake.
+func (s *stream) setHandshakeDeadline(handshakeDeadline time.Time) {
+	s.deadlinesMutex.Lock()
+	defer s.deadlinesMutex.Unlock()
+	s.handshakeDeadline = handshakeDeadline
+	s.applyDeadlinesLocked()
 }
 
 // The zero time means no deadline, so it is later than any other.
-func earlierDeadline(callerDeadline, handshakeDeadline time.Time) time.Time {
-	if callerDeadline.IsZero() || handshakeDeadline.Before(callerDeadline) {
-		return handshakeDeadline
+func earlierDeadline(first, second time.Time) time.Time {
+	switch {
+	case first.IsZero():
+		return second
+	case second.IsZero() || first.Before(second):
+		return first
+	default:
+		return second
 	}
-	return callerDeadline
 }
