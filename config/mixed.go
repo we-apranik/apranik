@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"time"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/registry"
@@ -36,7 +37,10 @@ func (b *configBuilder) buildMixed(raw json.RawMessage, loc string) *blueprint.M
 	if socks5 == nil || http == nil {
 		return nil
 	}
-	return &blueprint.Mixed{SOCKS5: socks5, HTTP: http}
+	if settings.FirstByteTimeout < 0 {
+		b.diagnostics.errorf(fieldLocation(loc, "first_byte_timeout"), "first_byte_timeout must not be negative")
+	}
+	return &blueprint.Mixed{SOCKS5: socks5, HTTP: http, FirstByteTimeout: time.Duration(settings.FirstByteTimeout)}
 }
 
 // An absent key leaves the module's own defaults, as for freedom's halves.

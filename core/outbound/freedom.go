@@ -3,7 +3,6 @@ package outbound
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -15,9 +14,6 @@ type FreedomConfig struct {
 	Tag            string
 	Dialer         spec.StreamDialer
 	DatagramDialer spec.DatagramDialer
-
-	// Zero means DefaultDialTimeout; negative means no bound.
-	DialTimeout time.Duration
 
 	// Nil means nat.NewDefaultPolicy().
 	DatagramPolicy *nat.Policy
@@ -39,7 +35,6 @@ func NewFreedom(config FreedomConfig) component.Outbound {
 		streamDialer:   config.Dialer,
 		datagramDialer: config.DatagramDialer,
 		datagramPolicy: config.DatagramPolicy,
-		dialTimeout:    config.DialTimeout,
 		logger:         logger.With("outbound", config.Tag),
 	}
 }
@@ -49,7 +44,6 @@ type freedomOutbound struct {
 	streamDialer   spec.StreamDialer
 	datagramDialer spec.DatagramDialer
 	datagramPolicy *nat.Policy
-	dialTimeout    time.Duration
 	logger         *logging.Logger
 }
 
@@ -76,9 +70,7 @@ func (o *freedomOutbound) DialStream(ctx context.Context, metadata spec.Metadata
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, spec.ErrUnsupportedNetwork)
 	}
 
-	dialCtx, endDial := boundedContext(ctx, o.dialTimeout, DefaultDialTimeout)
-	destinationStream, err := o.streamDialer.DialStream(dialCtx, metadata.Destination)
-	endDial()
+	destinationStream, err := o.streamDialer.DialStream(ctx, metadata.Destination)
 	if err != nil {
 		o.logger.Debug("Dial failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)

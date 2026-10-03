@@ -16,15 +16,24 @@ import (
 // with a method, which is ASCII letters.
 const socks5VersionByte = 0x05
 
-// The result is an ordinary spec.StreamProxyServer, so fallback, sniffing and
-// timeouts behave as for either protocol alone.
-func NewStreamServer(socks5Server, httpServer spec.StreamProxyServer) spec.StreamProxyServer {
-	return &streamServer{socks5Server: socks5Server, httpServer: httpServer}
+// PROVISIONAL.
+const DefaultFirstByteTimeout = 10 * time.Second
+
+// The result is an ordinary spec.StreamProxyServer, so fallback and sniffing
+// behave as for either protocol alone. firstByteTimeout bounds only the wait
+// for the byte that picks one; each then bounds its own handshake. Zero means
+// DefaultFirstByteTimeout.
+func NewStreamServer(socks5Server, httpServer spec.StreamProxyServer, firstByteTimeout time.Duration) spec.StreamProxyServer {
+	if firstByteTimeout == 0 {
+		firstByteTimeout = DefaultFirstByteTimeout
+	}
+	return &streamServer{socks5Server: socks5Server, httpServer: httpServer, firstByteTimeout: firstByteTimeout}
 }
 
 type streamServer struct {
-	socks5Server spec.StreamProxyServer
-	httpServer   spec.StreamProxyServer
+	socks5Server     spec.StreamProxyServer
+	httpServer       spec.StreamProxyServer
+	firstByteTimeout time.Duration
 }
 
 var _ spec.UDPAssociateHandler = (*streamServer)(nil)
@@ -33,9 +42,7 @@ var _ spec.UDPAssociateHandler = (*streamServer)(nil)
 // not the peekable one made here, so nothing may stay buffered in it.
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	peekableStream := peekable.NewStream(underlyingStream)
-	if deadline, ok := ctx.Deadline(); ok {
-		underlyingStream.SetReadDeadline(deadline)
-	}
+	underlyingStream.SetReadDeadline(time.Now().Add(s.firstByteTimeout))
 	firstByte, err := peekableStream.PeekExactly(1)
 	underlyingStream.SetReadDeadline(time.Time{})
 	if err != nil {

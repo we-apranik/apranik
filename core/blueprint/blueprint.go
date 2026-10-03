@@ -72,11 +72,6 @@ type Inbound struct {
 	// Zero means close it instead.
 	Fallback spec.Destination
 
-	// Bounds the proxy handshake, so a client that connects and says nothing
-	// cannot hold a goroutine open indefinitely. Zero leaves the inbound's own
-	// default in force.
-	HandshakeTimeout time.Duration
-
 	// Silence in both directions ends a TCP connection. Zero means
 	// relay.DefaultStreamIdleTimeout; negative means no bound.
 	TCPIdleTimeout time.Duration
@@ -107,13 +102,6 @@ type Outbound struct {
 	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	Freedom *Freedom
-
-	// Zero means outbound.DefaultDialTimeout; negative means no bound.
-	DialTimeout time.Duration
-
-	// The proxy handshake with the server; only with Proxy. Zero means
-	// outbound.DefaultHandshakeTimeout; negative means no bound.
-	HandshakeTimeout time.Duration
 }
 
 // Mixed serves SOCKS5 and HTTP on one port; core picks one per connection
@@ -121,6 +109,11 @@ type Outbound struct {
 type Mixed struct {
 	SOCKS5 spec.StreamProxyModule
 	HTTP   spec.StreamProxyModule
+
+	// How long a client may take to send the byte that picks SOCKS5 or HTTP;
+	// each then bounds its own handshake. Zero means
+	// mixed.DefaultFirstByteTimeout.
+	FirstByteTimeout time.Duration
 }
 
 // Freedom sends straight to each destination, so its transports are always

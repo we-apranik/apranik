@@ -20,10 +20,15 @@ const (
 )
 
 func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Outbound {
-	outbound := blueprint.Outbound{
-		Tag:              raw.Tag,
-		DialTimeout:      time.Duration(raw.DialTimeout),
-		HandshakeTimeout: time.Duration(raw.HandshakeTimeout),
+	outbound := blueprint.Outbound{Tag: raw.Tag}
+
+	if raw.MovedDialTimeout != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "dial_timeout"),
+			`dial_timeout moved to tcp's settings: "transport": [{"type": "tcp", "settings": {"dial_timeout": "10s"}}, ...]`)
+	}
+	if raw.MovedHandshakeTimeout != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "handshake_timeout"),
+			`handshake_timeout moved into each layer's own settings: "protocol": {"type": "trojan", "settings": {"handshake_timeout": "10s"}}, and likewise for every transport`)
 	}
 
 	if raw.Server != "" {

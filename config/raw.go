@@ -44,7 +44,6 @@ type rawInbound struct {
 	// "tcp" or "udp", default "tcp". Selects which registry the lookups use.
 	Network string `json:"network"`
 
-	HandshakeTimeout      types.Duration `json:"handshake_timeout"`
 	TCPIdleTimeout        types.Duration `json:"tcp_idle_timeout"`
 	UDPSessionIdleTimeout types.Duration `json:"udp_session_idle_timeout"`
 
@@ -56,6 +55,10 @@ type rawInbound struct {
 
 	// Moved to a routing rule's sniff action; read only to say so.
 	MovedSniffing json.RawMessage `json:"sniffing"`
+
+	// Moved into each transport's and protocol's own settings; read only to
+	// say so.
+	MovedHandshakeTimeout json.RawMessage `json:"handshake_timeout"`
 
 	// Absent means a request the proxy refuses is closed.
 	Fallback *rawFallback `json:"fallback"`
@@ -74,8 +77,9 @@ type rawOutbound struct {
 	Server     string `json:"server"`
 	ServerPort uint16 `json:"server_port"`
 
-	DialTimeout      types.Duration `json:"dial_timeout"`
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// Moved to tcp's and the protocol's own settings; read only to say so.
+	MovedDialTimeout      json.RawMessage `json:"dial_timeout"`
+	MovedHandshakeTimeout json.RawMessage `json:"handshake_timeout"`
 
 	// A proxy protocol's way to its server, or freedom's to each destination.
 	Transport []rawModule `json:"transport"`
@@ -99,6 +103,8 @@ type rawFreedomSettings struct {
 type rawMixedSettings struct {
 	SOCKS5 json.RawMessage `json:"socks5"`
 	HTTP   json.RawMessage `json:"http"`
+
+	FirstByteTimeout types.Duration `json:"first_byte_timeout"`
 }
 
 // The RFC 4787 vocabulary, spelled the way nat's String writes it.

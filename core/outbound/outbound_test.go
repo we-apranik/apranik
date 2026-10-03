@@ -11,9 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -119,81 +117,9 @@ func TestOnlyTheFreedomOutboundBuildsANAT(t *testing.T) {
 	}
 }
 
-type blockingDialer struct{}
-
-func (blockingDialer) DialStream(ctx context.Context, _ spec.Destination) (spec.Stream, error) {
-	<-ctx.Done()
-	return nil, ctx.Err()
-}
-
-func (blockingDialer) Close() error { return nil }
-
-func TestADialThatNeverAnswersIsBoundedByTheDialTimeout(t *testing.T) {
-	destination, err := spec.NewDestinationFromDomain("example.com", 443)
-	if err != nil {
-		t.Fatal(err)
-	}
-	outbounds := map[string]component.Outbound{
-		"freedom": outbound.NewFreedom(outbound.FreedomConfig{Tag: "freedom", Dialer: blockingDialer{}, DialTimeout: 100 * time.Millisecond}),
-		"proxy":   outbound.NewStream(outbound.StreamConfig{Tag: "proxy", ServerAddr: destination, Dialer: blockingDialer{}, DialTimeout: 100 * time.Millisecond}),
-	}
-
-	for name, dialing := range outbounds {
-		started := time.Now()
-		_, err := dialing.DialStream(context.Background(), spec.Metadata{Network: spec.NetworkTCP, Destination: destination})
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Errorf("%s: DialStream returned %v, want a deadline error", name, err)
-		}
-		if waited := time.Since(started); waited > time.Second {
-			t.Errorf("%s: waited %s, want about the 100ms dial timeout", name, waited)
-		}
-	}
-}
-
-type connectedDialer struct{ serverStream spec.Stream }
-
-func (d connectedDialer) DialStream(context.Context, spec.Destination) (spec.Stream, error) {
-	return d.serverStream, nil
-}
-
-func (connectedDialer) Close() error { return nil }
-
-type silentServerClient struct{}
-
-func (silentServerClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, _ spec.Metadata) (spec.Stream, error) {
-	<-ctx.Done()
-	return nil, ctx.Err()
-}
-
 type pipeStream struct{ net.Conn }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
-
-func TestAServerThatNeverAnswersTheHandshakeIsBounded(t *testing.T) {
-	outboundSide, serverSide := net.Pipe()
-	defer serverSide.Close()
-
-	server, err := spec.NewDestinationFromDomain("proxy.example", 1080)
-	if err != nil {
-		t.Fatal(err)
-	}
-	proxy := outbound.NewStream(outbound.StreamConfig{
-		Tag:              "proxy",
-		ServerAddr:       server,
-		Dialer:           connectedDialer{serverStream: pipeStream{outboundSide}},
-		ProxyClient:      silentServerClient{},
-		HandshakeTimeout: 100 * time.Millisecond,
-	})
-
-	started := time.Now()
-	_, err = proxy.DialStream(context.Background(), spec.Metadata{Network: spec.NetworkTCP, Destination: server})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("DialStream returned %v, want a deadline error", err)
-	}
-	if waited := time.Since(started); waited > time.Second {
-		t.Errorf("waited %s, want about the 100ms handshake timeout", waited)
-	}
-}
 
 // recordingDialer hands out one stream and remembers where it was asked to go.
 type recordingDialer struct {
@@ -292,33 +218,5 @@ func TestAFailedDatagramRequestClosesTheServerStream(t *testing.T) {
 	case <-serverStream.closed:
 	default:
 		t.Error("the stream to the server was left open")
-	}
-}
-
-type silentDatagramClient struct{}
-
-func (silentDatagramClient) RequestDatagramOverStream(ctx context.Context, _ spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
-	<-ctx.Done()
-	return nil, ctx.Err()
-}
-
-func TestADatagramRequestIsBoundedByTheHandshakeTimeout(t *testing.T) {
-	outboundSide, serverSide := net.Pipe()
-	defer serverSide.Close()
-	proxy := outbound.NewStream(outbound.StreamConfig{
-		Tag:                      "proxy",
-		ServerAddr:               proxyServer(t),
-		Dialer:                   recordingDialer{serverStream: pipeStream{outboundSide}, dialed: make(chan spec.Destination, 1)},
-		DatagramOverStreamClient: silentDatagramClient{},
-		HandshakeTimeout:         100 * time.Millisecond,
-	})
-
-	started := time.Now()
-	_, err := proxy.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Errorf("CreateDatagram = %v, want a deadline error", err)
-	}
-	if waited := time.Since(started); waited > time.Second {
-		t.Errorf("waited %s, want about the 100ms handshake timeout", waited)
 	}
 }

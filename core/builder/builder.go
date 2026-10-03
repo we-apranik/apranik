@@ -111,7 +111,6 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 		DatagramOverStreamServer: datagramServer,
 		Fallback:                 fallback,
 		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
-		HandshakeTimeout:         inboundBlueprint.HandshakeTimeout,
 		MaxConnections:           inboundBlueprint.MaxConnections,
 		Logger:                   b.logger,
 	}), nil
@@ -140,7 +139,7 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	if err != nil {
 		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.HTTP.Info().Name, err)
 	}
-	return mixed.NewStreamServer(socks5Server, httpServer), nil
+	return mixed.NewStreamServer(socks5Server, httpServer, inboundBlueprint.Mixed.FirstByteTimeout), nil
 }
 
 func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
@@ -185,7 +184,6 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (co
 
 	return outbound.NewFreedom(outbound.FreedomConfig{
 		Tag:            outboundBlueprint.Tag,
-		DialTimeout:    outboundBlueprint.DialTimeout,
 		Dialer:         dialer,
 		DatagramDialer: datagramDialer,
 		DatagramPolicy: freedom.NAT,
@@ -222,8 +220,6 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (comp
 		Dialer:                   dialer,
 		ProxyClient:              proxyClient,
 		DatagramOverStreamClient: datagramClient,
-		DialTimeout:              outboundBlueprint.DialTimeout,
-		HandshakeTimeout:         outboundBlueprint.HandshakeTimeout,
 		Logger:                   b.logger,
 	}), nil
 }

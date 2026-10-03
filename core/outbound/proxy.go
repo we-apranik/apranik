@@ -3,7 +3,6 @@ package outbound
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -22,10 +21,6 @@ type StreamConfig struct {
 	// Nil means this outbound carries TCP only.
 	DatagramOverStreamClient spec.DatagramOverStreamProxyClient
 
-	// Zero means the Default constants above; negative means no bound.
-	DialTimeout      time.Duration
-	HandshakeTimeout time.Duration
-
 	// Nil is allowed: NewStream substitutes a silent logger.
 	Logger *logging.Logger
 }
@@ -37,14 +32,12 @@ func NewStream(config StreamConfig) component.Outbound {
 	}
 
 	return &streamOutbound{
-		tag:              config.Tag,
-		serverAddr:       config.ServerAddr,
-		dialer:           config.Dialer,
-		proxyClient:      config.ProxyClient,
-		datagramClient:   config.DatagramOverStreamClient,
-		dialTimeout:      config.DialTimeout,
-		handshakeTimeout: config.HandshakeTimeout,
-		logger:           logger.With("outbound", config.Tag),
+		tag:            config.Tag,
+		serverAddr:     config.ServerAddr,
+		dialer:         config.Dialer,
+		proxyClient:    config.ProxyClient,
+		datagramClient: config.DatagramOverStreamClient,
+		logger:         logger.With("outbound", config.Tag),
 	}
 }
 
@@ -52,14 +45,12 @@ func NewStream(config StreamConfig) component.Outbound {
 // spec.StreamDialer.DialStream share a name at different signatures, so
 // embedding would not compile.
 type streamOutbound struct {
-	tag              string
-	serverAddr       spec.Destination
-	dialer           spec.StreamDialer
-	proxyClient      spec.StreamProxyClient
-	datagramClient   spec.DatagramOverStreamProxyClient
-	dialTimeout      time.Duration
-	handshakeTimeout time.Duration
-	logger           *logging.Logger
+	tag            string
+	serverAddr     spec.Destination
+	dialer         spec.StreamDialer
+	proxyClient    spec.StreamProxyClient
+	datagramClient spec.DatagramOverStreamProxyClient
+	logger         *logging.Logger
 }
 
 func (o *streamOutbound) Tag() string { return o.tag }
@@ -86,9 +77,7 @@ func (o *streamOutbound) DialStream(ctx context.Context, metadata spec.Metadata)
 		return nil, err
 	}
 
-	handshakeCtx, endHandshake := boundedContext(ctx, o.handshakeTimeout, DefaultHandshakeTimeout)
-	payload, err := o.proxyClient.RequestStream(handshakeCtx, serverStream, metadata)
-	endHandshake()
+	payload, err := o.proxyClient.RequestStream(ctx, serverStream, metadata)
 	if err != nil {
 		serverStream.Close()
 		o.logger.Debug("Proxy handshake failed", "error", err)
@@ -109,9 +98,7 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 		return nil, err
 	}
 
-	handshakeCtx, endHandshake := boundedContext(ctx, o.handshakeTimeout, DefaultHandshakeTimeout)
-	datagram, err := o.datagramClient.RequestDatagramOverStream(handshakeCtx, serverStream, metadata)
-	endHandshake()
+	datagram, err := o.datagramClient.RequestDatagramOverStream(ctx, serverStream, metadata)
 	if err != nil {
 		serverStream.Close()
 		o.logger.Debug("Proxy handshake failed", "error", err)
@@ -121,9 +108,7 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 }
 
 func (o *streamOutbound) dialServer(ctx context.Context) (spec.Stream, error) {
-	dialCtx, endDial := boundedContext(ctx, o.dialTimeout, DefaultDialTimeout)
-	serverStream, err := o.dialer.DialStream(dialCtx, o.serverAddr)
-	endDial()
+	serverStream, err := o.dialer.DialStream(ctx, o.serverAddr)
 	if err != nil {
 		o.logger.Debug("Dial to proxy server failed", "error", err)
 		return nil, fmt.Errorf("outbound %q: reaching %s: %w", o.tag, o.serverAddr, err)

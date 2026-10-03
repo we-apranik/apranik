@@ -48,7 +48,7 @@ func loopback(t *testing.T) spec.Endpoint {
 type mixedInboundOptions struct {
 	socks5Settings   socks5.Settings
 	httpSettings     proxyhttp.Settings
-	handshakeTimeout time.Duration
+	firstByteTimeout time.Duration
 }
 
 // startMixedInbound runs a real inbound on loopback TCP with the real socks5
@@ -77,11 +77,10 @@ func startMixedInbound(t *testing.T, options mixedInboundOptions) (net.Addr, rec
 	}
 
 	in := inbound.NewStream(inbound.StreamConfig{
-		Tag:              "mixed-in",
-		Listener:         listener,
-		ProxyServer:      mixed.NewStreamServer(socks5Server, httpServer),
-		AssociateSocket:  associateSocket,
-		HandshakeTimeout: options.handshakeTimeout,
+		Tag:             "mixed-in",
+		Listener:        listener,
+		ProxyServer:     mixed.NewStreamServer(socks5Server, httpServer, options.firstByteTimeout),
+		AssociateSocket: associateSocket,
 	})
 	handler := recordingHandler{calls: make(chan handled, 1)}
 	if err := in.Activate(context.Background(), handler); err != nil {
@@ -219,8 +218,8 @@ func TestMixedKeepsEachHalfsAuthentication(t *testing.T) {
 	}
 }
 
-func TestMixedClosesASilentClientAtTheHandshakeTimeout(t *testing.T) {
-	address, handler := startMixedInbound(t, mixedInboundOptions{handshakeTimeout: 100 * time.Millisecond})
+func TestMixedClosesASilentClientAtTheFirstByteTimeout(t *testing.T) {
+	address, handler := startMixedInbound(t, mixedInboundOptions{firstByteTimeout: 100 * time.Millisecond})
 	connection := dialMixed(t, address)
 
 	if _, err := connection.Read(make([]byte, 1)); err != io.EOF {

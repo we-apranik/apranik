@@ -125,7 +125,7 @@ func parseConfig(t *testing.T, text string) *blueprint.Blueprint {
 func tlsServerTransport(t *testing.T, certificates testCertificates) string {
 	return fmt.Sprintf(`[
 		{ "type": "tcp" },
-		{ "type": "tls", "settings": { "certificates": [{ "certificate": %s, "key": %s }] } }
+		{ "type": "tls", "settings": { "certificates": [{ "certificate": %s, "key": %s }], "handshake_timeout": "300ms" } }
 	]`, jsonString(t, certificates.leafPEM), jsonString(t, certificates.leafKeyPEM))
 }
 
@@ -168,9 +168,8 @@ func startTrojanServer(t *testing.T, transport string) (port uint16, fallbackRec
 		"version": 1,
 		"inbounds": [{
 			"tag": "trojan-tls-in", "listen": "127.0.0.1", "port": %d, "network": "tcp",
-			"handshake_timeout": "300ms",
 			"transport": %s,
-			"protocol": { "type": "trojan", "settings": { "users": [{ "name": "alice", "password": "correct horse" }] } },
+			"protocol": { "type": "trojan", "settings": { "users": [{ "name": "alice", "password": "correct horse" }], "handshake_timeout": "300ms" } },
 			"fallback": { "server": "127.0.0.1", "server_port": %d }
 		}],
 		"outbounds": [{ "tag": "freedom", "protocol": { "type": "freedom" } }]

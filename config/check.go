@@ -186,9 +186,6 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 	if !outbound.StreamTransport.IsZero() {
 		diagnostics.errorf(fieldLocation(loc, "transport"), "freedom's transport belongs in its own stack, Freedom.StreamTransport")
 	}
-	if outbound.HandshakeTimeout != 0 {
-		diagnostics.errorf(fieldLocation(loc, "handshake_timeout"), "%s has no proxy handshake", freedomProtocol)
-	}
 
 	settingsLoc := fieldLocation(protocolLoc, "settings")
 	transportLoc := fieldLocation(loc, "transport")

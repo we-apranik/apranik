@@ -91,12 +91,6 @@ func TestGoodDocumentLoads(t *testing.T) {
 	if inbound.Network != spec.NetworkTCP {
 		t.Errorf("network = %q, want tcp by default", inbound.Network)
 	}
-	// Config decides no defaults: an absent timeout stays zero, and the inbound
-	// package applies its own when it is built.
-	if inbound.HandshakeTimeout != 0 {
-		t.Errorf("handshake timeout = %v, want zero left for the inbound to default", inbound.HandshakeTimeout)
-	}
-
 	// The settings really reached the module, through the embedded struct.
 	proxy, ok := inbound.StreamProxy.(*socks5.Proxy)
 	if !ok {
@@ -461,7 +455,7 @@ func TestTheOldDatagramKeyIsRefused(t *testing.T) {
 }
 
 func TestAnOutboundNeedsAProtocol(t *testing.T) {
-	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"dial_timeout": "5s"`, 1)
+	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"transport": []`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
 	if !failed || !find(diagnostics, "outbounds[0].protocol", "type") {
@@ -666,9 +660,6 @@ func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 		`"listen": "127.0.0.1",`,
 		`"listen": "127.0.0.1", "tcp_idle_timeout": "2m", "udp_session_idle_timeout": "90s",`, 1)
 	document = strings.Replace(document,
-		`"tag": "freedom",`,
-		`"tag": "freedom", "dial_timeout": "7s",`, 1)
-	document = strings.Replace(document,
 		`"protocol": {"type": "freedom"}`,
 		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s", "resolve_cache_ttl": "1m"}}}`, 1)
 
@@ -676,12 +667,9 @@ func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 	requireNoErrors(t, diagnostics)
 	requireNoErrors(t, config.Check(configuration))
 
-	inbound, outbound := configuration.Inbounds[0], configuration.Outbounds[0]
+	inbound := configuration.Inbounds[0]
 	if inbound.TCPIdleTimeout != 2*time.Minute || inbound.UDPSessionIdleTimeout != 90*time.Second {
 		t.Errorf("inbound timeouts = %s, %s; want 2m, 90s", inbound.TCPIdleTimeout, inbound.UDPSessionIdleTimeout)
-	}
-	if outbound.DialTimeout != 7*time.Second {
-		t.Errorf("dial timeout = %s, want 7s", outbound.DialTimeout)
 	}
 }
 
@@ -696,14 +684,34 @@ func TestANegativeUDPSessionIdleTimeoutIsRefused(t *testing.T) {
 	}
 }
 
-func TestAHandshakeTimeoutOnFreedomIsRefused(t *testing.T) {
+// The old keys beside the components are refused with where they moved.
+func TestTheMovedTimeoutKeysPointToTheirNewPlace(t *testing.T) {
 	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "handshake_timeout": "5s",`, 1)
+	document = strings.Replace(document,
 		`"tag": "freedom",`,
-		`"tag": "freedom", "handshake_timeout": "5s",`, 1)
+		`"tag": "freedom", "dial_timeout": "5s", "handshake_timeout": "5s",`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].handshake_timeout", "freedom has no proxy handshake") {
-		t.Errorf("a freedom handshake timeout was not refused with its path: %v", diagnostics)
+	for _, want := range []struct{ location, text string }{
+		{"inbounds[0].handshake_timeout", "each layer's own settings"},
+		{"outbounds[0].dial_timeout", "tcp's settings"},
+		{"outbounds[0].handshake_timeout", "each layer's own settings"},
+	} {
+		if !failed || !find(diagnostics, want.location, want.text) {
+			t.Errorf("%s was not refused with where it moved: %v", want.location, diagnostics)
+		}
+	}
+}
+
+func TestATimeoutInsideALayersSettingsIsAccepted(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"transport": [{"type": "tcp", "settings": {"dial_timeout": "5s"}}], "protocol": {"type": "freedom"}`, 1)
+
+	if diagnostics, failed := loadAndCheck(t, document); failed {
+		t.Errorf("tcp's dial_timeout was refused: %v", diagnostics)
 	}
 }
 
