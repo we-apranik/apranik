@@ -25,8 +25,9 @@ left out for the module's defaults.
 
 > [!NOTE]
 > `udp` appears only inside [`freedom`](../outbound/freedom.md#udp)'s settings.
-> Overlays run once per connection, after the base has connected or accepted,
-> and within the inbound's `handshake_timeout` or the outbound's dial timeout.
+> Overlays run once per connection, after the base has connected or accepted.
+> Every layer bounds its own handshake with the `handshake_timeout` in its own
+> settings (`tcp`'s connect with `dial_timeout`); see [Timeouts](../timeouts.md).
 
 An inbound's stack listens; an outbound's stack reaches the proxy server, or,
 under [`freedom`](../outbound/freedom.md#transport), each destination. The same

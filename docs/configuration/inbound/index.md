@@ -21,7 +21,6 @@ An inbound accepts connections from clients: it listens on an address, runs a
 
       "fallback": {},
 
-      "handshake_timeout": "10s",
       "tcp_idle_timeout": "5m",
       "udp_session_idle_timeout": "5m",
       "max_connections": 0
@@ -84,7 +83,8 @@ proxy protocol exists yet.
 The [transport stack](../transport/index.md), base transport first, then any
 overlays: `[{ "type": "tcp" }]`, or for example
 `[{ "type": "tcp" }, { "type": "tls", ... }, { "type": "ws", ... }]`. Overlays
-run once per accepted connection, inside `handshake_timeout`.
+run once per accepted connection, in its own goroutine, each within the
+`handshake_timeout` in its own settings.
 
 ### `protocol`
 
@@ -113,14 +113,6 @@ The fallback receives what the client sent inside the overlays: behind `tls` it
 gets the decrypted HTTP request, not TLS records. A client that fails an overlay
 handshake (not TLS at all, or a wrong WebSocket path, which gets a `404`) is
 closed, not forwarded.
-
-### `handshake_timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>10s</code></span>
-
-How long a client has to finish its handshakes: every overlay's (TLS,
-WebSocket upgrade) and then the proxy protocol's, together. Negative disables.
 
 ### `tcp_idle_timeout`
 

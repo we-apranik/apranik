@@ -45,6 +45,15 @@ The other fields are those of every [inbound](index.md).
 
 [HTTP settings](../protocol/http.md#inbound) for the HTTP half.
 
+### `first_byte_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long a client may take to send the first byte, which picks SOCKS5 or HTTP.
+After that, the chosen protocol's own `handshake_timeout` applies, from its
+settings above.
+
 </div>
 
 ## How it chooses

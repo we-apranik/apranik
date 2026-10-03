@@ -68,6 +68,15 @@ Who may connect. Names and passwords must each be unique, so a password always
 identifies one user; the matched name is reported as the user. This list may move
 once user management is designed.
 
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long a client may take to send its request. An outbound sends its request
+with the first payload and waits for no answer, so it has nothing to bound and
+ignores this.
+
 ## Outbound
 
 ### `password`

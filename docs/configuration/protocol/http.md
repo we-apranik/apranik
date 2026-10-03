@@ -51,6 +51,16 @@ anyone who can reach the inbound may use it, and `apranik check` warns about it.
 
 The account to log in to the server with, if it asks for one.
 
+## Both
+
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the request may take to arrive (inbound), or the proxy's answer to
+`CONNECT` (outbound).
+
 </div>
 
 > [!WARNING]

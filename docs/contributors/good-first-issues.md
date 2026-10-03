@@ -40,20 +40,19 @@ from `core` except the router.
 
 ---
 
-## 3. Tests for the inbound accept loop and handshake timeout
+## 3. Tests for the inbound accept loop
 
 **Description.** `core/inbound/inbound_test.go` covers dispatch, fallback and
 `max_connections`; `core/builder`'s end-to-end tests cover a silent TLS client.
 Still missing, with a fake `spec.StreamListener` and a fake
 `spec.StreamProxyServer`:
 
-- a proxy handshake that never completes is abandoned after `HandshakeTimeout`;
 - a failed handshake closes the stream and does not reach the handler;
 - `Close` waits for live connections to finish.
 
 **Files.** `core/inbound/inbound_test.go`
 
-**Acceptance criteria.** The three behaviours are covered and pass under `-race`.
+**Acceptance criteria.** The two behaviours are covered and pass under `-race`.
 
 **Difficulty.** Medium
 

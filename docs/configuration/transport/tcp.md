@@ -53,4 +53,13 @@ Unanswered probes before the connection is dropped.
 
 Send small writes at once instead of batching them (disables Nagle's algorithm).
 
+### `dial_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long connecting may take, name resolution included. Outbound only. It
+bounds the TCP connection alone; each layer above bounds its own handshake
+with its own `handshake_timeout`.
+
 </div>

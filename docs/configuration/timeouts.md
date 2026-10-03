@@ -3,19 +3,26 @@
 Every timeout is configured beside the component it bounds; there is no central
 timeouts section. Durations are written as quoted strings such as `"10s"`.
 
-[![Every timeout: for a TCP connection in order, inbound handshake_timeout 10s (overlays and proxy together), sniff action timeout 300ms (only when a rule sniffs), outbound dial_timeout 10s, outbound handshake_timeout 10s, then relay until tcp_idle_timeout 5m of silence; TCP keep-alive 15s and the -fetch-timeout flag. For a UDP session: udp_session_idle_timeout 5m, NAT idle_timeout 5m, resolver 5s with a 30s cache, and the internal 1m cached route.](../assets/diagrams/timeouts.excalidraw.svg)](../assets/diagrams/timeouts.excalidraw.svg)
+Every layer bounds its own handshake with the timeout in its own settings, so
+each can be set on its own: `tcp`'s `dial_timeout`, then each overlay's and the
+protocol's `handshake_timeout`. Nothing above them adds an overall limit, so a
+stack's handshakes can together take the sum of their timeouts.
 
 | Timeout | Where | Default |
 | --- | --- | --- |
-| Client handshake, overlays included | [`inbounds[].handshake_timeout`](inbound/index.md#handshake_timeout) | `10s` |
+| TCP connect, name resolution included | [`tcp`](transport/tcp.md#dial_timeout) settings `dial_timeout` | `10s` |
+| TLS handshake | [`tls`](transport/tls.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| WebSocket upgrade, early data included | [`ws`](transport/ws.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| HTTPUpgrade upgrade, `pipeline` included | [`httpupgrade`](transport/httpupgrade.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| SOCKS5 handshake | [`socks5`](protocol/socks5.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| HTTP proxy request | [`http`](protocol/http.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| Trojan request (inbound) | [`trojan`](protocol/trojan.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| Mixed's first byte | [`mixed`](inbound/mixed.md#first_byte_timeout) settings `first_byte_timeout` | `10s` |
 | Sniffing wait | a `sniff` rule's [`settings.timeout`](routing/sniffing.md#timeout) | `300ms` |
 | TCP idle | [`inbounds[].tcp_idle_timeout`](inbound/index.md#tcp_idle_timeout) | `5m` |
 | UDP session idle | [`inbounds[].udp_session_idle_timeout`](inbound/index.md#udp_session_idle_timeout) | `5m` |
-| Dial, overlays included | [`outbounds[].dial_timeout`](outbound/index.md#dial_timeout) | `10s` |
-| Server handshake | [`outbounds[].handshake_timeout`](outbound/index.md#handshake_timeout) | `10s` |
 | Trojan request wait for the first payload | internal | `100ms` |
 | Fallback dial | internal | `10s` |
-| `ws` handshake with early data, `httpupgrade` response with `pipeline` (sent on the first write, outside the dial) | internal | `10s` |
 | `ws` Close frame on close | internal | `1s` |
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
 | TCP keep-alive | `tcp` settings `keep_alive` (for freedom: `settings.tcp.keep_alive`) | `15s` |

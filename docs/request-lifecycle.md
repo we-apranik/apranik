@@ -60,12 +60,12 @@ Step by step:
    The result goes into `Metadata.Sniffed` for the later rules; the
    destination is not changed.
 5. **Dial.** `freedomOutbound.DialStream` in `core/outbound/freedom.go` passes the
-   destination to the stream dialer, bounded by the outbound's `dial_timeout`. The TCP module's `streamDialer.DialStream`
-   joins host and port; if the destination is a domain, this is the only place
+   destination to the stream dialer. The TCP module's `streamDialer.DialStream`
+   bounds the connect with its own `dial_timeout` and joins host and port; if the destination is a domain, this is the only place
    it is resolved.
    For a proxy outbound, `streamOutbound.DialStream` instead dials the proxy
-   server and calls the proxy client's `RequestStream`, bounded by the outbound's
-   `handshake_timeout`. This is where the meaning of the address flips from
+   server and calls the proxy client's `RequestStream`, which bounds itself with
+   the `handshake_timeout` in its own settings. This is where the meaning of the address flips from
    "destination" to "proxy server".
 6. **Relay.** `relay.Stream` in `core/relay/stream.go` copies both directions with
    `forwardStream`, calling `CloseWrite` on the far side when one side finishes.
@@ -111,7 +111,7 @@ Step by step:
 On the client side, a Trojan-over-TLS outbound replaces step 5:
 
 1. `streamOutbound.DialStream` (in `core/outbound/proxy.go`) calls its dialer
-   with the proxy server's address, bounded by `dial_timeout`. The builder made
+   with the proxy server's address; each layer bounds its own part. The builder made
    that dialer from the base and the overlays: `overlayStreamDialer.DialStream`
    in `core/builder/builder.go` dials TCP, then calls the TLS client's
    `WrapClientStream`, which handshakes with the server's domain as SNI.

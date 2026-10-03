@@ -67,6 +67,17 @@ only. The UDP association ends when its control connection closes.
 
 The account to log in to the server with, if it asks for one.
 
+## Both
+
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the SOCKS5 handshake may take: inbound, from the greeting to the
+reply, and for UDP ASSOCIATE the reply that follows; outbound, the server's
+answers.
+
 </div>
 
 A SOCKS5 outbound carries TCP only.

@@ -11,7 +11,7 @@ It is a special outbound protocol, built by core.
 {
   "tag": "direct",
   "transport": [
-    { "type": "tcp", "settings": { "keep_alive": "15s" } },
+    { "type": "tcp", "settings": { "keep_alive": "15s", "dial_timeout": "10s" } },
     { "type": "fragment" }
   ],
   "protocol": {
@@ -24,16 +24,15 @@ It is a special outbound protocol, built by core.
         "idle_timeout": "5m"
       }
     }
-  },
-  "dial_timeout": "10s"
+  }
 }
 ```
 
 </div>
 
-Of the [outbound fields](index.md), [`tag`](index.md#tag),
-[`dial_timeout`](index.md#dial_timeout) and `transport` apply; freedom takes no
-server.
+Of the [outbound fields](index.md), [`tag`](index.md#tag) and `transport`
+apply; freedom takes no server. How long a connection to a destination may take
+is `tcp`'s [`dial_timeout`](../transport/tcp.md#dial_timeout).
 
 ## Transport
 

@@ -119,12 +119,12 @@ so the builder composes a stack without knowing what any layer is:
 
 - **Outbound.** The builder asks the base for a dialer and each overlay for its
   client, and joins them into one `StreamDialer`: dial through the base, then
-  `WrapClientStream` in stack order. The outbound's `dial_timeout` covers all of
-  it.
+  `WrapClientStream` in stack order. Each layer bounds its own part: `tcp` with
+  its `dial_timeout`, each overlay with its own `handshake_timeout`.
 - **Inbound.** The listener is the base alone. `core/inbound` accepts, counts the
   connection against `max_connections`, and starts a goroutine for it; there it
-  runs each overlay's `WrapServerStream`, then the proxy server, all within the
-  inbound's `handshake_timeout`. A client that stalls a TLS handshake holds up
+  runs each overlay's `WrapServerStream`, then the proxy server, each within its
+  own `handshake_timeout`. A client that stalls a TLS handshake holds up
   only its own goroutine.
 
 [![Stack composition. Inbound, reading up from the wire: the client connection, the tcp base listener that returns at once, overlays (tls, ws, httpupgrade) wrapping the connection in its own goroutine within handshake_timeout, the proxy server returning payload and Metadata, then core/inbound handing the stream to the handler, where the router chooses an outbound or blocks. Proxy outbound, writing down: the proxy client, overlays wrapping the dialed stream within dial_timeout, the tcp base transport, then the proxy server. Freedom has no stack. Block is not an outbound: it is a routing action.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)

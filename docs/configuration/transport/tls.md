@@ -160,9 +160,15 @@ when it opens a connection for a WebSocket.
 One of `1.0`, `1.1`, `1.2`, `1.3`. A minimum below `1.2` is warned about. A
 client may set them only with `"fingerprint": "none"`.
 
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the TLS handshake may take, on either side.
+
 </div>
 
-The handshake runs per connection: on an inbound within `handshake_timeout`,
-on an outbound within the dial timeout. A client that fails the handshake is
+The handshake runs per connection, within `handshake_timeout`. A client that fails the handshake is
 closed, not handed to the inbound's `fallback`; a fallback receives only what a
 client sent inside TLS.

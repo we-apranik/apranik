@@ -166,7 +166,6 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `tag` | name used in logs |
 | `listen`, `port` | IP address and port to listen on; an address is required, so nothing is exposed on every interface by omission |
 | `network` | `tcp` (default) or `udp` |
-| `handshake_timeout` | how long a client may take to finish its handshakes, overlays (TLS, WebSocket) and proxy together; default `10s`, negative disables |
 | `tcp_idle_timeout` | a TCP connection silent in both directions for this long is closed; default `5m`, negative disables |
 | `max_connections` | connections held at once; one more is closed as soon as it is accepted; default `0`, no limit |
 | `udp_session_idle_timeout` | a UDP session silent for this long is ended; default `5m` |
@@ -197,14 +196,13 @@ inbounds only, for now.
 | `protocol` | a proxy protocol such as `socks5`, `http` or `trojan`, or one of the special protocols `freedom` and `block` |
 | `server`, `server_port` | the proxy server to reach; proxy protocols only |
 | `transport` | the transport stack used to reach the server; proxy protocols only |
-| `dial_timeout` | how long to wait for a connection to the server (or, for freedom, the destination), overlay handshakes included; default `10s`, negative disables; not with `block` |
-| `handshake_timeout` | how long the proxy handshake with the server may take; proxy protocols only; default `10s`, negative disables |
 
 ### Special inbound protocol
 
 **`mixed`** serves SOCKS5 and HTTP on one port, choosing per connection from
 the first byte. Its settings are the two modules' own settings, and either may
-be left out for that module's defaults:
+be left out for that module's defaults; `first_byte_timeout` (default `10s`)
+bounds the wait for the byte that chooses:
 
 ```json
 { "tag": "mixed-in", "listen": "127.0.0.1", "port": 1082,
@@ -254,15 +252,15 @@ anyone who can reach the socket inject packets into a session.
 
 | Module | Settings |
 | --- | --- |
-| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`) |
+| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`), `dial_timeout` (default `10s`) |
 | `udp` | `resolve_timeout` (default `5s`): longest a domain lookup may take; `resolve_cache_ttl` (default `30s`): how long a resolved domain is reused |
-| `tls` | client: `server_name`, `insecure`, `certificate_authorities`, `fingerprint` (default `chrome`; `none` for Go's own); server: `certificates` (file or inline PEM); both: `alpn` (`["http/1.1"]` under `ws` and `httpupgrade`), `min_version`, `max_version` (a client only with `fingerprint: none`) |
-| `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `max_early_data` (default `0`), `early_data_header_name` (default `Sec-WebSocket-Protocol`) |
-| `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`) |
+| `tls` | client: `server_name`, `insecure`, `certificate_authorities`, `fingerprint` (default `chrome`; `none` for Go's own); server: `certificates` (file or inline PEM); both: `alpn` (`["http/1.1"]` under `ws` and `httpupgrade`), `min_version`, `max_version` (a client only with `fingerprint: none`), `handshake_timeout` (default `10s`) |
+| `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `early_data` (`max_bytes`, required; `location` `header` (default) or `path`; `header_name`, default `Sec-WebSocket-Protocol`), `handshake_timeout` (default `10s`) |
+| `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`), `handshake_timeout` (default `10s`) |
 | `fragment` | outbound only: `tls_records`, `tcp_packets` (both default `true`), `piece_sizes` (default `["3-5", "10-20"]`), `piece_delays` (default `["10-20ms"]`, only with `tcp_packets`), `max_pieces` (default `"4-8"`, `0` no limit), `split_sni` (default `true`) |
-| `socks5` | `username`, `password`, `udp_relay` (default `true`) |
-| `http` | `username`, `password` |
-| `trojan` | server: `users` (`[{ name, password }]`); client: `password` |
+| `socks5` | `username`, `password`, `udp_relay` (default `true`), `handshake_timeout` (default `10s`) |
+| `http` | `username`, `password`, `handshake_timeout` (default `10s`) |
+| `trojan` | server: `users` (`[{ name, password }]`), `handshake_timeout` (default `10s`); client: `password` |
 
 An inbound with no username is accepted with a warning: anyone who can reach it
 may use it.

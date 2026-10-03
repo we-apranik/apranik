@@ -55,6 +55,16 @@ Outbound: the `Host` header, which a CDN routes on; default the server's
 address. Inbound: if set, the `Host` a request must carry (case and port
 ignored); any other gets a `400`. Unset accepts any.
 
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the upgrade handshake may take. Outbound with `pipeline`, the wait for
+the `101` happens on the first read and is bounded by this too; a read
+deadline the caller set still applies if it is earlier, and stays in force
+afterwards.
+
 ## Outbound
 
 ### `headers`

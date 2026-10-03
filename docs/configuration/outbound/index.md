@@ -17,11 +17,8 @@ an outbound.
       "tag": "upstream",
       "server": "203.0.113.5",
       "server_port": 1080,
-      "transport": [{ "type": "tcp" }],
-      "protocol": { "type": "socks5", "settings": {} },
-
-      "dial_timeout": "10s",
-      "handshake_timeout": "10s"
+      "transport": [{ "type": "tcp", "settings": { "dial_timeout": "10s" } }],
+      "protocol": { "type": "socks5", "settings": { "handshake_timeout": "10s" } }
     }
   ]
 }
@@ -39,7 +36,7 @@ an outbound.
 | `freedom` | [Freedom](freedom.md) | TCP and UDP, straight to each destination |
 
 `freedom` is a special protocol built by core. It reaches no proxy server, so
-it takes no `server`, `server_port` or `handshake_timeout`, and its
+it takes no `server` or `server_port`, and its
 `transport` holds only [`tcp` and transports that need no server
 side](freedom.md#transport).
 
@@ -90,21 +87,5 @@ The proxy server's port.
 The [transport stack](../transport/index.md) used to reach the server, base
 transport first, then any overlays, for example
 `[{ "type": "tcp" }, { "type": "tls" }]`.
-
-### `dial_timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>10s</code></span>
-
-How long reaching the server may take (for `freedom`, the destination),
-including every overlay's handshake (TLS, WebSocket upgrade). Negative disables.
-
-### `handshake_timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>10s</code></span>
-<span class="cfg cfg-note">proxy protocols only</span>
-
-How long the proxy handshake with the server may take. Negative disables.
 
 </div>

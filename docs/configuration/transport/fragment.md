@@ -134,7 +134,8 @@ both ends) or `"0"` (separate writes, no waiting). Only with `tcp_packets`.
 
 Longer delays make separate packets more likely but slow the connection's
 start: roughly the number of pieces times the delay, about 70–140 ms with the
-defaults. In a proxy outbound this counts against `dial_timeout`.
+defaults. The pieces go out during the TLS handshake, so this counts against the `tls`
+layer's `handshake_timeout`.
 
 ### `max_pieces`
 
