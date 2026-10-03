@@ -1,6 +1,7 @@
 // Package tlsclienthello reads the one TLS message sent in plaintext, the
-// ClientHello: joins it from its records and finds the server name (SNI) in
-// it. The tls sniffer reports that name; the fragment transport cuts inside it.
+// ClientHello: joins it from its records, finds the server name (SNI) in it
+// and lists its extensions. The tls sniffer reports the name and guesses the
+// browser from the extensions; the fragment transport cuts inside the name.
 package tlsclienthello
 
 import (
@@ -97,26 +98,12 @@ type ServerName struct {
 // FindServerName returns the zero ServerName, and no error, for a
 // ClientHello that names no server. body is what Reassemble returns.
 func FindServerName(body []byte) (ServerName, error) {
-	reader := byteReader{remaining: body}
-	reader.skip(2 + 32)    // legacy_version, random
-	reader.skipVariable(1) // legacy_session_id
-	reader.skipVariable(2) // cipher_suites
-	reader.skipVariable(1) // legacy_compression_methods
-	if reader.failed {
-		return ServerName{}, ErrMalformed
-	}
-	if len(reader.remaining) == 0 {
-		return ServerName{}, nil
-	}
-
-	extensions := byteReader{remaining: reader.variable(2)}
-	for len(extensions.remaining) > 0 && !extensions.failed {
-		extensionType := extensions.uint16()
-		extensionData := extensions.variable(2)
+	var serverName ServerName
+	var nameErr error
+	err := forEachExtension(body, func(extensionType int, extensionData []byte) bool {
 		if extensionType != extensionServerName {
-			continue
+			return true
 		}
-
 		serverNameList := byteReader{remaining: extensionData}
 		names := byteReader{remaining: serverNameList.variable(2)}
 		for len(names.remaining) > 0 && !names.failed {
@@ -125,17 +112,75 @@ func FindServerName(body []byte) (ServerName, error) {
 			if nameType == serverNameTypeHostName && !names.failed {
 				// Every slice shares body's backing array, so the capacity
 				// left after name's start gives its offset.
-				return ServerName{Name: string(name), Offset: cap(body) - cap(name)}, nil
+				serverName = ServerName{Name: string(name), Offset: cap(body) - cap(name)}
+				return false
 			}
 		}
 		if serverNameList.failed || names.failed {
-			return ServerName{}, ErrMalformed
+			nameErr = ErrMalformed
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return ServerName{}, err
+	}
+	if nameErr != nil {
+		return ServerName{}, nameErr
+	}
+	return serverName, nil
+}
+
+// ExtensionTypes lists the ClientHello's extension types in the order sent.
+// body is what Reassemble returns.
+func ExtensionTypes(body []byte) ([]uint16, error) {
+	var extensionTypes []uint16
+	err := forEachExtension(body, func(extensionType int, _ []byte) bool {
+		extensionTypes = append(extensionTypes, uint16(extensionType))
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return extensionTypes, nil
+}
+
+// IsGREASE reports whether value is one of RFC 8701's reserved GREASE values
+// (0x0a0a, 0x1a1a, ... 0xfafa), which Chromium and Apple clients scatter in
+// their ClientHellos.
+func IsGREASE(value uint16) bool {
+	return value&0x0f0f == 0x0a0a && value>>8 == value&0xff
+}
+
+// forEachExtension stops early when visit returns false.
+func forEachExtension(body []byte, visit func(extensionType int, extensionData []byte) bool) error {
+	reader := byteReader{remaining: body}
+	reader.skip(2 + 32)    // legacy_version, random
+	reader.skipVariable(1) // legacy_session_id
+	reader.skipVariable(2) // cipher_suites
+	reader.skipVariable(1) // legacy_compression_methods
+	if reader.failed {
+		return ErrMalformed
+	}
+	if len(reader.remaining) == 0 {
+		return nil
+	}
+
+	extensions := byteReader{remaining: reader.variable(2)}
+	for len(extensions.remaining) > 0 && !extensions.failed {
+		extensionType := extensions.uint16()
+		extensionData := extensions.variable(2)
+		if extensions.failed {
+			break
+		}
+		if !visit(extensionType, extensionData) {
+			return nil
 		}
 	}
 	if reader.failed || extensions.failed {
-		return ServerName{}, ErrMalformed
+		return ErrMalformed
 	}
-	return ServerName{}, nil
+	return nil
 }
 
 type byteReader struct {

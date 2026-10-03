@@ -97,3 +97,48 @@ func TestOtherBytesAreNotAClientHello(t *testing.T) {
 		t.Errorf("got %v, want ErrNotClientHello", err)
 	}
 }
+
+func TestExtensionTypesListsEveryExtensionInOrder(t *testing.T) {
+	body, err := tlsclienthello.Reassemble(clientHelloRecord(t, "example.com"))
+	if err != nil {
+		t.Fatalf("Reassemble: %v", err)
+	}
+	extensionTypes, err := tlsclienthello.ExtensionTypes(body)
+	if err != nil {
+		t.Fatalf("ExtensionTypes: %v", err)
+	}
+	const serverName, supportedVersions = 0x0000, 0x002b
+	if len(extensionTypes) == 0 || extensionTypes[0] != serverName {
+		t.Errorf("extensions = %#x, want server_name first, as Go sends it", extensionTypes)
+	}
+	found := false
+	for _, extensionType := range extensionTypes {
+		found = found || extensionType == supportedVersions
+	}
+	if !found {
+		t.Errorf("extensions = %#x, want supported_versions among them", extensionTypes)
+	}
+}
+
+func TestExtensionTypesRefusesATruncatedClientHello(t *testing.T) {
+	body, err := tlsclienthello.Reassemble(clientHelloRecord(t, "example.com"))
+	if err != nil {
+		t.Fatalf("Reassemble: %v", err)
+	}
+	if _, err := tlsclienthello.ExtensionTypes(body[:len(body)-3]); !errors.Is(err, tlsclienthello.ErrMalformed) {
+		t.Errorf("err = %v, want ErrMalformed", err)
+	}
+}
+
+func TestIsGREASE(t *testing.T) {
+	for _, value := range []uint16{0x0a0a, 0x1a1a, 0x5a5a, 0xfafa} {
+		if !tlsclienthello.IsGREASE(value) {
+			t.Errorf("%#04x is GREASE", value)
+		}
+	}
+	for _, value := range []uint16{0x0000, 0x0a1a, 0x1a0a, 0x4469, 0x0a0b, 0xfe0d} {
+		if tlsclienthello.IsGREASE(value) {
+			t.Errorf("%#04x is not GREASE", value)
+		}
+	}
+}
