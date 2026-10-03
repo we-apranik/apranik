@@ -164,7 +164,7 @@ server.
             { "type": "tls", "settings": { "alpn": ["http/1.1"] } },
             {
               "type": "ws",
-              "settings": { "path": "/chat", "max_early_data": 2048 }
+              "settings": { "path": "/chat", "early_data": { "max_bytes": 2048 } }
             }
           ],
           "protocol": { "type": "trojan", "settings": { "password": "change me" } }
@@ -176,8 +176,8 @@ server.
 Here the CDN terminates TLS and connects to the server over plain HTTP on
 port 8080, so the server's stack has no `tls`. If the CDN connects to the origin
 over TLS, add a `tls` layer with a certificate between `tcp` and `ws` on the
-server. `max_early_data` saves a round trip per connection; the server accepts
-it without configuration. The client's `"alpn": ["http/1.1"]` is required: a
+server. `early_data` saves a round trip per connection; the server accepts it
+in the default header without configuration. The client's `"alpn": ["http/1.1"]` is required: a
 CDN that supports HTTP/2 would otherwise choose it, and `ws` speaks HTTP/1.1
 ([why](transport/tls.md#alpn)).
 

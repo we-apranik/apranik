@@ -34,7 +34,7 @@ sing-box's WebSocket transports, early data included; see
           "settings": {
             "path": "/chat",
             "headers": { "User-Agent": "Mozilla/5.0 ..." },
-            "max_early_data": 2048
+            "early_data": { "max_bytes": 2048 }
           }
         }
       ]
@@ -54,15 +54,33 @@ The request path. A server compares it without the query string, so an Xray
 client's `/chat?ed=2048` matches `/chat`. A request for any other path gets a
 `404`; a malformed upgrade gets a `400`.
 
-### `early_data_header_name`
+### `early_data`
 
-<span class="cfg cfg-type">string</span>
-<span class="cfg cfg-def">Default: <code>Sec-WebSocket-Protocol</code></span>
+<span class="cfg cfg-type">object</span>
+<span class="cfg cfg-def">Default: absent</span>
 
-The header that carries early data, as Xray uses. A server always accepts early
-data there and echoes the header. Set it to `""` for sing-box's path mode, where
-early data is appended to the path; a server then accepts it only when
-`max_early_data` is above 0.
+Early data puts the start of the first payload in the upgrade request, base64,
+so the server can begin without waiting a round trip; the rest follows as
+frames. The outbound then sends its handshake with the first payload rather
+than when the connection opens.
+
+| Field | Meaning |
+| --- | --- |
+| `max_bytes` | Required, 1 to 16384. Outbound: how many bytes of the first payload go in the handshake. Inbound: the most it accepts; more gets a `400`. Xray's `?ed=2048` and sing-box's `max_early_data: 2048` correspond to 2048. |
+| `location` | `"header"` (default) or `"path"`. |
+| `header_name` | Only with `"header"`. Default `Sec-WebSocket-Protocol`. |
+
+What each case does:
+
+| Config | Outbound | Inbound |
+| --- | --- | --- |
+| absent | No early data; the handshake runs when the connection opens. Works with any server. | Accepts early data in `Sec-WebSocket-Protocol` (up to 16384 bytes) and echoes the header, so an Xray client works. The path must match exactly. |
+| `{"max_bytes": 2048}` | Early data in `Sec-WebSocket-Protocol`: Xray's way, and sing-box's with `early_data_header_name: "Sec-WebSocket-Protocol"`. | The same header, up to 2048 bytes. |
+| `"header_name": "X-Early"` | Early data in that header. Only a server set to the same name reads it; an Xray server ignores it and the connection fails. | Reads that header instead. The header is echoed only when it is `Sec-WebSocket-Protocol`. |
+| `"location": "path"` | Early data appended to the path, before any query: `/chat` becomes `/chat<base64>`. sing-box's default. An Xray server answers `404`. | Also accepts `/chat<base64>` as `/chat`, and still accepts the header. A suffix that is not base64 gets a `400`. |
+
+`header_name` with `"path"` is refused, and so is a `headers` entry for the
+header that carries early data.
 
 ### `host`
 
@@ -73,6 +91,16 @@ address. It may differ from the TLS `server_name` and from the address dialed.
 Inbound: if set, the `Host` a request must carry (case and port ignored); any
 other gets a `400`. Unset accepts any.
 
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the upgrade handshake may take. Outbound with `early_data`, it is
+counted from the first write, which sends the handshake; a deadline the caller
+set on the connection still applies if it is earlier, and stays in force
+afterwards.
+
 ## Outbound
 
 ### `headers`
@@ -82,16 +110,6 @@ other gets a `400`. Unset accepts any.
 Extra request headers. `Host`, `Upgrade`, `Connection` and `Sec-WebSocket-*`
 are written by the module and refused here. Without a `User-Agent`, a browser's
 is sent.
-
-### `max_early_data`
-
-<span class="cfg cfg-type">integer</span>
-<span class="cfg cfg-def">Default: <code>0</code> (off)</span>
-
-Up to this many bytes of the first payload travel in the handshake, saving a
-round trip; the rest follow as frames. Xray's `?ed=2048` corresponds to 2048.
-With it on, the handshake is sent with the first payload rather than when the
-connection opens. At most 16384.
 
 </div>
 

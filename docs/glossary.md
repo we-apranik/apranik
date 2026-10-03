@@ -15,7 +15,7 @@
 | **Datagram** | The message-oriented carrier. Apranik says "datagram", never "packet", in code. |
 | **Destination** | `spec.Destination`: exactly one of a domain or an IP, plus a port. Resolved only by a base transport. |
 | **Diagnostics** | The list of errors and warnings `config` reports, each with its location in the config file. |
-| **Early data** | Payload sent inside a handshake to save a round trip: `ws` puts the start of the first write in a header (`max_early_data`, Xray's `ed`). |
+| **Early data** | Payload sent inside a handshake to save a round trip: `ws` puts the start of the first write in a header (`early_data`, Xray's `ed`). |
 | **Endpoint** | `spec.Endpoint`: an IP and a port, already resolved. |
 | **Fallback** | Where an inbound sends a request its protocol refuses with `spec.ErrFallbackRequested`: every byte, from the first, is replayed to that address over plain TCP, so a probe sees an ordinary service. |
 | **Fingerprint** | What a TLS ClientHello reveals about the program that sent it: cipher suites, extensions, their order. `tls`'s `fingerprint` picks a browser's to imitate through uTLS. |
