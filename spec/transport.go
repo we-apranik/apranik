@@ -115,8 +115,9 @@ type TransportInfo struct {
 // dialed to the proxy server. server is that server's address, as dialed: a
 // layer that needs a name (TLS's SNI) takes it from there.
 //
-// Core calls it once per connection, bounded by the outbound's dial timeout.
-// On error it leaves underlyingStream open; core closes it. The returned
+// Core calls it once per connection. ctx ends with the request, not with
+// the handshake: the layer bounds its own handshake, with a timeout from its
+// own settings. On error it leaves underlyingStream open; core closes it. The returned
 // stream's Close closes underlyingStream, and its CloseWrite half-closes it.
 type StreamOverlayClient interface {
 	WrapClientStream(ctx context.Context, underlyingStream Stream, server Destination) (Stream, error)
@@ -124,9 +125,10 @@ type StreamOverlayClient interface {
 
 // StreamOverlayServer runs this layer's server side over an accepted stream.
 //
-// Core calls it once per connection, in that connection's own goroutine and
-// bounded by the inbound's handshake timeout, so a client that stalls holds
-// up nobody else. Close and error rules are StreamOverlayClient's.
+// Core calls it once per connection, in that connection's own goroutine, so
+// a client that stalls holds up nobody else. ctx ends only when the inbound
+// closes: the layer bounds its own handshake, with a timeout from its own
+// settings. Close and error rules are StreamOverlayClient's.
 type StreamOverlayServer interface {
 	WrapServerStream(ctx context.Context, underlyingStream Stream) (Stream, error)
 }
