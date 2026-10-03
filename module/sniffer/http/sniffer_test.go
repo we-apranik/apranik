@@ -56,3 +56,49 @@ func TestAHostWithoutAPortReportsPortZero(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestHeadersAreReportedWithMethodAndPath(t *testing.T) {
+	request := "POST /upload?x=1 HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.9.1\r\nAccept: text/html\r\nACCEPT: */*\r\n\r\n"
+
+	result, err := newSniffer(t).Sniff([]byte(request))
+	if err != nil {
+		t.Fatalf("Sniff: %v", err)
+	}
+	want := map[string]string{
+		":method":    "POST",
+		":path":      "/upload?x=1",
+		"host":       "example.com",
+		"user-agent": "curl/8.9.1",
+		"accept":     "text/html, */*",
+	}
+	if len(result.RequestHeaders) != len(want) {
+		t.Errorf("headers = %v, want %v", result.RequestHeaders, want)
+	}
+	for name, wantValue := range want {
+		if result.RequestHeaders[name] != wantValue {
+			t.Errorf("header %q = %q, want %q", name, result.RequestHeaders[name], wantValue)
+		}
+	}
+}
+
+func TestOnlyTheFirstHostHeaderNamesTheDomain(t *testing.T) {
+	result, err := newSniffer(t).Sniff([]byte("GET / HTTP/1.1\r\nHost: first.example\r\nHost: second.example\r\n\r\n"))
+	if err != nil {
+		t.Fatalf("Sniff: %v", err)
+	}
+	if result.Domain != "first.example" {
+		t.Errorf("Domain = %q, want first.example", result.Domain)
+	}
+}
+
+func BenchmarkSniffBrowserRequest(b *testing.B) {
+	request := []byte("GET /search?q=apranik HTTP/1.1\r\nHost: www.example.com\r\n" +
+		"User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0\r\n" +
+		"Accept: text/html,application/xhtml+xml\r\nAccept-Language: en-US,en;q=0.5\r\n" +
+		"Accept-Encoding: gzip, deflate\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\n\r\n")
+	sniffer, _ := http.NewSnifferModule().NewSniffer()
+	b.ReportAllocs()
+	for b.Loop() {
+		sniffer.Sniff(request)
+	}
+}
