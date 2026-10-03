@@ -14,16 +14,18 @@ func (*Proxy) Info() spec.ModuleInfo {
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {
 	return &streamServer{
-		username: p.Username,
-		password: p.Password.Reveal(),
-		udpRelay: p.UDPRelay,
+		username:         p.Username,
+		password:         p.Password.Reveal(),
+		udpRelay:         p.UDPRelay,
+		handshakeTimeout: p.handshakeTimeout(),
 	}, nil
 }
 
 func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
 	return &streamClient{
-		username: p.Username,
-		password: p.Password.Reveal(),
+		username:         p.Username,
+		password:         p.Password.Reveal(),
+		handshakeTimeout: p.handshakeTimeout(),
 	}, nil
 }
 

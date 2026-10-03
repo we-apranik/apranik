@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
 	"github.com/The-Apranik/Apranik/shared/socksaddr"
@@ -12,8 +13,9 @@ import (
 )
 
 type streamClient struct {
-	username string
-	password string
+	username         string
+	password         string
+	handshakeTimeout time.Duration
 }
 
 // RequestStream speaks the client half of the handshake over a stream that
@@ -31,6 +33,8 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
+	defer cancel()
 	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	offered := byte(wire.MethodNoAuth)

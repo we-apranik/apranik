@@ -16,7 +16,9 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -573,5 +575,18 @@ func TestUDPAssociate(t *testing.T) {
 	}
 	if !bytes.Contains(reply, []byte("dns.example")) {
 		t.Errorf("reply = %q, want the source address in the header", reply)
+	}
+}
+
+func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
+	_, serverSide := pipe(t)
+	result := serverOn(t, &socks5.Settings{HandshakeTimeout: types.Duration(100 * time.Millisecond)}, serverSide)
+	select {
+	case got := <-result:
+		if got.err == nil {
+			t.Error("a silent client was accepted")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a silent client held the handshake past handshake_timeout")
 	}
 }
