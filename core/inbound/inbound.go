@@ -1,6 +1,7 @@
 // Package inbound accepts connections and hands each one's payload and
-// metadata to the traffic handler. It runs the accept loop, bounds every
-// handshake with a timeout, asks a protocol that can frame datagrams in a
+// metadata to the traffic handler. It runs the accept loop, runs each
+// connection's handshakes in its own goroutine (every layer bounds its own
+// with its handshake_timeout), asks a protocol that can frame datagrams in a
 // stream which payload each request wants, hands a UDP association to the
 // handler as a UDP session, and replays a refused stream to the fallback.
 package inbound
@@ -22,10 +23,6 @@ import (
 
 // EMFILE is not fatal; a hot loop on it would make a busy server worse.
 const acceptBackoff = 10 * time.Millisecond
-
-// A client that connects and then says nothing would otherwise hold a
-// goroutine and a socket open for as long as it liked.
-const DefaultHandshakeTimeout = 10 * time.Second
 
 // PROVISIONAL: 10 seconds, as for an outbound's dial.
 const fallbackDialTimeout = 10 * time.Second
@@ -73,9 +70,6 @@ type StreamConfig struct {
 	// needing one must refuse.
 	AssociateSocket spec.UDPAssociateSocketFunc
 
-	// Zero means DefaultHandshakeTimeout; negative disables the bound.
-	HandshakeTimeout time.Duration
-
 	// Connections held at once. One accepted beyond it is closed at once,
 	// before any handshake: refusing early is cheaper than queueing. Zero
 	// means no limit.
@@ -89,11 +83,6 @@ func NewStream(config StreamConfig) component.Inbound {
 	logger := config.Logger
 	if logger == nil {
 		logger = logging.Discard()
-	}
-
-	handshakeTimeout := config.HandshakeTimeout
-	if handshakeTimeout == 0 {
-		handshakeTimeout = DefaultHandshakeTimeout
 	}
 
 	if config.Fallback != nil && config.Fallback.IdleTimeout == 0 {
@@ -117,7 +106,6 @@ func NewStream(config StreamConfig) component.Inbound {
 		datagramServer:     config.DatagramOverStreamServer,
 		fallback:           config.Fallback,
 		udpAssociateSocket: config.AssociateSocket,
-		handshakeTimeout:   handshakeTimeout,
 		logger:             logger.With("inbound", config.Tag),
 	}
 }
@@ -130,7 +118,6 @@ type streamInbound struct {
 	datagramServer     spec.DatagramOverStreamProxyServer
 	fallback           *Fallback
 	udpAssociateSocket spec.UDPAssociateSocketFunc
-	handshakeTimeout   time.Duration
 	logger             *logging.Logger
 
 	// Nil means no limit. Full means the next connection is refused.
@@ -246,15 +233,6 @@ func (i *streamInbound) releaseConnectionSlot() {
 	}
 }
 
-// Covers the handshake only: once a payload carrier comes back, a long-lived
-// tunnel is the normal case rather than a stall.
-func (i *streamInbound) handshakeContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if i.handshakeTimeout < 0 {
-		return context.WithCancel(ctx)
-	}
-	return context.WithTimeout(ctx, i.handshakeTimeout)
-}
-
 // Internet scanners fail transport handshakes all the time, so a failure is
 // logged at Debug and the connection closed.
 func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stream) (spec.Stream, error) {
@@ -272,12 +250,11 @@ func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stre
 // Recording only when something may need it: identifying peeks, and a
 // fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
-	handshakeCtx, endHandshake := i.handshakeContext(ctx)
-	defer endHandshake()
+	inboundLocalEndpoint := spec.NewEndpointFromNetAddr(stream.LocalAddr())
 
 	// Recording starts above the overlays, so a fallback is handed what the
 	// client sent inside them, not TLS records.
-	stream, err := i.wrapServerOverlays(handshakeCtx, stream)
+	stream, err := i.wrapServerOverlays(ctx, stream)
 	if err != nil {
 		i.logger.Debug("Transport handshake failed", "error", err)
 		return
@@ -291,30 +268,30 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 	}
 
 	if i.datagramServer != nil {
-		isDatagram, err := i.datagramServer.IsDatagramOverStream(handshakeCtx, recording)
+		isDatagram, err := i.datagramServer.IsDatagramOverStream(ctx, recording)
 		if err != nil {
 			stream.Close()
 			i.logger.Warn("Handshake failed", "error", err)
 			return
 		}
 		if isDatagram {
-			datagram, metadata, err := i.datagramServer.AcceptDatagramOverStream(handshakeCtx, recording)
-			endHandshake()
+			datagram, metadata, err := i.datagramServer.AcceptDatagramOverStream(ctx, recording)
 			if err != nil {
 				i.refuse(ctx, recording, stream, err)
 				return
 			}
 			recording.StopRecording()
+			metadata.InboundLocalEndpoint = inboundLocalEndpoint
 			i.handleDatagramOverStream(ctx, handler, datagram, metadata)
 			return
 		}
 	}
 
-	payload, metadata, err := i.proxyServer.AcceptStream(handshakeCtx, handshakeStream)
-	endHandshake()
+	payload, metadata, err := i.proxyServer.AcceptStream(ctx, handshakeStream)
 	if err == nil || errors.Is(err, spec.ErrUDPAssociationRequested) {
 		stopRecording(recording)
 	}
+	metadata.InboundLocalEndpoint = inboundLocalEndpoint
 	if errors.Is(err, spec.ErrUDPAssociationRequested) {
 		i.handleUDPAssociate(ctx, handler, handshakeStream, metadata)
 		return
@@ -380,9 +357,7 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler componen
 		return
 	}
 
-	handshakeCtx, endHandshake := i.handshakeContext(ctx)
-	session, err := associateHandler.Associate(handshakeCtx, controlStream, metadata)
-	endHandshake()
+	session, err := associateHandler.Associate(ctx, controlStream, metadata)
 	if err != nil {
 		controlStream.Close()
 		i.logger.Warn("Datagram negotiation failed", "error", err)

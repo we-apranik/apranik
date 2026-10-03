@@ -103,6 +103,10 @@ func TestEachRequestReachesTheMatchingHandler(t *testing.T) {
 			if got.network != tc.want || got.metadata.User != "alice" || got.metadata.InboundTag != "trojan-in" {
 				t.Errorf("command X'%02X' dispatched as %+v", tc.command, got)
 			}
+			if got.metadata.InboundLocalEndpoint.String() != address.String() {
+				t.Errorf("command X'%02X': InboundLocalEndpoint = %s, want the address the client reached, %s",
+					tc.command, got.metadata.InboundLocalEndpoint, address)
+			}
 		case <-time.After(5 * time.Second):
 			t.Fatalf("command X'%02X' never reached the handler", tc.command)
 		}
