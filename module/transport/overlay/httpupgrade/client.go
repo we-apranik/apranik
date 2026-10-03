@@ -95,23 +95,12 @@ type pendingResponse struct {
 }
 
 // Only the read deadline is touched: a Write may be in flight, and its own
-// deadline is not this method's to change. The caller's read deadline, if
-// earlier, bounds the wait too, and is put back afterwards rather than
-// cleared.
+// deadline is not this method's to change. A read deadline the caller sets
+// while this waits takes effect at once (see stream.setResponseDeadline).
 func (p *pendingResponse) read(s *stream) error {
-	responseDeadline := time.Now().Add(p.timeout)
-	s.callerReadDeadlineMutex.Lock()
-	callerReadDeadline := s.callerReadDeadline
-	s.callerReadDeadlineMutex.Unlock()
-	if !callerReadDeadline.IsZero() && callerReadDeadline.Before(responseDeadline) {
-		responseDeadline = callerReadDeadline
-	}
-
-	s.Stream.SetReadDeadline(responseDeadline)
+	s.setResponseDeadline(time.Now().Add(p.timeout))
 	err := checkResponse(s.handshakeReader)
-	s.callerReadDeadlineMutex.Lock()
-	s.Stream.SetReadDeadline(s.callerReadDeadline)
-	s.callerReadDeadlineMutex.Unlock()
+	s.setResponseDeadline(time.Time{})
 	if err != nil {
 		return fmt.Errorf("httpupgrade: handshake: %w", err)
 	}

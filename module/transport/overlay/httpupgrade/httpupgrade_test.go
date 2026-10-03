@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -466,5 +467,79 @@ func TestItSpeaksHTTP1Point1(t *testing.T) {
 	}
 	if got := provider.TransportInfo().ApplicationProtocols; len(got) != 1 || got[0] != "http/1.1" {
 		t.Errorf("speaks %v, want [http/1.1]", got)
+	}
+}
+
+// A failed read of the pending 101 may have consumed part of it, so a retry
+// would parse garbage; every later Read reports the first failure instead.
+func TestAPipeliningClientKeepsReportingAFailedResponse(t *testing.T) {
+	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
+	clientSide, serverSide := tcpPair(t)
+	go func() {
+		http.ReadRequest(bufio.NewReader(serverSide))
+		serverSide.Write([]byte("HTTP/1.1 101 Swi"))
+	}()
+	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	_, firstErr := client.Read(make([]byte, 1))
+	if !errors.Is(firstErr, os.ErrDeadlineExceeded) {
+		t.Fatalf("first Read: %v, want the deadline", firstErr)
+	}
+	serverSide.Write([]byte("tching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\npayload"))
+	client.SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := client.Read(make([]byte, 7)); err != firstErr {
+		t.Errorf("second Read: %v, want the first failure again", err)
+	}
+}
+
+// A read deadline set while the client waits for the 101 bounds that wait at
+// once, as it would a read on the stream below.
+func TestAReadDeadlineSetDuringTheResponseWaitApplies(t *testing.T) {
+	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
+	clientSide, _ := tcpPair(t)
+	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	readDone := make(chan error, 1)
+	go func() {
+		_, err := client.Read(make([]byte, 1))
+		readDone <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	client.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
+	select {
+	case err := <-readDone:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("Read: %v, want the deadline", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the new read deadline did not end the wait for the 101")
+	}
+}
+
+// The response deadline ends with the response; a caller's earlier read
+// deadline outlives it.
+func TestTheCallerReadDeadlineOutlivesTheResponse(t *testing.T) {
+	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
+	clientSide, serverSide := tcpPair(t)
+	go func() {
+		http.ReadRequest(bufio.NewReader(serverSide))
+		serverSide.Write([]byte(switchingProtocolsResponse))
+	}()
+	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	started := time.Now()
+	if _, err := client.Read(make([]byte, 1)); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("Read: %v, want the caller's deadline", err)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Errorf("Read waited %s, want about 300ms", elapsed)
 	}
 }
