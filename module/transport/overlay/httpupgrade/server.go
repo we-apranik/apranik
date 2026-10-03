@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -40,7 +41,7 @@ func newServer(settings *Settings) *server {
 // already sit in it, behind the request. Xray's and sing-box's servers drop
 // those bytes; this one hands them on.
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
-	release := handshake.BoundByContext(ctx, underlyingStream)
+	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	err := s.acceptUpgrade(underlyingStream, reader)
 	if releaseErr := release(); err == nil {

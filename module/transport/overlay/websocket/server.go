@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -28,7 +29,7 @@ func newServer(settings *Settings) *server {
 }
 
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
-	release := handshake.BoundByContext(ctx, underlyingStream)
+	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	earlyData, err := s.acceptUpgrade(underlyingStream, reader)
 	if releaseErr := release(); err == nil {

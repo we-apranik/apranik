@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -61,7 +62,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 		return wrapped, nil
 	}
 
-	release := handshake.BoundByContext(ctx, underlyingStream)
+	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	err := deferredHandshake.run(underlyingStream, reader, nil)
 	if releaseErr := release(); err == nil {
 		err = releaseErr

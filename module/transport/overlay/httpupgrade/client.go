@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -49,7 +50,7 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 		"Connection: Upgrade\r\n" +
 		"Upgrade: websocket\r\n\r\n"
 
-	release := handshake.BoundByContext(ctx, underlyingStream)
+	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	_, err := underlyingStream.Write([]byte(request))
 	if err == nil && !c.pipeline {

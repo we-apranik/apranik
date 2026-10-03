@@ -132,7 +132,7 @@ Rules:
 - **Per connection, within `ctx`.** `WrapClientStream(ctx, underlyingStream,
   server)` and `WrapServerStream(ctx, underlyingStream)` finish their handshake
   before `ctx` ends; a blocking read must fail when it does (see
-  `handshake.BoundByContext` in `shared/websocket/handshake`). The client gets
+  `streamdeadline.BindToContext` in `shared/streamdeadline`). The client gets
   the server's address as dialed, for an SNI or a `Host`.
 - **Core owns the connection.** Never dial, never start an accept loop or a
   goroutine per connection, and on error leave `underlyingStream` open: core
