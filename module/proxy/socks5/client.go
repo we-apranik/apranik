@@ -31,7 +31,7 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, err
 	}
 
-	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
+	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	offered := byte(wire.MethodNoAuth)
 	if c.username != "" {

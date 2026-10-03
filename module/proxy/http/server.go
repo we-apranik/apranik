@@ -29,7 +29,7 @@ type streamServer struct {
 // A CONNECT request becomes a tunnel (server_connect.go); an absolute-form
 // request is rewritten for the origin (server_absolute_form.go).
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
-	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
+	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	head, streamAfterHead, err := wire.ReadHead(underlyingStream)
 	if err != nil {

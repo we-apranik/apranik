@@ -39,7 +39,7 @@ func (s *streamServer) SetAssociateSocket(socket spec.UDPAssociateSocketFunc) { 
 // UDP ASSOCIATE returns a nil Stream with Network NetworkUDP, since
 // AcceptStream cannot return a Datagram; Associate binds and replies.
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
-	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
+	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	if err := s.authenticate(underlyingStream); err != nil {
 		return nil, spec.Metadata{}, err
@@ -86,7 +86,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 // Reads the declared address AcceptStream left unread, opens the socket, and
 // replies. Does not wait for the session: core owns the relay from here.
 func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
-	defer streamdeadline.ApplyContextDeadline(ctx, controlStream)()
+	defer streamdeadline.BindToContext(ctx, controlStream)()
 
 	declaredClient, err := socksaddr.ReadAddress(controlStream)
 	if err != nil {

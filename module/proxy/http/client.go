@@ -41,7 +41,7 @@ func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.
 		return nil, err
 	}
 
-	defer streamdeadline.ApplyContextDeadline(ctx, underlyingStream)()
+	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
 	var connectRequest bytes.Buffer
 	fmt.Fprintf(&connectRequest, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n", connectTarget, connectTarget)
