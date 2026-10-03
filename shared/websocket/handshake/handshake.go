@@ -7,7 +7,6 @@ package handshake
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -29,8 +27,11 @@ const MaxHandshakeLength = 64 << 10
 const ReaderSize = 4096
 
 // Without its own User-Agent a client request stands out; Xray also sends a
-// browser's by default. PROVISIONAL: a fixed string that will age.
-const DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+// browser's by default. The Chrome version matches the ClientHello of the tls
+// transport's default fingerprint (uTLS v1.8.2's HelloChrome_Auto, Chrome 133),
+// so a CDN that sees both sees one browser. Update both together.
+// PROVISIONAL: a fixed string that will age.
+const DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
 
 var (
 	ErrHandshakeTooLarge = errors.New("handshake larger than 64 KiB")
@@ -69,26 +70,6 @@ func (r *LimitedReader) Read(p []byte) (int, error) {
 }
 
 func (r *LimitedReader) LiftLimit() { r.limited = false }
-
-// BoundByContext makes blocking reads and writes on the stream fail once ctx
-// ends. release undoes it and must be called before the stream is handed on;
-// it fails if ctx ended first, since the stream's deadline is then already
-// spent and the handshake must be abandoned.
-func BoundByContext(ctx context.Context, underlyingStream spec.Stream) (release func() error) {
-	if deadline, ok := ctx.Deadline(); ok {
-		underlyingStream.SetDeadline(deadline)
-	}
-	stopInterrupting := context.AfterFunc(ctx, func() {
-		underlyingStream.SetDeadline(time.Unix(1, 0))
-	})
-	return func() error {
-		if !stopInterrupting() {
-			return ctx.Err()
-		}
-		underlyingStream.SetDeadline(time.Time{})
-		return nil
-	}
-}
 
 // WriteRefusal answers the way an ordinary web server would, so a prober
 // that gets the host, path or upgrade wrong learns nothing more.
