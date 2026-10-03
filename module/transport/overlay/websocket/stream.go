@@ -42,7 +42,8 @@ var (
 // fragment or not, is just more bytes.
 //
 // One reader and any number of writers, as spec.Stream allows. The reader
-// answers pings and Close, so every frame written takes writeMutex.
+// answers pings and Close, so every frame written takes writeMutex; a pong
+// never waits for it (see sendPendingPongIfWriterIsIdle).
 type stream struct {
 	underlyingStream spec.Stream
 	reader           *bufio.Reader
@@ -70,8 +71,15 @@ type stream struct {
 	// Closed when a deferred handshake succeeds or fails.
 	handshakeFinished chan struct{}
 
-	writeMutex sync.Mutex
-	closeSent  bool
+	// What the caller last set through this stream, so a deferred handshake
+	// can put it back after bounding itself.
+	callerDeadlinesMutex sync.Mutex
+	callerReadDeadline   time.Time
+	callerWriteDeadline  time.Time
+
+	writeMutex         sync.Mutex
+	closeSent          bool
+	pendingPongPayload atomic.Pointer[[]byte]
 }
 
 func (s *stream) Read(p []byte) (int, error) {
@@ -149,9 +157,9 @@ func (s *stream) readFrameUntilData() error {
 
 	switch header.opcode {
 	case opcodePing:
-		if err := s.writeFrame(opcodePong, control); err != nil {
-			return fmt.Errorf("websocket: answering a ping: %w", err)
-		}
+		pongPayload := append([]byte(nil), control...)
+		s.pendingPongPayload.Store(&pongPayload)
+		s.sendPendingPongIfWriterIsIdle()
 	case opcodeClose:
 		// Echo the status code, as RFC 6455 section 5.5.1 asks; a failure to
 		// send it changes nothing, since the stream is ending anyway.
@@ -173,7 +181,7 @@ func (s *stream) Write(p []byte) (int, error) {
 		return 0, err
 	}
 	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
+	defer s.unlockWriteAfterSendingPendingPong()
 	written := early
 	for remaining := p[early:]; len(remaining) > 0; {
 		chunk := remaining[:min(len(remaining), maxFramePayloadLength)]
@@ -188,8 +196,36 @@ func (s *stream) Write(p []byte) (int, error) {
 
 func (s *stream) writeFrame(opcode byte, payload []byte) error {
 	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
+	defer s.unlockWriteAfterSendingPendingPong()
 	return s.writeFrameLocked(opcode, payload)
+}
+
+// The reader never waits for writeMutex to answer a ping: a writer blocked on
+// a peer that is not reading would stop our reads too, and two peers doing
+// that deadlock. So the reader leaves the pong pending and sends it only if
+// the lock is free; otherwise whoever holds the lock sends it on the way out.
+// Only the latest pong is kept, as RFC 6455 section 5.5.3 allows. A pong that
+// fails to send is dropped: the next read or write reports the broken stream.
+func (s *stream) sendPendingPongIfWriterIsIdle() {
+	for s.pendingPongPayload.Load() != nil && s.writeMutex.TryLock() {
+		s.sendPendingPongLocked()
+		s.writeMutex.Unlock()
+	}
+}
+
+// Checking again after unlocking catches a pong stored between the send and
+// the unlock, whose reader found the lock still held.
+func (s *stream) unlockWriteAfterSendingPendingPong() {
+	s.sendPendingPongLocked()
+	s.writeMutex.Unlock()
+	s.sendPendingPongIfWriterIsIdle()
+}
+
+// The caller holds writeMutex.
+func (s *stream) sendPendingPongLocked() {
+	if pongPayload := s.pendingPongPayload.Swap(nil); pongPayload != nil {
+		s.writeFrameLocked(opcodePong, *pongPayload)
+	}
 }
 
 // writeFrameLocked writes one final frame, header and payload in a single
@@ -253,8 +289,26 @@ func (s *stream) Close() error {
 	return err
 }
 
-func (s *stream) LocalAddr() net.Addr                { return s.underlyingStream.LocalAddr() }
-func (s *stream) RemoteAddr() net.Addr               { return s.underlyingStream.RemoteAddr() }
-func (s *stream) SetDeadline(t time.Time) error      { return s.underlyingStream.SetDeadline(t) }
-func (s *stream) SetReadDeadline(t time.Time) error  { return s.underlyingStream.SetReadDeadline(t) }
-func (s *stream) SetWriteDeadline(t time.Time) error { return s.underlyingStream.SetWriteDeadline(t) }
+func (s *stream) LocalAddr() net.Addr  { return s.underlyingStream.LocalAddr() }
+func (s *stream) RemoteAddr() net.Addr { return s.underlyingStream.RemoteAddr() }
+
+func (s *stream) SetDeadline(t time.Time) error {
+	s.callerDeadlinesMutex.Lock()
+	defer s.callerDeadlinesMutex.Unlock()
+	s.callerReadDeadline, s.callerWriteDeadline = t, t
+	return s.underlyingStream.SetDeadline(t)
+}
+
+func (s *stream) SetReadDeadline(t time.Time) error {
+	s.callerDeadlinesMutex.Lock()
+	defer s.callerDeadlinesMutex.Unlock()
+	s.callerReadDeadline = t
+	return s.underlyingStream.SetReadDeadline(t)
+}
+
+func (s *stream) SetWriteDeadline(t time.Time) error {
+	s.callerDeadlinesMutex.Lock()
+	defer s.callerDeadlinesMutex.Unlock()
+	s.callerWriteDeadline = t
+	return s.underlyingStream.SetWriteDeadline(t)
+}

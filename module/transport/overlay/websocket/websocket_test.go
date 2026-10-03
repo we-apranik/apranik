@@ -10,10 +10,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -87,7 +89,7 @@ func connect(t testing.TB, clientModule, serverModule *Transport) (client, serve
 	if err != nil {
 		t.Fatalf("WrapClientStream: %v", err)
 	}
-	if clientModule.MaxEarlyData > 0 {
+	if clientModule.EarlyData != nil {
 		// The client's handshake waits for its first Write, so the server
 		// can only finish once the test writes; hand back a lazy result.
 		return clientStream, &lazyServer{done: serverDone, t: t}
@@ -228,12 +230,10 @@ func TestXrayStyleEarlyDataIsReplayedAndEchoed(t *testing.T) {
 
 func TestEarlyDataFromOurClient(t *testing.T) {
 	for name, edit := range map[string]func(*Settings){
-		"header mode, all early": func(s *Settings) { s.MaxEarlyData = 64 },
-		"header mode, split":     func(s *Settings) { s.MaxEarlyData = 4 },
-		"sing-box path mode": func(s *Settings) {
-			s.MaxEarlyData = 64
-			s.EarlyDataHeaderName = ""
-		},
+		"header mode, all early": func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} },
+		"header mode, split":     func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 4} },
+		"custom header":          func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64, HeaderName: "X-Early"} },
+		"sing-box path mode":     func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64, Location: "path"} },
 	} {
 		client, server := connect(t, newModule(t, edit), newModule(t, edit))
 		if n, err := client.Write([]byte("hello world")); err != nil || n != len("hello world") {
@@ -253,7 +253,7 @@ func TestEarlyDataFromOurClient(t *testing.T) {
 
 // With early data, a Read first waits for the Write that sends the handshake.
 func TestAReadBeforeTheFirstWriteWaitsForIt(t *testing.T) {
-	edit := func(s *Settings) { s.MaxEarlyData = 64 }
+	edit := func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }
 	client, server := connect(t, newModule(t, edit), newModule(t, edit))
 
 	replies := make(chan string, 1)
@@ -280,7 +280,7 @@ func TestAReadBeforeTheFirstWriteWaitsForIt(t *testing.T) {
 }
 
 func TestClosingAClientWaitingForItsHandshakeEndsItsRead(t *testing.T) {
-	edit := func(s *Settings) { s.MaxEarlyData = 64 }
+	edit := func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }
 	client, _ := connect(t, newModule(t, edit), newModule(t, edit))
 	done := make(chan error, 1)
 	go func() {
@@ -343,6 +343,50 @@ func TestAPingBetweenFragmentsIsAnsweredAndTheMessageIsReadWhole(t *testing.T) {
 	io.ReadFull(reader, payload)
 	if string(payload) != "are you there" {
 		t.Errorf("pong carried %q", payload)
+	}
+}
+
+func TestAPingDoesNotStopReadsWhileAWriteIsStalled(t *testing.T) {
+	server, clientSide, _ := acceptedByHand(t)
+	writeReturned := make(chan struct{})
+	go func() {
+		server.Write(make([]byte, 64<<20))
+		close(writeReturned)
+	}()
+	writerHoldsTheLock := func() bool {
+		if server.(*stream).writeMutex.TryLock() {
+			server.(*stream).writeMutex.Unlock()
+			return false
+		}
+		return true
+	}
+	for !writerHoldsTheLock() {
+		time.Sleep(time.Millisecond)
+	}
+
+	var wire []byte
+	wire = append(wire, maskedFrame(opcodePing, true, []byte("are you there"))...)
+	wire = append(wire, maskedFrame(opcodeBinary, true, []byte("still reading"))...)
+	clientSide.Write(wire)
+
+	readDone := make(chan error, 1)
+	go func() {
+		received := make([]byte, len("still reading"))
+		_, err := io.ReadFull(server, received)
+		readDone <- err
+	}()
+	select {
+	case err := <-readDone:
+		if err != nil {
+			t.Fatalf("read: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the read waited for the stalled write to answer the ping")
+	}
+	select {
+	case <-writeReturned:
+		t.Fatal("the write was not stalled; the test proves nothing")
+	default:
 	}
 }
 
@@ -510,16 +554,20 @@ func TestCloseWriteIsRefusedSoTheRelayClosesBothWays(t *testing.T) {
 
 func TestValidateRefusesMalformedSettings(t *testing.T) {
 	for name, edit := range map[string]func(*Settings){
-		"no leading slash":    func(s *Settings) { s.Path = "chat" },
-		"space in path":       func(s *Settings) { s.Path = "/a b" },
-		"negative early data": func(s *Settings) { s.MaxEarlyData = -1 },
-		"too much early data": func(s *Settings) { s.MaxEarlyData = maxEarlyDataLimit + 1 },
-		"bad header name":     func(s *Settings) { s.Headers = map[string]string{"X Bad": "1"} },
-		"line break in value": func(s *Settings) { s.Headers = map[string]string{"X-A": "1\r\nX-B: 2"} },
-		"owned header":        func(s *Settings) { s.Headers = map[string]string{"Host": "a"} },
-		"bad early header":    func(s *Settings) { s.EarlyDataHeaderName = "a:b" },
+		"no leading slash":     func(s *Settings) { s.Path = "chat" },
+		"space in path":        func(s *Settings) { s.Path = "/a b" },
+		"no max_bytes":         func(s *Settings) { s.EarlyData = &EarlyData{} },
+		"negative early data":  func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: -1} },
+		"too much early data":  func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: maxEarlyDataLimit + 1} },
+		"unknown location":     func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 1, Location: "query"} },
+		"header name for path": func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 1, Location: "path", HeaderName: "X-Early"} },
+		"negative timeout":     func(s *Settings) { s.HandshakeTimeout = -1 },
+		"bad header name":      func(s *Settings) { s.Headers = map[string]string{"X Bad": "1"} },
+		"line break in value":  func(s *Settings) { s.Headers = map[string]string{"X-A": "1\r\nX-B: 2"} },
+		"owned header":         func(s *Settings) { s.Headers = map[string]string{"Host": "a"} },
+		"bad early header":     func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 1, HeaderName: "a:b"} },
 		"early header also set": func(s *Settings) {
-			s.MaxEarlyData = 10
+			s.EarlyData = &EarlyData{MaxBytes: 10}
 			s.Headers = map[string]string{"sec-websocket-protocol": "x"}
 		},
 	} {
@@ -547,5 +595,75 @@ func TestItSpeaksHTTP1Point1(t *testing.T) {
 	}
 	if got := provider.TransportInfo().ApplicationProtocols; len(got) != 1 || got[0] != "http/1.1" {
 		t.Errorf("speaks %v, want [http/1.1]", got)
+	}
+}
+
+func TestAServerWithoutEarlyDataSettingsAcceptsItInTheXrayHeader(t *testing.T) {
+	client, server := connect(t, newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }), newModule(t, nil))
+	if _, err := client.Write([]byte("hello")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	received := make([]byte, len("hello"))
+	if _, err := io.ReadFull(server, received); err != nil || string(received) != "hello" {
+		t.Errorf("server read %q, %v", received, err)
+	}
+}
+
+func TestTheServerRefusesMoreEarlyDataThanItsMaxBytes(t *testing.T) {
+	client, _ := connect(t,
+		newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }),
+		newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 4} }))
+	if _, err := client.Write([]byte("hello world")); !errors.Is(err, errUpgradeRefused) {
+		t.Errorf("Write: %v, want the upgrade refused", err)
+	}
+}
+
+// The deferred handshake bounds itself, then puts back the deadline the
+// caller set before the first Write instead of clearing it.
+func TestTheDeferredHandshakeKeepsTheCallersReadDeadline(t *testing.T) {
+	client, _ := connect(t, newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }), newModule(t, nil))
+	client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if _, err := client.Write([]byte("hello")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	readDone := make(chan error, 1)
+	go func() {
+		_, err := client.Read(make([]byte, 1))
+		readDone <- err
+	}()
+	select {
+	case err := <-readDone:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("Read: %v, want the caller's deadline", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the caller's read deadline was cleared by the handshake")
+	}
+}
+
+func TestTheDeferredHandshakeIsBoundedByItsTimeout(t *testing.T) {
+	clientSide, serverSide := tcpPair(t)
+	go io.Copy(io.Discard, serverSide)
+	module := newModule(t, func(s *Settings) {
+		s.EarlyData = &EarlyData{MaxBytes: 64}
+		s.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+	})
+	overlayClient, _ := module.NewStreamOverlayClient()
+	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDone := make(chan error, 1)
+	go func() {
+		_, err := client.Write([]byte("hello"))
+		writeDone <- err
+	}()
+	select {
+	case err := <-writeDone:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Errorf("Write: %v, want the handshake timed out", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a server that never answers held the handshake past its timeout")
 	}
 }

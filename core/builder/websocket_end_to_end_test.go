@@ -13,7 +13,10 @@ import (
 // early data, built from config files as `apranik run` builds them.
 
 func webSocketTransport(earlyData int) string {
-	return fmt.Sprintf(`{ "type": "ws", "settings": { "path": "/chat", "max_early_data": %d } }`, earlyData)
+	if earlyData == 0 {
+		return `{ "type": "ws", "settings": { "path": "/chat" } }`
+	}
+	return fmt.Sprintf(`{ "type": "ws", "settings": { "path": "/chat", "early_data": { "max_bytes": %d } } }`, earlyData)
 }
 
 func TestTrojanOverWebSocketCarriesTCPAndUDP(t *testing.T) {

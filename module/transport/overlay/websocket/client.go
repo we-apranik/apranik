@@ -13,27 +13,31 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// A client that defers its handshake to the first Write has no context left
-// to bound the wait for the server's answer, so it uses this. PROVISIONAL:
-// the outbound's default handshake timeout.
-const deferredHandshakeTimeout = 10 * time.Second
-
 type client struct {
-	path                string
-	host                string
-	extraHeaderLines    string
+	path             string
+	host             string
+	extraHeaderLines string
+	handshakeTimeout time.Duration
+
+	// Zero sends no early data. An empty header name puts it in the path.
 	maxEarlyData        int
 	earlyDataHeaderName string
 }
 
 func newClient(settings *Settings) *client {
-	return &client{
-		path:                settings.Path,
-		host:                settings.Host,
-		extraHeaderLines:    handshake.RequestHeaderLines(settings.Headers),
-		maxEarlyData:        settings.MaxEarlyData,
-		earlyDataHeaderName: settings.EarlyDataHeaderName,
+	built := &client{
+		path:             settings.Path,
+		host:             settings.Host,
+		extraHeaderLines: handshake.RequestHeaderLines(settings.Headers),
+		handshakeTimeout: settings.handshakeTimeout(),
 	}
+	if earlyData := settings.EarlyData; earlyData != nil {
+		built.maxEarlyData = earlyData.MaxBytes
+		if !earlyData.isInPath() {
+			built.earlyDataHeaderName = earlyData.effectiveHeaderName()
+		}
+	}
+	return built
 }
 
 // clientHandshake is everything needed to send the upgrade request later.
@@ -62,6 +66,8 @@ func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Str
 		return wrapped, nil
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
+	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	err := deferredHandshake.run(underlyingStream, reader, nil)
 	if releaseErr := release(); err == nil {
@@ -140,9 +146,9 @@ func (s *stream) completeHandshakeWithEarlyData(p []byte) (int, error) {
 	}
 
 	early := p[:min(len(p), s.pendingHandshake.client.maxEarlyData)]
-	s.underlyingStream.SetDeadline(time.Now().Add(deferredHandshakeTimeout))
+	restoreCallerDeadlines := s.boundByHandshakeTimeout(s.pendingHandshake.client.handshakeTimeout)
 	err := s.pendingHandshake.run(s.underlyingStream, s.reader, early)
-	s.underlyingStream.SetDeadline(time.Time{})
+	restoreCallerDeadlines()
 	if err != nil {
 		s.finishHandshake(fmt.Errorf("websocket: handshake: %w", err))
 		return 0, s.handshakeErr
@@ -178,4 +184,32 @@ func (s *stream) completeHandshake() error {
 	s.handshakeMutex.Lock()
 	defer s.handshakeMutex.Unlock()
 	return s.handshakeErr
+}
+
+// boundByHandshakeTimeout gives the stream below the earlier of the caller's
+// deadlines and the handshake's own, and returns a func that puts the
+// caller's back, rather than clearing them: a deadline set before the first
+// Write, an idle bound for example, must outlive the handshake.
+func (s *stream) boundByHandshakeTimeout(timeout time.Duration) (restoreCallerDeadlines func()) {
+	handshakeDeadline := time.Now().Add(timeout)
+	s.callerDeadlinesMutex.Lock()
+	callerReadDeadline, callerWriteDeadline := s.callerReadDeadline, s.callerWriteDeadline
+	s.callerDeadlinesMutex.Unlock()
+
+	s.underlyingStream.SetReadDeadline(earlierDeadline(callerReadDeadline, handshakeDeadline))
+	s.underlyingStream.SetWriteDeadline(earlierDeadline(callerWriteDeadline, handshakeDeadline))
+	return func() {
+		s.callerDeadlinesMutex.Lock()
+		defer s.callerDeadlinesMutex.Unlock()
+		s.underlyingStream.SetReadDeadline(s.callerReadDeadline)
+		s.underlyingStream.SetWriteDeadline(s.callerWriteDeadline)
+	}
+}
+
+// The zero time means no deadline, so it is later than any other.
+func earlierDeadline(callerDeadline, handshakeDeadline time.Time) time.Time {
+	if callerDeadline.IsZero() || handshakeDeadline.Before(callerDeadline) {
+		return handshakeDeadline
+	}
+	return callerDeadline
 }

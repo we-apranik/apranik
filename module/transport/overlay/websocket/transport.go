@@ -31,5 +31,5 @@ func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 // The return type is the kind declaration: registering this as anything else
 // will not compile.
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule {
-	return &Transport{Settings: Settings{Path: "/", EarlyDataHeaderName: defaultEarlyDataHeaderName}}
+	return &Transport{Settings: Settings{Path: "/"}}
 }

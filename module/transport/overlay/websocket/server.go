@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
@@ -15,20 +16,31 @@ import (
 type server struct {
 	requiredHost        string
 	path                string
+	handshakeTimeout    time.Duration
 	earlyDataHeaderName string
 	earlyDataInPath     bool
+	maxEarlyData        int
 }
 
 func newServer(settings *Settings) *server {
-	return &server{
+	built := &server{
 		requiredHost:        settings.Host,
 		path:                settings.Path,
-		earlyDataHeaderName: settings.EarlyDataHeaderName,
-		earlyDataInPath:     settings.EarlyDataHeaderName == "" && settings.MaxEarlyData > 0,
+		handshakeTimeout:    settings.handshakeTimeout(),
+		earlyDataHeaderName: defaultEarlyDataHeaderName,
+		maxEarlyData:        maxEarlyDataLimit,
 	}
+	if earlyData := settings.EarlyData; earlyData != nil {
+		built.earlyDataHeaderName = earlyData.effectiveHeaderName()
+		built.earlyDataInPath = earlyData.isInPath()
+		built.maxEarlyData = earlyData.MaxBytes
+	}
+	return built
 }
 
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
+	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
 	earlyData, err := s.acceptUpgrade(underlyingStream, reader)
@@ -80,7 +92,7 @@ func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reade
 	// echoed back, since a client that sent Sec-WebSocket-Protocol expects to
 	// see it chosen. A value that is not base64 is ignored, as Xray does.
 	var protocolEcho string
-	if !s.earlyDataInPath && s.earlyDataHeaderName != "" {
+	if len(earlyData) == 0 {
 		if value := request.Header.Get(s.earlyDataHeaderName); value != "" {
 			if decoded, err := decodeEarlyData(value); err == nil && len(decoded) > 0 {
 				earlyData = decoded
@@ -89,6 +101,11 @@ func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reade
 				}
 			}
 		}
+	}
+
+	if len(earlyData) > s.maxEarlyData {
+		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
+		return nil, fmt.Errorf("%w: %d bytes, more than %d", errTooMuchEarlyData, len(earlyData), s.maxEarlyData)
 	}
 
 	response := "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" + "Sec-WebSocket-Accept: " + acceptKeyFor(key) + "\r\n" + protocolEcho + "\r\n"

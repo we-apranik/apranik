@@ -12,12 +12,13 @@ import (
 const acceptKeySuffix = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 var (
-	errNotAnUpgrade   = errors.New("websocket: not a WebSocket upgrade request")
-	errWrongHost      = errors.New("websocket: wrong host")
-	errWrongPath      = errors.New("websocket: wrong path")
-	errUpgradeRefused = errors.New("websocket: the server did not switch protocols")
-	errWrongAcceptKey = errors.New("websocket: the server's Sec-WebSocket-Accept does not match the key")
-	errBadEarlyData   = errors.New("websocket: early data is not valid base64")
+	errNotAnUpgrade     = errors.New("websocket: not a WebSocket upgrade request")
+	errWrongHost        = errors.New("websocket: wrong host")
+	errWrongPath        = errors.New("websocket: wrong path")
+	errUpgradeRefused   = errors.New("websocket: the server did not switch protocols")
+	errWrongAcceptKey   = errors.New("websocket: the server's Sec-WebSocket-Accept does not match the key")
+	errBadEarlyData     = errors.New("websocket: early data is not valid base64")
+	errTooMuchEarlyData = errors.New("websocket: more early data than max_bytes")
 )
 
 // An endpoint's key and the value the peer must answer with.
