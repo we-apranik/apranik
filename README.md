@@ -53,7 +53,7 @@ architecture is not optimised for rapid, Iran-specific adaptation.
 
 ## Status
 
-Early and working. One dependency: uTLS.
+Early and working. Two dependencies: uTLS, and `golang.org/x/net` for its DNS message codec.
 
 | Area | Available |
 | --- | --- |
@@ -63,6 +63,7 @@ Early and working. One dependency: uTLS.
 | Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan), `freedom` (straight to the destination) and `block` (refuses everything) |
 | Sniffers | `tls` (SNI from a ClientHello), `http` (Host header), per inbound, off by default |
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
+| DNS | servers `udp`, `tcp`, `dot`, `doh` and the operating system's, each through any outbound; DNS rules, a TTL cache, IPv4/IPv6 preference, and a routing `resolve` action ([docs](docs/configuration/dns/index.md)) |
 | Configuration | JSON config file, validated in full before anything starts |
 
 Not yet: multiplexing transports (HTTP/2, gRPC), VLESS, REALITY, ECH, routing rules
@@ -158,6 +159,9 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `strict` | refuse unknown keys; default `true` |
 | `log` | see below |
 | `inbounds`, `outbounds` | arrays, see below |
+| `datasets` | named lists of domains or IP ranges that routing and DNS rules look up |
+| `dns` | the resolver: DNS servers, DNS rules, cache; absent means the operating system resolves |
+| `routing` | rules choosing an outbound per request |
 
 ### Inbound
 
@@ -196,6 +200,7 @@ inbounds only, for now.
 | `protocol` | a proxy protocol such as `socks5`, `http` or `trojan`, or one of the special protocols `freedom` and `block` |
 | `server`, `server_port` | the proxy server to reach; proxy protocols only |
 | `transport` | the transport stack used to reach the server; proxy protocols only |
+| `dns_server` | the DNS server that resolves `server` when it is a domain; proxy protocols only |
 
 ### Special inbound protocol
 
@@ -229,7 +234,6 @@ NAT behaviour of that UDP:
 { "tag": "direct",
   "transport": [{ "type": "tcp", "settings": { "keep_alive": "15s" } }, { "type": "fragment" }],
   "protocol": { "type": "freedom", "settings": {
-    "udp": { "resolve_timeout": "5s" },
     "nat": { "filtering": "address-and-port-dependent", "idle_timeout": "5m" }
 } } }
 ```
@@ -252,8 +256,8 @@ anyone who can reach the socket inject packets into a session.
 
 | Module | Settings |
 | --- | --- |
-| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`), `dial_timeout` (default `10s`) |
-| `udp` | `resolve_timeout` (default `5s`): longest a domain lookup may take; `resolve_cache_ttl` (default `30s`): how long a resolved domain is reused |
+| `tcp` | `keep_alive` (idle before the first probe, default `15s`, negative disables), `keep_alive_interval` (between probes, default `15s`), `keep_alive_count` (unanswered probes before the connection is dropped, default `9`), `no_delay` (default `true`), `dial_timeout` (default `10s`), `next_address_delay` (default `250ms`: how long one address is tried before the next starts beside it) |
+| `udp` | none; a domain is resolved through `dns` |
 | `tls` | client: `server_name`, `insecure`, `certificate_authorities`, `fingerprint` (default `chrome`; `none` for Go's own); server: `certificates` (file or inline PEM); both: `alpn` (`["http/1.1"]` under `ws` and `httpupgrade`), `min_version`, `max_version` (a client only with `fingerprint: none`), `handshake_timeout` (default `10s`) |
 | `ws` | `path` (default `/`), `host` (client: the Host header; server: a required Host), `headers`, `early_data` (`max_bytes`, required; `location` `header` (default) or `path`; `header_name`, default `Sec-WebSocket-Protocol`), `handshake_timeout` (default `10s`) |
 | `httpupgrade` | `path`, `host`, `headers`, `pipeline` (client, default `false`), `accept_websocket_key` (server, default `true`), `handshake_timeout` (default `10s`) |
@@ -307,8 +311,9 @@ else's repository.
   boundaries.
 - **Two address types.** `Endpoint` is an IP and a port, already resolved.
   `Destination` is exactly one of a domain or an IP, plus a port. A domain stays
-  a domain all the way down: **only the base transport resolves**, so a poisoned
-  local DNS answer never reaches a proxy protocol's decisions.
+  a domain all the way down: **only the base transport resolves**, through the
+  resolver core hands it, so a poisoned local DNS answer never reaches a proxy
+  protocol's decisions.
 - **Base and overlay transports.** A base transport creates a connection (TCP,
   UDP); an overlay wraps one (TLS, WebSocket), one connection at a time, inside
   core's timeouts. A stack is a fold core runs without knowing what any layer
