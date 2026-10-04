@@ -17,7 +17,6 @@ It is a special outbound protocol, built by core.
   "protocol": {
     "type": "freedom",
     "settings": {
-      "udp": { "resolve_timeout": "5s" },
       "nat": {
         "mapping": "endpoint-independent",
         "filtering": "address-and-port-dependent",
@@ -32,7 +31,10 @@ It is a special outbound protocol, built by core.
 
 Of the [outbound fields](index.md), [`tag`](index.md#tag) and `transport`
 apply; freedom takes no server. How long a connection to a destination may take
-is `tcp`'s [`dial_timeout`](../transport/tcp.md#dial_timeout).
+is `tcp`'s [`dial_timeout`](../transport/tcp.md#dial_timeout). Freedom
+resolves each destination's domain through the [resolver](../dns/index.md):
+the operating system's when there is no `dns` section, the DNS rules' choice
+when there is one.
 
 ## Transport
 
@@ -66,7 +68,9 @@ Freedom's UDP is not part of the stack; it is set in [`udp`](#udp).
 <span class="cfg cfg-type">object</span>
 <span class="cfg cfg-def">Default: the module's defaults</span>
 
-[`udp` transport settings](../transport/udp.md) for its UDP sockets.
+[`udp` transport settings](../transport/udp.md) for its UDP sockets. It has
+none today: a domain a datagram is sent to is resolved through the
+[resolver](../dns/index.md).
 
 ### `nat`
 
