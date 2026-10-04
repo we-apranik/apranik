@@ -38,6 +38,7 @@
 //   - proxy.go: proxy servers, clients and the proxy kinds
 //   - metadata.go: Metadata and SniffResult
 //   - sniffer.go: the sniffer kind
+//   - dns.go: the DNS server kinds, DNSServer and Resolver
 //   - udpassociate.go: the SOCKS5 UDP ASSOCIATE hand-off
 //   - errors.go: the sentinel errors
 package spec

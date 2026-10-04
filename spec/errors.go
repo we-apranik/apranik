@@ -9,6 +9,10 @@ var (
 	ErrUDPAssociationRequested = errors.New("spec: hand off to a UDP associate handler")
 	ErrSniffNeedMoreData       = errors.New("spec: sniffer needs more data")
 
+	// ErrDNSAnswerTruncated: a datagram answer had its truncation flag set and
+	// the server cannot retry over a stream.
+	ErrDNSAnswerTruncated = errors.New("spec: dns answer truncated")
+
 	// ErrFallbackRequested is returned by Accept* for a request that is not
 	// valid for this protocol. Core replays every byte the handshake read, and
 	// the rest of the stream, to the inbound's fallback. Return it only before
