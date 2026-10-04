@@ -16,13 +16,13 @@ import (
 // startup calls it then; the SOCKS5 associate path calls it per association.
 type datagramListener struct {
 	bind     spec.Endpoint
-	resolver resolverPolicy
+	resolver spec.Resolver
 
 	mu     sync.Mutex
 	socket *socket
 }
 
-func newDatagramListener(bind spec.Endpoint, resolver resolverPolicy) (*datagramListener, error) {
+func newDatagramListener(bind spec.Endpoint, resolver spec.Resolver) (*datagramListener, error) {
 	// A zero one is refused rather than becoming a wildcard: an inbound that
 	// bound every interface because a field was omitted is a real exposure.
 	if !bind.IsValid() {

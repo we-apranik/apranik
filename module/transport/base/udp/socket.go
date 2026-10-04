@@ -20,12 +20,17 @@ const maxDatagram = 65507
 // Domains only appear here when a proxy layer passed one through unresolved,
 // so the working set is small; this bounds it so a long session can't grow it
 // without limit.
-const resolveCacheLimit = 256
+const resolveMemoLimit = 256
 
-type resolverPolicy struct {
-	timeout  time.Duration
-	cacheTTL time.Duration
-}
+// A write to a domain asks the resolver, which caches by TTL. This memo only
+// keeps a stream of datagrams to one domain from asking per datagram, so it is
+// short: an answer outlives its TTL by at most this. Not a setting.
+const resolveMemoLifetime = 5 * time.Second
+
+// WriteTo has no context, and a lookup must not stall the write path forever.
+// Each DNS server bounds its own queries; this is the outer limit. Not a
+// setting.
+const resolveBoundWithoutContext = 15 * time.Second
 
 type resolvedAddress struct {
 	address netip.AddrPort
@@ -45,13 +50,13 @@ type socket struct {
 	// buffer.
 	oversizeBuffer []byte
 
-	resolver resolverPolicy
+	resolver spec.Resolver
 
 	mu       sync.Mutex
 	resolved map[string]resolvedAddress
 }
 
-func newSocket(connection *net.UDPConn, network string, resolver resolverPolicy) *socket {
+func newSocket(connection *net.UDPConn, network string, resolver spec.Resolver) *socket {
 	return &socket{
 		connection: connection,
 		network:    network,
@@ -123,7 +128,7 @@ func (s *socket) Close() error { return s.connection.Close() }
 func (s *socket) LocalAddr() net.Addr { return s.connection.LocalAddr() }
 
 // An IP needs no lookup at all; only a domain reaches the resolver, and its
-// result is cached briefly because a session usually revisits the same few.
+// result is remembered briefly because a session usually revisits the same few.
 // A netip.AddrPort, unlike a *net.UDPAddr, is a value, so sending to one
 // allocates nothing.
 func (s *socket) resolve(to spec.Destination) (netip.AddrPort, error) {
@@ -143,10 +148,10 @@ func (s *socket) resolve(to spec.Destination) (netip.AddrPort, error) {
 		return cached, nil
 	}
 
-	ctx, done := context.WithTimeout(context.Background(), s.resolver.timeout)
+	ctx, done := context.WithTimeout(context.Background(), resolveBoundWithoutContext)
 	defer done()
 
-	addresses, err := net.DefaultResolver.LookupNetIP(ctx, "ip", domain)
+	addresses, err := s.resolver.ResolveDomain(ctx, domain)
 	if err != nil {
 		return netip.AddrPort{}, fmt.Errorf("udp: resolve %s: %w", domain, err)
 	}
@@ -182,7 +187,7 @@ func (s *socket) cache(domain string, target netip.AddrPort) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.resolved) >= resolveCacheLimit {
+	if len(s.resolved) >= resolveMemoLimit {
 		now := time.Now()
 		for key, entry := range s.resolved {
 			if now.After(entry.expires) {
@@ -191,50 +196,32 @@ func (s *socket) cache(domain string, target netip.AddrPort) {
 		}
 	}
 	for key := range s.resolved {
-		if len(s.resolved) < resolveCacheLimit {
+		if len(s.resolved) < resolveMemoLimit {
 			break
 		}
 		delete(s.resolved, key)
 	}
 
-	s.resolved[domain] = resolvedAddress{address: target, expires: time.Now().Add(s.resolver.cacheTTL)}
+	s.resolved[domain] = resolvedAddress{address: target, expires: time.Now().Add(resolveMemoLifetime)}
 }
 
-// A domain with both an A and an AAAA record yields both, in whatever order
-// the resolver chose, and a socket bound to one family cannot reach the other:
-// sending there is not an error, the datagram simply vanishes. So the family
-// decides, and a dual-stack socket prefers IPv4, which is what this transport
-// resolved to before and what a host with no IPv6 route needs.
+// A socket bound to one family cannot reach the other: sending there is not
+// an error, the datagram simply vanishes. So the first address, in the
+// resolver's order (its ip_versions), that this socket can reach is chosen.
 func reachable(addresses []netip.Addr, network string) (netip.Addr, error) {
-	var first4, first6 netip.Addr
 	for _, address := range addresses {
 		unmapped := address.Unmap()
 		switch {
-		case unmapped.Is4() && !first4.IsValid():
-			first4 = unmapped
-		case !unmapped.Is4() && !first6.IsValid():
-			first6 = unmapped
+		case network == "udp4" && unmapped.Is4(), network == "udp6" && !unmapped.Is4(), network == "udp":
+			return unmapped, nil
 		}
 	}
-
 	switch network {
 	case "udp4":
-		if !first4.IsValid() {
-			return netip.Addr{}, errors.New("no IPv4 address, and this socket is IPv4-only")
-		}
-		return first4, nil
+		return netip.Addr{}, errors.New("no IPv4 address, and this socket is IPv4-only")
 	case "udp6":
-		if !first6.IsValid() {
-			return netip.Addr{}, errors.New("no IPv6 address, and this socket is IPv6-only")
-		}
-		return first6, nil
+		return netip.Addr{}, errors.New("no IPv6 address, and this socket is IPv6-only")
 	default:
-		if first4.IsValid() {
-			return first4, nil
-		}
-		if first6.IsValid() {
-			return first6, nil
-		}
 		return netip.Addr{}, errors.New("no addresses")
 	}
 }

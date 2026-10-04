@@ -659,9 +659,6 @@ func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"listen": "127.0.0.1",`,
 		`"listen": "127.0.0.1", "tcp_idle_timeout": "2m", "udp_session_idle_timeout": "90s",`, 1)
-	document = strings.Replace(document,
-		`"protocol": {"type": "freedom"}`,
-		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s", "resolve_cache_ttl": "1m"}}}`, 1)
 
 	configuration, diagnostics := config.Parse([]byte(document), modules(t))
 	requireNoErrors(t, diagnostics)
@@ -670,6 +667,16 @@ func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 	inbound := configuration.Inbounds[0]
 	if inbound.TCPIdleTimeout != 2*time.Minute || inbound.UDPSessionIdleTimeout != 90*time.Second {
 		t.Errorf("inbound timeouts = %s, %s; want 2m, 90s", inbound.TCPIdleTimeout, inbound.UDPSessionIdleTimeout)
+	}
+}
+
+func TestUDPResolveSettingsPointToTheDNSSection(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"protocol": {"type": "freedom"}`,
+		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s", "resolve_cache_ttl": "1m"}}}`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.udp", "moved to the dns section") {
+		t.Errorf("udp's resolve settings were not refused with a pointer to dns: %v", diagnostics)
 	}
 }
 

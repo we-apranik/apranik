@@ -32,7 +32,9 @@ func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	for index, outbound := range coreBlueprint.Outbounds {
 		checkOutbound(&diagnostics, outbound, indexLocation("outbounds", index))
 	}
-	checkRouting(&diagnostics, coreBlueprint)
+	datasetKinds := checkDatasets(&diagnostics, coreBlueprint.Datasets)
+	checkDNS(&diagnostics, coreBlueprint, datasetKinds)
+	checkRouting(&diagnostics, coreBlueprint, datasetKinds)
 
 	if len(coreBlueprint.Inbounds) == 0 {
 		diagnostics.warnf("inbounds", "no inbounds configured, so nothing will accept traffic")
@@ -78,6 +80,10 @@ func checkTags(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 		loc := fieldLocation(indexLocation("outbounds", index), "tag")
 		if outbound.Tag == "" {
 			diagnostics.errorf(loc, "an outbound needs a tag")
+			continue
+		}
+		if outbound.Tag == blueprint.DefaultDNSOutboundTag {
+			diagnostics.errorf(loc, "tag %q is reserved for the freedom core builds for dns servers that name no outbound", outbound.Tag)
 			continue
 		}
 		if first, duplicate := seen[outbound.Tag]; duplicate {
@@ -182,6 +188,10 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 
 	if outbound.Server.IsValid() {
 		diagnostics.errorf(fieldLocation(loc, "server"), "%s reaches no proxy server, so it takes no server", freedomProtocol)
+	}
+	if outbound.DNSServer != "" {
+		diagnostics.errorf(fieldLocation(loc, "dns_server"),
+			"%s has no server name of its own to resolve; each destination is resolved by the dns rules", freedomProtocol)
 	}
 	if !outbound.StreamTransport.IsZero() {
 		diagnostics.errorf(fieldLocation(loc, "transport"), "freedom's transport belongs in its own stack, Freedom.StreamTransport")

@@ -85,8 +85,7 @@ func (c domainCondition) matches(request *routedRequest) bool {
 type destinationIPCondition []*match.PrefixMatcher
 
 func (c destinationIPCondition) matches(request *routedRequest) bool {
-	address, isIP := request.destinationIP()
-	return isIP && containedInAny(c, address)
+	return request.anyDestinationIP(func(address netip.Addr) bool { return containedInAny(c, address) })
 }
 
 type sourceIPCondition []*match.PrefixMatcher
@@ -108,8 +107,7 @@ func containedInAny(matchers []*match.PrefixMatcher, address netip.Addr) bool {
 type ipIsPrivateCondition bool
 
 func (c ipIsPrivateCondition) matches(request *routedRequest) bool {
-	address, isIP := request.destinationIP()
-	return isIP && match.IsPrivateAddress(address) == bool(c)
+	return request.anyDestinationIP(func(address netip.Addr) bool { return match.IsPrivateAddress(address) == bool(c) })
 }
 
 type destinationPortCondition struct{ ports *match.PortMatcher }
@@ -148,19 +146,17 @@ func (c sniffedBrowserFamilyCondition) matches(request *routedRequest) bool {
 	return sniffed != nil && sniffed.BrowserFamily != "" && slices.Contains(c, sniffed.BrowserFamily)
 }
 
-// A domain destination matches no version: the router does not resolve.
+// A domain destination matches no version until a resolve action has run.
 type ipVersionCondition []int
 
 func (c ipVersionCondition) matches(request *routedRequest) bool {
-	address, isIP := request.destinationIP()
-	if !isIP {
-		return false
-	}
-	version := 6
-	if address.Unmap().Is4() {
-		version = 4
-	}
-	return slices.Contains(c, version)
+	return request.anyDestinationIP(func(address netip.Addr) bool {
+		version := 6
+		if address.Unmap().Is4() {
+			version = 4
+		}
+		return slices.Contains(c, version)
+	})
 }
 
 type sourceIPIsPrivateCondition bool

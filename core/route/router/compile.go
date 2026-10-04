@@ -161,16 +161,18 @@ func (c ruleCompiler) dataset(tag string, kind blueprint.DatasetKind) (*dataset.
 
 func (c ruleCompiler) compileAction(action blueprint.Action) (compiledAction, error) {
 	set := 0
-	for _, isSet := range []bool{action.Route != nil, action.Block, action.Sniff != nil} {
+	for _, isSet := range []bool{action.Route != nil, action.Block, action.Sniff != nil, action.Resolve != nil} {
 		if isSet {
 			set++
 		}
 	}
 	if set != 1 {
-		return compiledAction{}, errors.New("an action must be exactly one of route, block and sniff")
+		return compiledAction{}, errors.New("an action must be exactly one of route, block, sniff and resolve")
 	}
 
 	switch {
+	case action.Resolve != nil:
+		return compiledAction{kind: actionResolve, resolveServer: action.Resolve.Server}, nil
 	case action.Route != nil:
 		outbound, found := c.outbounds[action.Route.Outbound]
 		if !found {

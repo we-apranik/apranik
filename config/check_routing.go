@@ -16,7 +16,7 @@ const longSniffTimeout = 5 * time.Second
 
 var knownBrowserFamilies = []string{spec.BrowserFamilyChromium, spec.BrowserFamilyFirefox, spec.BrowserFamilySafari}
 
-func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
+func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint, datasetKinds map[string]blueprint.DatasetKind) {
 	routing := coreBlueprint.Routing
 	if routing == nil {
 		if len(coreBlueprint.Outbounds) > 1 {
@@ -30,7 +30,8 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 		diagnostics:  diagnostics,
 		outbounds:    make(map[string]blueprint.Outbound, len(coreBlueprint.Outbounds)),
 		inbounds:     make(map[string]bool, len(coreBlueprint.Inbounds)),
-		datasetKinds: make(map[string]blueprint.DatasetKind, len(routing.Datasets)),
+		datasetKinds: datasetKinds,
+		dnsServers:   dnsServerTags(coreBlueprint.DNS),
 	}
 	for _, outbound := range coreBlueprint.Outbounds {
 		checker.outbounds[outbound.Tag] = outbound
@@ -39,10 +40,8 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 		checker.inbounds[inbound.Tag] = true
 	}
 
-	checker.checkDatasetDeclarations(routing.Datasets)
-
 	sniffedBefore := false
-	var pendingSniffLoc string
+	var pendingSniffLoc, pendingResolveLoc string
 	for index, rule := range routing.Rules {
 		ruleLoc := indexLocation(fieldLocation("routing", "rules"), index)
 		matchLoc := fieldLocation(ruleLoc, "match")
@@ -55,11 +54,17 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 		if pendingSniffLoc != "" && readsSniffedData(rule.Match) {
 			pendingSniffLoc = ""
 		}
+		if pendingResolveLoc != "" && readsDestinationIP(rule.Match) {
+			pendingResolveLoc = ""
+		}
 
 		checker.checkAction(rule.Action, actionLoc, rule.Match)
 		if rule.Action.Sniff != nil {
 			sniffedBefore = true
 			pendingSniffLoc = actionLoc
+		}
+		if rule.Action.Resolve != nil {
+			pendingResolveLoc = actionLoc
 		}
 
 		if isEmptyMatch(rule.Match) && endsEvaluation(rule.Action) && index < len(routing.Rules)-1 {
@@ -70,11 +75,14 @@ func checkRouting(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) 
 	if pendingSniffLoc != "" {
 		diagnostics.warnf(pendingSniffLoc, "no rule after this sniff reads a domain or a sniffed_* field, so sniffing only delays connections")
 	}
+	if pendingResolveLoc != "" {
+		diagnostics.warnf(pendingResolveLoc, "no rule after this resolve reads an IP field, so resolving only delays connections")
+	}
 
 	defaultLoc := fieldLocation("routing", "default_action")
 	switch action := routing.DefaultAction; {
-	case action.Sniff != nil:
-		diagnostics.errorf(defaultLoc, "default_action must route or block; sniff decides nothing")
+	case action.Sniff != nil, action.Resolve != nil:
+		diagnostics.errorf(defaultLoc, "default_action must route or block; sniff and resolve decide nothing")
 	case action.Route == nil && !action.Block:
 		diagnostics.errorf(defaultLoc, `routing needs a default_action, such as {"type": "route", "settings": {"outbound": "proxy"}}`)
 	default:
@@ -87,42 +95,47 @@ type routingChecker struct {
 	outbounds    map[string]blueprint.Outbound
 	inbounds     map[string]bool
 	datasetKinds map[string]blueprint.DatasetKind
+	dnsServers   map[string]bool
 }
 
-func (c routingChecker) checkDatasetDeclarations(datasets []blueprint.Dataset) {
+// checkDatasets checks the declarations and returns the kind of each it could
+// read, for the rules that name them.
+func checkDatasets(diagnostics *Diagnostics, datasets []blueprint.Dataset) map[string]blueprint.DatasetKind {
+	kinds := make(map[string]blueprint.DatasetKind, len(datasets))
 	seen := make(map[string]int, len(datasets))
 	for index, declaration := range datasets {
-		loc := indexLocation(fieldLocation("routing", "datasets"), index)
+		loc := indexLocation("datasets", index)
 		switch {
 		case declaration.Tag == "":
-			c.diagnostics.errorf(fieldLocation(loc, "tag"), "a dataset needs a tag")
+			diagnostics.errorf(fieldLocation(loc, "tag"), "a dataset needs a tag")
 		default:
 			if first, duplicate := seen[declaration.Tag]; duplicate {
-				c.diagnostics.errorf(fieldLocation(loc, "tag"), "tag %q is already used by routing.datasets[%d]", declaration.Tag, first)
+				diagnostics.errorf(fieldLocation(loc, "tag"), "tag %q is already used by datasets[%d]", declaration.Tag, first)
 			} else {
 				seen[declaration.Tag] = index
 			}
 		}
 		if declaration.File == "" {
-			c.diagnostics.report(fieldLocation(loc, "source"), errMissingField("file", "dataset source"))
+			diagnostics.report(fieldLocation(loc, "source"), errMissingField("file", "dataset source"))
 		}
 		formatLoc := fieldLocation(loc, "format")
 		if declaration.Format != blueprint.DatasetFormatGeodata {
-			c.diagnostics.errorf(fieldLocation(formatLoc, "type"), "unknown dataset format %q; want %q", declaration.Format, blueprint.DatasetFormatGeodata)
+			diagnostics.errorf(fieldLocation(formatLoc, "type"), "unknown dataset format %q; want %q", declaration.Format, blueprint.DatasetFormatGeodata)
 		}
 		switch declaration.Kind {
 		case blueprint.DatasetKindDomain, blueprint.DatasetKindIP:
-			c.datasetKinds[declaration.Tag] = declaration.Kind
+			kinds[declaration.Tag] = declaration.Kind
 		default:
-			c.diagnostics.errorf(fieldLocation(formatLoc, "kind"), "unknown kind %q; want %q or %q", declaration.Kind, blueprint.DatasetKindDomain, blueprint.DatasetKindIP)
+			diagnostics.errorf(fieldLocation(formatLoc, "kind"), "unknown kind %q; want %q or %q", declaration.Kind, blueprint.DatasetKindDomain, blueprint.DatasetKindIP)
 		}
 		if declaration.Format == blueprint.DatasetFormatGeodata && declaration.Category == "" {
-			c.diagnostics.report(formatLoc, errMissingField("category", "geodata format"))
+			diagnostics.report(formatLoc, errMissingField("category", "geodata format"))
 		}
 		if declaration.Attribute != "" && declaration.Kind == blueprint.DatasetKindIP {
-			c.diagnostics.errorf(fieldLocation(formatLoc, "attribute"), "attribute selects domain entries; an ip dataset has none")
+			diagnostics.errorf(fieldLocation(formatLoc, "attribute"), "attribute selects domain entries; an ip dataset has none")
 		}
 	}
+	return kinds
 }
 
 func (c routingChecker) checkMatch(fields blueprint.Match, loc string) {
@@ -156,13 +169,17 @@ func (c routingChecker) checkMatch(fields blueprint.Match, loc string) {
 }
 
 func (c routingChecker) checkDatasetReferences(tags []string, want blueprint.DatasetKind, loc string) {
+	checkDatasetReferences(c.diagnostics, c.datasetKinds, tags, want, loc)
+}
+
+func checkDatasetReferences(diagnostics *Diagnostics, datasetKinds map[string]blueprint.DatasetKind, tags []string, want blueprint.DatasetKind, loc string) {
 	for index, tag := range tags {
-		kind, declared := c.datasetKinds[tag]
+		kind, declared := datasetKinds[tag]
 		switch {
 		case !declared:
-			c.diagnostics.errorf(indexLocation(loc, index), "no dataset is tagged %q", tag)
+			diagnostics.errorf(indexLocation(loc, index), "no dataset is tagged %q", tag)
 		case kind != want:
-			c.diagnostics.errorf(indexLocation(loc, index), "dataset %q holds %s values; this field compares %s values", tag, kind, want)
+			diagnostics.errorf(indexLocation(loc, index), "dataset %q holds %s values; this field compares %s values", tag, kind, want)
 		}
 	}
 }
@@ -178,6 +195,10 @@ func (c routingChecker) checkAction(action blueprint.Action, loc string, fields 
 		}
 		if fields.Network == spec.NetworkUDP && !carriesUDP(outbound) {
 			c.diagnostics.warnf(settingsLoc, "outbound %q cannot carry UDP, so UDP routed here is dropped", outbound.Tag)
+		}
+	case action.Resolve != nil:
+		if server := action.Resolve.Server; server != "" && !c.dnsServers[server] {
+			c.diagnostics.errorf(fieldLocation(loc, "settings", "server"), "no dns server is tagged %q", server)
 		}
 	case action.Sniff != nil:
 		settingsLoc := fieldLocation(loc, "settings")
@@ -236,6 +257,13 @@ func readsSniffResultField(fields blueprint.Match) bool {
 	return len(fields.SniffedProtocols) > 0 || len(fields.SniffedRequestHeaders) > 0 || len(fields.SniffedBrowserFamilies) > 0
 }
 
+// The fields a resolve action's addresses feed.
+func readsDestinationIP(fields blueprint.Match) bool {
+	return anyNestedMatch(fields, func(each blueprint.Match) bool {
+		return len(each.IPs) > 0 || each.IPIsPrivate != nil || len(each.IPVersions) > 0 || len(each.IPDatasets) > 0
+	})
+}
+
 // Domain fields read the sniffed name when there is one.
 func readsSniffedData(fields blueprint.Match) bool {
 	return anyNestedMatch(fields, func(each blueprint.Match) bool {
@@ -260,13 +288,13 @@ func anyNestedMatch(fields blueprint.Match, test func(blueprint.Match) bool) boo
 	return false
 }
 
-// CheckDatasets reads every dataset the routing section declares, so a
+// CheckDatasets reads every dataset the config declares, so a
 // missing file, a missing category or a file of the other kind is reported
 // before anything runs. It reads files, which Check never does, so the
 // loaders call it after Check; a program building its own blueprint may too.
 func CheckDatasets(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	var diagnostics Diagnostics
-	if coreBlueprint == nil || coreBlueprint.Routing == nil {
+	if coreBlueprint == nil {
 		return diagnostics
 	}
 	// Declarations Check already refused are not read again.
@@ -274,7 +302,7 @@ func CheckDatasets(coreBlueprint *blueprint.Blueprint) Diagnostics {
 		readable  []blueprint.Dataset
 		positions []int
 	)
-	for index, declaration := range coreBlueprint.Routing.Datasets {
+	for index, declaration := range coreBlueprint.Datasets {
 		kindKnown := declaration.Kind == blueprint.DatasetKindDomain || declaration.Kind == blueprint.DatasetKindIP
 		if declaration.File != "" && declaration.Format == blueprint.DatasetFormatGeodata && kindKnown {
 			readable = append(readable, declaration)
@@ -284,7 +312,7 @@ func CheckDatasets(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	_, errs := dataset.LoadAll(readable)
 	for index, err := range errs {
 		if err != nil {
-			diagnostics.report(indexLocation(fieldLocation("routing", "datasets"), positions[index]), err)
+			diagnostics.report(indexLocation("datasets", positions[index]), err)
 		}
 	}
 	return diagnostics

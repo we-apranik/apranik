@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func listenLocal(t *testing.T) (spec.StreamListener, spec.Destination) {
 func connect(t *testing.T, ln spec.StreamListener, dst spec.Destination) (client, server spec.Stream) {
 	t.Helper()
 
-	d, err := (&tcp.Transport{}).NewStreamDialer()
+	d, err := (&tcp.Transport{}).NewStreamDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewStreamDialer: %v", err)
 	}
@@ -182,7 +183,7 @@ func TestDialAcceptsADomain(t *testing.T) {
 	ln, dst := listenLocal(t)
 	port := dst.Port()
 
-	d, err := (&tcp.Transport{}).NewStreamDialer()
+	d, err := (&tcp.Transport{}).NewStreamDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewStreamDialer: %v", err)
 	}
@@ -197,7 +198,7 @@ func TestDialAcceptsADomain(t *testing.T) {
 }
 
 func TestDialRejectsMalformedAddresses(t *testing.T) {
-	d, err := (&tcp.Transport{}).NewStreamDialer()
+	d, err := (&tcp.Transport{}).NewStreamDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewStreamDialer: %v", err)
 	}
@@ -334,6 +335,130 @@ func TestValidateRefusesNegativeKeepAliveIntervalAndCount(t *testing.T) {
 	} {
 		if err := settings.Validate(); err == nil {
 			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+// staticResolver answers from a table, so these tests reach no DNS server.
+type staticResolver map[string][]netip.Addr
+
+func (r staticResolver) ResolveDomain(_ context.Context, domain string) ([]netip.Addr, error) {
+	addresses, found := r[domain]
+	if !found {
+		return nil, errors.New("no such host")
+	}
+	return addresses, nil
+}
+
+var testResolver = staticResolver{"localhost": {netip.MustParseAddr("127.0.0.1")}}
+
+func TestNewStreamDialerRefusesNoResolver(t *testing.T) {
+	if _, err := (&tcp.Transport{}).NewStreamDialer(nil); err == nil {
+		t.Fatal("a dialer without a resolver was built")
+	}
+}
+
+func TestDialReportsAFailedLookup(t *testing.T) {
+	d, _ := (&tcp.Transport{}).NewStreamDialer(testResolver)
+	_, err := d.DialStream(context.Background(), domainDst("missing.example", 443))
+	if err == nil || !strings.Contains(err.Error(), "resolve missing.example") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// A first address that never answers costs about next_address_delay, not the
+// whole dial_timeout: the next address is tried beside it.
+func TestDialTriesTheNextAddressWhenTheFirstIsSlow(t *testing.T) {
+	ln, dst := listenLocal(t)
+	go ln.AcceptStream(context.Background())
+
+	resolver := staticResolver{"slow-first.example": {
+		netip.MustParseAddr("10.255.255.1"), // unroutable on most hosts: never answers
+		netip.MustParseAddr("127.0.0.1"),
+	}}
+	d, _ := (&tcp.Transport{Settings: tcp.Settings{
+		DialTimeout:      types.Duration(5 * time.Second),
+		NextAddressDelay: types.Duration(50 * time.Millisecond),
+	}}).NewStreamDialer(resolver)
+
+	started := time.Now()
+	c, err := d.DialStream(context.Background(), domainDst("slow-first.example", dst.Port()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("took %v: the second address waited for the first", elapsed)
+	}
+	if got := c.RemoteAddr().(*net.TCPAddr).IP.String(); got != "127.0.0.1" {
+		t.Fatalf("connected to %s", got)
+	}
+}
+
+func TestDialReportsEveryAddressThatFailed(t *testing.T) {
+	ln, dst := listenLocal(t)
+	ln.Close()
+	resolver := staticResolver{"closed.example": {netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("::1")}}
+	d, _ := (&tcp.Transport{}).NewStreamDialer(resolver)
+	_, err := d.DialStream(context.Background(), domainDst("closed.example", dst.Port()))
+	if err == nil {
+		t.Fatal("dialed a closed port")
+	}
+	for _, want := range []string{"127.0.0.1", "[::1]"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+}
+
+// The loser of a race that connects anyway is closed, not leaked.
+func TestDialClosesTheConnectionThatLostTheRace(t *testing.T) {
+	first, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	port := first.Addr().(*net.TCPAddr).Port
+	second, err := net.Listen("tcp", net.JoinHostPort("127.0.0.2", strconv.Itoa(port)))
+	if err != nil {
+		t.Skipf("no second loopback address here: %v", err)
+	}
+	defer second.Close()
+
+	resolver := staticResolver{"both.example": {netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("127.0.0.2")}}
+	d, _ := (&tcp.Transport{Settings: tcp.Settings{NextAddressDelay: types.Duration(time.Nanosecond)}}).NewStreamDialer(resolver)
+
+	accepted := make(chan net.Conn, 2)
+	for _, listener := range []net.Listener{first, second} {
+		go func() {
+			if connection, err := listener.Accept(); err == nil {
+				accepted <- connection
+			}
+		}()
+	}
+
+	client, err := d.DialStream(context.Background(), domainDst("both.example", uint16(port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	winner := client.RemoteAddr().String()
+
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case connection := <-accepted:
+			defer connection.Close()
+			if connection.LocalAddr().String() == winner {
+				continue
+			}
+			connection.SetReadDeadline(time.Now().Add(2 * time.Second))
+			if _, err := connection.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+				t.Fatalf("the losing connection was not closed: read returned %v", err)
+			}
+			return
+		case <-deadline:
+			t.Skip("only one attempt reached a listener; nothing lost the race")
 		}
 	}
 }

@@ -30,6 +30,8 @@ type rawConfig struct {
 	Log       rawLog        `json:"log"`
 	Inbounds  []rawInbound  `json:"inbounds"`
 	Outbounds []rawOutbound `json:"outbounds"`
+	Datasets  []rawDataset  `json:"datasets"`
+	DNS       *rawDNS       `json:"dns"`
 	Routing   *rawRouting   `json:"routing"`
 }
 
@@ -86,6 +88,9 @@ type rawOutbound struct {
 
 	// A proxy protocol, or the special protocol freedom.
 	Protocol rawModule `json:"protocol"`
+
+	// The DNS server that resolves server when it is a domain.
+	DNSServer string `json:"dns_server"`
 }
 
 // Freedom's TCP is its outbound's transport stack; its UDP is always plain

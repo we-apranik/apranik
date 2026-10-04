@@ -24,6 +24,13 @@ type Blueprint struct {
 	Inbounds  []Inbound
 	Outbounds []Outbound
 
+	// Named lists of values that routing and DNS rules look up.
+	Datasets []Dataset
+
+	// Nil means every name is resolved by the operating system, as before
+	// DNS existed.
+	DNS *DNS
+
 	// Nil means every request takes the first outbound.
 	Routing *Routing
 }
@@ -102,6 +109,11 @@ type Outbound struct {
 	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	Freedom *Freedom
+
+	// Only with Proxy: the DNS server that resolves Server when it is a
+	// domain, so the proxy's own name never loops through a DNS server that
+	// uses the proxy. Empty means the dns section's default server.
+	DNSServer string
 }
 
 // Mixed serves SOCKS5 and HTTP on one port; core picks one per connection

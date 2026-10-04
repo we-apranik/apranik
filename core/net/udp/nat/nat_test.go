@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
@@ -25,7 +26,7 @@ import (
 func countingDialer(t *testing.T) (nat.CreateDatagramFunc, func() int) {
 	t.Helper()
 
-	real, err := (&udp.Transport{}).NewDatagramDialer()
+	real, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -321,7 +322,7 @@ func TestIdleEntryIsReapedAndRedialedOnNextUse(t *testing.T) {
 }
 
 func TestCloseEndsTheSocketsItDialed(t *testing.T) {
-	real, err := (&udp.Transport{}).NewDatagramDialer()
+	real, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -508,7 +509,7 @@ func TestWriteToAfterCloseOnAFreshKeyReturnsErrClosed(t *testing.T) {
 // Racing first writes to one key may dial more than once, but only one socket
 // may survive: the losers must be closed, not leaked.
 func TestConcurrentFirstWritesLeaveOneSocket(t *testing.T) {
-	real, err := (&udp.Transport{}).NewDatagramDialer()
+	real, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}

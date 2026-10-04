@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"encoding/json"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -15,7 +16,20 @@ import (
 )
 
 // goodDocument with two outbounds and the given routing section.
+// withRouting adds routing to a good document. A "datasets" key written in
+// routing, where it used to live, is moved to the top level, where it lives now.
 func withRouting(routing string) string {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(routing), &fields); err != nil {
+		panic(err)
+	}
+	datasets, hasDatasets := fields["datasets"]
+	if hasDatasets {
+		delete(fields, "datasets")
+		hoisted, _ := json.Marshal(fields)
+		routing = string(hoisted)
+	}
+
 	document := strings.Replace(goodDocument, `"outbounds": [{
     "tag": "freedom",
     "protocol": {"type": "freedom"}
@@ -24,7 +38,11 @@ func withRouting(routing string) string {
     {"tag": "direct", "protocol": {"type": "freedom"}},
     {"tag": "proxy", "server": "example.com", "server_port": 1080, "transport": [{"type": "tcp"}], "protocol": {"type": "socks5"}}
   ]`, 1)
-	return strings.TrimSuffix(strings.TrimSpace(document), "}") + `, "routing": ` + routing + `}`
+	document = strings.TrimSuffix(strings.TrimSpace(document), "}")
+	if hasDatasets {
+		document += `, "datasets": ` + string(datasets)
+	}
+	return document + `, "routing": ` + routing + `}`
 }
 
 const everyField = `{
@@ -160,14 +178,14 @@ func TestRoutingRefusals(t *testing.T) {
 		{"unknown dataset", `{"rules": [{"match": {"domain_in_dataset": ["ir"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.domain_in_dataset[0]", `no dataset is tagged "ir"`},
 		{"dataset of the wrong kind", `{"datasets": [{"tag": "ir-ips", "source": {"file": "geoip.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir"}}],
 		  "rules": [{"match": {"domain_in_dataset": ["ir-ips"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`, "routing.rules[0].match.domain_in_dataset[0]", "holds ip values"},
-		{"dataset without kind", `{"datasets": [{"tag": "x", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "category": "ir"}}], "default_action": {"type": "block"}}`, "routing.datasets[0].format.kind", "unknown kind"},
-		{"dataset unknown format", `{"datasets": [{"tag": "x", "source": {"file": "x.srs"}, "format": {"type": "srs", "kind": "domain"}}], "default_action": {"type": "block"}}`, "routing.datasets[0].format.type", `"srs"`},
-		{"dataset without category", `{"datasets": [{"tag": "x", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "kind": "domain"}}], "default_action": {"type": "block"}}`, "routing.datasets[0].format", `"category"`},
-		{"dataset without file", `{"datasets": [{"tag": "x", "format": {"type": "geodata", "kind": "domain", "category": "ir"}}], "default_action": {"type": "block"}}`, "routing.datasets[0].source", `"file"`},
-		{"ip dataset with attribute", `{"datasets": [{"tag": "x", "source": {"file": "geoip.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir", "attribute": "cn"}}], "default_action": {"type": "block"}}`, "routing.datasets[0].format.attribute", "domain entries"},
+		{"dataset without kind", `{"datasets": [{"tag": "x", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "category": "ir"}}], "default_action": {"type": "block"}}`, "datasets[0].format.kind", "unknown kind"},
+		{"dataset unknown format", `{"datasets": [{"tag": "x", "source": {"file": "x.srs"}, "format": {"type": "srs", "kind": "domain"}}], "default_action": {"type": "block"}}`, "datasets[0].format.type", `"srs"`},
+		{"dataset without category", `{"datasets": [{"tag": "x", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "kind": "domain"}}], "default_action": {"type": "block"}}`, "datasets[0].format", `"category"`},
+		{"dataset without file", `{"datasets": [{"tag": "x", "format": {"type": "geodata", "kind": "domain", "category": "ir"}}], "default_action": {"type": "block"}}`, "datasets[0].source", `"file"`},
+		{"ip dataset with attribute", `{"datasets": [{"tag": "x", "source": {"file": "geoip.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir", "attribute": "cn"}}], "default_action": {"type": "block"}}`, "datasets[0].format.attribute", "domain entries"},
 		{"duplicate dataset tag", `{"datasets": [
 		  {"tag": "x", "source": {"file": "a.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir"}},
-		  {"tag": "x", "source": {"file": "b.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir"}}], "default_action": {"type": "block"}}`, "routing.datasets[1].tag", "already used"},
+		  {"tag": "x", "source": {"file": "b.dat"}, "format": {"type": "geodata", "kind": "ip", "category": "ir"}}], "default_action": {"type": "block"}}`, "datasets[1].tag", "already used"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -201,6 +219,15 @@ func TestRoutingWarnings(t *testing.T) {
 				t.Errorf("want a warning at %s containing %q; got:\n%v", testCase.location, testCase.message, diagnostics)
 			}
 		})
+	}
+}
+
+func TestDatasetsInRoutingPointToTheTopLevel(t *testing.T) {
+	document := strings.TrimSuffix(strings.TrimSpace(goodDocument), "}") +
+		`, "routing": {"datasets": [], "default_action": {"type": "route", "settings": {"outbound": "freedom"}}}}`
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "routing.datasets", "moved to the top level") {
+		t.Errorf("routing.datasets was not refused with a pointer: %v", diagnostics)
 	}
 }
 
@@ -251,7 +278,7 @@ func TestLoadFileResolvesAndReadsDatasets(t *testing.T) {
 
 	configuration, diagnostics := config.LoadFile(configPath, modules(t))
 	requireNoErrors(t, diagnostics)
-	if got := configuration.Routing.Datasets[0].File; got != filepath.Join(directory, "geosite.dat") {
+	if got := configuration.Datasets[0].File; got != filepath.Join(directory, "geosite.dat") {
 		t.Errorf("dataset file = %q, want it resolved against the config's directory", got)
 	}
 
@@ -260,7 +287,7 @@ func TestLoadFileResolvesAndReadsDatasets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, diagnostics = config.LoadFile(configPath, modules(t))
-	if !diagnostics.HasErrors() || !find(diagnostics, "routing.datasets[0]", `"cn"`) {
+	if !diagnostics.HasErrors() || !find(diagnostics, "datasets[0]", `"cn"`) {
 		t.Errorf("a missing category was not reported at its dataset: %v", diagnostics)
 	}
 
@@ -269,7 +296,7 @@ func TestLoadFileResolvesAndReadsDatasets(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, diagnostics = config.LoadFile(configPath, modules(t))
-	if !diagnostics.HasErrors() || !find(diagnostics, "routing.datasets[0]", "holds IP ranges") {
+	if !diagnostics.HasErrors() || !find(diagnostics, "datasets[0]", "holds IP ranges") {
 		t.Errorf("a geoip file declared as domains was not reported: %v", diagnostics)
 	}
 }
@@ -277,7 +304,7 @@ func TestLoadFileResolvesAndReadsDatasets(t *testing.T) {
 func TestParseWithoutBaseDirectoryKeepsRelativePaths(t *testing.T) {
 	configuration, diagnostics := config.Parse([]byte(withRouting(datasetRouting)), modules(t))
 	requireNoErrors(t, diagnostics)
-	if got := configuration.Routing.Datasets[0].File; got != "geosite.dat" {
+	if got := configuration.Datasets[0].File; got != "geosite.dat" {
 		t.Errorf("dataset file = %q, want it left relative", got)
 	}
 }

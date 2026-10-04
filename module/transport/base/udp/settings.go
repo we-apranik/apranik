@@ -1,45 +1,29 @@
 package udp
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/The-Apranik/Apranik/config/types"
+	"encoding/json"
+	"errors"
 )
 
 // Addresses are parameters, not settings: a listener is handed its bind
-// address, and a dialer whichever local address the caller wants.
+// address, and a dialer whichever local address the caller wants. Resolving is
+// the resolver's, so its timeout and cache are configured in the
+// dns section, not here.
 type Settings struct {
-	// Bounds one lookup of a domain a write is addressed to. WriteTo has no
-	// context of its own, so without it a resolver that never answers stalls
-	// the write path.
-	ResolveTimeout types.Duration `json:"resolve_timeout"`
-
-	// How long a resolved domain is reused. Go's resolver does not report the
-	// record's TTL, so this is a fixed compromise.
-	ResolveCacheTTL types.Duration `json:"resolve_cache_ttl"`
+	// Moved to the dns section; read only to say so.
+	MovedResolveTimeout  json.RawMessage `json:"resolve_timeout,omitempty"`
+	MovedResolveCacheTTL json.RawMessage `json:"resolve_cache_ttl,omitempty"`
 }
 
 func (s *Settings) Validate() error {
-	if time.Duration(s.ResolveTimeout) < 0 {
-		return fmt.Errorf("udp: resolve_timeout %s must not be negative", s.ResolveTimeout)
+	var errs []error
+	if s.MovedResolveTimeout != nil {
+		errs = append(errs, errors.New(`udp: resolve_timeout moved to the dns section: each DNS server bounds its own queries with "settings": {"timeout": "5s"}`))
 	}
-	if time.Duration(s.ResolveCacheTTL) < 0 {
-		return fmt.Errorf("udp: resolve_cache_ttl %s must not be negative", s.ResolveCacheTTL)
+	if s.MovedResolveCacheTTL != nil {
+		errs = append(errs, errors.New(`udp: resolve_cache_ttl moved to the dns section: answers are cached for their TTL, configured under "dns": {"cache": {...}}`))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (s *Settings) Warnings() []string { return nil }
-
-// Zero means the default, so a Transport built without its constructor works.
-func (s *Settings) resolverPolicy() resolverPolicy {
-	policy := resolverPolicy{timeout: time.Duration(s.ResolveTimeout), cacheTTL: time.Duration(s.ResolveCacheTTL)}
-	if policy.timeout == 0 {
-		policy.timeout = DefaultResolveTimeout
-	}
-	if policy.cacheTTL == 0 {
-		policy.cacheTTL = DefaultResolveCacheTTL
-	}
-	return policy
-}

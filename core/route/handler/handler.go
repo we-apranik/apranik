@@ -24,6 +24,7 @@ type Handler struct {
 	router                component.Router
 	streamIdleTimeout     time.Duration
 	udpSessionIdleTimeout time.Duration
+	resolver              DomainResolver
 	logger                *logging.Logger
 }
 
@@ -34,6 +35,9 @@ type Config struct {
 
 	// Zero means session.DefaultIdleTimeout.
 	UDPSessionIdleTimeout time.Duration
+
+	// What a routing resolve action asks. Nil: a resolve finds nothing.
+	Resolver DomainResolver
 
 	// Nil is allowed: New substitutes a silent logger.
 	Logger *logging.Logger
@@ -52,12 +56,13 @@ func New(router component.Router, config Config) *Handler {
 		router:                router,
 		streamIdleTimeout:     streamIdleTimeout,
 		udpSessionIdleTimeout: config.UDPSessionIdleTimeout,
+		resolver:              config.Resolver,
 		logger:                logger,
 	}
 }
 
 func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, metadata spec.Metadata) error {
-	informant := newStreamTrafficInformant(metadata, clientStream)
+	informant := newStreamTrafficInformant(metadata, clientStream, h.resolver, h.logger)
 	decision, err := h.router.Route(ctx, informant)
 	clientStream = informant.streamToRelay()
 	metadata = informant.Metadata()
@@ -126,7 +131,7 @@ func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.
 	packetMetadata.Network = spec.NetworkUDP
 	packetMetadata.Destination = destination
 
-	decision, err := h.router.Route(ctx, udpSessionTrafficInformant{metadata: packetMetadata})
+	decision, err := h.router.Route(ctx, &udpSessionTrafficInformant{metadata: packetMetadata, resolver: h.resolver, logger: h.logger})
 	if err != nil {
 		return component.Decision{}, fmt.Errorf("handler: routing %s: %w", destination, err)
 	}

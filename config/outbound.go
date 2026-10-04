@@ -20,7 +20,7 @@ const (
 )
 
 func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Outbound {
-	outbound := blueprint.Outbound{Tag: raw.Tag}
+	outbound := blueprint.Outbound{Tag: raw.Tag, DNSServer: raw.DNSServer}
 
 	if raw.MovedDialTimeout != nil {
 		b.diagnostics.errorf(fieldLocation(loc, "dial_timeout"),

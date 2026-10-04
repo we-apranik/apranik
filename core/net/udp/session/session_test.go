@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
@@ -393,7 +394,7 @@ func TestTwoSessionsToOneDestinationUseDifferentSockets(t *testing.T) {
 	local := peer.LocalAddr().(*net.UDPAddr)
 	target := destinationOf(t, "127.0.0.1", uint16(local.Port))
 
-	dialer, err := (&udp.Transport{}).NewDatagramDialer()
+	dialer, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}

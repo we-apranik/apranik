@@ -12,6 +12,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/outbound"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
@@ -101,7 +102,7 @@ func TestTwoUDPSessionsToOneDestinationDoNotCross(t *testing.T) {
 		t.Fatalf("NewDestinationFromIP: %v", err)
 	}
 
-	dialer, err := (&udp.Transport{}).NewDatagramDialer()
+	dialer, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -244,7 +245,7 @@ func TestBlockedUDPDestinationIsDroppedOthersPass(t *testing.T) {
 	allowed := startUDPEchoServer(t)
 	blocked := startUDPEchoServer(t)
 
-	dialer, err := (&udp.Transport{}).NewDatagramDialer()
+	dialer, err := (&udp.Transport{}).NewDatagramDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

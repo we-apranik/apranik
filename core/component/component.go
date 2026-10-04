@@ -5,6 +5,7 @@ package component
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
@@ -30,6 +31,13 @@ type RouterTrafficInformant interface {
 	// sniffs; later calls return its result. Nil when nothing was recognised
 	// or the traffic cannot be sniffed, such as a UDP session.
 	Sniff(ctx context.Context, sniffers []spec.Sniffer, timeout time.Duration) *spec.SniffResult
+
+	// Resolve looks the destination's domain up, asking the DNS server tagged
+	// serverTag, or the one the DNS rules pick when it is empty.
+	// Only the first call resolves; later calls return its result. Nil when
+	// the destination is an IP, or the lookup failed. The destination itself
+	// is never rewritten.
+	Resolve(ctx context.Context, serverTag string) []netip.Addr
 }
 
 // Decision is the router's answer. A nil Outbound means the request is

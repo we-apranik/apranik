@@ -24,7 +24,7 @@ func (s settings) Info() spec.ModuleInfo {
 
 type baseStream struct{ settings }
 
-func (baseStream) NewStreamDialer() (spec.StreamDialer, error) { return nil, nil }
+func (baseStream) NewStreamDialer(spec.Resolver) (spec.StreamDialer, error) { return nil, nil }
 func (baseStream) NewStreamListener(spec.Endpoint) (spec.StreamListener, error) {
 	return nil, nil
 }
@@ -36,8 +36,8 @@ func (overlayStream) NewStreamOverlayServer() (spec.StreamOverlayServer, error) 
 
 type baseDatagram struct{ settings }
 
-func (baseDatagram) NewDatagramDialer() (spec.DatagramDialer, error) { return nil, nil }
-func (baseDatagram) NewDatagramListener(spec.Endpoint) (spec.DatagramListener, error) {
+func (baseDatagram) NewDatagramDialer(spec.Resolver) (spec.DatagramDialer, error) { return nil, nil }
+func (baseDatagram) NewDatagramListener(spec.Endpoint, spec.Resolver) (spec.DatagramListener, error) {
 	return nil, nil
 }
 

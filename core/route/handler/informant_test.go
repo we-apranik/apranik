@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/component"
+	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -28,7 +29,7 @@ func TestStreamInformantSniffsOnceAndReplays(t *testing.T) {
 	defer clientSide.Close()
 	go clientSide.Write([]byte("abcdefgh"))
 
-	informant := newStreamTrafficInformant(spec.Metadata{}, pipeStream{handlerSide})
+	informant := newStreamTrafficInformant(spec.Metadata{}, pipeStream{handlerSide}, nil, logging.Discard())
 	calls := 0
 	sniffers := []spec.Sniffer{prefixSniffer{&calls}}
 	first := informant.Sniff(context.Background(), sniffers, time.Second)
@@ -48,7 +49,7 @@ func TestStreamInformantSniffsOnceAndReplays(t *testing.T) {
 
 func TestStreamInformantWithoutSniffRelaysTheStreamItself(t *testing.T) {
 	stream := pipeStream{}
-	informant := newStreamTrafficInformant(spec.Metadata{}, stream)
+	informant := newStreamTrafficInformant(spec.Metadata{}, stream, nil, logging.Discard())
 	if informant.streamToRelay() != spec.Stream(stream) {
 		t.Fatal("a stream nobody sniffed was wrapped")
 	}
@@ -60,7 +61,7 @@ func TestStreamInformantReusesAPeekableStream(t *testing.T) {
 	go clientSide.Write([]byte("abcd"))
 	alreadyPeekable := peekable.NewStream(pipeStream{handlerSide})
 
-	informant := newStreamTrafficInformant(spec.Metadata{}, alreadyPeekable)
+	informant := newStreamTrafficInformant(spec.Metadata{}, alreadyPeekable, nil, logging.Discard())
 	calls := 0
 	informant.Sniff(context.Background(), []spec.Sniffer{prefixSniffer{&calls}}, time.Second)
 	if informant.streamToRelay() != spec.Stream(alreadyPeekable) {
@@ -77,7 +78,7 @@ func BenchmarkRouteStreamWithoutRules(b *testing.B) {
 	ctx := context.Background()
 	b.ReportAllocs()
 	for b.Loop() {
-		informant := newStreamTrafficInformant(metadata, stream)
+		informant := newStreamTrafficInformant(metadata, stream, nil, logging.Discard())
 		router.Route(ctx, informant)
 		_ = informant.streamToRelay()
 	}

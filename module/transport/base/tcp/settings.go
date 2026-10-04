@@ -26,6 +26,11 @@ type Settings struct {
 	// defaultDialTimeout.
 	DialTimeout types.Duration `json:"dial_timeout"`
 
+	// When a domain has several addresses, how long one connection attempt
+	// runs before the next starts beside it (RFC 8305's Connection Attempt
+	// Delay). Zero means defaultNextAddressDelay.
+	NextAddressDelay types.Duration `json:"next_address_delay"`
+
 	// Disables Nagle's algorithm. On by default: a proxy carries interactive
 	// traffic, where coalescing small writes shows up as lag.
 	NoDelay bool `json:"no_delay"`
@@ -34,6 +39,9 @@ type Settings struct {
 func (s *Settings) Validate() error {
 	if s.DialTimeout < 0 {
 		return fmt.Errorf("tcp: dial_timeout %s must not be negative", s.DialTimeout)
+	}
+	if s.NextAddressDelay < 0 {
+		return fmt.Errorf("tcp: next_address_delay %s must not be negative", s.NextAddressDelay)
 	}
 	if time.Duration(s.KeepAlive) > 24*time.Hour {
 		return fmt.Errorf("tcp: keep_alive %s is longer than a day, which is almost certainly a mistake", s.KeepAlive)
@@ -49,6 +57,16 @@ func (s *Settings) Validate() error {
 
 // PROVISIONAL.
 const defaultDialTimeout = 10 * time.Second
+
+// PROVISIONAL: the delay RFC 8305 recommends.
+const defaultNextAddressDelay = 250 * time.Millisecond
+
+func (s *Settings) nextAddressDelay() time.Duration {
+	if s.NextAddressDelay == 0 {
+		return defaultNextAddressDelay
+	}
+	return time.Duration(s.NextAddressDelay)
+}
 
 func (s *Settings) dialTimeout() time.Duration {
 	if s.DialTimeout == 0 {

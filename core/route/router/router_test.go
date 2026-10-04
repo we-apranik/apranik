@@ -34,6 +34,16 @@ type fakeInformant struct {
 	metadata   spec.Metadata
 	sniffed    *spec.SniffResult
 	sniffCalls int
+
+	resolved      []netip.Addr
+	resolveCalls  int
+	resolveServer string
+}
+
+func (f *fakeInformant) Resolve(_ context.Context, serverTag string) []netip.Addr {
+	f.resolveCalls++
+	f.resolveServer = serverTag
+	return f.resolved
 }
 
 func (f *fakeInformant) Metadata() spec.Metadata { return f.metadata }
@@ -303,6 +313,62 @@ func TestDomainRulesReadTheSniffedNameFirst(t *testing.T) {
 	emptySniff := &fakeInformant{metadata: tcpTo(toDomain("digikala.ir", 443)), sniffed: &spec.SniffResult{Protocol: "http"}}
 	if got := decide(t, router, emptySniff); got != "direct" {
 		t.Errorf("got %s, want direct: no sniffed name falls back to the destination", got)
+	}
+}
+
+func TestResolveFeedsIPRulesWithoutRewritingTheDestination(t *testing.T) {
+	yes := true
+	router := mustRouter(t, blueprint.Routing{
+		Rules: []blueprint.Rule{
+			{Match: blueprint.Match{IPDatasets: []string{"ir-ips"}}, Action: route("other")}, // before resolve: a domain matches no IP rule
+			{Match: blueprint.Match{Ports: portRange(22, 22)}, Action: route("direct")},
+			{Match: blueprint.Match{Network: spec.NetworkTCP}, Action: blueprint.Action{Resolve: &blueprint.ResolveAction{Server: "cf"}}},
+			{Match: blueprint.Match{IPDatasets: []string{"ir-ips"}}, Action: route("direct")},
+			{Match: blueprint.Match{IPIsPrivate: &yes}, Action: block},
+			{Match: blueprint.Match{IPVersions: []int{6}}, Action: route("other")},
+		},
+		DefaultAction: route("proxy"),
+	})
+
+	ssh := &fakeInformant{metadata: tcpTo(toDomain("server.example", 22))}
+	if got := decide(t, router, ssh); got != "direct" || ssh.resolveCalls != 0 {
+		t.Errorf("ssh: got %s after %d lookups, want direct with none", got, ssh.resolveCalls)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		resolved []netip.Addr
+		want     string
+	}{
+		{"an Iranian address", []netip.Addr{netip.MustParseAddr("8.8.8.8"), netip.MustParseAddr("185.143.233.2")}, "direct"},
+		{"a private address", []netip.Addr{netip.MustParseAddr("10.0.0.5")}, "block"},
+		{"an IPv6 address", []netip.Addr{netip.MustParseAddr("2001:db8::1")}, "other"},
+		{"nothing resolved", nil, "proxy"},
+	} {
+		informant := &fakeInformant{metadata: tcpTo(toDomain("shop.example", 443)), resolved: tc.resolved}
+		if got := decide(t, router, informant); got != tc.want {
+			t.Errorf("%s: got %s, want %s", tc.name, got, tc.want)
+		}
+		if informant.resolveCalls != 1 || informant.resolveServer != "cf" {
+			t.Errorf("%s: %d lookups with server %q, want one with cf", tc.name, informant.resolveCalls, informant.resolveServer)
+		}
+		if domain, _ := informant.Metadata().Destination.Domain(); domain != "shop.example" {
+			t.Errorf("%s: the destination was rewritten", tc.name)
+		}
+	}
+
+	// An IP destination is its own answer; what a resolve found does not
+	// replace it.
+	byIP := &fakeInformant{metadata: tcpTo(toIP("8.8.8.8", 443)), resolved: []netip.Addr{netip.MustParseAddr("185.143.233.2")}}
+	if got := decide(t, router, byIP); got != "proxy" {
+		t.Errorf("IP destination: got %s, want proxy", got)
+	}
+}
+
+func TestResolveCannotBeTheDefault(t *testing.T) {
+	_, err := New(Config{Routing: blueprint.Routing{DefaultAction: blueprint.Action{Resolve: &blueprint.ResolveAction{}}}, Outbounds: outbounds("proxy")})
+	if err == nil {
+		t.Fatal("a resolve default was accepted")
 	}
 }
 

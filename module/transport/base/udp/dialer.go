@@ -9,7 +9,7 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-type datagramDialer struct{ resolver resolverPolicy }
+type datagramDialer struct{ resolver spec.Resolver }
 
 // One socket per call: every caller needs its own ephemeral port.
 // A zero localAddr, which is most of the time, takes any address and any free

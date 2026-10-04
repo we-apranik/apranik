@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
@@ -36,7 +37,7 @@ func bindLocal(t *testing.T) (spec.Datagram, spec.Destination) {
 func bindLocalOn(t *testing.T, ip netip.Addr) (spec.Datagram, spec.Destination) {
 	t.Helper()
 
-	ln, err := (&udp.Transport{}).NewDatagramListener(endpoint(ip.String(), 0))
+	ln, err := (&udp.Transport{}).NewDatagramListener(endpoint(ip.String(), 0), testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramListener: %v", err)
 	}
@@ -57,7 +58,7 @@ func bindLocalOn(t *testing.T, ip netip.Addr) (spec.Datagram, spec.Destination) 
 func TestDatagramsTravelBothWays(t *testing.T) {
 	server, serverAddr := bindLocal(t)
 
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestDatagramsTravelBothWays(t *testing.T) {
 func TestWriteToADomain(t *testing.T) {
 	server, serverAddr := bindLocal(t)
 
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestOneDatagramReachesBothAddressFamilies(t *testing.T) {
 	v4, v4Addr := bindLocal(t)
 	v6, v6Addr := bindLocalOn(t, netip.MustParseAddr("::1"))
 
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestOneDatagramReachesBothAddressFamilies(t *testing.T) {
 // A caller that cares which interface traffic leaves by passes a local
 // address; the usual caller passes a zero one and gets an ephemeral port.
 func TestCreateDatagramBindsWhereTheCallerAsks(t *testing.T) {
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -233,7 +234,7 @@ func TestInfoIsConstant(t *testing.T) {
 }
 
 func TestBadBindAddressIsRefusedWhileBuilding(t *testing.T) {
-	if _, err := (&udp.Transport{}).NewDatagramListener(spec.Endpoint{}); err == nil {
+	if _, err := (&udp.Transport{}).NewDatagramListener(spec.Endpoint{}, testResolver); err == nil {
 		t.Error("NewDatagramListener with neither domain nor IP succeeded, want an error")
 	}
 }
@@ -241,7 +242,7 @@ func TestBadBindAddressIsRefusedWhileBuilding(t *testing.T) {
 // Port 0 is what a SOCKS5 associate socket asks for. Nothing is bound until
 // ListenDatagram, so there is no address to report before it.
 func TestBindAcceptsAnEphemeralPort(t *testing.T) {
-	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0))
+	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0), testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramListener: %v", err)
 	}
@@ -267,7 +268,7 @@ func TestBindAcceptsAnEphemeralPort(t *testing.T) {
 // Two datagrams would share one connection, so either one's Close would take
 // the other down with it.
 func TestListenDatagramHandsOutOneDatagram(t *testing.T) {
-	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0))
+	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0), testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramListener: %v", err)
 	}
@@ -283,7 +284,7 @@ func TestListenDatagramHandsOutOneDatagram(t *testing.T) {
 
 // A cancelled context must not leave a socket open behind it.
 func TestCreateDatagramHonoursACancelledContext(t *testing.T) {
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -301,7 +302,7 @@ func TestCreateDatagramHonoursACancelledContext(t *testing.T) {
 func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 	server, serverAddr := bindLocal(t)
 
-	d, err := (&udp.Transport{}).NewDatagramDialer()
+	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -324,7 +325,7 @@ func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 // what it resolved to: that is the only way a NAT above it can match a reply,
 // which always arrives from an IP, against a domain destination.
 func TestSocketReportsWhatItResolvedTo(t *testing.T) {
-	dialer, err := (&udp.Transport{}).NewDatagramDialer()
+	dialer, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
 		t.Fatalf("NewDatagramDialer: %v", err)
 	}
@@ -366,7 +367,7 @@ func benchmarkSocketAndPeer(b *testing.B) (spec.Datagram, *net.UDPConn) {
 	}
 	b.Cleanup(func() { peer.Close() })
 
-	dialer, err := udp.NewBaseDatagramTransportModule().NewDatagramDialer()
+	dialer, err := udp.NewBaseDatagramTransportModule().NewDatagramDialer(testResolver)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -435,5 +436,68 @@ func BenchmarkSocketReadFrom(b *testing.B) {
 		if _, _, err := socket.ReadFrom(buffer); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// countingResolver answers from a table and counts lookups, so these tests
+// reach no DNS server.
+type countingResolver struct {
+	addresses map[string][]netip.Addr
+	lookups   atomic.Int64
+}
+
+func (r *countingResolver) ResolveDomain(_ context.Context, domain string) ([]netip.Addr, error) {
+	r.lookups.Add(1)
+	addresses, found := r.addresses[domain]
+	if !found {
+		return nil, errors.New("no such host")
+	}
+	return addresses, nil
+}
+
+var testResolver = &countingResolver{addresses: map[string][]netip.Addr{
+	"localhost": {netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("::1")},
+}}
+
+func TestNewDialerAndListenerRefuseNoResolver(t *testing.T) {
+	if _, err := (&udp.Transport{}).NewDatagramDialer(nil); err == nil {
+		t.Error("a dialer without a resolver was built")
+	}
+	if _, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0), nil); err == nil {
+		t.Error("a listener without a resolver was built")
+	}
+}
+
+// The resolver's order decides, and a stream of datagrams to one domain asks
+// the resolver once, not per datagram.
+func TestSocketResolvesThroughTheResolverInItsOrder(t *testing.T) {
+	peer, err := net.ListenUDP("udp6", &net.UDPAddr{IP: net.IPv6loopback})
+	if err != nil {
+		t.Skipf("no IPv6 loopback here: %v", err)
+	}
+	defer peer.Close()
+
+	resolver := &countingResolver{addresses: map[string][]netip.Addr{
+		"v6first.example": {netip.MustParseAddr("::1"), netip.MustParseAddr("127.0.0.1")},
+	}}
+	dialer, _ := (&udp.Transport{}).NewDatagramDialer(resolver)
+	client, err := dialer.CreateDatagram(context.Background(), spec.Endpoint{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	to := domainDst("v6first.example", uint16(peer.LocalAddr().(*net.UDPAddr).Port))
+	for range 5 {
+		_, sentTo, err := client.(spec.ResolvedWriter).WriteToResolved([]byte("x"), to)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sentTo.Addr() != netip.MustParseAddr("::1") {
+			t.Fatalf("sent to %s, want the resolver's first address ::1", sentTo)
+		}
+	}
+	if got := resolver.lookups.Load(); got != 1 {
+		t.Fatalf("%d lookups for 5 datagrams, want 1", got)
 	}
 }

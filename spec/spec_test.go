@@ -44,3 +44,37 @@ func BenchmarkNewEndpointFromTCPAddr(b *testing.B) {
 		spec.NewEndpointFromNetAddr(address)
 	}
 }
+
+type fakeConfig struct{}
+
+func (fakeConfig) Validate() error    { return nil }
+func (fakeConfig) Warnings() []string { return nil }
+
+type fakeStreamDNSServerModule struct{ fakeConfig }
+
+func (fakeStreamDNSServerModule) Info() spec.ModuleInfo { return spec.ModuleInfo{Name: "fake"} }
+func (fakeStreamDNSServerModule) NeedsTLS() bool        { return true }
+func (fakeStreamDNSServerModule) NewStreamDNSServer(spec.StreamDialer) (spec.DNSServer, error) {
+	return nil, nil
+}
+
+type fakeDatagramDNSServerModule struct{ fakeConfig }
+
+func (fakeDatagramDNSServerModule) Info() spec.ModuleInfo { return spec.ModuleInfo{Name: "fake"} }
+func (fakeDatagramDNSServerModule) NewDatagramDNSServer(spec.DatagramDialer) (spec.DNSServer, error) {
+	return nil, nil
+}
+
+func TestDNSServerKindsAreModules(t *testing.T) {
+	var stream spec.StreamDNSServerModule = fakeStreamDNSServerModule{}
+	var datagram spec.DatagramDNSServerModule = fakeDatagramDNSServerModule{}
+
+	for _, module := range []spec.Config{stream, datagram} {
+		if err := module.Validate(); err != nil {
+			t.Fatalf("Validate: %v", err)
+		}
+	}
+	if !stream.NeedsTLS() {
+		t.Fatal("NeedsTLS: want the fake's true")
+	}
+}

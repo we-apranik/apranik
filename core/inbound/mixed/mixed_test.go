@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	proxyhttp "github.com/The-Apranik/Apranik/module/proxy/http"
@@ -69,7 +70,7 @@ func startMixedInbound(t *testing.T, options mixedInboundOptions) (net.Addr, rec
 	}
 
 	associateSocket := func(ctx context.Context) (spec.Datagram, error) {
-		datagramListener, err := udp.NewBaseDatagramTransportModule().NewDatagramListener(loopback(t))
+		datagramListener, err := udp.NewBaseDatagramTransportModule().NewDatagramListener(loopback(t), dns.NewSystemResolver(nil))
 		if err != nil {
 			return nil, err
 		}

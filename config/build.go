@@ -82,6 +82,12 @@ func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
 		coreBlueprint.Outbounds = append(coreBlueprint.Outbounds,
 			b.buildOutbound(outbound, indexLocation("outbounds", index)))
 	}
+	for index, dataset := range raw.Datasets {
+		coreBlueprint.Datasets = append(coreBlueprint.Datasets, b.buildDataset(dataset, indexLocation("datasets", index)))
+	}
+	if raw.DNS != nil {
+		coreBlueprint.DNS = b.buildDNS(*raw.DNS, "dns")
+	}
 	if raw.Routing != nil {
 		coreBlueprint.Routing = b.buildRouting(*raw.Routing, "routing")
 	}

@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/core/sniff"
 	"github.com/The-Apranik/Apranik/spec"
@@ -20,10 +22,18 @@ type streamTrafficInformant struct {
 	peekableStream *peekable.Stream
 	sniffed        *spec.SniffResult
 	sniffDone      bool
+
+	resolver   DomainResolver
+	logger     *logging.Logger
+	resolution destinationResolution
 }
 
-func newStreamTrafficInformant(metadata spec.Metadata, clientStream spec.Stream) *streamTrafficInformant {
-	return &streamTrafficInformant{metadata: metadata, clientStream: clientStream}
+func newStreamTrafficInformant(metadata spec.Metadata, clientStream spec.Stream, resolver DomainResolver, logger *logging.Logger) *streamTrafficInformant {
+	return &streamTrafficInformant{metadata: metadata, clientStream: clientStream, resolver: resolver, logger: logger}
+}
+
+func (i *streamTrafficInformant) Resolve(ctx context.Context, serverTag string) []netip.Addr {
+	return i.resolution.resolve(ctx, i.resolver, i.logger, i.metadata.Destination, serverTag)
 }
 
 func (i *streamTrafficInformant) Metadata() spec.Metadata { return i.metadata }
@@ -57,10 +67,18 @@ func (i *streamTrafficInformant) streamToRelay() spec.Stream {
 // Nothing is sniffed until UDP sniffing exists (open question Q2).
 type udpSessionTrafficInformant struct {
 	metadata spec.Metadata
+
+	resolver   DomainResolver
+	logger     *logging.Logger
+	resolution destinationResolution
 }
 
-func (i udpSessionTrafficInformant) Metadata() spec.Metadata { return i.metadata }
+func (i *udpSessionTrafficInformant) Metadata() spec.Metadata { return i.metadata }
 
-func (udpSessionTrafficInformant) Sniff(context.Context, []spec.Sniffer, time.Duration) *spec.SniffResult {
+func (*udpSessionTrafficInformant) Sniff(context.Context, []spec.Sniffer, time.Duration) *spec.SniffResult {
 	return nil
+}
+
+func (i *udpSessionTrafficInformant) Resolve(ctx context.Context, serverTag string) []netip.Addr {
+	return i.resolution.resolve(ctx, i.resolver, i.logger, i.metadata.Destination, serverTag)
 }

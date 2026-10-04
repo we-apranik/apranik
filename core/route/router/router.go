@@ -1,8 +1,8 @@
 // Package router decides where each request goes. Rules are
 // compiled once, with every tag already turned into the outbound or dataset it
 // names, and then only read: one Router serves every inbound at once. What
-// costs work to find out, such as a sniff, it asks the traffic informant for,
-// and only when a rule's action says so.
+// costs work to find out, such as a sniff or a lookup, it asks the traffic
+// informant for, and only when a rule's action says so (a design note, a design note).
 package router
 
 import (
@@ -36,6 +36,7 @@ const (
 	actionRoute actionKind = iota
 	actionBlock
 	actionSniff
+	actionResolve
 )
 
 type compiledAction struct {
@@ -43,6 +44,9 @@ type compiledAction struct {
 	outbound     component.Outbound
 	sniffers     []spec.Sniffer
 	sniffTimeout time.Duration
+
+	// The DNS server a resolve asks; empty means the DNS rules choose.
+	resolveServer string
 }
 
 // Config is what New compiles: the routing blueprint, and everything its tags
@@ -73,7 +77,7 @@ func New(config Config) (*Router, error) {
 	switch {
 	case err != nil:
 		errs = append(errs, fmt.Errorf("routing.default_action: %w", err))
-	case defaultAction.kind == actionSniff:
+	case defaultAction.kind == actionSniff, defaultAction.kind == actionResolve:
 		errs = append(errs, errors.New("routing.default_action: must route or block"))
 	default:
 		router.defaultDecision = component.Decision{Outbound: defaultAction.outbound, Rule: defaultRuleName}
@@ -101,6 +105,8 @@ func (r *Router) Route(ctx context.Context, informant component.RouterTrafficInf
 		switch rule.action.kind {
 		case actionSniff:
 			request.setSniffed(informant.Sniff(ctx, rule.action.sniffers, rule.action.sniffTimeout))
+		case actionResolve:
+			request.setResolved(informant.Resolve(ctx, rule.action.resolveServer))
 		case actionRoute:
 			return component.Decision{Outbound: rule.action.outbound, Rule: rule.name}, nil
 		case actionBlock:

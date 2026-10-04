@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
@@ -135,7 +136,7 @@ func TestARefusedStreamIsReplayedWholeToTheFallback(t *testing.T) {
 
 	fallbackAddress := fallbackListener.Addr().(*net.TCPAddr).AddrPort()
 	fallbackDestination, _ := spec.NewDestinationFromIP(fallbackAddress.Addr(), fallbackAddress.Port())
-	dialer, err := tcp.NewBaseStreamTransportModule().NewStreamDialer()
+	dialer, err := tcp.NewBaseStreamTransportModule().NewStreamDialer(dns.NewSystemResolver(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

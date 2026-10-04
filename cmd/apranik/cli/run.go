@@ -77,6 +77,16 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		return errors.New("no outbounds configured")
 	}
 
+	datasets, err := stackBuilder.LoadDatasets(coreBlueprint.Datasets)
+	if err != nil {
+		return err
+	}
+
+	// Before the outbounds, which resolve through it; its servers, which go
+	// through the outbounds, are attached after them.
+	if err := stackBuilder.UseDNS(coreBlueprint.DNS); err != nil {
+		return err
+	}
 	outbounds := make([]component.Outbound, 0, len(coreBlueprint.Outbounds))
 	for _, outboundBlueprint := range coreBlueprint.Outbounds {
 		built, err := stackBuilder.BuildOutbound(outboundBlueprint)
@@ -86,9 +96,12 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		defer built.Close()
 		outbounds = append(outbounds, built)
 	}
+	if err := stackBuilder.BuildDNS(coreBlueprint.DNS, outbounds, datasets); err != nil {
+		return err
+	}
 
 	// One router for every inbound: it holds no per-connection state.
-	trafficRouter, err := stackBuilder.BuildRouter(coreBlueprint.Routing, outbounds)
+	trafficRouter, err := stackBuilder.BuildRouter(coreBlueprint.Routing, outbounds, datasets)
 	if err != nil {
 		return err
 	}
@@ -106,6 +119,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		trafficHandler := handler.New(trafficRouter, handler.Config{
 			StreamIdleTimeout:     inboundBlueprint.TCPIdleTimeout,
 			UDPSessionIdleTimeout: inboundBlueprint.UDPSessionIdleTimeout,
+			Resolver:              stackBuilder.Resolver(),
 			Logger:                logger,
 		})
 		if err := built.Activate(ctx, trafficHandler); err != nil {

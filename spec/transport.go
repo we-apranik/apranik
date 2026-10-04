@@ -68,10 +68,14 @@ type DatagramListener interface {
 // Known limit: bind is an Endpoint, so a transport whose endpoint is not a host
 // and port -- a Unix socket path, a TUN device name -- cannot express it.
 // Deliberately unsolved while v1 ships tcp and udp.
+//
+// A base transport is the only layer that resolves a domain, and it does so
+// through the Resolver it is given, never on its own. A listener
+// accepts from addresses and resolves nothing.
 type BaseStreamTransportModule interface {
 	Config
 	Info() ModuleInfo
-	NewStreamDialer() (StreamDialer, error)
+	NewStreamDialer(resolver Resolver) (StreamDialer, error)
 	NewStreamListener(bind Endpoint) (StreamListener, error)
 }
 
@@ -89,9 +93,10 @@ type OverlayStreamTransportModule interface {
 	NewStreamOverlayServer() (StreamOverlayServer, error)
 }
 
-// TransportInfoProvider is optional on a stream overlay transport module. Unlike
-// Info, it describes this configuration, so it may depend on settings. Only the
-// config check reads it.
+// TransportInfoProvider is optional on a stream overlay transport module, and
+// on a stream DNS server module, which sits above its TLS layer as an overlay
+// sits above another. Unlike Info, it describes this configuration, so it may
+// depend on settings. Only the config check reads it.
 type TransportInfoProvider interface {
 	TransportInfo() TransportInfo
 }
@@ -133,12 +138,13 @@ type StreamOverlayServer interface {
 	WrapServerStream(ctx context.Context, underlyingStream Stream) (Stream, error)
 }
 
-// BaseDatagramTransportModule: UDP.
+// BaseDatagramTransportModule: UDP. Both sides resolve through resolver: a
+// listener's datagrams can be written to a domain too.
 type BaseDatagramTransportModule interface {
 	Config
 	Info() ModuleInfo
-	NewDatagramDialer() (DatagramDialer, error)
-	NewDatagramListener(bind Endpoint) (DatagramListener, error)
+	NewDatagramDialer(resolver Resolver) (DatagramDialer, error)
+	NewDatagramListener(bind Endpoint, resolver Resolver) (DatagramListener, error)
 }
 
 // OverlayDatagramTransportModule: DTLS, per-message obfuscation. It still wraps

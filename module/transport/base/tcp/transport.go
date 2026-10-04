@@ -4,6 +4,7 @@
 package tcp
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -19,11 +20,18 @@ func (*Transport) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "tcp", Description: "TCP over IPv4/IPv6"}
 }
 
-func (t *Transport) NewStreamDialer() (spec.StreamDialer, error) {
+var errNoResolver = errors.New("tcp: a dialer needs a resolver")
+
+func (t *Transport) NewStreamDialer(resolver spec.Resolver) (spec.StreamDialer, error) {
+	if resolver == nil {
+		return nil, errNoResolver
+	}
 	return &streamDialer{
-		dialer:      net.Dialer{KeepAlive: time.Duration(t.KeepAlive), KeepAliveConfig: t.keepAliveConfig()},
-		noDelay:     t.NoDelay,
-		dialTimeout: t.dialTimeout(),
+		dialer:           net.Dialer{KeepAlive: time.Duration(t.KeepAlive), KeepAliveConfig: t.keepAliveConfig()},
+		resolver:         resolver,
+		noDelay:          t.NoDelay,
+		dialTimeout:      t.dialTimeout(),
+		nextAddressDelay: t.nextAddressDelay(),
 	}, nil
 }
 

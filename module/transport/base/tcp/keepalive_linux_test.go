@@ -42,7 +42,7 @@ func TestKeepAliveIntervalAndCountReachBothEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	dialer, err := transport.NewStreamDialer()
+	dialer, err := transport.NewStreamDialer(testResolver)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestNegativeKeepAliveDisablesProbesOnBothEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	dialer, _ := transport.NewStreamDialer()
+	dialer, _ := transport.NewStreamDialer(testResolver)
 
 	accepted := make(chan spec.Stream, 1)
 	go func() {

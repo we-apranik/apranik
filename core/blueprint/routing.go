@@ -9,9 +9,9 @@ import (
 )
 
 // Routing decides which outbound serves each request: the first rule whose
-// action decides wins, and DefaultAction serves the rest.
+// action decides wins, and DefaultAction serves the rest. The
+// datasets its rules name are the Blueprint's.
 type Routing struct {
-	Datasets      []Dataset
 	Rules         []Rule
 	DefaultAction Action
 }
@@ -25,8 +25,9 @@ type Rule struct {
 // of one field are alternatives. An empty Match matches every request.
 //
 // Domain fields read the sniffed name when one was sniffed, else the
-// destination's domain. IP fields read the destination's IP only: a domain
-// destination is never resolved to match them.
+// destination's domain. IP fields read the destination's IP, or, after a
+// resolve action, match when any resolved address does; the router never
+// resolves on its own.
 type Match struct {
 	Inbounds         []string
 	Network          spec.Network // zero: either
@@ -72,12 +73,21 @@ type PortRange struct {
 	First, Last uint16
 }
 
-// Exactly one of Route, Block and Sniff is set. Route and Block end the rule
-// list; Sniff fills the sniff result and goes on to the next rule.
+// Exactly one of Route, Block, Sniff and Resolve is set. Route and Block end
+// the rule list; Sniff fills the sniff result and Resolve the destination's
+// addresses, and both go on to the next rule.
 type Action struct {
-	Route *RouteAction
-	Block bool
-	Sniff *SniffAction
+	Route   *RouteAction
+	Block   bool
+	Sniff   *SniffAction
+	Resolve *ResolveAction
+}
+
+// ResolveAction looks the destination's domain up so IP fields can match it.
+// The destination itself is never rewritten.
+type ResolveAction struct {
+	// The DNS server to ask. Empty means the DNS rules choose.
+	Server string
 }
 
 type RouteAction struct {

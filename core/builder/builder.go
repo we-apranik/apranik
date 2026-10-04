@@ -12,6 +12,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -36,6 +37,17 @@ var (
 type Builder struct {
 	logging *logging.System
 	logger  *logging.Logger
+
+	// What every base transport resolves through. The system resolver until
+	// UseDNS replaces it.
+	resolver *dns.Resolver
+
+	// UseDNS must come before any outbound, which takes the resolver.
+	outboundsBuilt bool
+
+	// Built here, not from the blueprint, so closed here: the internal
+	// freedom DNS servers without an outbound go through.
+	internalOutbounds []component.Outbound
 }
 
 // New builds the logging system first, so every component it goes on to
@@ -45,12 +57,21 @@ func New(log blueprint.Log) (*Builder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("logging: %w", err)
 	}
-	return &Builder{logging: system, logger: system.Logger()}, nil
+	return &Builder{logging: system, logger: system.Logger(), resolver: dns.NewSystemResolver(system.Logger())}, nil
 }
 
 func (b *Builder) Logger() *logging.Logger { return b.logger }
 
-func (b *Builder) Close() error { return b.logging.Close() }
+// Close closes the resolver and the DNS servers it holds, the outbounds this
+// builder made for them, then the log.
+func (b *Builder) Close() error {
+	errs := []error{b.resolver.Close()}
+	for _, internal := range b.internalOutbounds {
+		errs = append(errs, internal.Close())
+	}
+	errs = append(errs, b.logging.Close())
+	return errors.Join(errs...)
+}
 
 func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.Inbound, error) {
 	if inboundBlueprint.Network == spec.NetworkUDP {
@@ -88,7 +109,7 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 	// own stack, and no lookup by name.
 	var fallback *inbound.Fallback
 	if inboundBlueprint.Fallback.IsValid() {
-		dialer, err := buildStreamDialer(blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()})
+		dialer, err := buildStreamDialer(blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()}, b.resolver)
 		if err != nil {
 			listener.Close()
 			return nil, fmt.Errorf("inbound %q: fallback: %w", inboundBlueprint.Tag, err)
@@ -150,6 +171,7 @@ func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 }
 
 func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
+	b.outboundsBuilt = true
 	switch {
 	case outboundBlueprint.Freedom != nil:
 		return b.buildFreedomOutbound(outboundBlueprint)
@@ -169,12 +191,12 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (co
 		err            error
 	)
 	if !freedom.StreamTransport.IsZero() {
-		if dialer, err = buildStreamDialer(freedom.StreamTransport); err != nil {
+		if dialer, err = buildStreamDialer(freedom.StreamTransport, b.resolver); err != nil {
 			return nil, fmt.Errorf("outbound %q: %w", outboundBlueprint.Tag, err)
 		}
 	}
 	if !freedom.DatagramTransport.IsZero() {
-		if datagramDialer, err = buildDatagramDialer(freedom.DatagramTransport); err != nil {
+		if datagramDialer, err = buildDatagramDialer(freedom.DatagramTransport, b.resolver); err != nil {
 			if dialer != nil {
 				dialer.Close()
 			}
@@ -192,7 +214,13 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (co
 }
 
 func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {
-	dialer, err := buildStreamDialer(outboundBlueprint.StreamTransport)
+	// The proxy's own name never goes through the rules, which may send it
+	// to a DNS server that goes through this very proxy.
+	var serverResolver spec.Resolver = b.resolver
+	if outboundBlueprint.DNSServer != "" {
+		serverResolver = b.resolver.PinnedTo(outboundBlueprint.DNSServer)
+	}
+	dialer, err := buildStreamDialer(outboundBlueprint.StreamTransport, serverResolver)
 	if err != nil {
 		return nil, fmt.Errorf("outbound %q: %w", outboundBlueprint.Tag, err)
 	}
@@ -237,7 +265,7 @@ func (b *Builder) buildUDPAssociateSocket(bindAddr spec.Endpoint) spec.UDPAssoci
 			return nil, fmt.Errorf("opening a UDP associate socket: %w", bindErr)
 		}
 
-		listener, err := buildDatagramListener(stack, bind)
+		listener, err := buildDatagramListener(stack, bind, b.resolver)
 		if err != nil {
 			return nil, fmt.Errorf("opening a UDP associate socket on %s: %w", bind, err)
 		}
@@ -250,11 +278,11 @@ func (b *Builder) buildUDPAssociateSocket(bindAddr spec.Endpoint) spec.UDPAssoci
 	}
 }
 
-func buildStreamDialer(stack blueprint.StreamTransportStack) (spec.StreamDialer, error) {
+func buildStreamDialer(stack blueprint.StreamTransportStack, resolver spec.Resolver) (spec.StreamDialer, error) {
 	if stack.Base == nil {
 		return nil, errNoBaseTransport
 	}
-	dialer, err := stack.Base.NewStreamDialer()
+	dialer, err := stack.Base.NewStreamDialer(resolver)
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
 	}
@@ -330,11 +358,11 @@ func buildStreamOverlayServers(stack blueprint.StreamTransportStack) ([]inbound.
 	return overlays, nil
 }
 
-func buildDatagramDialer(stack blueprint.DatagramTransportStack) (spec.DatagramDialer, error) {
+func buildDatagramDialer(stack blueprint.DatagramTransportStack, resolver spec.Resolver) (spec.DatagramDialer, error) {
 	if stack.Base == nil {
 		return nil, errNoBaseTransport
 	}
-	dialer, err := stack.Base.NewDatagramDialer()
+	dialer, err := stack.Base.NewDatagramDialer(resolver)
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
 	}
@@ -350,11 +378,11 @@ func buildDatagramDialer(stack blueprint.DatagramTransportStack) (spec.DatagramD
 	return dialer, nil
 }
 
-func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.Endpoint) (spec.DatagramListener, error) {
+func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.Endpoint, resolver spec.Resolver) (spec.DatagramListener, error) {
 	if stack.Base == nil {
 		return nil, errNoBaseTransport
 	}
-	listener, err := stack.Base.NewDatagramListener(bind)
+	listener, err := stack.Base.NewDatagramListener(bind, resolver)
 	if err != nil {
 		return nil, fmt.Errorf("transport %q: %w", stack.Base.Info().Name, err)
 	}
@@ -370,23 +398,28 @@ func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.End
 	return listener, nil
 }
 
-// BuildRouter loads the routing section's datasets and compiles its rules
-// against the outbounds already built. With no routing section, every
+// LoadDatasets reads every dataset the blueprint declares, once, for the
+// router and the DNS rules alike.
+func (b *Builder) LoadDatasets(declarations []blueprint.Dataset) (map[string]*dataset.Dataset, error) {
+	datasets, errs := dataset.LoadAll(declarations)
+	if err := dataset.Joined(declarations, errs); err != nil {
+		return nil, err
+	}
+	for _, declaration := range declarations {
+		b.logger.Debug("Dataset loaded", "tag", declaration.Tag, "entries", datasets[declaration.Tag].Len())
+	}
+	return datasets, nil
+}
+
+// BuildRouter compiles the routing section's rules against the outbounds
+// already built and the datasets loaded. With no routing section, every
 // request takes the first outbound.
-func (b *Builder) BuildRouter(routing *blueprint.Routing, outbounds []component.Outbound) (component.Router, error) {
+func (b *Builder) BuildRouter(routing *blueprint.Routing, outbounds []component.Outbound, datasets map[string]*dataset.Dataset) (component.Router, error) {
 	if len(outbounds) == 0 {
 		return nil, errors.New("router: no outbounds to route to")
 	}
 	if routing == nil {
 		return router.NewWithDefaultOutbound(outbounds[0]), nil
-	}
-
-	datasets, errs := dataset.LoadAll(routing.Datasets)
-	if err := dataset.Joined(routing.Datasets, errs); err != nil {
-		return nil, fmt.Errorf("router: %w", err)
-	}
-	for _, declaration := range routing.Datasets {
-		b.logger.Debug("Dataset loaded", "tag", declaration.Tag, "entries", datasets[declaration.Tag].Len())
 	}
 
 	outboundsByTag := make(map[string]component.Outbound, len(outbounds))

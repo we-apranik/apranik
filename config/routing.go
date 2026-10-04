@@ -18,11 +18,14 @@ import (
 	"github.com/The-Apranik/Apranik/core/route/match"
 )
 
-// The routing section and its datasets.
+// The routing section. Its datasets moved to the top
+// level, where DNS rules reach them too.
 type rawRouting struct {
-	Datasets      []rawDataset `json:"datasets"`
-	Rules         []rawRule    `json:"rules"`
-	DefaultAction *rawModule   `json:"default_action"`
+	Rules         []rawRule  `json:"rules"`
+	DefaultAction *rawModule `json:"default_action"`
+
+	// Read only to say where datasets moved.
+	MovedDatasets json.RawMessage `json:"datasets"`
 }
 
 type rawDataset struct {
@@ -91,6 +94,10 @@ type rawRouteSettings struct {
 	Outbound string `json:"outbound"`
 }
 
+type rawResolveSettings struct {
+	Server string `json:"server"`
+}
+
 type rawSniffSettings struct {
 	Sniffers []rawModule    `json:"sniffers"`
 	Timeout  types.Duration `json:"timeout"`
@@ -98,17 +105,18 @@ type rawSniffSettings struct {
 
 // Action types, as the config file names them.
 const (
-	actionRoute = "route"
-	actionBlock = "block"
-	actionSniff = "sniff"
+	actionRoute   = "route"
+	actionBlock   = "block"
+	actionSniff   = "sniff"
+	actionResolve = "resolve"
 )
 
 func (b *configBuilder) buildRouting(raw rawRouting, loc string) *blueprint.Routing {
 	routing := &blueprint.Routing{}
 
-	for index, dataset := range raw.Datasets {
-		routing.Datasets = append(routing.Datasets,
-			b.buildDataset(dataset, indexLocation(fieldLocation(loc, "datasets"), index)))
+	if raw.MovedDatasets != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "datasets"),
+			`datasets moved to the top level of the config, beside routing, so dns rules can use them too: "datasets": [...]`)
 	}
 	for index, rule := range raw.Rules {
 		ruleLoc := indexLocation(fieldLocation(loc, "rules"), index)
@@ -320,8 +328,15 @@ func (b *configBuilder) buildAction(raw rawModule, loc string) blueprint.Action 
 			break
 		}
 		return blueprint.Action{Sniff: b.buildSniffAction(settings, settingsLoc)}
+	case actionResolve:
+		var settings rawResolveSettings
+		if !b.decodeStrict(raw.Settings, &settings, settingsLoc) {
+			break
+		}
+		return blueprint.Action{Resolve: &blueprint.ResolveAction{Server: settings.Server}}
 	default:
-		b.diagnostics.errorf(fieldLocation(loc, "type"), "unknown action %q; want %q, %q or %q", raw.Type, actionRoute, actionBlock, actionSniff)
+		b.diagnostics.errorf(fieldLocation(loc, "type"), "unknown action %q; want %q, %q, %q or %q",
+			raw.Type, actionRoute, actionBlock, actionSniff, actionResolve)
 	}
 	return blueprint.Action{}
 }

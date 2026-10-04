@@ -46,6 +46,13 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 	}
 	t.Cleanup(func() { built.Close() })
 
+	datasets, err := built.LoadDatasets(coreBlueprint.Datasets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := built.UseDNS(coreBlueprint.DNS); err != nil {
+		t.Fatal(err)
+	}
 	var outbounds []component.Outbound
 	for _, outboundBlueprint := range coreBlueprint.Outbounds {
 		outbound, err := built.BuildOutbound(outboundBlueprint)
@@ -55,7 +62,10 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 		t.Cleanup(func() { outbound.Close() })
 		outbounds = append(outbounds, outbound)
 	}
-	trafficRouter, err := built.BuildRouter(coreBlueprint.Routing, outbounds)
+	if err := built.BuildDNS(coreBlueprint.DNS, outbounds, datasets); err != nil {
+		t.Fatal(err)
+	}
+	trafficRouter, err := built.BuildRouter(coreBlueprint.Routing, outbounds, datasets)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +75,7 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inbound.Close() })
-	if err := inbound.Activate(context.Background(), handler.New(trafficRouter, handler.Config{})); err != nil {
+	if err := inbound.Activate(context.Background(), handler.New(trafficRouter, handler.Config{Resolver: built.Resolver()})); err != nil {
 		t.Fatal(err)
 	}
 	return coreBlueprint.Inbounds[0].Bind.Port()
@@ -161,10 +171,10 @@ func TestRoutingEndToEnd(t *testing.T) {
 			{"tag": "proxy", "protocol": {"type": "freedom"}},
 			{"tag": "direct", "protocol": {"type": "freedom"}}
 		],
+		"datasets": [
+			{"tag": "blocked", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "kind": "domain", "category": "blocked"}}
+		],
 		"routing": {
-			"datasets": [
-				{"tag": "blocked", "source": {"file": "geosite.dat"}, "format": {"type": "geodata", "kind": "domain", "category": "blocked"}}
-			],
 			"rules": [
 				{"match": {"port": [%d]}, "action": {"type": "block"}},
 				{"match": {"inbound": ["socks-in"], "network": "tcp"},

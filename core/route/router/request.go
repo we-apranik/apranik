@@ -12,6 +12,9 @@ import (
 type routedRequest struct {
 	metadata spec.Metadata
 
+	// A resolve action's answer for a domain destination; nil before one.
+	resolvedAddresses []netip.Addr
+
 	nameComputed bool
 	name         string // normalized; empty when there is none
 }
@@ -42,10 +45,20 @@ func (r *routedRequest) domainName() string {
 	return r.name
 }
 
-// Only a destination that is an IP: a domain is never resolved to match an IP
-// rule; a resolve action will come with the DNS subsystem.
-func (r *routedRequest) destinationIP() (netip.Addr, bool) {
-	return r.metadata.Destination.IP()
+func (r *routedRequest) setResolved(addresses []netip.Addr) { r.resolvedAddresses = addresses }
+
+// anyDestinationIP reports whether test holds for the destination's IP, or,
+// for a domain destination, for any address a resolve action found. The router never resolves on its own.
+func (r *routedRequest) anyDestinationIP(test func(netip.Addr) bool) bool {
+	if address, isIP := r.metadata.Destination.IP(); isIP {
+		return test(address)
+	}
+	for _, address := range r.resolvedAddresses {
+		if test(address.Unmap()) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *routedRequest) sourceIP() (netip.Addr, bool) {
