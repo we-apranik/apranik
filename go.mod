@@ -2,7 +2,10 @@ module github.com/The-Apranik/Apranik
 
 go 1.27
 
-require github.com/refraction-networking/utls v1.8.2
+require (
+	github.com/refraction-networking/utls v1.8.2
+	golang.org/x/net v0.38.0
+)
 
 require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
