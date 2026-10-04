@@ -197,10 +197,29 @@ values from elsewhere. Options that must be set before bind go in
 
 ### DNS
 
-Go has no DNS cache. Every dial by domain name resolves again. The `udp`
-module caches resolutions (`resolve_cache_ttl`, 30 s); the `tcp` module does
-not (see below). A cache must respect how often records change; a stale answer
-breaks connections.
+Go has no DNS cache, so Apranik has its own: `core/dns` caches answers for
+their TTL, and every base transport resolves through it. A cache
+must respect how often records change; a stale answer breaks connections, so
+serving stale answers is off by default and bounded by `max_stale_age`.
+
+Measured 2026-10-05 (`go test -bench . -benchmem ./core/dns/`, 12 threads,
+`-count 3`, medians):
+
+| Benchmark | Before | After |
+| --- | --- | --- |
+| `ResolveCachedOneRecordType` (a cache hit) | 626 ns, 458 B, 7 allocs | 208 ns, 24 B, 1 alloc |
+| `ResolveCachedTwoRecordTypes` | 874 ns, 572 B, 9 allocs | 376 ns, 48 B, 1 alloc |
+| `ResolveCachedParallel` | 810 ns, 458 B, 7 allocs | 516 ns, 24 B, 1 alloc |
+| `ResolveUncached` (in-memory server) | 15.5 µs, 5.1 KB, 36 allocs | 13.3 µs, 4.5 KB, 29 allocs |
+
+"Before" is the first working version, "after" the one committed: the
+qualified name is built only for a query, the label check does not split the
+name, record-type lists are shared, results stay in arrays unless two queries
+run at once, and a hostname is not handed to `netip.ParseAddr` to fail. The one
+allocation left is the slice returned, which the caller owns. The `udp`
+transport remembers a domain's address for 5 seconds, so a stream of datagrams
+to one domain does not ask the resolver per datagram: its write to a domain
+stays at 0 allocations.
 
 ### TLS
 
@@ -329,7 +348,8 @@ Candidates for future work. Each needs a benchmark before it is started.
 
 | Where | What | Why it might matter |
 | --- | --- | --- |
-| `module/transport/base/tcp` | No DNS cache: freedom resolves a domain on every TCP dial. | Every new connection to a domain pays a lookup. The `udp` module already caches. |
+| `core/dns` | One mutex guards the cache; `ResolveCachedParallel` is slower per lookup than the serial benchmark. | Sharding by name would cut contention if lookups ever show up in a profile. |
+| `shared/dnsstream` | Each query allocates its framed copy and each response its buffer (14 allocations a query). | A pooled frame buffer; only worth it if DNS over TCP or TLS carries heavy load. |
 | `module/transport/overlay/tls` | The client clones its `tls.Config` (or uTLS's) on every dial to set the server name. | One allocation per connection; a small per-server-name cache would remove it. |
 | `module/transport/overlay/tls` | With a fingerprint, the ClientHello is built from the preset on every dial, twice when `alpn` is set. | Around 300 extra allocations per handshake against Go's own; caching the built extensions is not safe as-is (key shares are per connection). |
 | `module/transport/overlay/websocket` | Every frame is copied into a pooled buffer, header and payload together, so it goes out in one write. On the server, which does not mask, a vectored write could skip the copy. | A copy per write on the server's data path. |
