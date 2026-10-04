@@ -1,7 +1,15 @@
 # UDP
 
 The base datagram transport. Today it is configured only inside
-[`freedom`](../outbound/freedom.md#udp)'s settings.
+[`freedom`](../outbound/freedom.md#udp)'s settings, and it has no settings of
+its own.
+
+A datagram addressed to a domain is resolved through the
+[resolver](../dns/index.md), like every other lookup. The settings
+`resolve_timeout` and `resolve_cache_ttl` it once had moved there: each DNS
+server bounds its own queries with its `timeout`, and answers are cached for
+their TTL under [`dns.cache`](../dns/index.md#cache). A config that still sets
+them is refused with a pointer.
 
 ## Structure
 
@@ -9,31 +17,8 @@ The base datagram transport. Today it is configured only inside
 
 ```json
 {
-  "udp": {
-    "resolve_timeout": "5s",
-    "resolve_cache_ttl": "30s"
-  }
+  "udp": {}
 }
 ```
-
-</div>
-
-<div class="cfg-fields" markdown>
-
-## Fields
-
-### `resolve_timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>5s</code></span>
-
-How long looking up a destination domain may take. Must not be negative.
-
-### `resolve_cache_ttl`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>30s</code></span>
-
-How long a looked-up address is reused. Must not be negative.
 
 </div>
