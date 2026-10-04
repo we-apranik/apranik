@@ -6,6 +6,41 @@
     "outputs": [{ "type": "stderr", "format": "human", "color": true }]
   },
 
+  "dns": {
+    "ip_versions": "prefer_ipv4",
+    "servers": [
+      {
+        "tag": "cloudflare-dot",
+        "type": "dot",
+        "settings": { "server": "1.1.1.1" },
+        "tls": { "server_name": "one.one.one.one" },
+        "outbound": "freedom-fragment"
+      },
+      {
+        "tag": "google-doh",
+        "type": "doh",
+        "settings": { "server": "dns.google", "path": "/dns-query" },
+        "outbound": "freedom-fragment"
+      },
+      {
+        "tag": "google-tcp",
+        "type": "tcp",
+        "settings": { "server": "8.8.8.8" }
+      },
+      {
+        "tag": "cloudflare-udp",
+        "type": "udp",
+        "settings": { "server": "1.1.1.1", "timeout": "3s" }
+      },
+      { "tag": "os", "type": "system" }
+    ],
+    "rules": [
+      { "match": { "domain_suffix": ["ir"] }, "server": "os" },
+      { "match": { "domain_suffix": ["google.com", "gstatic.com"] }, "server": "google-doh" }
+    ],
+    "default_server": "cloudflare-dot"
+  },
+
   "inbounds": [
     {
       "tag": "socks-in",
@@ -39,6 +74,27 @@
     }
   ],
 
+  "routing": {
+    "rules": [
+      {
+        "match": { "inbound": ["socks-in", "http-in", "mixed-in"], "network": "tcp" },
+        "action": {
+          "type": "sniff",
+          "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }], "timeout": "300ms" }
+        }
+      },
+      {
+        "match": { "any": [{ "ip_is_private": true }, { "domain_suffix": ["ir"] }] },
+        "action": { "type": "route", "settings": { "outbound": "freedom" } }
+      },
+      {
+        "match": { "network": "udp", "port": [443] },
+        "action": { "type": "block" }
+      }
+    ],
+    "default_action": { "type": "route", "settings": { "outbound": "freedom-fragment" } }
+  },
+
   "outbounds": [
     {
       "tag": "freedom",
@@ -62,26 +118,5 @@
       ],
       "protocol": { "type": "freedom" }
     }
-  ],
-
-  "routing": {
-    "rules": [
-      {
-        "match": { "inbound": ["socks-in", "http-in", "mixed-in"], "network": "tcp" },
-        "action": {
-          "type": "sniff",
-          "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }], "timeout": "300ms" }
-        }
-      },
-      {
-        "match": { "any": [{ "ip_is_private": true }, { "domain_suffix": ["ir"] }] },
-        "action": { "type": "route", "settings": { "outbound": "freedom" } }
-      },
-      {
-        "match": { "network": "udp", "port": [443] },
-        "action": { "type": "block" }
-      }
-    ],
-    "default_action": { "type": "route", "settings": { "outbound": "freedom-fragment" } }
-  }
+  ]
 }
