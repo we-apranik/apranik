@@ -27,8 +27,8 @@ stack's handshakes can together take the sum of their timeouts.
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
 | TCP keep-alive | `tcp` settings `keep_alive` (for freedom: `settings.tcp.keep_alive`) | `15s` |
 | TCP keep-alive probes | `tcp` settings `keep_alive_interval` and `keep_alive_count` | `15s`, `9` |
-| UDP domain lookup | freedom `settings.udp.resolve_timeout` | `5s` |
-| UDP lookup cache | freedom `settings.udp.resolve_cache_ttl` | `30s` |
+| One DNS query | each [DNS server](dns/index.md)'s `settings.timeout` | `5s` |
+| A domain's next address | `tcp` settings `next_address_delay` | `250ms` |
 | Remote config file download | `apranik run/check -fetch-timeout` | `30s` |
 
 Two stay internal: a cached UDP route is forgotten after 1 minute of silence, and
