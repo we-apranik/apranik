@@ -61,8 +61,9 @@ Step by step:
    destination is not changed.
 5. **Dial.** `freedomOutbound.DialStream` in `core/outbound/freedom.go` passes the
    destination to the stream dialer. The TCP module's `streamDialer.DialStream`
-   bounds the connect with its own `dial_timeout` and joins host and port; if the destination is a domain, this is the only place
-   it is resolved.
+   bounds the connect with its own `dial_timeout`; if the destination is a
+   domain, this is the only place it is resolved, through the resolver
+   (`core/dns`), and its addresses are dialed with Happy Eyeballs.
    For a proxy outbound, `streamOutbound.DialStream` instead dials the proxy
    server and calls the proxy client's `RequestStream`, which bounds itself with
    the `handshake_timeout` in its own settings. This is where the meaning of the address flips from

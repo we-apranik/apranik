@@ -42,7 +42,9 @@ expected to build a `Stream` internally (Decided; none exists yet).
 
 **Addresses.** `Endpoint` is an IP and a port, already resolved. `Destination` is
 exactly one of a domain or an IP, plus a port. A domain stays a domain until the
-base transport, which is the only layer that resolves.
+base transport, which is the only layer that resolves, through the
+`spec.Resolver` core hands it: `core/dns`, which picks a DNS server by rule and
+caches answers.
 
 **Transport kinds.** A base transport creates connections; an overlay wraps them.
 A stream overlay works on one stream at a time: it builds a client and a server

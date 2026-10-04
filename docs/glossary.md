@@ -11,8 +11,9 @@
 | **CDN fronting** | Reaching a server through a CDN, so a censor sees the CDN's address and TLS name. `ws` and `httpupgrade` exist for it. See [Examples](configuration/examples.md#trojan-over-websocket-behind-a-cdn). |
 | **Component** | `core/component`: the roles core's own parts play for each other (`Inbound`, `Outbound`, `Router`, `TrafficHandler`). Not module contract, so not in `spec`. |
 | **Core** | Everything under `core/`: the code that composes modules. Modules never import it. |
-| **Dataset** | A named list of domains or IP ranges, read from a file such as `geosite.dat`, that routing rules look up. Values only; what to do with them is in the rules. |
+| **Dataset** | A named list of domains or IP ranges, read from a file such as `geosite.dat`, that routing and DNS rules look up. Values only; what to do with them is in the rules. Declared at the top level of the config. |
 | **Datagram** | The message-oriented carrier. Apranik says "datagram", never "packet", in code. |
+| **DNS server** | One configured upstream the resolver sends queries to (`dns.servers[]`): a module of type `udp`, `tcp`, `dot` or `doh` carrying wire-format messages over its outbound, or the special type `system`, the operating system. Implements `spec.StreamDNSServerModule` or `spec.DatagramDNSServerModule`. |
 | **Destination** | `spec.Destination`: exactly one of a domain or an IP, plus a port. Resolved only by a base transport. |
 | **Diagnostics** | The list of errors and warnings `config` reports, each with its location in the config file. |
 | **Early data** | Payload sent inside a handshake to save a round trip: `ws` puts the start of the first write in a header (`early_data`, Xray's `ed`). |
@@ -23,6 +24,7 @@
 | **Freedom** | The special outbound protocol that sends straight to each destination, over TCP (its transport: `tcp`, then only transports that need no server side) and UDP. |
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
+| **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor per kind. The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
@@ -35,6 +37,7 @@
 | **Pipelining** | `httpupgrade`'s `pipeline`: the client sends its payload right after the upgrade request, without waiting for the `101`. |
 | **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` on an outbound, or `mixed` on an inbound. |
 | **Proxy protocol** | A module that speaks proxy semantics over a supplied carrier, such as SOCKS5, HTTP CONNECT or Trojan. It never opens a connection itself. Its server `Accept*`s requests; its client `Request*`s a payload. |
+| **Resolver** | `core/dns`: answers a lookup (a name in, addresses out) by choosing a DNS server with the DNS rules, asking for the IP versions configured, and caching the answer for its TTL. Every base transport resolves through it, as `spec.Resolver`. |
 | **Registry** | `core/registry`: maps the names used in config files to module constructors, per kind. `registry.Default()` is the only place that names modules. |
 | **Relay** | `core/relay`: the copy loops. `relay.Stream` for TCP, `relay.Datagrams` for a UDP session. |
 | **Request** | What a proxy client sends to ask the server for a payload. `Request*` methods connect nothing and may send nothing until the first write. |
