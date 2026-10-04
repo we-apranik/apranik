@@ -13,7 +13,6 @@ checked in order; the first rule whose action decides wins, and
 ```json
 {
   "routing": {
-    "datasets": [],
     "rules": [
       {
         "match": { "domain_suffix": ["ir"] },
@@ -35,19 +34,13 @@ required.
 
 ## Fields
 
-### `datasets`
-
-<span class="cfg cfg-type">list of datasets</span>
-
-Named lists of domains or IP ranges, read from files, that rules look up. See
-[Datasets](datasets.md).
-
 ### `rules`
 
 <span class="cfg cfg-type">list of rules</span>
 
 Each rule is a [`match`](#match) and an [`action`](#actions). Rules are
-checked in order.
+checked in order. Rules look up [datasets](datasets.md), which are declared
+at the top level of the config, beside `routing`.
 
 ### `default_action`
 
@@ -156,10 +149,11 @@ The destination side has no prefix; the source side, the client, has
 | `inbound_local_port` | list of numbers | the port of ours the client reached |
 | `inbound_local_port_range` | list of `"first-last"` | the port of ours the client reached, inclusive |
 
-IP fields read only a destination that **is** an IP. A domain destination is
-not resolved to match them, so it never matches `ip`, `ip_in_dataset`,
-`ip_is_private` or `ip_version`. An IPv4 address written as IPv6
-(`::ffff:1.2.3.4`) is version 4. Resolving for routing will come with the DNS subsystem.
+IP fields read a destination that **is** an IP. The router never resolves a
+domain on its own: a domain destination matches `ip`, `ip_in_dataset`,
+`ip_is_private` and `ip_version` only after a [`resolve`](#resolve) action,
+and then when **any** of its addresses matches. An IPv4 address written as
+IPv6 (`::ffff:1.2.3.4`) is version 4.
 
 The `inbound_local_` fields read the local end of the connection the client
 opened: the address and port of this server it reached, where `source_` is
@@ -180,7 +174,7 @@ IPv4 ranges Xray's `geoip:private` adds: `0.0.0.0/8`, `100.64.0.0/10`
 
 An action is `{"type": ..., "settings": {...}}`, the shape `protocol` and
 `transport` use. `route` and `block` decide and end the rule list; `sniff`
-does not, and the next rule is checked.
+and `resolve` do not, and the next rule is checked.
 
 ### `route`
 
@@ -213,18 +207,33 @@ to the next rule, which sees the result. Rules before it see nothing sniffed.
 Sniffing runs only when a request reaches this rule, so put rules that do not
 need it, such as a port rule for SSH, before it. See [Sniffing](sniffing.md).
 
+### `resolve`
+
+```json
+{ "type": "resolve", "settings": { "server": "cloudflare" } }
+```
+
+Looks the destination's domain up through the [DNS resolver](../dns/index.md),
+then goes on to the next rule, whose IP fields see the addresses. `server`,
+optional, names the DNS server to ask; without it the [DNS rules](../dns/index.md#rules)
+choose. The destination is **not** rewritten: the outbound still receives the
+domain, and a proxy server still resolves it at its end. A destination that
+is already an IP is not looked up. A lookup that fails leaves the rules after
+it with no addresses, and the request goes on. Like `sniff`, it runs only when
+a request reaches it, so put rules that need no lookup before it.
+
 ## Example
 
 A client in Iran: Iranian sites and local addresses direct, ads blocked, QUIC
 blocked so browsers fall back to TCP, everything else through the proxy.
 
 ```json
+"datasets": [
+  { "tag": "ads",        "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ads-all" } },
+  { "tag": "ir-domains", "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ir" } },
+  { "tag": "ir-ips",     "source": { "file": "geoip.dat" },   "format": { "type": "geodata", "kind": "ip",     "category": "ir" } }
+],
 "routing": {
-  "datasets": [
-    { "tag": "ads",        "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ads-all" } },
-    { "tag": "ir-domains", "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ir" } },
-    { "tag": "ir-ips",     "source": { "file": "geoip.dat" },   "format": { "type": "geodata", "kind": "ip",     "category": "ir" } }
-  ],
   "rules": [
     { "match":  { "inbound": ["mixed-in"], "network": "tcp" },
       "action": { "type": "sniff", "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }] } } },
@@ -253,7 +262,9 @@ Errors:
 - a regex, IP, CIDR or port range that does not parse, or an `ip_version`
   other than 4 or 6;
 - a rule after one whose `match` is empty and that decides: it can never run;
-- a `sniff` with no sniffers, or a `default_action` that sniffs.
+- a `sniff` with no sniffers, or a `default_action` that sniffs or resolves;
+- a `resolve` naming a DNS server that does not exist;
+- `datasets` written inside `routing`, where they used to live.
 
 Warnings:
 
@@ -262,5 +273,6 @@ Warnings:
   read before any `sniff`;
 - a `sniffed_browser_family` value no sniffer reports;
 - a `sniff` that no later rule reads;
+- a `resolve` that no later rule's IP field reads;
 - a sniff `timeout` over 5 seconds;
 - UDP routed to an outbound that cannot carry it.

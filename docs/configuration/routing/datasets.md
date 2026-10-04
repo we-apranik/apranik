@@ -1,9 +1,13 @@
 # Datasets
 
 A dataset is a named list of domains or of IP ranges, read from a file, that
-[routing rules](index.md) look up: "every Iranian domain", "every Iranian IP
-range", "ad servers". A dataset holds values only. What to do with them is
-written in the rules.
+[routing rules](index.md) and [DNS rules](../dns/index.md#rules) look up:
+"every Iranian domain", "every Iranian IP range", "ad servers". A dataset
+holds values only. What to do with them is written in the rules.
+
+Datasets are declared at the top level of the config, beside `routing` and
+`dns`, so both can use them. A config that still declares them inside
+`routing`, where they used to live, is refused with a pointer.
 
 ## Structure
 
@@ -11,15 +15,13 @@ written in the rules.
 
 ```json
 {
-  "routing": {
-    "datasets": [
-      {
-        "tag": "ir-domains",
-        "source": { "file": "geosite.dat" },
-        "format": { "type": "geodata", "kind": "domain", "category": "category-ir" }
-      }
-    ]
-  }
+  "datasets": [
+    {
+      "tag": "ir-domains",
+      "source": { "file": "geosite.dat" },
+      "format": { "type": "geodata", "kind": "domain", "category": "category-ir" }
+    }
+  ]
 }
 ```
 
@@ -27,7 +29,8 @@ written in the rules.
 
 Rules use a dataset by its tag, in the field for its kind:
 `domain_in_dataset` for a domain dataset, `ip_in_dataset` and
-`source_ip_in_dataset` for an IP dataset.
+`source_ip_in_dataset` for an IP dataset. DNS rules use only
+`domain_in_dataset`.
 
 <div class="cfg-fields" markdown>
 
