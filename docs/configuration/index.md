@@ -2,7 +2,8 @@
 
 Apranik reads one JSON config file. It describes **inbounds** (how traffic
 arrives), **outbounds** (how it leaves), **routing** (which outbound each
-request takes) and the **log**. The format is version
+request takes), **dns** (how names are resolved), the **datasets** routing and
+DNS rules look up, and the **log**. The format is version
 `1`. How stable it stays over time is still an open question.
 
 ## Structure
@@ -17,6 +18,8 @@ request takes) and the **log**. The format is version
   "log": {},
   "inbounds": [],
   "outbounds": [],
+  "datasets": [],
+  "dns": {},
   "routing": {}
 }
 ```
@@ -32,6 +35,8 @@ request takes) and the **log**. The format is version
 | `log` | [Log](log.md) |
 | `inbounds` | [Inbound](inbound/index.md) |
 | `outbounds` | [Outbound](outbound/index.md) |
+| `datasets` | [Datasets](routing/datasets.md) |
+| `dns` | [DNS](dns/index.md) |
 | `routing` | [Routing](routing/index.md) |
 
 ### `version`
@@ -93,7 +98,7 @@ The steps split along one line, **reading** and **running**:
 - `config.Check` reports what can be read but cannot run: a missing field, a
   conflicting pair, an unsafe value. It opens nothing, so `apranik check` works on
   a machine that could never run the config file.
-- `config.CheckDatasets` reads the [datasets](routing/datasets.md) routing names, so a
+- `config.CheckDatasets` reads the [datasets](routing/datasets.md) the config declares, so a
   missing file or category is reported by `apranik check` too.
 - `core/builder` turns a clean config into running components. It binds
   listeners and loads files a module needs (TLS certificates, for example) at
@@ -106,12 +111,12 @@ The steps split along one line, **reading** and **running**:
 | --- | --- |
 | duration | a quoted Go duration: `"300ms"`, `"10s"`, `"5m"`, `"1h30m"`. A bare number is refused, since no unit can be assumed. Where noted, a negative value disables the limit. |
 | secret | a string. Apranik never prints it in logs, errors or warnings. |
-| address | an IP literal for `listen`; an IP or a domain for `server`. A domain stays unresolved until the base transport dials it. |
+| address | an IP literal for `listen`; an IP or a domain for `server`. A domain stays unresolved until the base transport dials it, through the [resolver](dns/index.md). |
 
 ## Modules and their settings
 
-Anything named by `"type"` in `transport`, `protocol` or `sniffers` is a
-**module**. Its `settings` object is decoded straight into the module, and JSON
+Anything named by `"type"` in `transport`, `protocol`, `sniffers` or
+`dns.servers` is a **module** (except the special types built by core). Its `settings` object is decoded straight into the module, and JSON
 overrides only what it names; everything else keeps the module's default.
 
 <div class="grid cards" markdown>
@@ -147,6 +152,13 @@ overrides only what it names; everything else keeps the module's default.
 
     [Rules](routing/index.md) that send each request to an outbound or block it,
     with [datasets](routing/datasets.md) of domains and IP ranges.
+
+-   :material-dns:{ .lg .middle } **DNS**
+
+    ---
+
+    [DNS servers](dns/index.md) `udp` · `tcp` · `dot` · `doh` · `system`,
+    each through any outbound, with DNS rules and a cache.
 
 -   :material-timer-outline:{ .lg .middle } **Timeouts**
 

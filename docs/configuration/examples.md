@@ -222,10 +222,10 @@ their name even for connections that name an IP, and sends the rest out.
     }
   ],
   "outbounds": [{ "tag": "direct", "protocol": { "type": "freedom" } }],
+  "datasets": [
+    { "tag": "ads", "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ads-all" } }
+  ],
   "routing": {
-    "datasets": [
-      { "tag": "ads", "source": { "file": "geosite.dat" }, "format": { "type": "geodata", "kind": "domain", "category": "category-ads-all" } }
-    ],
     "rules": [
       { "match": { "network": "tcp" },
         "action": { "type": "sniff", "settings": { "sniffers": [{ "type": "tls" }, { "type": "http" }] } } },
