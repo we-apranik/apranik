@@ -107,6 +107,7 @@ nav:
           - configuration/routing/index.md
           - configuration/routing/datasets.md
           - configuration/routing/sniffing.md
+      - DNS: configuration/dns/index.md
       - Timeouts: configuration/timeouts.md
       - Examples: configuration/examples.md
   - How it works:
