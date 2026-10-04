@@ -16,6 +16,8 @@ const (
 	KindDatagramOverStreamProxy
 	KindDatagramProxy
 	KindSniffer
+	KindStreamDNSServer
+	KindDatagramDNSServer
 )
 
 func (k Kind) String() string {
@@ -36,6 +38,10 @@ func (k Kind) String() string {
 		return "datagram proxy"
 	case KindSniffer:
 		return "sniffer"
+	case KindStreamDNSServer:
+		return "stream DNS server"
+	case KindDatagramDNSServer:
+		return "datagram DNS server"
 	default:
 		return fmt.Sprintf("unknown kind %d", int(k))
 	}
@@ -53,7 +59,7 @@ const (
 
 func (k Kind) carrier() carrier {
 	switch k {
-	case KindBaseDatagram, KindOverlayDatagram, KindDatagramProxy:
+	case KindBaseDatagram, KindOverlayDatagram, KindDatagramProxy, KindDatagramDNSServer:
 		return carrierDatagram
 	default:
 		return carrierStream

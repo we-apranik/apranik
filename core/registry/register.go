@@ -6,7 +6,7 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// Info is all eight kind interfaces have in common. The tables stay typed;
+// Info is all ten kind interfaces have in common. The tables stay typed;
 // this only lets one register function serve them all.
 type module interface {
 	Info() spec.ModuleInfo

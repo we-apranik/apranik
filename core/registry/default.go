@@ -3,6 +3,11 @@ package registry
 import (
 	"errors"
 
+	dnsdoh "github.com/The-Apranik/Apranik/module/dns/doh"
+	dnsdot "github.com/The-Apranik/Apranik/module/dns/dot"
+	dnstcp "github.com/The-Apranik/Apranik/module/dns/tcp"
+	dnsudp "github.com/The-Apranik/Apranik/module/dns/udp"
+
 	"github.com/The-Apranik/Apranik/module/proxy/http"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
@@ -34,5 +39,9 @@ func Default() (*Registry, error) {
 		moduleRegistry.ProxyProtocols().RegisterDatagramOverStream(trojan.NewDatagramOverStreamProxyModule),
 		moduleRegistry.Sniffers().Register(tlssniffer.NewSnifferModule),
 		moduleRegistry.Sniffers().Register(httpsniffer.NewSnifferModule),
+		moduleRegistry.DNSServers().RegisterDatagram(dnsudp.NewDatagramDNSServerModule),
+		moduleRegistry.DNSServers().RegisterStream(dnstcp.NewStreamDNSServerModule),
+		moduleRegistry.DNSServers().RegisterStream(dnsdot.NewStreamDNSServerModule),
+		moduleRegistry.DNSServers().RegisterStream(dnsdoh.NewStreamDNSServerModule),
 	)
 }
