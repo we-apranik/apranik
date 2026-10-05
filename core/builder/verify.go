@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -40,15 +41,11 @@ func (b *Builder) BuildRouting(coreBlueprint *blueprint.Blueprint) (Routing, err
 	if err := b.UseDNS(coreBlueprint.DNS); err != nil {
 		return Routing{}, err
 	}
-	routing := Routing{Outbounds: make([]component.Outbound, 0, len(coreBlueprint.Outbounds))}
-	for _, outboundBlueprint := range coreBlueprint.Outbounds {
-		built, err := b.BuildOutbound(outboundBlueprint)
-		if err != nil {
-			routing.Close()
-			return Routing{}, err
-		}
-		routing.Outbounds = append(routing.Outbounds, built)
+	outbounds, err := b.BuildOutbounds(coreBlueprint.Outbounds)
+	if err != nil {
+		return Routing{}, err
 	}
+	routing := Routing{Outbounds: outbounds}
 	if err := b.BuildDNS(coreBlueprint.DNS, routing.Outbounds, datasets); err != nil {
 		routing.Close()
 		return Routing{}, err
@@ -60,6 +57,17 @@ func (b *Builder) BuildRouting(coreBlueprint *blueprint.Blueprint) (Routing, err
 		return Routing{}, err
 	}
 	return routing, nil
+}
+
+// StartProbing starts every outbound that tests its members in the
+// background. Run calls it once; Verify never does, so checking a config dials
+// nothing.
+func (r Routing) StartProbing(ctx context.Context) {
+	for _, built := range r.Outbounds {
+		if probing, ok := built.(component.ProbingOutbound); ok {
+			probing.StartProbing(ctx)
+		}
+	}
 }
 
 // VerifyOptions says how far Verify goes beyond building.

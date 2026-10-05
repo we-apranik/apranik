@@ -80,6 +80,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	routing.StartProbing(ctx)
 
 	for _, inboundBlueprint := range coreBlueprint.Inbounds {
 		built, err := stackBuilder.BuildInbound(inboundBlueprint)

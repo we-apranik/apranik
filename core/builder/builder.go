@@ -210,9 +210,98 @@ func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (component
 		return b.buildFreedomOutbound(outboundBlueprint)
 	case outboundBlueprint.Proxy != nil:
 		return b.buildProxyOutbound(outboundBlueprint)
+	case outboundBlueprint.Group != nil:
+		return nil, fmt.Errorf("outbound %q is a group, which needs its members built first: use BuildOutbounds", outboundBlueprint.Tag)
 	default:
 		return nil, fmt.Errorf("outbound %q has no protocol", outboundBlueprint.Tag)
 	}
+}
+
+// BuildOutbounds builds every outbound, in the order given: the first is the
+// default when there is no routing section. Groups are built after the
+// outbounds they pick among, whatever order the config file lists them in.
+func (b *Builder) BuildOutbounds(outboundBlueprints []blueprint.Outbound) ([]component.Outbound, error) {
+	built := make([]component.Outbound, len(outboundBlueprints))
+	builtByTag := make(map[string]component.Outbound, len(outboundBlueprints))
+	closeBuilt := func() {
+		for _, outbound := range built {
+			if outbound != nil {
+				outbound.Close()
+			}
+		}
+	}
+
+	pendingGroups := make([]int, 0)
+	for index, outboundBlueprint := range outboundBlueprints {
+		if outboundBlueprint.Group != nil {
+			pendingGroups = append(pendingGroups, index)
+			continue
+		}
+		outbound, err := b.BuildOutbound(outboundBlueprint)
+		if err != nil {
+			closeBuilt()
+			return nil, err
+		}
+		built[index], builtByTag[outboundBlueprint.Tag] = outbound, outbound
+	}
+
+	for len(pendingGroups) > 0 {
+		stillPending := pendingGroups[:0:0]
+		for _, index := range pendingGroups {
+			outboundBlueprint := outboundBlueprints[index]
+			members, ready := membersBuiltSoFar(outboundBlueprint.Group.Members, builtByTag)
+			if !ready {
+				stillPending = append(stillPending, index)
+				continue
+			}
+			outbound, err := b.buildGroupOutbound(outboundBlueprint, members)
+			if err != nil {
+				closeBuilt()
+				return nil, err
+			}
+			built[index], builtByTag[outboundBlueprint.Tag] = outbound, outbound
+		}
+		if len(stillPending) == len(pendingGroups) {
+			closeBuilt()
+			return nil, fmt.Errorf("outbound %q: members that are missing or wait on each other", outboundBlueprints[stillPending[0]].Tag)
+		}
+		pendingGroups = stillPending
+	}
+	return built, nil
+}
+
+func membersBuiltSoFar(tags []string, builtByTag map[string]component.Outbound) ([]component.Outbound, bool) {
+	members := make([]component.Outbound, 0, len(tags))
+	for _, tag := range tags {
+		member, found := builtByTag[tag]
+		if !found {
+			return nil, false
+		}
+		members = append(members, member)
+	}
+	return members, true
+}
+
+func (b *Builder) buildGroupOutbound(outboundBlueprint blueprint.Outbound, members []component.Outbound) (component.Outbound, error) {
+	group := outboundBlueprint.Group
+	built, err := outbound.NewGroup(outbound.GroupConfig{
+		Tag:          outboundBlueprint.Tag,
+		Members:      members,
+		PicksFastest: group.Type == blueprint.GroupTypeURLTest,
+		Probe: outbound.ProbeConfig{
+			UseTLS:   group.Probe.Type == blueprint.ProbeTypeHTTPS,
+			URL:      group.Probe.URL,
+			Interval: group.Probe.Interval,
+			Timeout:  group.Probe.Timeout,
+		},
+		Tolerance: group.Tolerance,
+		Logger:    b.logger,
+	})
+	if err != nil {
+		return nil, err
+	}
+	b.logger.Debug("Outbound group built", "outbound", outboundBlueprint.Tag, "type", group.Type, "members", len(members))
+	return built, nil
 }
 
 func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (component.Outbound, error) {

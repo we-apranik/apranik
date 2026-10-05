@@ -15,7 +15,6 @@ import (
 
 	"github.com/The-Apranik/Apranik/config"
 	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
 	"github.com/The-Apranik/Apranik/core/route/handler"
@@ -53,15 +52,13 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 	if err := built.UseDNS(coreBlueprint.DNS); err != nil {
 		t.Fatal(err)
 	}
-	var outbounds []component.Outbound
-	for _, outboundBlueprint := range coreBlueprint.Outbounds {
-		outbound, err := built.BuildOutbound(outboundBlueprint)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { outbound.Close() })
-		outbounds = append(outbounds, outbound)
+	outbounds, err := built.BuildOutbounds(coreBlueprint.Outbounds)
+	if err != nil {
+		t.Fatal(err)
 	}
+	routing := builder.Routing{Outbounds: outbounds}
+	t.Cleanup(func() { routing.Close() })
+	routing.StartProbing(t.Context())
 	if err := built.BuildDNS(coreBlueprint.DNS, outbounds, datasets); err != nil {
 		t.Fatal(err)
 	}
