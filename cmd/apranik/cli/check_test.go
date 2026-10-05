@@ -124,3 +124,20 @@ func plainInboundsConfig(ports ...int) string {
 	return `{"version": 1, "inbounds": [` + inbounds + `],
   "outbounds": [{"tag": "direct", "protocol": {"type": "freedom"}}]}`
 }
+
+// proxy_protocol only reads what a proxy in front of a server sends, so an
+// outbound with it fails when built, which check now does.
+func TestCheckRefusesProxyProtocolOnAnOutbound(t *testing.T) {
+	path := writeConfigFile(t, `{
+  "version": 1,
+  "outbounds": [{
+    "tag": "out", "server": "127.0.0.1", "server_port": 1080,
+    "transport": [{"type": "tcp"}, {"type": "proxy_protocol"}],
+    "protocol": {"type": "trojan", "settings": {"password": "p"}}
+  }]
+}`)
+
+	if err := runCheck([]string{"-config", path}); !errors.Is(err, ErrReported) {
+		t.Fatalf("runCheck error = %v, want ErrReported", err)
+	}
+}
