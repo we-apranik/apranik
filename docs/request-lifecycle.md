@@ -37,7 +37,9 @@ Step by step:
    (default 10 seconds). If the inbound's stack has overlays,
    `wrapServerOverlays` runs each one's `WrapServerStream` first, in stack order
    (a TLS handshake, a WebSocket upgrade); a failure is logged at Debug and the
-   connection closed. Then it calls the proxy server's `AcceptStream`. For SOCKS5
+   connection closed. Core made a `spec.TransportMetadata` when it accepted the
+   socket and hands every overlay a copy: an overlay that learns the real client
+   replaces `Source`, and core keeps nothing else it writes. Then it calls the proxy server's `AcceptStream`. For SOCKS5
    this is `streamServer.AcceptStream` in `module/proxy/socks5/server.go`: it
    authenticates, reads the CONNECT request, replies, and returns the same stream
    as the payload plus a `Metadata` with the destination.
