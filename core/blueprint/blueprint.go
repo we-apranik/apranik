@@ -91,7 +91,7 @@ type Inbound struct {
 	MaxConnections int
 }
 
-// Exactly one of Proxy and Freedom is set; config.Check refuses anything
+// Exactly one of Proxy, Freedom and Group is set; config.Check refuses anything
 // else. Blocking is a routing action, not an outbound.
 type Outbound struct {
 	Tag string
@@ -109,6 +109,10 @@ type Outbound struct {
 	DatagramOverStreamProxy spec.DatagramOverStreamProxyModule
 
 	Freedom *Freedom
+
+	// A group reaches no server and takes no transport: it picks among other
+	// outbounds.
+	Group *Group
 
 	// Only with Proxy: the DNS server that resolves Server when it is a
 	// domain, so the proxy's own name never loops through a DNS server that
