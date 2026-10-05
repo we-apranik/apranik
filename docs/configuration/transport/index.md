@@ -22,6 +22,7 @@ left out for the module's defaults.
 | `ws` | overlay, stream | [WebSocket](ws.md) |
 | `httpupgrade` | overlay, stream | [HTTPUpgrade](httpupgrade.md) |
 | `fragment` | overlay, stream, outbound only | [Fragment](fragment.md) |
+| `proxy_protocol` | overlay, stream, inbound only | [PROXY protocol](proxy_protocol.md) |
 
 > [!NOTE]
 > `udp` appears only inside [`freedom`](../outbound/freedom.md#udp)'s settings.
@@ -41,6 +42,7 @@ warning.
 | Look like an HTTPS site | `tcp → tls` |
 | Pass a CDN or HTTP reverse proxy | `tcp → tls → ws`, or `tcp → ws` when the CDN ends TLS |
 | The same, with no cost after the handshake | `httpupgrade` in place of `ws`, where nothing checks WebSocket frames |
+| Know the real client behind a CDN or load balancer | `original_source_ip` on `ws` or `httpupgrade`, or `tcp → proxy_protocol` for a load balancer that sends a PROXY header ([details](original_source_ip.md)) |
 | Hide the SNI from DPI that does not reassemble | `fragment` directly below `tls`, or alone above `tcp` under `freedom` |
 
 [![What ws and httpupgrade put on the wire: both send the same HTTP/1.1 upgrade request and get a 101 answer; ws then carries the payload in WebSocket frames with a header and, from the client, a mask; httpupgrade carries the payload as raw bytes.](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)
