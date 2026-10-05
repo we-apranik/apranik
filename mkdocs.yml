@@ -98,6 +98,7 @@ nav:
       - Outbound:
           - configuration/outbound/index.md
           - configuration/outbound/freedom.md
+          - configuration/outbound/group.md
       - Protocols:
           - configuration/protocol/socks5.md
           - configuration/protocol/http.md

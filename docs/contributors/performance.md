@@ -282,6 +282,23 @@ not rely on them.
 - Loopback benchmarks measure Apranik's code, not the network. Use them to
   compare versions of Apranik, never to claim real-world throughput.
 
+## Outbound group
+
+Measured 2026-10-05 (`go test -bench GroupDialStream -benchmem -count 5 ./core/outbound`,
+12 threads, medians). The members connect instantly, so the time is the group's own
+choice of order. One allocation in the "after" column is the benchmark's own stub
+stream.
+
+| Benchmark | Before | After |
+| --- | --- | --- |
+| `urltest`, 3 members | 124 ns, 88 B, 3 allocs | 45 ns, 16 B, 1 alloc |
+| `urltest`, 10 members | 248 ns, 256 B, 3 allocs | 45 ns, 16 B, 1 alloc |
+| `fallback`, 3 members | 120 ns, 88 B, 3 allocs | 50 ns, 16 B, 1 alloc |
+| `fallback`, 10 members | 238 ns, 256 B, 3 allocs | 50 ns, 16 B, 1 alloc |
+
+"Before" built and sorted the member order for every connection; "after" works it
+out once per probe round and a connection only reads it.
+
 ## Benchmarks and CI
 
 Every hot path has a benchmark in the package it measures:
@@ -290,6 +307,7 @@ Every hot path has a benchmark in the package it measures:
 | --- | --- |
 | TCP relay | `core/relay`: `BenchmarkStreamRelayOneShortExchange` |
 | Sniffing | `core/sniff`: `BenchmarkSniffTLSClientHello` |
+| Outbound group | `core/outbound`: `BenchmarkGroupDialStream` |
 | Routing | `core/route/router`: `BenchmarkRouteRealisticConfig`; `core/route/handler`: `BenchmarkRouteStreamWithoutRules` |
 | Matchers and datasets | `core/route/match`: domain, prefix and `ip_is_private` lookups; `core/route/dataset/geodata`: `BenchmarkReadOneCategoryOfMany` |
 | HTTP handshake | `module/proxy/http`: `BenchmarkAcceptConnect` |

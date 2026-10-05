@@ -34,11 +34,17 @@ an outbound.
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP, and UDP framed in the stream |
 | `freedom` | [Freedom](freedom.md) | TCP and UDP, straight to each destination |
+| `urltest` | [Group](group.md) | what every member carries; picks the fastest member |
+| `fallback` | [Group](group.md) | what every member carries; picks the first member that works |
 
 `freedom` is a special protocol built by core. It reaches no proxy server, so
 it takes no `server` or `server_port`, and its
 `transport` holds only [`tcp` and transports that need no server
 side](freedom.md#transport).
+
+`urltest` and `fallback` are [groups](group.md), also built by core: an outbound that
+picks one of other outbounds for each connection. They take none of `server`,
+`server_port`, `transport` or `dns_server`.
 
 <div class="cfg-fields" markdown>
 

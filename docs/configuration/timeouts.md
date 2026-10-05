@@ -29,6 +29,8 @@ stack's handshakes can together take the sum of their timeouts.
 | TCP keep-alive | `tcp` settings `keep_alive` (for freedom: `settings.tcp.keep_alive`) | `15s` |
 | TCP keep-alive probes | `tcp` settings `keep_alive_interval` and `keep_alive_count` | `15s`, `9` |
 | One DNS query | each [DNS server](dns/index.md)'s `settings.timeout` | `5s` |
+| One group probe | an [outbound group](outbound/group.md#probes)'s `probe.timeout` | `10s` |
+| Time between group probe rounds | an [outbound group](outbound/group.md#probes)'s `probe.interval` | `5m` |
 | A domain's next address | `tcp` settings `next_address_delay` | `250ms` |
 | Remote config file download | `apranik run/check -fetch-timeout` | `30s` |
 

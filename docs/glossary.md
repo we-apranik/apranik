@@ -22,6 +22,7 @@
 | **Fingerprint** | What a TLS ClientHello reveals about the program that sent it: cipher suites, extensions, their order. `tls`'s `fingerprint` picks a browser's to imitate through uTLS. |
 | **Fragment** | The overlay transport that cuts the TLS ClientHello into records, packets or both, so DPI that does not reassemble never sees the server name whole. Outbound only. |
 | **Freedom** | The special outbound protocol that sends straight to each destination, over TCP (its transport: `tcp`, then only transports that need no server side) and UDP. |
+| **Group** | An outbound that connects nowhere itself and picks one of its members, other outbounds, for each connection: `urltest` (the fastest) and `fallback` (the first that works). See [Outbound groups](configuration/outbound/group.md). |
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |
@@ -30,12 +31,13 @@
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor per kind. The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
 | **Module kind** | One of the `spec` interfaces a module fills, each named `...Module`: `BaseStreamTransportModule`, `OverlayStreamTransportModule`, `StreamProxyModule`, `SnifferModule` and so on. |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
-| **Outbound** | How traffic leaves: a proxy client plus a dialer stack, or freedom (`component.Outbound`). |
+| **Outbound** | How traffic leaves: a proxy client plus a dialer stack, freedom, or a group that picks among other outbounds (`component.Outbound`). |
 | **Overlay transport** | A transport that wraps a layer below it, one connection at a time (`WrapClientStream`, `WrapServerStream`), such as TLS or WebSocket. `tls`, `ws` and `httpupgrade` are built. |
 | **Payload** | What a layer returns upward: the proxied traffic with the protocol's framing removed. |
 | **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Pipelining** | `httpupgrade`'s `pipeline`: the client sends its payload right after the upgrade request, without waiting for the `101`. |
-| **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` on an outbound, or `mixed` on an inbound. |
+| **Probe** | The small HTTP request a group sends through each member to learn whether it works and how long it takes. |
+| **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` or a group type (`urltest`, `fallback`) on an outbound, or `mixed` on an inbound. |
 | **PROXY protocol** | HAProxy's header a load balancer writes before the client's bytes, naming the client it accepted (versions 1 and 2). Read by the `proxy_protocol` overlay. Not a proxy protocol in this project's sense. |
 | **Proxy protocol** | A module that speaks proxy semantics over a supplied carrier, such as SOCKS5, HTTP CONNECT or Trojan. It never opens a connection itself. Its server `Accept*`s requests; its client `Request*`s a payload. |
 | **Source endpoint** | `Metadata.Transport.SourceEndpoint`: who the client is. The accepted socket's remote end, unless an overlay below the proxy layer replaced it with the address a proxy in front reported. The socket's own end stays in `InboundRemoteEndpoint`. |
