@@ -147,6 +147,18 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		collectWarnings(diagnostics, inbound.Mixed.HTTP, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
 	}
 
+	if inbound.Bind.IsValid() {
+		for index, overlay := range inbound.StreamTransport.Overlays {
+			collectListenAddressWarnings(diagnostics, overlay, inbound.Bind, fieldLocation(indexLocation(transportLoc, index+1), "settings"))
+		}
+		collectListenAddressWarnings(diagnostics, inbound.StreamProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
+		collectListenAddressWarnings(diagnostics, inbound.DatagramProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
+		if inbound.Mixed != nil {
+			collectListenAddressWarnings(diagnostics, inbound.Mixed.SOCKS5, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedSOCKS5Module))
+			collectListenAddressWarnings(diagnostics, inbound.Mixed.HTTP, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
+		}
+	}
+
 	if inbound.MaxConnections < 0 {
 		diagnostics.errorf(fieldLocation(loc, "max_connections"), "must not be negative; 0 means no limit")
 	}
@@ -329,6 +341,18 @@ func collectWarnings(diagnostics *Diagnostics, component spec.Config, loc string
 		return
 	}
 	for _, warning := range component.Warnings() {
+		diagnostics.warnf(loc, "%s", warning)
+	}
+}
+
+// Only what depends on where the inbound listens: a module that implements
+// spec.ListenAddressWarner moves that warning out of Warnings.
+func collectListenAddressWarnings(diagnostics *Diagnostics, component any, listen spec.Endpoint, loc string) {
+	warner, implements := component.(spec.ListenAddressWarner)
+	if !implements || warner == nil {
+		return
+	}
+	for _, warning := range warner.WarningsForListenAddress(listen) {
 		diagnostics.warnf(loc, "%s", warning)
 	}
 }
