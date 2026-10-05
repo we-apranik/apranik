@@ -1,5 +1,19 @@
 (function () {
+  function initBackToTop() {
+    var button = document.querySelector(".ap-home .totop");
+    if (!button) return;
+    function update() { button.hidden = window.scrollY < 600; }
+    window.addEventListener("scroll", update, { passive: true });
+    update();
+    button.addEventListener("click", function () {
+      var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+      document.querySelector(".md-header a, .md-header button").focus({ preventScroll: true });
+    });
+  }
+
   function init() {
+    initBackToTop();
     var items = document.querySelectorAll(".ap-home .loop li.st");
     var info = document.getElementById("loopinfo");
     if (!items.length || !info) return;
