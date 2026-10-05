@@ -101,6 +101,18 @@ counted from the first write, which sends the handshake; a deadline the caller
 set on the connection still applies if it is earlier, and stays in force
 afterwards.
 
+## Inbound
+
+### `original_source_ip`
+
+<span class="cfg cfg-type">object</span>
+<span class="cfg cfg-def">Default: on, reads <code>X-Forwarded-For</code> from any peer</span>
+
+Read the client's IP from a header a proxy in front added, so routing and logs
+see the client and not the CDN. Its format, the setups for nginx and Cloudflare,
+and how it differs from Xray and sing-box are in
+[Client address behind a proxy](original_source_ip.md).
+
 ## Outbound
 
 ### `headers`
