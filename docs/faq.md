@@ -10,15 +10,15 @@ Researchers who find new methods, developers who build clients and server panels
 
 ## What does the name mean?
 
-Apranik was a commander of the late Sasanian army who, by tradition, kept fighting a guerrilla war after the empire fell in the seventh century.
+Apranik was a Sasanian commander who fought the Arab invasion of Persia (Iran) in the seventh century. By tradition, she kept up a guerrilla war after the empire fell, and her motto was “No retreat, no surrender.”
 
 ## How is it different from other proxy tools?
 
 It's built around adding new methods as separate modules, so a researcher can contribute one without learning the whole project, and a maintainer can review it on its own.
 
-## Is it free, and is it only for one country?
+## Is it free, and who can use it?
 
-It's free to use and free to adapt, and any community can adapt it to the censorship it faces. **[TODO: confirm the license before publishing.]**
+It's free to use and free to adapt, and any community can adapt it to the censorship it faces, wherever it is. It is released under the [Mozilla Public License 2.0](https://github.com/The-Apranik/Apranik/blob/main/LICENSE).
 
 ## How do I add a new method?
 
@@ -26,15 +26,15 @@ Write it as a module, test it on its own, and send it for review. Every change i
 
 ## Is it safe to use?
 
-We don't promise that. The code is public so you can check it, and vulnerability reports are handled privately. The [threat model](design/threat-model.md) says what we do and don't claim.
+Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. The [threat model](design/threat-model.md) explains exactly what it protects against.
 
 ## Does it make me anonymous?
 
-No. Getting around blocking and staying anonymous are different things, and Apranik is built for the first. If anonymity matters to you, treat it as a separate question.
+Apranik's job is to get you around blocking. Anonymity is a different goal that needs its own tools, so if it matters to you, plan for it separately.
 
 ## Will it always work?
 
-No. No circumvention method works forever, because censors watch what works and block it. That's why Apranik is built so new methods can be added quickly.
+Apranik is built for a moving target. Censors keep blocking what works, so no single method lasts forever. That is why new methods are added as modules and shipped to every app in one release: access can adapt as fast as blocking does.
 
 ## How do I report a security issue?
 
