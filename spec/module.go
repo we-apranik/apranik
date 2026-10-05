@@ -38,3 +38,11 @@ type Config interface {
 	Validate() error
 	Warnings() []string
 }
+
+// ListenAddressWarner is optional on a module that runs in an inbound.
+// config.Check calls it with the address that inbound listens on, so the
+// module warns only about what that address makes unsafe. Warnings stays for
+// what does not depend on it.
+type ListenAddressWarner interface {
+	WarningsForListenAddress(listen Endpoint) []string
+}
