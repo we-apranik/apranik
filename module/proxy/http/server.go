@@ -50,7 +50,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 		return nil, spec.Metadata{}, err
 	}
 
-	metadata := spec.Metadata{Network: spec.NetworkTCP, Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: s.username}
+	metadata := spec.Metadata{Network: spec.NetworkTCP, Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: s.username}
 
 	if strings.EqualFold(requestMethod, "CONNECT") {
 		return acceptConnectTunnel(streamAfterHead, metadata, httpVersion, requestTarget)

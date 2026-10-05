@@ -82,7 +82,7 @@ func connect(t testing.TB, clientModule, serverModule *Transport) (client, serve
 	t.Cleanup(cancel)
 	serverDone := make(chan wrapResult, 1)
 	go func() {
-		stream, err := overlayServer.WrapServerStream(ctx, serverSide)
+		stream, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		serverDone <- wrapResult{stream, err}
 	}()
 	clientStream, err := overlayClient.WrapClientStream(ctx, clientSide, testServer(t))
@@ -151,7 +151,7 @@ func rawRequest(t *testing.T, serverModule *Transport, request string) (*http.Re
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		stream, err := overlayServer.WrapServerStream(ctx, serverSide)
+		stream, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		serverDone <- wrapResult{stream, err}
 	}()
 	clientSide.Write([]byte(request))
@@ -503,7 +503,7 @@ func TestACancelledContextEndsAHandshakeWithASilentClient(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := overlayServer.WrapServerStream(ctx, serverSide)
+		_, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		done <- err
 	}()
 	select {
@@ -523,7 +523,7 @@ func TestAnEndlessHeaderIsCutOff(t *testing.T) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := overlayServer.WrapServerStream(ctx, serverSide)
+		_, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		done <- err
 	}()
 	go func() {

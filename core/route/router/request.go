@@ -62,6 +62,6 @@ func (r *routedRequest) anyDestinationIP(test func(netip.Addr) bool) bool {
 }
 
 func (r *routedRequest) sourceIP() (netip.Addr, bool) {
-	address := r.metadata.Source.Addr()
+	address := r.metadata.Transport.SourceEndpoint.Addr()
 	return address, address.IsValid()
 }

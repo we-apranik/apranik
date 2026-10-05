@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/The-Apranik/Apranik/shared/originalsourceip"
 	"github.com/The-Apranik/Apranik/shared/streamdeadline"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
 	"github.com/The-Apranik/Apranik/spec"
@@ -20,6 +21,7 @@ type server struct {
 	earlyDataHeaderName string
 	earlyDataInPath     bool
 	maxEarlyData        int
+	originalSourceIP    *originalsourceip.Resolver // nil when disabled
 }
 
 func newServer(settings *Settings) *server {
@@ -29,6 +31,7 @@ func newServer(settings *Settings) *server {
 		handshakeTimeout:    settings.handshakeTimeout(),
 		earlyDataHeaderName: defaultEarlyDataHeaderName,
 		maxEarlyData:        maxEarlyDataLimit,
+		originalSourceIP:    settings.OriginalSourceIP.NewResolver(),
 	}
 	if earlyData := settings.EarlyData; earlyData != nil {
 		built.earlyDataHeaderName = earlyData.effectiveHeaderName()
@@ -38,12 +41,12 @@ func newServer(settings *Settings) *server {
 	return built
 }
 
-func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream, transport *spec.TransportMetadata) (spec.Stream, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
 	release := streamdeadline.BindToContext(ctx, underlyingStream)
 	limiter, reader := handshake.NewReader(underlyingStream)
-	earlyData, err := s.acceptUpgrade(underlyingStream, reader)
+	earlyData, requestHeader, err := s.acceptUpgrade(underlyingStream, reader)
 	if releaseErr := release(); err == nil {
 		err = releaseErr
 	}
@@ -52,6 +55,12 @@ func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Str
 	}
 	limiter.LiftLimit()
 
+	if s.originalSourceIP != nil {
+		if source, believed := s.originalSourceIP.Resolve(requestHeader, transport.SourceEndpoint); believed {
+			transport.SourceEndpoint = source
+		}
+	}
+
 	wrapped := &stream{underlyingStream: underlyingStream, reader: reader, pendingEarlyData: earlyData}
 	wrapped.handshakeDone.Store(true)
 	return wrapped, nil
@@ -59,33 +68,33 @@ func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Str
 
 // acceptUpgrade reads and checks the request, answers it, and returns any
 // early data it carried. A request it refuses gets an ordinary HTTP answer.
-func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reader) ([]byte, error) {
+func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reader) ([]byte, http.Header, error) {
 	request, err := http.ReadRequest(reader)
 	if err != nil {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
-		return nil, fmt.Errorf("reading the upgrade request: %w", err)
+		return nil, nil, fmt.Errorf("reading the upgrade request: %w", err)
 	}
 
 	// 400 for a wrong host and 404 for a wrong path, as sing-box answers.
 	if s.requiredHost != "" && !handshake.HostMatches(request.Host, s.requiredHost) {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
-		return nil, fmt.Errorf("%w: %q", errWrongHost, request.Host)
+		return nil, nil, fmt.Errorf("%w: %q", errWrongHost, request.Host)
 	}
 
 	earlyData, pathMatches, err := s.matchPath(request)
 	if !pathMatches {
 		handshake.WriteRefusal(underlyingStream, http.StatusNotFound)
-		return nil, fmt.Errorf("%w: %q", errWrongPath, request.URL.Path)
+		return nil, nil, fmt.Errorf("%w: %q", errWrongPath, request.URL.Path)
 	}
 	if err != nil {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
-		return nil, err
+		return nil, nil, err
 	}
 
 	key := request.Header.Get("Sec-WebSocket-Key")
 	if key == "" || request.Method != http.MethodGet || !handshake.HeaderContainsToken(request.Header, "Upgrade", "websocket") || !handshake.HeaderContainsToken(request.Header, "Connection", "upgrade") || request.Header.Get("Sec-WebSocket-Version") != "13" {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
-		return nil, errNotAnUpgrade
+		return nil, nil, errNotAnUpgrade
 	}
 
 	// Xray's rule: a header value that is valid base64 is early data, and is
@@ -105,14 +114,14 @@ func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reade
 
 	if len(earlyData) > s.maxEarlyData {
 		handshake.WriteRefusal(underlyingStream, http.StatusBadRequest)
-		return nil, fmt.Errorf("%w: %d bytes, more than %d", errTooMuchEarlyData, len(earlyData), s.maxEarlyData)
+		return nil, nil, fmt.Errorf("%w: %d bytes, more than %d", errTooMuchEarlyData, len(earlyData), s.maxEarlyData)
 	}
 
 	response := "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" + "Sec-WebSocket-Accept: " + acceptKeyFor(key) + "\r\n" + protocolEcho + "\r\n"
 	if _, err := underlyingStream.Write([]byte(response)); err != nil {
-		return nil, fmt.Errorf("answering the upgrade: %w", err)
+		return nil, nil, fmt.Errorf("answering the upgrade: %w", err)
 	}
-	return earlyData, nil
+	return earlyData, request.Header, nil
 }
 
 // matchPath compares the path without its query. In sing-box's path mode, the

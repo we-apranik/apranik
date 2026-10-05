@@ -134,8 +134,15 @@ type StreamOverlayClient interface {
 // a client that stalls holds up nobody else. ctx ends only when the inbound
 // closes: the layer bounds its own handshake, with a timeout from its own
 // settings. Close and error rules are StreamOverlayClient's.
+//
+// transport is what core made when it accepted the socket, shared by every
+// overlay of the connection in stack order. A layer that learns who the client
+// really is (a PROXY header, a trusted forwarding header) replaces
+// transport.SourceEndpoint; it reads it first, which is what the layers below
+// say. A layer may also fill the section named for its own protocol
+// (transport.ProxyProtocol). Core reads back nothing else.
 type StreamOverlayServer interface {
-	WrapServerStream(ctx context.Context, underlyingStream Stream) (Stream, error)
+	WrapServerStream(ctx context.Context, underlyingStream Stream, transport *TransportMetadata) (Stream, error)
 }
 
 // BaseDatagramTransportModule: UDP. Both sides resolve through resolver: a

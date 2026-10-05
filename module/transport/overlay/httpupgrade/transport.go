@@ -6,6 +6,7 @@
 package httpupgrade
 
 import (
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -32,5 +33,5 @@ func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 // The return type is the kind declaration: registering this as anything else
 // will not compile.
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule {
-	return &Transport{Settings: Settings{Path: "/", AcceptWebSocketKey: true}}
+	return &Transport{Settings: Settings{Path: "/", AcceptWebSocketKey: true, OriginalSourceIP: types.DefaultOriginalSourceIP()}}
 }

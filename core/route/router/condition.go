@@ -119,7 +119,7 @@ func (c destinationPortCondition) matches(request *routedRequest) bool {
 type sourcePortCondition struct{ ports *match.PortMatcher }
 
 func (c sourcePortCondition) matches(request *routedRequest) bool {
-	return request.metadata.Source.IsValid() && c.ports.Contains(request.metadata.Source.Port())
+	return request.metadata.Transport.SourceEndpoint.IsValid() && c.ports.Contains(request.metadata.Transport.SourceEndpoint.Port())
 }
 
 // Every named header must be present and match; header names are lowercase.
@@ -169,13 +169,13 @@ func (c sourceIPIsPrivateCondition) matches(request *routedRequest) bool {
 type inboundLocalIPCondition []*match.PrefixMatcher
 
 func (c inboundLocalIPCondition) matches(request *routedRequest) bool {
-	address := request.metadata.InboundLocalEndpoint.Addr()
+	address := request.metadata.Transport.InboundLocalEndpoint.Addr()
 	return address.IsValid() && containedInAny(c, address)
 }
 
 type inboundLocalPortCondition struct{ ports *match.PortMatcher }
 
 func (c inboundLocalPortCondition) matches(request *routedRequest) bool {
-	localEndpoint := request.metadata.InboundLocalEndpoint
+	localEndpoint := request.metadata.Transport.InboundLocalEndpoint
 	return localEndpoint.IsValid() && c.ports.Contains(localEndpoint.Port())
 }

@@ -83,7 +83,7 @@ func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wante
 		return spec.Metadata{}, fmt.Errorf("%w: trojan: unknown password", spec.ErrFallbackRequested)
 	}
 
-	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: name}
+	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: name}
 	switch {
 	case request.Command != wantedCommand:
 		// Core dispatched on IsDatagramOverStream, so this is a mismatch

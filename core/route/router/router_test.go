@@ -110,7 +110,7 @@ func from(address string, port uint16) spec.Endpoint {
 }
 
 func tcpTo(destination spec.Destination) spec.Metadata {
-	return spec.Metadata{Network: spec.NetworkTCP, Destination: destination, Source: from("192.168.1.50", 50000), InboundTag: "mixed-in"}
+	return spec.Metadata{Network: spec.NetworkTCP, Destination: destination, Transport: spec.TransportMetadata{SourceEndpoint: from("192.168.1.50", 50000)}, InboundTag: "mixed-in"}
 }
 
 func decide(t *testing.T, router *Router, informant *fakeInformant) string {
@@ -213,12 +213,12 @@ func headers(nameThenPattern ...string) map[string]*regexp.Regexp {
 }
 
 func withSource(metadata spec.Metadata, source spec.Endpoint) spec.Metadata {
-	metadata.Source = source
+	metadata.Transport.SourceEndpoint = source
 	return metadata
 }
 
 func withLocal(metadata spec.Metadata, local spec.Endpoint) spec.Metadata {
-	metadata.InboundLocalEndpoint = local
+	metadata.Transport.InboundLocalEndpoint = local
 	return metadata
 }
 

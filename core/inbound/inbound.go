@@ -235,26 +235,42 @@ func (i *streamInbound) releaseConnectionSlot() {
 
 // Internet scanners fail transport handshakes all the time, so a failure is
 // logged at Debug and the connection closed.
-func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stream) (spec.Stream, error) {
+//
+// The overlays get a copy of what core knows about the accepted socket. Core
+// keeps only what an overlay may write: SourceEndpoint, and the ProxyProtocol
+// section. InboundRemoteEndpoint and InboundLocalEndpoint stay the socket's.
+func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stream, accepted spec.TransportMetadata) (spec.Stream, spec.TransportMetadata, error) {
+	editableByOverlays := accepted
 	for _, overlay := range i.overlays {
-		wrapped, err := overlay.Server.WrapServerStream(ctx, stream)
+		wrapped, err := overlay.Server.WrapServerStream(ctx, stream, &editableByOverlays)
 		if err != nil {
 			stream.Close()
-			return nil, fmt.Errorf("transport %q: %w", overlay.Name, err)
+			return nil, accepted, fmt.Errorf("transport %q: %w", overlay.Name, err)
 		}
 		stream = wrapped
 	}
-	return stream, nil
+	if editableByOverlays.SourceEndpoint != accepted.SourceEndpoint {
+		i.logger.Debug("Source replaced by a transport overlay",
+			"socket_remote_endpoint", accepted.InboundRemoteEndpoint, "source", editableByOverlays.SourceEndpoint)
+	}
+	accepted.SourceEndpoint = editableByOverlays.SourceEndpoint
+	accepted.ProxyProtocol = editableByOverlays.ProxyProtocol
+	return stream, accepted, nil
 }
 
 // Recording only when something may need it: identifying peeks, and a
 // fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
-	inboundLocalEndpoint := spec.NewEndpointFromNetAddr(stream.LocalAddr())
+	socketRemoteEndpoint := spec.NewEndpointFromNetAddr(stream.RemoteAddr())
+	acceptedSocket := spec.TransportMetadata{
+		SourceEndpoint:        socketRemoteEndpoint,
+		InboundRemoteEndpoint: socketRemoteEndpoint,
+		InboundLocalEndpoint:  spec.NewEndpointFromNetAddr(stream.LocalAddr()),
+	}
 
 	// Recording starts above the overlays, so a fallback is handed what the
 	// client sent inside them, not TLS records.
-	stream, err := i.wrapServerOverlays(ctx, stream)
+	stream, transport, err := i.wrapServerOverlays(ctx, stream, acceptedSocket)
 	if err != nil {
 		i.logger.Debug("Transport handshake failed", "error", err)
 		return
@@ -281,7 +297,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 				return
 			}
 			recording.StopRecording()
-			metadata.InboundLocalEndpoint = inboundLocalEndpoint
+			metadata.Transport = transport
 			i.handleDatagramOverStream(ctx, handler, datagram, metadata)
 			return
 		}
@@ -291,7 +307,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 	if err == nil || errors.Is(err, spec.ErrUDPAssociationRequested) {
 		stopRecording(recording)
 	}
-	metadata.InboundLocalEndpoint = inboundLocalEndpoint
+	metadata.Transport = transport
 	if errors.Is(err, spec.ErrUDPAssociationRequested) {
 		i.handleUDPAssociate(ctx, handler, handshakeStream, metadata)
 		return

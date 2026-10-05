@@ -78,7 +78,7 @@ func connect(t testing.TB, clientModule, serverModule *Transport) (client, serve
 	t.Cleanup(cancel)
 	serverDone := make(chan wrapResult, 1)
 	go func() {
-		stream, err := overlayServer.WrapServerStream(ctx, serverSide)
+		stream, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		serverDone <- wrapResult{stream, err}
 	}()
 	client, err := overlayClient.WrapClientStream(ctx, clientSide, testServer(t))
@@ -187,7 +187,7 @@ func rawRequest(t *testing.T, serverModule *Transport, request string) (*http.Re
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		stream, err := overlayServer.WrapServerStream(ctx, serverSide)
+		stream, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		serverDone <- wrapResult{stream, err}
 	}()
 	clientSide.Write([]byte(request))
@@ -264,7 +264,7 @@ func TestPayloadSentWithTheRequestIsKept(t *testing.T) {
 	clientSide.Write([]byte(upgradeRequest("/", "") + "payload behind the request"))
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	server, err := overlayServer.WrapServerStream(ctx, serverSide)
+	server, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestACancelledContextEndsAHandshakeWithASilentClient(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := overlayServer.WrapServerStream(ctx, serverSide)
+		_, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		done <- err
 	}()
 	select {

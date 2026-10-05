@@ -171,7 +171,7 @@ func handshake(t *testing.T, clientModule, serverModule *tls.Transport, server s
 
 	serverDone := make(chan handshakeResult, 1)
 	go func() {
-		stream, err := overlayServer.WrapServerStream(ctx, serverSide)
+		stream, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		if err != nil {
 			serverSide.Close() // as core does, so the client is not left waiting
 		}
@@ -368,7 +368,7 @@ func TestACancelledContextEndsAHandshakeWithASilentClient(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := overlayServer.WrapServerStream(ctx, serverSide)
+		_, err := overlayServer.WrapServerStream(ctx, serverSide, &spec.TransportMetadata{})
 		done <- err
 	}()
 	select {
@@ -495,7 +495,7 @@ func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
 	_, serverSide := tcpPair(t)
 	result := make(chan error, 1)
 	go func() {
-		_, err := overlayServer.WrapServerStream(context.Background(), serverSide)
+		_, err := overlayServer.WrapServerStream(context.Background(), serverSide, &spec.TransportMetadata{})
 		result <- err
 	}()
 	select {

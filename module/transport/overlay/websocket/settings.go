@@ -7,6 +7,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // Early data puts the start of the payload in the handshake, base64, so the
@@ -51,6 +52,9 @@ type Settings struct {
 	// handshake deferred to the first write. Zero means
 	// defaultHandshakeTimeout.
 	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+
+	// Server: read the client's IP from a header a proxy in front added.
+	OriginalSourceIP types.OriginalSourceIP `json:"original_source_ip"`
 }
 
 type EarlyData struct {
@@ -106,6 +110,9 @@ func (s *Settings) Validate() error {
 			return fmt.Errorf("websocket: early_data: %w", err)
 		}
 	}
+	if err := s.OriginalSourceIP.Validate(); err != nil {
+		return fmt.Errorf("websocket: original_source_ip: %w", err)
+	}
 	return nil
 }
 
@@ -134,4 +141,14 @@ func (e *EarlyData) validate(headers map[string]string) error {
 	return nil
 }
 
-func (s *Settings) Warnings() []string { return nil }
+func (s *Settings) Warnings() []string {
+	var warnings []string
+	for _, warning := range s.OriginalSourceIP.Warnings() {
+		warnings = append(warnings, "websocket: original_source_ip: "+warning)
+	}
+	return warnings
+}
+
+func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
+	return s.OriginalSourceIP.WarningsForListenAddress("websocket", listen)
+}

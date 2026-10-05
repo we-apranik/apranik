@@ -35,7 +35,7 @@ func newServer(settings *Settings) (*server, error) {
 	}, handshakeTimeout: settings.handshakeTimeout()}, nil
 }
 
-func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream, _ *spec.TransportMetadata) (spec.Stream, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
 	connection := cryptotls.Server(underlyingStream, s.config)

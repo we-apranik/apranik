@@ -6,6 +6,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // One settings type for both roles: an outbound reads the client fields, an
@@ -38,6 +39,9 @@ type Settings struct {
 	// client's wait for the 101 on its first Read. Zero means
 	// defaultHandshakeTimeout.
 	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+
+	// Server: read the client's IP from a header a proxy in front added.
+	OriginalSourceIP types.OriginalSourceIP `json:"original_source_ip"`
 }
 
 // PROVISIONAL.
@@ -66,7 +70,20 @@ func (s *Settings) Validate() error {
 	if s.HandshakeTimeout < 0 {
 		return fmt.Errorf("httpupgrade: handshake_timeout %s must not be negative", s.HandshakeTimeout)
 	}
+	if err := s.OriginalSourceIP.Validate(); err != nil {
+		return fmt.Errorf("httpupgrade: original_source_ip: %w", err)
+	}
 	return nil
 }
 
-func (s *Settings) Warnings() []string { return nil }
+func (s *Settings) Warnings() []string {
+	var warnings []string
+	for _, warning := range s.OriginalSourceIP.Warnings() {
+		warnings = append(warnings, "httpupgrade: original_source_ip: "+warning)
+	}
+	return warnings
+}
+
+func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
+	return s.OriginalSourceIP.WarningsForListenAddress("httpupgrade", listen)
+}

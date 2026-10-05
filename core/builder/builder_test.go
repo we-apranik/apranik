@@ -63,7 +63,7 @@ func (passthroughOverlay) WrapClientStream(_ context.Context, underlyingStream s
 	return underlyingStream, nil
 }
 
-func (passthroughOverlay) WrapServerStream(_ context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+func (passthroughOverlay) WrapServerStream(_ context.Context, underlyingStream spec.Stream, _ *spec.TransportMetadata) (spec.Stream, error) {
 	return underlyingStream, nil
 }
 

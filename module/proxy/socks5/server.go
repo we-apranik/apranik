@@ -59,7 +59,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	}
 	command := request[1]
 
-	metadata := spec.Metadata{Source: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr()), User: s.username}
+	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: s.username}
 
 	switch {
 	case command == wire.CommandConnect:
