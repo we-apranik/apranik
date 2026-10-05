@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% block tabs %}
+  {{ super() }}
+  <div class="ap-home">
+
+    <!-- 1. HERO -->
+    <section class="hero"><div class="wrap">
+      <h1><span>Censorship adapts.</span> <span>So we must.</span></h1>
+      <p class="lead">Apranik is an open-source core that circumvention apps are built on. It's modular, so when censors block the usual ways through, a researcher can add a new method once and it reaches every app that uses it.</p>
+      <div class="btns"><a class="b p" href="#loop">How it works</a><a class="b" href="{{ 'overview/' | url }}">Get started</a></div>
+    </div></section>
+
+    <!-- 2. PROBLEM -->
+    <section class="alt prob"><div class="wrap">
+      <h2>Blocking changes. Access shouldn't depend on it.</h2>
+      <p>Censors don't block once. They watch what works, then block that. A method that connects people today can stop working without warning.</p>
+      <p>Researchers keep finding new ways through. But a new method isn't something people can use yet. It has to be rebuilt, tested, and shipped inside each app, one at a time, and by the time it arrives, censors may have moved again.</p>
+      <p>People lose access in the gap between a method being found and a method being usable.</p>
+    </div></section>
+
+    <!-- 3. THE LOOP -->
+    <section id="loop"><div class="wrap">
+      <h2>One loop, every time censors change.</h2>
+      <div class="loopwrap">
+        <ol class="loop">
+          <li class="band" role="presentation" aria-hidden="true">Apranik</li>
+          <li class="st" tabindex="0" role="button" data-t="Censors block a method" data-d="A method that was working stops working."><i class="dot"></i><b>Censors block a method that was working</b><small>Censors</small></li>
+          <li class="st ppl" tabindex="0" role="button" data-t="A researcher finds a new way through" data-d="Someone finds a path that still gets through."><i class="dot"></i><b>A researcher finds a new way through</b><small>Researchers</small></li>
+          <li class="st ap" tabindex="0" role="button" data-t="They add it to Apranik as a module" data-d="Only the new part is written. Everything else already exists in the core."><i class="dot"></i><b>They add it to Apranik as a module</b><small>Researchers</small></li>
+          <li class="st ap" tabindex="0" role="button" data-t="It is reviewed and tested" data-d="The module is checked on its own and reviewed in the open."><i class="dot"></i><b>It's reviewed and tested</b><small>Core maintainers</small></li>
+          <li class="st ap" tabindex="0" role="button" data-t="It ships in a release" data-d="It goes out once, in a release of the core."><i class="dot"></i><b>It ships in a release</b><small>Core maintainers</small></li>
+          <li class="st ppl" tabindex="0" role="button" data-t="Clients and panels pick up the release" data-d="They update to the new release instead of rebuilding the method."><i class="dot"></i><b>Clients and panels pick up the release</b><small>Client and panel maintainers</small></li>
+          <li class="st ppl" tabindex="0" role="button" data-t="People reconnect" data-d="People get back online through the apps they already use."><i class="dot"></i><b>People reconnect</b><small>People using the apps</small></li>
+        </ol>
+        <div class="back"><span>Then censors adapt again, and the loop starts over</span><i></i></div>
+        <div class="info" id="loopinfo" aria-live="polite"></div>
+      </div>
+      <p class="cap">Apranik covers the middle of the loop. A method is added, tested, and released once, so it doesn't have to be rebuilt inside every app.</p>
+    </div></section>
+
+    <!-- 4. BUILD ONCE -->
+    <section class="alt"><div class="wrap">
+      <h2>Build it once. Everyone gets it.</h2>
+      <p class="sub">Without a shared core, a new method either has to be rebuilt inside every existing app, or it arrives as its own new client and its own server panel. Either way the work is repeated for every method, and people have to find, trust, and install something new each time.</p>
+      <p class="sub">With Apranik, a method is added to the core once. Clients and panels already build on the core, so they pick it up with a release.</p>
+      <div class="fan">
+        <figure>
+          <svg viewBox="0 0 340 230" role="img" aria-label="Without a shared core, each method comes with its own client and panel">
+            <g><rect class="isl" x="4" y="6" width="332" height="62" rx="10"/><rect class="mb" x="14" y="20" width="84" height="34" rx="6"/><text x="56" y="42" text-anchor="middle">Method A</text><path class="ln" d="M98 37H130"/><rect class="bx" x="130" y="20" width="90" height="34" rx="6"/><text x="175" y="42" text-anchor="middle">Client</text><rect class="bx" x="236" y="20" width="90" height="34" rx="6"/><text x="281" y="42" text-anchor="middle">Panel</text></g>
+            <g><rect class="isl" x="4" y="84" width="332" height="62" rx="10"/><rect class="mb" x="14" y="98" width="84" height="34" rx="6"/><text x="56" y="120" text-anchor="middle">Method B</text><path class="ln" d="M98 115H130"/><rect class="bx" x="130" y="98" width="90" height="34" rx="6"/><text x="175" y="120" text-anchor="middle">Client</text><rect class="bx" x="236" y="98" width="90" height="34" rx="6"/><text x="281" y="120" text-anchor="middle">Panel</text></g>
+            <g><rect class="isl" x="4" y="162" width="332" height="62" rx="10"/><rect class="mb" x="14" y="176" width="84" height="34" rx="6"/><text x="56" y="198" text-anchor="middle">Method C</text><path class="ln" d="M98 193H130"/><rect class="bx" x="130" y="176" width="90" height="34" rx="6"/><text x="175" y="198" text-anchor="middle">Client</text><rect class="bx" x="236" y="176" width="90" height="34" rx="6"/><text x="281" y="198" text-anchor="middle">Panel</text></g>
+          </svg>
+          <figcaption><b>Without a shared core</b>Each method arrives as its own client and panel.</figcaption>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 340 230" role="img" aria-label="With Apranik, methods are added to one core that clients and panels build on">
+            <rect class="mb" x="6" y="22" width="84" height="34" rx="6"/><text x="48" y="44" text-anchor="middle">Method A</text>
+            <rect class="mb" x="6" y="98" width="84" height="34" rx="6"/><text x="48" y="120" text-anchor="middle">Method B</text>
+            <rect class="mb" x="6" y="174" width="84" height="34" rx="6"/><text x="48" y="196" text-anchor="middle">Method C</text>
+            <path class="lg" d="M90 39C112 39 112 90 130 90M90 115H130M90 191C112 191 112 140 130 140"/>
+            <rect class="gr" x="130" y="30" width="84" height="170" rx="8"/><text class="on" x="172" y="120" text-anchor="middle">Apranik</text><text class="on" x="172" y="138" text-anchor="middle" style="font-size:11px">core</text>
+            <path class="lg" d="M214 90C232 90 232 39 250 39M214 115H250M214 140C232 140 232 191 250 191"/>
+            <rect class="bx" x="250" y="22" width="84" height="34" rx="6"/><text x="292" y="44" text-anchor="middle">Client</text>
+            <rect class="bx" x="250" y="98" width="84" height="34" rx="6"/><text x="292" y="120" text-anchor="middle">Client</text>
+            <rect class="bx" x="250" y="174" width="84" height="34" rx="6"/><text x="292" y="196" text-anchor="middle">Panel</text>
+          </svg>
+          <figcaption><b>With Apranik</b>Methods are added once. Clients and panels build on the core.</figcaption>
+        </figure>
+      </div>
+    </div></section>
+
+    <!-- 5. HOW IT WORKS -->
+    <section class="how"><div class="wrap">
+      <h2>One core. Clients and panels on top. Methods plugged in.</h2>
+      <p>Apranik is the core that clients and server panels build on. It handles the connection itself, so they don't each have to.</p>
+      <p>It's modular. Each part of a connection is its own module, and a new method is another module that plugs into the same place. A researcher can add one without changing the rest, and a maintainer can review it on its own.</p>
+      <div class="scroll"><svg viewBox="0 0 640 310" role="img" aria-label="Clients and panels sit on the Apranik core, with modules plugged in below">
+        <rect class="bx" x="40" y="14" width="120" height="40" rx="8"/><text x="100" y="39" text-anchor="middle">Client</text>
+        <rect class="bx" x="180" y="14" width="120" height="40" rx="8"/><text x="240" y="39" text-anchor="middle">Client</text>
+        <rect class="bx" x="320" y="14" width="120" height="40" rx="8"/><text x="380" y="39" text-anchor="middle">Panel</text>
+        <rect class="bx" x="460" y="14" width="120" height="40" rx="8"/><text x="520" y="39" text-anchor="middle">Panel</text>
+        <path class="ln" d="M100 54V110M240 54V110M380 54V110M520 54V110"/>
+        <rect class="gr" x="40" y="110" width="540" height="62" rx="10"/><text class="on" x="310" y="147" text-anchor="middle" style="font-size:16px">Apranik core</text>
+        <path class="lg" d="M100 172V218M240 172V218M380 172V218M520 172V218"/>
+        <rect class="mb" x="40" y="218" width="120" height="44" rx="8"/><text class="bt" x="100" y="245" text-anchor="middle">Protocol</text>
+        <rect class="mb" x="180" y="218" width="120" height="44" rx="8"/><text class="bt" x="240" y="245" text-anchor="middle">Transport</text>
+        <rect class="mb" x="320" y="218" width="120" height="44" rx="8"/><text class="bt" x="380" y="245" text-anchor="middle">Security</text>
+        <rect class="gw" x="460" y="218" width="120" height="44" rx="8" stroke-dasharray="5 4"/><text class="gt" x="520" y="245" text-anchor="middle">New method</text>
+        <text class="t2" x="520" y="284" text-anchor="middle">Added by a researcher</text>
+        <text class="t2" x="310" y="284" text-anchor="middle">Reviewed by core maintainers</text>
+        <text class="t2" x="310" y="76" text-anchor="middle">Updated by client and panel maintainers</text>
+      </svg></div>
+    </div></section>
+
+    <!-- 6. WHAT'S INCLUDED -->
+    <section class="alt"><div class="wrap">
+      <h2>Bring the new part. The rest is here.</h2>
+      <p class="sub">Everything below is already built into the core.</p>
+      <div class="incl"><b>Protocols</b><span class="chip">SOCKS5</span><span class="chip">HTTP</span><span class="chip">Trojan</span></div>
+      <a class="lnk" href="{{ 'configuration/' | url }}">See everything that's supported</a>
+    </div></section>
+
+    <!-- 7. PRINCIPLES -->
+    <section><div class="wrap">
+      <h2>Built in the open, by the people who need it.</h2>
+      <div class="cards">
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M8 7 3 12l5 5M16 7l5 5-5 5"/></svg></div><h3>Open source</h3><p>The code is public. Anyone can read it, check it, and carry it forward.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M15 14.5c3 0 6 1 6 4.5"/></svg></div><h3>Community-built</h3><p>Researchers and maintainers shape it together. No single app decides.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><path d="M17 13v8M13 17h8"/></svg></div><h3>Modular by design</h3><p>A new part can be added and reviewed on its own, without learning the whole project.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="3"/></svg></div><h3>Free for everyone</h3><p>Free to use, and free to adapt in any community.</p></div>
+      </div>
+    </div></section>
+
+    <!-- 8. SECURITY AND TRUST -->
+    <section class="alt"><div class="wrap">
+      <h2>Don't trust us. Check.</h2>
+      <div class="cards">
+        <div class="card"><h3>The code is public</h3><p>Read it, run it, question it.</p></div>
+        <div class="card"><h3>Report a vulnerability</h3><p>A private way to reach the maintainers.</p></div>
+        <div class="card"><h3>Every change is reviewed</h3><p>Nothing ships without a second pair of eyes.</p></div>
+        <div class="card"><h3>What we don't promise</h3><p>No circumvention method works forever, and we don't claim otherwise.</p></div>
+      </div>
+      <a class="lnk" href="{{ 'design/threat-model/' | url }}">Read the security page</a>
+    </div></section>
+
+    <!-- 9. DOORS -->
+    <section><div class="wrap">
+      <h2>Everyone has a part.</h2>
+      <div class="groups">
+        <div><h3>Build with Apranik</h3><div class="doors">
+          <a class="door" href="{{ 'contributing/' | url }}"><h3>Researcher</h3><p>Found a new way through? Add it as a module and let clients and panels pick it up.</p></a>
+          <a class="door" href="{{ 'contributing/' | url }}"><h3>Core contributor</h3><p>Help build and review the core.</p></a>
+        </div></div>
+        <div><h3>Build on Apranik</h3><div class="doors">
+          <a class="door" href="{{ 'configuration/' | url }}"><h3>Client developer</h3><p>Build your client on the core. New methods arrive with each release.</p></a>
+          <a class="door" href="{{ 'configuration/' | url }}"><h3>Panel developer</h3><p>Build your server panel on the core, with the same benefit.</p></a>
+        </div></div>
+      </div>
+    </div></section>
+
+    <!-- 10. JOIN -->
+    <section class="join"><div class="wrap">
+      <h2>Join the loop.</h2>
+      <p class="sub">Apranik is built in the open. Read the code, talk with the people building it, or send a first change.</p>
+      <!-- TODO: replace both # links with the real GitHub and Telegram URLs before publishing -->
+      <div class="btns"><a class="b p" href="#">GitHub</a><a class="b" href="#">Telegram</a></div>
+    </div></section>
+
+    <!-- 10b. FAQ (10 questions max) -->
+    <section id="faq"><div class="wrap">
+      <h2>Straight answers.</h2>
+      <div class="faq">
+        <details><summary>What is Apranik?</summary><p>An open-source core that circumvention apps and server panels are built on. It handles the connection itself, so each app doesn't have to. New ways through are added to it as separate modules. It is not another VPN app: you don't install Apranik and use it directly, it's the layer underneath the apps and panels that people use.</p></details>
+        <details><summary>Who is it for?</summary><p>Researchers who find new methods, developers who build clients and server panels, and maintainers of the core. You don't need to be a developer to use an app built on Apranik.</p></details>
+        <details><summary>What does the name mean?</summary><p>Apranik was a commander of the late Sasanian army who, by tradition, kept fighting a guerrilla war after the empire fell in the seventh century.</p></details>
+        <details><summary>How is it different from other proxy tools?</summary><p>It's built around adding new methods as separate modules, so a researcher can contribute one without learning the whole project, and a maintainer can review it on its own.</p></details>
+        <details><summary>Is it free, and is it only for one country?</summary><p>It's free to use and free to adapt, and any community can adapt it to the censorship it faces. <span class="todo">[TODO: confirm the license before publishing.]</span></p></details>
+        <details><summary>How do I add a new method?</summary><p>Write it as a module, test it on its own, and send it for review. Every change is reviewed before it ships. The <a href="{{ 'contributing/' | url }}">contributing guide</a> walks through it.</p></details>
+        <details><summary>Is it safe to use?</summary><p>We don't promise that. The code is public so you can check it, and vulnerability reports are handled privately. The <a href="{{ 'design/threat-model/' | url }}">threat model</a> says what we do and don't claim.</p></details>
+        <details><summary>Does it make me anonymous?</summary><p>No. Getting around blocking and staying anonymous are different things, and Apranik is built for the first. If anonymity matters to you, treat it as a separate question.</p></details>
+        <details><summary>Will it always work?</summary><p>No. No circumvention method works forever, because censors watch what works and block it. That's why Apranik is built so new methods can be added quickly.</p></details>
+        <details><summary>How do I report a security issue?</summary><p>Use the private channel on the security page, and please don't post it publicly. <span class="todo">[TODO: add the link to the private reporting channel.]</span></p></details>
+      </div>
+    </div></section>
+
+    <!-- 11. SITE FOOTER -->
+    <footer class="foot"><div class="wrap">
+      <div class="cols">
+        <div class="brand"><b>Apranik</b><p>An open-source core that circumvention apps are built on.</p></div>
+        <div><h3>Learn</h3><a href="{{ 'overview/' | url }}">Overview</a><a href="{{ 'architecture/' | url }}">Architecture</a><a href="{{ 'configuration/' | url }}">Configuration</a><a href="{{ 'faq/' | url }}">FAQ</a></div>
+        <div><h3>Trust</h3><a href="{{ 'design/threat-model/' | url }}">Security</a><a href="{{ config.repo_url }}">Source code</a><!-- TODO: add license page and security contact links -->
+        </div>
+      </div>
+      <p class="legal">Apranik is open source. Licensed under MPL 2.0. No circumvention method works forever, and we don't claim otherwise.</p>
+    </div></footer>
+
+  </div>
+{% endblock %}
+
+{% block content %}{% endblock %}
