@@ -110,6 +110,8 @@ nav:
           - configuration/transport/ws.md
           - configuration/transport/httpupgrade.md
           - configuration/transport/fragment.md
+          - configuration/transport/proxy_protocol.md
+          - configuration/transport/original_source_ip.md
       - Routing:
           - configuration/routing/index.md
           - configuration/routing/datasets.md
