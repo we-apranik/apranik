@@ -193,7 +193,7 @@ func (c routingChecker) checkAction(action blueprint.Action, loc string, fields 
 			c.diagnostics.errorf(settingsLoc, "no outbound is tagged %q", action.Route.Outbound)
 			return
 		}
-		if fields.Network == spec.NetworkUDP && !carriesUDP(outbound) {
+		if fields.Network == spec.NetworkUDP && !carriesUDP(outbound, c.outbounds) {
 			c.diagnostics.warnf(settingsLoc, "outbound %q cannot carry UDP, so UDP routed here is dropped", outbound.Tag)
 		}
 	case action.Resolve != nil:
@@ -229,9 +229,28 @@ func (c routingChecker) checkAction(action blueprint.Action, loc string, fields 
 }
 
 // Freedom carries UDP; a proxy outbound only when its protocol frames
-// datagrams in its stream.
-func carriesUDP(outbound blueprint.Outbound) bool {
-	return outbound.Freedom != nil || outbound.DatagramOverStreamProxy != nil
+// datagrams in its stream; a group only when every member does, as the group
+// outbound itself reports.
+func carriesUDP(outbound blueprint.Outbound, outbounds map[string]blueprint.Outbound) bool {
+	return carriesUDPWithout(outbound, outbounds, map[string]bool{})
+}
+
+func carriesUDPWithout(outbound blueprint.Outbound, outbounds map[string]blueprint.Outbound, visiting map[string]bool) bool {
+	if outbound.Group == nil {
+		return outbound.Freedom != nil || outbound.DatagramOverStreamProxy != nil
+	}
+	if visiting[outbound.Tag] {
+		return false
+	}
+	visiting[outbound.Tag] = true
+	defer delete(visiting, outbound.Tag)
+	for _, tag := range outbound.Group.Members {
+		member, found := outbounds[tag]
+		if !found || !carriesUDPWithout(member, outbounds, visiting) {
+			return false
+		}
+	}
+	return len(outbound.Group.Members) > 0
 }
 
 func endsEvaluation(action blueprint.Action) bool {

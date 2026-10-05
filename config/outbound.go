@@ -15,6 +15,9 @@ const (
 	freedomProtocol = registry.FreedomProtocolName
 	blockProtocol   = registry.BlockProtocolName
 
+	urlTestProtocol  = registry.URLTestProtocolName
+	fallbackProtocol = registry.FallbackProtocolName
+
 	// Named here as freedom's udp is: the base that reaches destinations.
 	freedomBaseTransport = "tcp"
 )
@@ -51,6 +54,8 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		b.diagnostics.report(protocolLoc, errMissingField("type", "protocol"))
 	case freedomProtocol:
 		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"), raw.Transport, transportLoc)
+	case urlTestProtocol, fallbackProtocol:
+		outbound.Group = b.buildGroup(raw.Protocol, fieldLocation(protocolLoc, "settings"))
 	case mixedProtocol:
 		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol or freedom")
 	case blockProtocol:
@@ -64,6 +69,37 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 	}
 
 	return outbound
+}
+
+// Whether a field makes sense is Check's; this reads what is written. Nil when
+// the settings cannot be decoded.
+func (b *configBuilder) buildGroup(protocol rawModule, loc string) *blueprint.Group {
+	var settings rawGroupSettings
+	if len(protocol.Settings) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(protocol.Settings))
+		if b.strict {
+			decoder.DisallowUnknownFields()
+		}
+		if err := decoder.Decode(&settings); err != nil {
+			b.diagnostics.report(loc, err)
+			return nil
+		}
+	}
+
+	group := &blueprint.Group{
+		Type:      blueprint.GroupType(protocol.Type),
+		Members:   settings.Outbounds,
+		Tolerance: time.Duration(settings.Tolerance),
+	}
+	if settings.Probe != nil {
+		group.Probe = blueprint.Probe{
+			Type:     blueprint.ProbeType(settings.Probe.Type),
+			URL:      settings.Probe.URL,
+			Interval: time.Duration(settings.Probe.Interval),
+			Timeout:  time.Duration(settings.Probe.Timeout),
+		}
+	}
+	return group
 }
 
 func hasSettings(raw json.RawMessage) bool {

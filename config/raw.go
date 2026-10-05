@@ -93,6 +93,21 @@ type rawOutbound struct {
 	DNSServer string `json:"dns_server"`
 }
 
+// A group's members and the probe that tests them. Tolerance is the urltest
+// type's; Check refuses it on fallback.
+type rawGroupSettings struct {
+	Outbounds []string       `json:"outbounds"`
+	Probe     *rawProbe      `json:"probe"`
+	Tolerance types.Duration `json:"tolerance"`
+}
+
+type rawProbe struct {
+	Type     string         `json:"type"`
+	URL      string         `json:"url"`
+	Interval types.Duration `json:"interval"`
+	Timeout  types.Duration `json:"timeout"`
+}
+
 // Freedom's TCP is its outbound's transport stack; its UDP is always plain
 // udp, so only those settings are given, beside the NAT behaviour.
 type rawFreedomSettings struct {

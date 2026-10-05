@@ -170,7 +170,7 @@ func checkDNSServer(diagnostics *Diagnostics, server blueprint.DNSServer, outbou
 		return
 	}
 	if server.Datagram != nil {
-		if !carriesUDP(outbound) {
+		if !carriesUDP(outbound, outbounds) {
 			diagnostics.errorf(outboundLoc, "dns server type %q sends datagrams, and outbound %q cannot carry UDP", server.Datagram.Info().Name, outbound.Tag)
 		} else if outbound.Freedom != nil && len(outbound.Freedom.StreamTransport.Overlays) > 0 {
 			diagnostics.warnf(outboundLoc, "outbound %q's transport only shapes TCP; these UDP queries go out without it", outbound.Tag)
@@ -226,6 +226,12 @@ func checkDNSLoops(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint)
 	outboundIndex := map[string]int{}
 	for index, outbound := range coreBlueprint.Outbounds {
 		outboundIndex[outbound.Tag] = index
+		if outbound.Group != nil {
+			for _, member := range outbound.Group.Members {
+				edges[node{"outbound", outbound.Tag}] = append(edges[node{"outbound", outbound.Tag}], node{"outbound", member})
+			}
+			continue
+		}
 		if outbound.Proxy == nil {
 			continue
 		}
@@ -266,6 +272,10 @@ func checkDNSLoops(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint)
 			switch state[next] {
 			case onPath:
 				start := slices.Index(path, next)
+				if !slices.ContainsFunc(path[start:], func(step node) bool { return step.kind == "dns server" }) {
+					// Groups waiting on each other: checkGroups says so.
+					continue
+				}
 				names := make([]string, 0, len(path)-start+1)
 				for _, step := range path[start:] {
 					names = append(names, fmt.Sprintf("%s %q", step.kind, step.tag))
@@ -320,7 +330,7 @@ func warnAboutDirectServersBesideAProxy(diagnostics *Diagnostics, coreBlueprint 
 	case coreBlueprint.Routing == nil && len(coreBlueprint.Outbounds) > 0:
 		defaultOutbound = coreBlueprint.Outbounds[0]
 	}
-	if defaultOutbound.Proxy == nil {
+	if !routesThroughProxy(defaultOutbound, outbounds, map[string]bool{}) {
 		return
 	}
 	for index, server := range coreBlueprint.DNS.Servers {
@@ -329,4 +339,21 @@ func warnAboutDirectServersBesideAProxy(diagnostics *Diagnostics, coreBlueprint 
 				"traffic goes through %q by default, but this dns server has no outbound, so its queries go out directly and show the network which names are looked up", defaultOutbound.Tag)
 		}
 	}
+}
+
+func routesThroughProxy(outbound blueprint.Outbound, outbounds map[string]blueprint.Outbound, visiting map[string]bool) bool {
+	if outbound.Group == nil {
+		return outbound.Proxy != nil
+	}
+	if visiting[outbound.Tag] {
+		return false
+	}
+	visiting[outbound.Tag] = true
+	defer delete(visiting, outbound.Tag)
+	for _, tag := range outbound.Group.Members {
+		if routesThroughProxy(outbounds[tag], outbounds, visiting) {
+			return true
+		}
+	}
+	return false
 }

@@ -34,6 +34,7 @@ func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	}
 	datasetKinds := checkDatasets(&diagnostics, coreBlueprint.Datasets)
 	checkDNS(&diagnostics, coreBlueprint, datasetKinds)
+	checkGroups(&diagnostics, coreBlueprint)
 	checkRouting(&diagnostics, coreBlueprint, datasetKinds)
 
 	if len(coreBlueprint.Inbounds) == 0 {
@@ -184,15 +185,25 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
 	protocolLoc := fieldLocation(loc, "protocol")
 
+	protocols := 0
+	for _, set := range []bool{outbound.Proxy != nil, outbound.Freedom != nil, outbound.Group != nil} {
+		if set {
+			protocols++
+		}
+	}
 	switch {
-	case outbound.Proxy == nil && outbound.Freedom == nil:
-		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol or freedom")
+	case protocols == 0:
+		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol, freedom or a group (%s, %s)", urlTestProtocol, fallbackProtocol)
 		return
-	case outbound.Proxy != nil && outbound.Freedom != nil:
+	case protocols > 1:
 		diagnostics.errorf(protocolLoc, "an outbound has exactly one protocol")
 		return
 	}
 
+	if outbound.Group != nil {
+		checkGroupOutboundFields(diagnostics, outbound, loc)
+		return
+	}
 	if outbound.Proxy != nil {
 		checkProxyOutbound(diagnostics, outbound, loc)
 		return
