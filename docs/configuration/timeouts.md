@@ -17,6 +17,7 @@ stack's handshakes can together take the sum of their timeouts.
 | SOCKS5 handshake | [`socks5`](protocol/socks5.md#handshake_timeout) settings `handshake_timeout` | `10s` |
 | HTTP proxy request | [`http`](protocol/http.md#handshake_timeout) settings `handshake_timeout` | `10s` |
 | Trojan request (inbound) | [`trojan`](protocol/trojan.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| PROXY protocol header | [`proxy_protocol`](transport/proxy_protocol.md#timeout) settings `timeout` | `1s` |
 | Mixed's first byte | [`mixed`](inbound/mixed.md#first_byte_timeout) settings `first_byte_timeout` | `10s` |
 | Sniffing wait | a `sniff` rule's [`settings.timeout`](routing/sniffing.md#timeout) | `300ms` |
 | TCP idle | [`inbounds[].tcp_idle_timeout`](inbound/index.md#tcp_idle_timeout) | `5m` |
