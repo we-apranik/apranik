@@ -87,3 +87,12 @@ type Outbound interface {
 	CreateDatagram(ctx context.Context, metadata spec.Metadata) (spec.Datagram, error)
 	Close() error
 }
+
+// ProbingOutbound is an Outbound that tests its members in the background,
+// such as an outbound group. Core calls StartProbing once, when traffic is
+// about to flow, and never while building: checking a config dials nothing.
+// Close stops the probing and waits for it to end.
+type ProbingOutbound interface {
+	Outbound
+	StartProbing(ctx context.Context)
+}
