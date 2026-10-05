@@ -12,28 +12,76 @@
     });
   }
 
+  var loopTimer = null;
+
   function init() {
     initBackToTop();
-    var items = document.querySelectorAll(".ap-home .loop li.st");
-    var info = document.getElementById("loopinfo");
-    if (!items.length || !info) return;
+    if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+    var wrap = document.querySelector(".ap-home .loopwrap");
+    var steps = document.querySelectorAll(".ap-home [data-step]");
+    var infoBoxes = document.querySelectorAll(".ap-home .loopinfo");
+    if (!wrap || !steps.length) return;
+    var stepCount = document.querySelectorAll(".ap-home .loop li.st").length;
+    var current = 0;
 
-    function pick(li) {
-      items.forEach(function (x) { x.classList.remove("sel"); });
-      li.classList.add("sel");
-      var ap = li.classList.contains("ap");
-      info.style.borderLeftColor = ap ? "var(--ap-green)" : "var(--ap-ink2)";
-      info.innerHTML = "<b>" + li.dataset.t + "</b><span>" + li.dataset.d + "</span>";
+    function pick(index) {
+      current = index;
+      var source = null;
+      steps.forEach(function (x) {
+        var on = x.dataset.step === String(index);
+        x.classList.toggle("sel", on);
+        if (on && !source) source = x;
+      });
+      document.querySelectorAll(".ap-home .lseg").forEach(function (segment, segmentIndex) {
+        segment.classList.toggle("flow", segmentIndex === (index + 6) % 7);
+      });
+      var accent = source.classList.contains("ap") ? "var(--ap-green)"
+        : source.classList.contains("ppl") ? "var(--ap-blue)" : "var(--ap-red)";
+      infoBoxes.forEach(function (box) {
+        box.style.borderLeftColor = accent;
+        box.innerHTML = "<b>" + source.dataset.t + "</b><span>" + source.dataset.d + "</span>";
+      });
     }
 
-    items.forEach(function (li) {
-      li.addEventListener("click", function () { pick(li); });
-      li.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(li); }
+    pick(0);
+
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var visible = false;
+
+    function startTimer() {
+      if (loopTimer) clearInterval(loopTimer);
+      loopTimer = null;
+      if (reduceMotion) return;
+      loopTimer = setInterval(function () {
+        if (visible) pick((current + 1) % stepCount);
+      }, 3000);
+    }
+
+    function choose(index) {
+      pick(index);
+      startTimer();
+    }
+
+    steps.forEach(function (x) {
+      if (x.tagName === "LI") {
+        x.tabIndex = 0;
+        x.setAttribute("role", "button");
+      }
+      x.addEventListener("click", function () { choose(Number(x.dataset.step)); });
+      x.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(Number(x.dataset.step)); }
       });
     });
 
-    pick(items[2]);
+    if (reduceMotion) {
+      pick(2);
+      return;
+    }
+
+    new IntersectionObserver(function (entries) {
+      visible = entries[0].isIntersecting;
+    }).observe(wrap);
+    startTimer();
   }
 
   if (typeof document$ !== "undefined") {
