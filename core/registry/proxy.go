@@ -39,7 +39,8 @@ func (r *ProxyProtocolRegistry) LookupDatagram(name string) (func() spec.Datagra
 }
 
 func (r *ProxyProtocolRegistry) claim(info spec.ModuleInfo, kind Kind) error {
-	if info.Name == FreedomProtocolName || info.Name == BlockProtocolName || info.Name == MixedProtocolName {
+	switch info.Name {
+	case FreedomProtocolName, BlockProtocolName, MixedProtocolName, URLTestProtocolName, FallbackProtocolName:
 		return &ReservedNameError{Kind: kind, Name: info.Name}
 	}
 	for _, existing := range r.registered.kinds(info.Name) {

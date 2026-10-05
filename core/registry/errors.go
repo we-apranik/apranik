@@ -26,6 +26,10 @@ const (
 	FreedomProtocolName = "freedom"
 	BlockProtocolName   = "block"
 	MixedProtocolName   = "mixed"
+
+	// The outbound groups: protocols that choose among other outbounds.
+	URLTestProtocolName  = "urltest"
+	FallbackProtocolName = "fallback"
 )
 
 type ReservedNameError struct {
