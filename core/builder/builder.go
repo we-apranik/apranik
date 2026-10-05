@@ -73,48 +73,92 @@ func (b *Builder) Close() error {
 	return errors.Join(errs...)
 }
 
+// BuildInbound builds everything an inbound needs and binds its listener last,
+// so a refusal only a constructor can make (a certificate that fails to load)
+// leaves no port open.
 func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.Inbound, error) {
-	if inboundBlueprint.Network == spec.NetworkUDP {
-		return nil, fmt.Errorf("inbound %q: a datagram inbound needs a datagram proxy, and this build registers none: %w",
-			inboundBlueprint.Tag, spec.ErrUnsupportedNetwork)
-	}
-
-	// Before the listener: a certificate that fails to load leaves no port
-	// open.
-	overlays, err := buildStreamOverlayServers(inboundBlueprint.StreamTransport)
+	prepared, err := b.prepareInbound(inboundBlueprint)
 	if err != nil {
-		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+		return nil, err
 	}
 
 	listener, err := buildStreamListener(inboundBlueprint.StreamTransport, inboundBlueprint.Bind)
 	if err != nil {
+		prepared.discard()
 		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
 	}
 
-	proxyServer, err := buildInboundProxyServer(inboundBlueprint)
+	return inbound.NewStream(inbound.StreamConfig{
+		Tag:                      inboundBlueprint.Tag,
+		Listener:                 listener,
+		Overlays:                 prepared.overlays,
+		ProxyServer:              prepared.proxyServer,
+		DatagramOverStreamServer: prepared.datagramServer,
+		Fallback:                 prepared.fallback,
+		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
+		MaxConnections:           inboundBlueprint.MaxConnections,
+		Logger:                   b.logger,
+	}), nil
+}
+
+// CheckInbound makes every refusal BuildInbound makes except the bind, which
+// says something about the machine and not about the config.
+func (b *Builder) CheckInbound(inboundBlueprint blueprint.Inbound) error {
+	prepared, err := b.prepareInbound(inboundBlueprint)
 	if err != nil {
-		listener.Close()
-		return nil, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+		return err
+	}
+	prepared.discard()
+	return nil
+}
+
+// preparedInbound is an inbound with everything built except its socket.
+type preparedInbound struct {
+	overlays       []inbound.StreamOverlay
+	proxyServer    spec.StreamProxyServer
+	datagramServer spec.DatagramOverStreamProxyServer
+	fallback       *inbound.Fallback
+}
+
+func (p preparedInbound) discard() {
+	if p.fallback != nil {
+		p.fallback.Dialer.Close()
+	}
+}
+
+func (b *Builder) prepareInbound(inboundBlueprint blueprint.Inbound) (preparedInbound, error) {
+	if inboundBlueprint.Network == spec.NetworkUDP {
+		return preparedInbound{}, fmt.Errorf("inbound %q: a datagram inbound needs a datagram proxy, and this build registers none: %w",
+			inboundBlueprint.Tag, spec.ErrUnsupportedNetwork)
+	}
+	if inboundBlueprint.StreamTransport.Base == nil {
+		return preparedInbound{}, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, errNoBaseTransport)
 	}
 
-	var datagramServer spec.DatagramOverStreamProxyServer
+	var prepared preparedInbound
+	var err error
+	if prepared.overlays, err = buildStreamOverlayServers(inboundBlueprint.StreamTransport); err != nil {
+		return preparedInbound{}, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+	}
+
+	if prepared.proxyServer, err = buildInboundProxyServer(inboundBlueprint); err != nil {
+		return preparedInbound{}, fmt.Errorf("inbound %q: %w", inboundBlueprint.Tag, err)
+	}
+
 	if inboundBlueprint.DatagramOverStreamProxy != nil {
-		if datagramServer, err = inboundBlueprint.DatagramOverStreamProxy.NewDatagramOverStreamServer(); err != nil {
-			listener.Close()
-			return nil, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.DatagramOverStreamProxy.Info().Name, err)
+		if prepared.datagramServer, err = inboundBlueprint.DatagramOverStreamProxy.NewDatagramOverStreamServer(); err != nil {
+			return preparedInbound{}, fmt.Errorf("inbound %q: proxy %q: %w", inboundBlueprint.Tag, inboundBlueprint.DatagramOverStreamProxy.Info().Name, err)
 		}
 	}
 
 	// Always plain TCP, straight to the fallback: never the inbound's
 	// own stack, and no lookup by name.
-	var fallback *inbound.Fallback
 	if inboundBlueprint.Fallback.IsValid() {
 		dialer, err := buildStreamDialer(blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()}, b.resolver)
 		if err != nil {
-			listener.Close()
-			return nil, fmt.Errorf("inbound %q: fallback: %w", inboundBlueprint.Tag, err)
+			return preparedInbound{}, fmt.Errorf("inbound %q: fallback: %w", inboundBlueprint.Tag, err)
 		}
-		fallback = &inbound.Fallback{
+		prepared.fallback = &inbound.Fallback{
 			Dialer:      dialer,
 			Destination: inboundBlueprint.Fallback,
 			IdleTimeout: inboundBlueprint.TCPIdleTimeout,
@@ -122,19 +166,8 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 	}
 
 	b.logger.With("module", inboundProtocolName(inboundBlueprint)).
-		Debug("Stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", datagramServer != nil, "fallback", fallback != nil)
-
-	return inbound.NewStream(inbound.StreamConfig{
-		Tag:                      inboundBlueprint.Tag,
-		Listener:                 listener,
-		Overlays:                 overlays,
-		ProxyServer:              proxyServer,
-		DatagramOverStreamServer: datagramServer,
-		Fallback:                 fallback,
-		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
-		MaxConnections:           inboundBlueprint.MaxConnections,
-		Logger:                   b.logger,
-	}), nil
+		Debug("Stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", prepared.datagramServer != nil, "fallback", prepared.fallback != nil)
+	return prepared, nil
 }
 
 func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamProxyServer, error) {

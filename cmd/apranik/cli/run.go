@@ -14,7 +14,6 @@ import (
 	"github.com/The-Apranik/Apranik/config"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/handler"
@@ -73,38 +72,11 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 	defer stackBuilder.Close()
 	logger := stackBuilder.Logger()
 
-	if len(coreBlueprint.Outbounds) == 0 {
-		return errors.New("no outbounds configured")
-	}
-
-	datasets, err := stackBuilder.LoadDatasets(coreBlueprint.Datasets)
+	routing, err := stackBuilder.BuildRouting(coreBlueprint)
 	if err != nil {
 		return err
 	}
-
-	// Before the outbounds, which resolve through it; its servers, which go
-	// through the outbounds, are attached after them.
-	if err := stackBuilder.UseDNS(coreBlueprint.DNS); err != nil {
-		return err
-	}
-	outbounds := make([]component.Outbound, 0, len(coreBlueprint.Outbounds))
-	for _, outboundBlueprint := range coreBlueprint.Outbounds {
-		built, err := stackBuilder.BuildOutbound(outboundBlueprint)
-		if err != nil {
-			return err
-		}
-		defer built.Close()
-		outbounds = append(outbounds, built)
-	}
-	if err := stackBuilder.BuildDNS(coreBlueprint.DNS, outbounds, datasets); err != nil {
-		return err
-	}
-
-	// One router for every inbound: it holds no per-connection state.
-	trafficRouter, err := stackBuilder.BuildRouter(coreBlueprint.Routing, outbounds, datasets)
-	if err != nil {
-		return err
-	}
+	defer routing.Close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -116,7 +88,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		}
 		defer built.Close()
 
-		trafficHandler := handler.New(trafficRouter, handler.Config{
+		trafficHandler := handler.New(routing.Router, handler.Config{
 			StreamIdleTimeout:     inboundBlueprint.TCPIdleTimeout,
 			UDPSessionIdleTimeout: inboundBlueprint.UDPSessionIdleTimeout,
 			Resolver:              stackBuilder.Resolver(),

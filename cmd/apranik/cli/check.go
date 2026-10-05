@@ -6,20 +6,24 @@ import (
 	"fmt"
 
 	"github.com/The-Apranik/Apranik/config"
+	"github.com/The-Apranik/Apranik/core/builder"
 )
 
 var cmdCheck = &Command{
 	Name:  "check",
 	Short: "check a config file without running it",
-	Usage: `Usage: apranik check [-config source] [-fetch-timeout duration]
+	Usage: `Usage: apranik check [-config source] [-fetch-timeout duration] [-ports]
 
-Load and check the config file, print what is wrong with it, and
-exit non-zero if anything is. Nothing is built and no socket is opened, so a
-config file can be checked on a machine that could never run it.
+Load and check the config file, build everything it describes without
+dialing anything, print what is wrong, and exit non-zero if anything is.
+Nothing is bound unless -ports is given.
 
 Flags:
   -config source          file path or http(s) URL of the config file (default "config.json")
-  -fetch-timeout duration  how long to wait for a config file given as a URL (default 30s)`,
+  -fetch-timeout duration  how long to wait for a config file given as a URL (default 30s)
+  -ports                  also bind every inbound's address and release it, to find a port
+                          already in use or given to two inbounds; leave it off while the
+                          process this config replaces is still running`,
 	Run: runCheck,
 }
 
@@ -27,6 +31,7 @@ func runCheck(args []string) error {
 	flags := flag.NewFlagSet("apranik check", flag.ContinueOnError)
 	source := flags.String("config", defaultConfigSource, "file path or URL of the config file")
 	fetchTimeout := flags.Duration("fetch-timeout", config.DefaultFetchTimeout, "how long to wait for a config file given as a URL")
+	checkPorts := flags.Bool("ports", false, "also bind every inbound's address and release it")
 
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -44,6 +49,10 @@ func runCheck(args []string) error {
 	report(logger, diagnostics)
 	if diagnostics.HasErrors() {
 		return logFailure(logger, "Config has errors", "source", *source)
+	}
+
+	if err := builder.Verify(coreBlueprint, builder.VerifyOptions{CheckPorts: *checkPorts}); err != nil {
+		return logFailure(logger, "Config cannot be built", "source", *source, "error", err)
 	}
 
 	logger.Info("Config is valid", "source", *source)
