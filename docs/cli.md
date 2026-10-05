@@ -5,7 +5,7 @@ commands; `apranik help <command>` prints each one's detail.
 
 ```text
 apranik run [-config source] [-fetch-timeout duration]
-apranik check [-config source] [-fetch-timeout duration]
+apranik check [-config source] [-fetch-timeout duration] [-ports]
 apranik modules
 apranik generate <what>
 apranik version
@@ -40,12 +40,18 @@ in the format that config file asked for.
 
 ## `check`
 
-The same loading and checking as `run`, then it exits. Nothing is built and no
-socket is opened, so a config file can be checked on a machine that could never
-run it.
+The same loading and checking as `run`, then it builds everything the config
+file describes (every inbound, outbound, DNS server and the router) and discards
+it. Nothing is dialed, and nothing is bound without `-ports`, so a config file can
+be checked on a machine that could never run it.
 
-`check` does not read files a module loads while building, such as TLS
-certificates: those are read by `run` at startup.
+This finds what only building can: a TLS certificate file that cannot be read,
+a certificate and key that do not match, a dataset file that cannot be decoded.
+It does not bind anything unless you pass `-ports`, which also binds every
+inbound's address and releases it again, so it finds a port already in use and
+two inbounds given one port. Leave it off while the process the config replaces
+is still running. `check` does not open the log outputs, so a log file that
+cannot be written is found by `run`.
 
 ## `modules`
 

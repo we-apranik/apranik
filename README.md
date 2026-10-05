@@ -104,7 +104,8 @@ apranik help     [command]          usage
 `-config` takes a file path or an `http(s)` URL, and defaults to `config.json`.
 `-fetch-timeout` bounds the download of a URL config file (default `30s`).
 `check` runs every validation `run` does, without binding a port, so a config
-can be checked on a machine that could never run it.
+can be checked on a machine that could never run it. `check -ports` also binds
+each inbound's address and releases it, to find a port already in use.
 
 ## Configuration
 
