@@ -36,7 +36,9 @@
 | **Peekable stream** | `spec.PeekableStream`: a stream whose next bytes can be looked at without consuming them. `Peek` may read ahead; `PeekExactly` never reads past what was asked. Core implements it in `core/net/peekable`. |
 | **Pipelining** | `httpupgrade`'s `pipeline`: the client sends its payload right after the upgrade request, without waiting for the `101`. |
 | **Protocol** | The `protocol` of an inbound or outbound in the config file: a proxy protocol, `freedom` on an outbound, or `mixed` on an inbound. |
+| **PROXY protocol** | HAProxy's header a load balancer writes before the client's bytes, naming the client it accepted (versions 1 and 2). Read by the `proxy_protocol` overlay. Not a proxy protocol in this project's sense. |
 | **Proxy protocol** | A module that speaks proxy semantics over a supplied carrier, such as SOCKS5, HTTP CONNECT or Trojan. It never opens a connection itself. Its server `Accept*`s requests; its client `Request*`s a payload. |
+| **Source endpoint** | `Metadata.Transport.SourceEndpoint`: who the client is. The accepted socket's remote end, unless an overlay below the proxy layer replaced it with the address a proxy in front reported. The socket's own end stays in `InboundRemoteEndpoint`. |
 | **Resolver** | `core/dns`: answers a lookup (a name in, addresses out) by choosing a DNS server with the DNS rules, asking for the IP versions configured, and caching the answer for its TTL. Every base transport resolves through it, as `spec.Resolver`. |
 | **Registry** | `core/registry`: maps the names used in config files to module constructors, per kind. `registry.Default()` is the only place that names modules. |
 | **Relay** | `core/relay`: the copy loops. `relay.Stream` for TCP, `relay.Datagrams` for a UDP session. |
@@ -49,5 +51,5 @@
 | **Stack** | A list of transports, base first and overlays outward from the wire, composed as a fold. |
 | **Transport info** | `spec.TransportInfo`: facts about a configured transport that only the config check reads, today the application protocols it offers or can speak. |
 | **UDP session** | One client's UDP flow, such as one SOCKS5 association: `core/net/udp/session`. |
-| **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream)` or `AcceptStream(ctx, underlyingStream)`. |
+| **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream, transport)` or `AcceptStream(ctx, underlyingStream)`. |
 | **uTLS** | The library (`github.com/refraction-networking/utls`) that sends a copy of a real browser's ClientHello; Apranik's one dependency. |
