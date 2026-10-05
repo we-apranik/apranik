@@ -32,74 +32,102 @@
     <section id="loop"><div class="wrap">
       <h2>One loop, every time censors change.</h2>
       <div class="loopwrap">
-        <ol class="loop">
-          <li class="band" role="presentation" aria-hidden="true">Apranik</li>
-          <li class="st" tabindex="0" role="button" data-t="Censors block a method" data-d="A method that was working stops working."><i class="dot"></i><b>Censors block a method that was working</b><small>Censors</small></li>
-          <li class="st ppl" tabindex="0" role="button" data-t="A researcher finds a new way through" data-d="Someone finds a path that still gets through."><i class="dot"></i><b>A researcher finds a new way through</b><small>Researchers</small></li>
-          <li class="st ap" tabindex="0" role="button" data-t="They add it to Apranik as a module" data-d="Only the new part is written. Everything else already exists in the core."><i class="dot"></i><b>They add it to Apranik as a module</b><small>Researchers</small></li>
-          <li class="st ap" tabindex="0" role="button" data-t="It is reviewed and tested" data-d="The module is checked on its own and reviewed in the open."><i class="dot"></i><b>It's reviewed and tested</b><small>Core maintainers</small></li>
-          <li class="st ap" tabindex="0" role="button" data-t="It ships in a release" data-d="It goes out once, in a release of the core."><i class="dot"></i><b>It ships in a release</b><small>Core maintainers</small></li>
-          <li class="st ppl" tabindex="0" role="button" data-t="Clients and panels pick up the release" data-d="They update to the new release instead of rebuilding the method."><i class="dot"></i><b>Clients and panels pick up the release</b><small>Client and panel maintainers</small></li>
-          <li class="st ppl" tabindex="0" role="button" data-t="People reconnect" data-d="People get back online through the apps they already use."><i class="dot"></i><b>People reconnect</b><small>People using the apps</small></li>
-        </ol>
-        <div class="back"><span>Then censors adapt again, and the loop starts over</span><i></i></div>
-        <div class="info" id="loopinfo" aria-live="polite"></div>
+        <div class="loopgrid">
+          <div>
+            <ol class="loop">
+              <li class="st cen" data-step="0" data-t="Censors block a method" data-d="A method that was working stops working."><b>Censors block a method that was working</b><small>Censors</small></li>
+              <li class="st ppl" data-step="1" data-t="A researcher finds a new way through" data-d="Someone finds a path that still gets through."><b>A researcher finds a new way through</b><small>Researchers</small></li>
+              <li class="st ap" data-step="2" data-t="They add it to Apranik as a module" data-d="Only the new part is written. Everything else already exists in the core."><b>They add it to Apranik as a module</b><small>Researchers</small></li>
+              <li class="st ap" data-step="3" data-t="It is reviewed and tested" data-d="The module is checked on its own and reviewed in the open."><b>It's reviewed and tested</b><small>Core maintainers</small></li>
+              <li class="st ap" data-step="4" data-t="It ships in a release" data-d="It goes out once, in a release of the core."><b>It ships in a release</b><small>Core maintainers</small></li>
+              <li class="st ppl" data-step="5" data-t="Clients and panels pick up the release" data-d="They update to the new release instead of rebuilding the method."><b>Clients and panels pick up the release</b><small>Client and panel maintainers</small></li>
+              <li class="st ppl" data-step="6" data-t="People reconnect" data-d="People get back online through the apps they already use."><b>People reconnect</b><small>People using the apps</small></li>
+            </ol>
+            <div class="info loopinfo" aria-live="off"></div>
+          </div>
+          <svg class="loopsvg" viewBox="30 30 360 380" role="presentation" aria-hidden="true">
+          <path class="lband" d="M356.2 243.4 A150 150 0 0 1 144.9 345.1"/>
+          <path class="lseg" d="M242.7 63.6 A150 150 0 0 1 304.0 93.1"/>
+          <polygon class="lhead" points="304.0,93.1 293.9,91.4 300.2,83.6"/>
+          <path class="lseg" d="M344.9 144.3 A150 150 0 0 1 360.0 210.7"/>
+          <polygon class="lhead" points="360.0,210.7 355.0,201.7 365.0,201.7"/>
+          <path class="lseg ap" d="M345.4 274.5 A150 150 0 0 1 303.0 327.7"/>
+          <polygon class="lhead ap" points="303.0,327.7 307.0,318.2 313.2,326.0"/>
+          <path class="lseg ap" d="M244.0 356.1 A150 150 0 0 1 176.0 356.1"/>
+          <polygon class="lhead ap" points="176.0,356.1 185.9,353.3 183.6,363.0"/>
+          <path class="lseg" d="M117.0 327.7 A150 150 0 0 1 74.6 274.5"/>
+          <polygon class="lhead" points="74.6,274.5 82.9,280.5 73.9,284.8"/>
+          <path class="lseg" d="M60.0 210.7 A150 150 0 0 1 75.1 144.3"/>
+          <polygon class="lhead" points="75.1,144.3 75.7,154.6 66.7,150.2"/>
+          <path class="lseg" d="M116.0 93.1 A150 150 0 0 1 177.3 63.6"/>
+          <polygon class="lhead" points="177.3,63.6 169.6,70.5 167.4,60.7"/>
+          <g class="lnode cen" data-step="0"><circle cx="210.0" cy="60.0" r="19"/><text x="210.0" y="60.0" class="num" text-anchor="middle" dominant-baseline="central">1</text></g>
+          <g class="lnode ppl" data-step="1"><circle cx="327.3" cy="116.5" r="19"/><text x="327.3" y="116.5" class="num" text-anchor="middle" dominant-baseline="central">2</text></g>
+          <g class="lnode ap" data-step="2"><circle cx="356.2" cy="243.4" r="19"/><text x="356.2" y="243.4" class="num" text-anchor="middle" dominant-baseline="central">3</text></g>
+          <g class="lnode ap" data-step="3"><circle cx="275.1" cy="345.1" r="19"/><text x="275.1" y="345.1" class="num" text-anchor="middle" dominant-baseline="central">4</text></g>
+          <g class="lnode ap" data-step="4"><circle cx="144.9" cy="345.1" r="19"/><text x="144.9" y="345.1" class="num" text-anchor="middle" dominant-baseline="central">5</text></g>
+          <g class="lnode ppl" data-step="5"><circle cx="63.8" cy="243.4" r="19"/><text x="63.8" y="243.4" class="num" text-anchor="middle" dominant-baseline="central">6</text></g>
+          <g class="lnode ppl" data-step="6"><circle cx="92.7" cy="116.5" r="19"/><text x="92.7" y="116.5" class="num" text-anchor="middle" dominant-baseline="central">7</text></g>
+          <text class="llabel" x="294.2" y="384.8" text-anchor="middle">Apranik</text>
+          <text class="lcenter" x="210" y="199" text-anchor="middle">Censors adapt.</text><text class="lcenter" x="210" y="221" text-anchor="middle">So do we.</text>
+          </svg>
+        </div>
       </div>
       <p class="cap">Apranik covers the middle of the loop. A method is added, tested, and released once, so it doesn't have to be rebuilt inside every app.</p>
     </div></section>
 
     <!-- 4. BUILD ONCE -->
     <section class="alt"><div class="wrap">
-      <h2>Build it once. Everyone gets it.</h2>
-      <p class="sub">Without a shared core, a new method either has to be rebuilt inside every existing app, or it arrives as its own new client and its own server panel. Either way the work is repeated for every method, and people have to find, trust, and install something new each time.</p>
-      <p class="sub">With Apranik, a method is added to the core once. Clients and panels already build on the core, so they pick it up with a release.</p>
-      <div class="fan">
-        <figure>
-          <svg viewBox="0 0 340 230" role="img" aria-label="Without a shared core, each method comes with its own client and panel">
-            <g><rect class="isl" x="4" y="6" width="332" height="62" rx="10"/><rect class="mb" x="14" y="20" width="84" height="34" rx="6"/><text x="56" y="42" text-anchor="middle">Method A</text><path class="ln" d="M98 37H130"/><rect class="bx" x="130" y="20" width="90" height="34" rx="6"/><text x="175" y="42" text-anchor="middle">Client</text><rect class="bx" x="236" y="20" width="90" height="34" rx="6"/><text x="281" y="42" text-anchor="middle">Panel</text></g>
-            <g><rect class="isl" x="4" y="84" width="332" height="62" rx="10"/><rect class="mb" x="14" y="98" width="84" height="34" rx="6"/><text x="56" y="120" text-anchor="middle">Method B</text><path class="ln" d="M98 115H130"/><rect class="bx" x="130" y="98" width="90" height="34" rx="6"/><text x="175" y="120" text-anchor="middle">Client</text><rect class="bx" x="236" y="98" width="90" height="34" rx="6"/><text x="281" y="120" text-anchor="middle">Panel</text></g>
-            <g><rect class="isl" x="4" y="162" width="332" height="62" rx="10"/><rect class="mb" x="14" y="176" width="84" height="34" rx="6"/><text x="56" y="198" text-anchor="middle">Method C</text><path class="ln" d="M98 193H130"/><rect class="bx" x="130" y="176" width="90" height="34" rx="6"/><text x="175" y="198" text-anchor="middle">Client</text><rect class="bx" x="236" y="176" width="90" height="34" rx="6"/><text x="281" y="198" text-anchor="middle">Panel</text></g>
-          </svg>
-          <figcaption><b>Without a shared core</b>Each method arrives as its own client and panel.</figcaption>
-        </figure>
-        <figure>
-          <svg viewBox="0 0 340 230" role="img" aria-label="With Apranik, methods are added to one core that clients and panels build on">
-            <rect class="mb" x="6" y="22" width="84" height="34" rx="6"/><text x="48" y="44" text-anchor="middle">Method A</text>
-            <rect class="mb" x="6" y="98" width="84" height="34" rx="6"/><text x="48" y="120" text-anchor="middle">Method B</text>
-            <rect class="mb" x="6" y="174" width="84" height="34" rx="6"/><text x="48" y="196" text-anchor="middle">Method C</text>
-            <path class="lg" d="M90 39C112 39 112 90 130 90M90 115H130M90 191C112 191 112 140 130 140"/>
-            <rect class="gr" x="130" y="30" width="84" height="170" rx="8"/><text class="on" x="172" y="120" text-anchor="middle">Apranik</text><text class="on" x="172" y="138" text-anchor="middle" style="font-size:11px">core</text>
-            <path class="lg" d="M214 90C232 90 232 39 250 39M214 115H250M214 140C232 140 232 191 250 191"/>
-            <rect class="bx" x="250" y="22" width="84" height="34" rx="6"/><text x="292" y="44" text-anchor="middle">Client</text>
-            <rect class="bx" x="250" y="98" width="84" height="34" rx="6"/><text x="292" y="120" text-anchor="middle">Client</text>
-            <rect class="bx" x="250" y="174" width="84" height="34" rx="6"/><text x="292" y="196" text-anchor="middle">Panel</text>
-          </svg>
-          <figcaption><b>With Apranik</b>Methods are added once. Clients and panels build on the core.</figcaption>
-        </figure>
-      </div>
+      <h2>A new method shouldn't mean reinventing the wheel.</h2>
+      <p class="sub">Today, a new method has to be rebuilt, tested and released inside every app, one at a time. That takes time, and by the time it is ready, censors may already have blocked it. With Apranik, it is added to the core once, and every app picks it up with a release.</p>
+      <div class="ted" role="table" aria-label="Getting one new method to people, with Apranik and today">
+        <div class="ted-head" role="row"><span role="columnheader">For each new method</span><span role="columnheader" class="ok"><b>With Apranik</b><small>One shared core</small></span><span role="columnheader" class="bad"><b>Today</b><small>Every app on its own</small></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M15 14.5c3 0 6 1 6 4.5"/></svg><span>Who does the work, and how often?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>One team, once, in the core</b><em>The work is done and reviewed in one place.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Every app’s team, separately, for every new method</b><em>The same work is repeated by many teams, and it grows with every app and every method.</em></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>When can people use a new method?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>After one core release, when apps update</b><em>People get it as soon as their app updates.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Only after each app has rebuilt, tested and released it</b><em>People wait even though the method already exists.</em></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/></svg><span>What if censors block it first?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>Apps already have it, or get the fix together</b><em>A shorter wait leaves censors less time to react.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Most apps are too late</b><em>A slow rollout gives censors time to block it before it reaches most people.</em></span></div></div>
     </div></section>
 
     <!-- 5. HOW IT WORKS -->
     <section class="how"><div class="wrap">
-      <h2>One core. Clients and panels on top. Methods plugged in.</h2>
+      <h2>Build it once. Everyone gets it.</h2>
       <p>Apranik is the core that clients and server panels build on. It handles the connection itself, so they don't each have to.</p>
       <p>It's modular. Each part of a connection is its own module, and a new method is another module that plugs into the same place. A researcher can add one without changing the rest, and a maintainer can review it on its own.</p>
-      <div class="scroll"><svg viewBox="0 0 640 310" role="img" aria-label="Clients and panels sit on the Apranik core, with modules plugged in below">
-        <rect class="bx" x="40" y="14" width="120" height="40" rx="8"/><text x="100" y="39" text-anchor="middle">Client</text>
-        <rect class="bx" x="180" y="14" width="120" height="40" rx="8"/><text x="240" y="39" text-anchor="middle">Client</text>
-        <rect class="bx" x="320" y="14" width="120" height="40" rx="8"/><text x="380" y="39" text-anchor="middle">Panel</text>
-        <rect class="bx" x="460" y="14" width="120" height="40" rx="8"/><text x="520" y="39" text-anchor="middle">Panel</text>
-        <path class="ln" d="M100 54V110M240 54V110M380 54V110M520 54V110"/>
-        <rect class="gr" x="40" y="110" width="540" height="62" rx="10"/><text class="on" x="310" y="147" text-anchor="middle" style="font-size:16px">Apranik core</text>
-        <path class="lg" d="M100 172V218M240 172V218M380 172V218M520 172V218"/>
-        <rect class="mb" x="40" y="218" width="120" height="44" rx="8"/><text class="bt" x="100" y="245" text-anchor="middle">Protocol</text>
-        <rect class="mb" x="180" y="218" width="120" height="44" rx="8"/><text class="bt" x="240" y="245" text-anchor="middle">Transport</text>
-        <rect class="mb" x="320" y="218" width="120" height="44" rx="8"/><text class="bt" x="380" y="245" text-anchor="middle">Security</text>
-        <rect class="gw" x="460" y="218" width="120" height="44" rx="8" stroke-dasharray="5 4"/><text class="gt" x="520" y="245" text-anchor="middle">New method</text>
-        <text class="t2" x="520" y="284" text-anchor="middle">Added by a researcher</text>
-        <text class="t2" x="310" y="284" text-anchor="middle">Reviewed by core maintainers</text>
-        <rect x="175" y="62" width="270" height="20" rx="4" style="fill:var(--ap-card)"/><text class="t2" x="310" y="76" text-anchor="middle">Updated by client and panel maintainers</text>
-      </svg></div>
+      <div class="scroll"><svg viewBox="0 0 780 370" role="img" aria-label="Modules on the left plug into the Apranik core, which clients and panels on the right build on">
+        <text class="t2" x="95" y="22" text-anchor="middle">Modules</text>
+        <text class="t2" x="685" y="22" text-anchor="middle">Clients and panels</text>
+        <rect class="mb" x="30" y="40" width="130" height="46" rx="8"/>
+        <text class="bt" x="95" y="68" text-anchor="middle">Protocol</text>
+        <path class="lg" d="M160 63 C210 63 240 175 300 175"/>
+        <rect class="mb" x="30" y="110" width="130" height="46" rx="8"/>
+        <text class="bt" x="95" y="138" text-anchor="middle">Transport</text>
+        <path class="lg" d="M160 133 C210 133 240 175 300 175"/>
+        <rect class="mb" x="30" y="180" width="130" height="46" rx="8"/>
+        <text class="bt" x="95" y="208" text-anchor="middle">Security</text>
+        <path class="lg" d="M160 203 C210 203 240 175 300 175"/>
+        <rect class="gw" x="30" y="250" width="130" height="46" rx="8" stroke-dasharray="5 4"/>
+        <text class="gt" x="95" y="278" text-anchor="middle">New method</text>
+        <path class="lg" d="M160 273 C210 273 240 175 300 175" stroke-dasharray="4 4"/>
+        <circle class="gr" cx="390" cy="175" r="90"/>
+        <text class="on" x="390" y="172" text-anchor="middle" style="font-size:18px">Apranik</text>
+        <text class="on" x="390" y="194" text-anchor="middle" style="font-size:14px">core</text>
+        <path class="ln" d="M480 175 C530 175 550 63 620 63"/>
+        <rect class="bx" x="620" y="40" width="130" height="46" rx="8"/>
+        <text x="685" y="68" text-anchor="middle">Client</text>
+        <path class="ln" d="M480 175 C530 175 550 133 620 133"/>
+        <rect class="bx" x="620" y="110" width="130" height="46" rx="8"/>
+        <text x="685" y="138" text-anchor="middle">Client</text>
+        <path class="ln" d="M480 175 C530 175 550 203 620 203"/>
+        <rect class="bx" x="620" y="180" width="130" height="46" rx="8"/>
+        <text x="685" y="208" text-anchor="middle">Panel</text>
+        <path class="ln" d="M480 175 C530 175 550 273 620 273"/>
+        <rect class="bx" x="620" y="250" width="130" height="46" rx="8"/>
+        <text x="685" y="278" text-anchor="middle">Panel</text>
+        <text class="t2" x="95" y="326" text-anchor="middle">Added by a</text>
+        <text class="t2" x="95" y="344" text-anchor="middle">researcher</text>
+        <text class="t2" x="390" y="336" text-anchor="middle">Reviewed by core maintainers</text>
+        <text class="t2" x="685" y="326" text-anchor="middle">Updated by client and</text>
+        <text class="t2" x="685" y="344" text-anchor="middle">panel maintainers</text>
+        </svg></div>
     </div></section>
 
     <!-- 6. WHAT'S INCLUDED -->
