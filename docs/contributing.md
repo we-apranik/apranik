@@ -116,9 +116,11 @@ func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	return &server{...}, nil
 }
 
-func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, error) {
+func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream, transport *spec.TransportMetadata) (spec.Stream, error) {
 	// Once per connection, in that connection's goroutine, within ctx.
-	// Read and answer the handshake on underlyingStream, then:
+	// Read and answer the handshake on underlyingStream. A layer that learns
+	// who the client really is replaces transport.Source (and writes no other
+	// field); most layers ignore transport. Then:
 	return &stream{underlyingStream: underlyingStream, ...}, nil
 }
 ```
@@ -130,7 +132,7 @@ Rules:
   lacks (a server without a certificate), so the mistake stops `apranik run` at
   startup. `Validate` cannot know the role and must not read files.
 - **Per connection, within `ctx`.** `WrapClientStream(ctx, underlyingStream,
-  server)` and `WrapServerStream(ctx, underlyingStream)` finish their handshake
+  server)` and `WrapServerStream(ctx, underlyingStream, transport)` finish their handshake
   before `ctx` ends; a blocking read must fail when it does (see
   `streamdeadline.BindToContext` in `shared/streamdeadline`). The client gets
   the server's address as dialed, for an SNI or a `Host`.
