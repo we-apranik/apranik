@@ -114,7 +114,7 @@ body:has(.ap-home) .md-main,body:has(.ap-home) .md-footer{display:none}
 .ap-home .scroll svg{min-width:620px;width:100%;display:block}
 
 /* included */
-.ap-home .incl{margin-top:34px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.ap-home .incl{margin-top:20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
 .ap-home .incl>b{font:500 17px var(--ap-head);margin-right:6px}
 .ap-home .chip{padding:8px 16px;border-radius:999px;background:var(--ap-green-w);color:var(--ap-green);font-weight:600;font-size:15px}
 .ap-home .lnk{display:inline-block;margin-top:26px;font-weight:500;color:var(--ap-green)}
@@ -185,3 +185,17 @@ body:has(.ap-home) .md-search,body:has(.ap-home) label[for="__search"]{display:n
 /* home header: no full-width rule, content aligned with the header */
 body:has(.ap-home) .md-tabs{border-bottom:0}
 .ap-home .wrap{max-width:1320px;padding:0 16px}
+
+/* back to top */
+.ap-home .totop{position:fixed;right:20px;bottom:20px;z-index:5;width:46px;height:46px;border-radius:50%;border:1px solid var(--ap-line);background:var(--ap-green);color:var(--ap-on);cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:opacity .2s ease,transform .2s ease}
+.ap-home .totop[hidden]{display:none}
+.ap-home .totop svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ap-home .totop:hover{transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){.ap-home .totop{transition:none}.ap-home .totop:hover{transform:none}}
+
+/* change A: hero quiet link and licence line */
+.ap-home .hero .fine{margin:16px 0 0;font-size:14px;color:var(--ap-ink2)}
+
+/* home header: the repository link shows only the logo and the word GitHub */
+body:has(.ap-home) .md-source__repository{display:inline;font-size:0}
+body:has(.ap-home) .md-source__repository::after{content:"GitHub";font-size:.7rem}

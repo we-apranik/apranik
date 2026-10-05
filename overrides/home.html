@@ -15,7 +15,9 @@
     <section class="hero"><div class="wrap">
       <h1><span>Censorship adapts.</span> <span>So we must.</span></h1>
       <p class="lead">Apranik is an open-source core that circumvention apps are built on. It's modular, so when censors block the usual ways through, a researcher can add a new method once and it reaches every app that uses it.</p>
-      <div class="btns"><a class="b p" href="#loop">How it works</a><a class="b" href="{{ 'overview/' | url }}">Get started</a></div>
+      <!-- change A: one primary action, one quiet link, licence line -->
+      <div class="btns" data-change="A"><a class="b p" href="{{ 'overview/' | url }}">Get started</a><a class="b" href="#loop">How it works</a></div>
+      <p class="fine" data-change="A">Open source · MPL 2.0</p>
     </div></section>
 
     <!-- 2. PROBLEM -->
@@ -96,7 +98,7 @@
         <rect class="gw" x="460" y="218" width="120" height="44" rx="8" stroke-dasharray="5 4"/><text class="gt" x="520" y="245" text-anchor="middle">New method</text>
         <text class="t2" x="520" y="284" text-anchor="middle">Added by a researcher</text>
         <text class="t2" x="310" y="284" text-anchor="middle">Reviewed by core maintainers</text>
-        <text class="t2" x="310" y="76" text-anchor="middle">Updated by client and panel maintainers</text>
+        <rect x="175" y="62" width="270" height="20" rx="4" style="fill:var(--ap-card)"/><text class="t2" x="310" y="76" text-anchor="middle">Updated by client and panel maintainers</text>
       </svg></div>
     </div></section>
 
@@ -105,6 +107,11 @@
       <h2>Bring the new part. The rest is here.</h2>
       <p class="sub">Everything below is already built into the core.</p>
       <div class="incl"><b>Protocols</b><span class="chip">SOCKS5</span><span class="chip">HTTP</span><span class="chip">Trojan</span></div>
+      <div class="incl"><b>Transports</b><span class="chip">TCP</span><span class="chip">UDP</span><span class="chip">TLS</span><span class="chip">WebSocket</span><span class="chip">HTTPUpgrade</span></div>
+      <div class="incl"><b>Routing</b><span class="chip">Rules by domain, address, port, user or entry point</span><span class="chip">Domain and address lists from files</span><span class="chip">Block or send each connection where you choose</span></div>
+      <div class="incl"><b>Name lookup</b><span class="chip">UDP</span><span class="chip">TCP</span><span class="chip">DNS over TLS</span><span class="chip">DNS over HTTPS</span><span class="chip">Caching</span></div>
+      <div class="incl"><b>Traffic recognition</b><span class="chip">TLS</span><span class="chip">HTTP</span></div>
+      <div class="incl"><b>Operation</b><span class="chip">Config checked at startup</span><span class="chip">Timeouts on every layer</span><span class="chip">Structured logs</span></div>
       <a class="lnk" href="{{ 'configuration/' | url }}">See everything that's supported</a>
     </div></section>
 
@@ -121,7 +128,7 @@
 
     <!-- 8. SECURITY AND TRUST -->
     <section class="alt"><div class="wrap">
-      <h2>Don't trust us. Check.</h2>
+      <h2>Don't trust. Check.</h2>
       <div class="cards">
         <div class="card"><h3>The code is public</h3><p>Read it, run it, question it.</p></div>
         <div class="card"><h3>Report a vulnerability</h3><p>A private way to reach the maintainers.</p></div>
@@ -181,6 +188,10 @@
       </div>
       <p class="legal">Apranik is open source. Licensed under MPL 2.0. No circumvention method works forever, and we don't claim otherwise.</p>
     </div></footer>
+
+    <button class="totop" type="button" aria-label="Back to top" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
 
   </div>
 {% endblock %}
