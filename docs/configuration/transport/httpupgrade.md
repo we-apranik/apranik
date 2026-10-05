@@ -88,6 +88,16 @@ was seen against Xray in testing, but the risk is why it is off by default.
 
 ## Inbound
 
+### `original_source_ip`
+
+<span class="cfg cfg-type">object</span>
+<span class="cfg cfg-def">Default: on, reads <code>X-Forwarded-For</code> from any peer</span>
+
+Read the client's IP from a header a proxy in front added, so routing and logs
+see the client and not the CDN. Its format, the setups for nginx and Cloudflare,
+and how it differs from Xray and sing-box are in
+[Client address behind a proxy](original_source_ip.md).
+
 ### `accept_websocket_key`
 
 <span class="cfg cfg-type">boolean</span>
@@ -101,8 +111,8 @@ it with a `404`, as sing-box does.
 A request that is not a `GET` upgrade to `websocket` gets a `404`, a malformed
 one a `400`, as sing-box answers. `Connection: keep-alive, Upgrade` is
 accepted. Half-close passes through to the layer below. Behind a CDN the
-inbound sees the CDN's address as the client's; `X-Forwarded-For` is not read
-yet.
+client's address comes from `X-Forwarded-For`, as
+[`original_source_ip`](original_source_ip.md) sets.
 
 Its upgrade request is HTTP/1.1, so a [`tls`](tls.md) below it must offer only
 `http/1.1`: set its `alpn` to `["http/1.1"]`, as the outbound above does.
