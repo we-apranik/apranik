@@ -61,28 +61,37 @@ them. A module that fills several kinds, such as `trojan`, appears under each.
 
 ```text
 Base stream transports
-  tcp          TCP over IPv4/IPv6
+  tcp             TCP over IPv4/IPv6
 
 Overlay stream transports
-  fragment     cut the TLS ClientHello into records and packets to hide the server name
-  httpupgrade  HTTP/1.1 upgrade, then raw bytes, over the stream below
-  tls          TLS 1.2 and 1.3 over the stream below, with a browser's ClientHello
-  ws           WebSocket (RFC 6455) over the stream below
+  fragment        cut the TLS ClientHello into records and packets to hide the server name
+  httpupgrade     HTTP/1.1 upgrade, then raw bytes, over the stream below
+  proxy_protocol  read the client's address from a PROXY protocol header (HAProxy, nginx, AWS), v1 and v2
+  tls             TLS 1.2 and 1.3 over the stream below, with a browser's ClientHello
+  ws              WebSocket (RFC 6455) over the stream below
 
 Base datagram transports
-  udp          UDP over IPv4/IPv6
+  udp             UDP over IPv4/IPv6
 
 Stream proxies
-  http         HTTP proxy (CONNECT and plain http:// requests), with Basic authentication
-  socks5       SOCKS5 proxy (RFC 1928), with UDP ASSOCIATE
-  trojan       Trojan proxy, CONNECT and UDP framed in the stream
+  http            HTTP proxy (CONNECT and plain http:// requests), with Basic authentication
+  socks5          SOCKS5 proxy (RFC 1928), with UDP ASSOCIATE
+  trojan          Trojan proxy, CONNECT and UDP framed in the stream
 
 Datagram over stream proxies
-  trojan       Trojan proxy, CONNECT and UDP framed in the stream
+  trojan          Trojan proxy, CONNECT and UDP framed in the stream
 
 Sniffers
-  http         sniff host from an HTTP/1 request's Host header
-  tls          sniff server name (SNI) from a TLS ClientHello
+  http            sniff host and request headers from an HTTP/1 request
+  tls             sniff server name (SNI) and browser family from a TLS ClientHello
+
+Stream DNS servers
+  doh             DNS over HTTPS (RFC 8484), HTTP/1.1
+  dot             DNS over TLS (RFC 7858)
+  tcp             DNS over TCP (RFC 7766)
+
+Datagram DNS servers
+  udp             DNS over UDP (RFC 1035)
 ```
 
 ## `generate`
@@ -109,7 +118,7 @@ apranik dev
   platform  linux/amd64
 
   Base stream transports        tcp
-  Overlay stream transports     fragment, httpupgrade, tls, ws
+  Overlay stream transports     fragment, httpupgrade, proxy_protocol, tls, ws
   Base datagram transports      udp
   Stream proxies                http, socks5, trojan
   Datagram over stream proxies  trojan
