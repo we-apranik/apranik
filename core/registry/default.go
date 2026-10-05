@@ -17,6 +17,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/module/transport/overlay/fragment"
 	"github.com/The-Apranik/Apranik/module/transport/overlay/httpupgrade"
+	"github.com/The-Apranik/Apranik/module/transport/overlay/proxyprotocol"
 	tlstransport "github.com/The-Apranik/Apranik/module/transport/overlay/tls"
 	"github.com/The-Apranik/Apranik/module/transport/overlay/websocket"
 )
@@ -33,6 +34,7 @@ func Default() (*Registry, error) {
 		moduleRegistry.Transports().RegisterOverlayStream(websocket.NewOverlayStreamTransportModule),
 		moduleRegistry.Transports().RegisterOverlayStream(httpupgrade.NewOverlayStreamTransportModule),
 		moduleRegistry.Transports().RegisterOverlayStream(fragment.NewOverlayStreamTransportModule),
+		moduleRegistry.Transports().RegisterOverlayStream(proxyprotocol.NewOverlayStreamTransportModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(http.NewStreamProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(trojan.NewStreamProxyModule),
