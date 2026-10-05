@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 type Settings struct {
@@ -45,9 +46,18 @@ func (s *Settings) Validate() error {
 
 func (s *Settings) Warnings() []string {
 	if s.Username == "" {
-		return []string{"http: no username set, so any client that can reach this inbound may use it"}
+		return nil
 	}
 	// Basic auth is base64, not encryption. Over a bare TCP carrier the
 	// credential crosses the wire recoverable by anyone on the path.
 	return []string{"http: Basic authentication sends the password in a recoverable form unless the carrier below it is encrypted"}
+}
+
+// An inbound with no username is open to whoever can reach its port: only a
+// listen address on this machine makes that safe.
+func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
+	if s.Username == "" && !listen.Addr().IsLoopback() {
+		return []string{"http: no username set, so any client that can reach this inbound may use it"}
+	}
+	return nil
 }

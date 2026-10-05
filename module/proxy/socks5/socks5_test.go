@@ -327,14 +327,27 @@ func TestSettingsDoNotPrintTheirPassword(t *testing.T) {
 	}
 }
 
-// An unauthenticated inbound is usable by anyone who can reach it, which is
-// worth saying out loud even though it is the common local setup.
-func TestNoAuthIsWarnedAbout(t *testing.T) {
-	if warnings := (&socks5.Settings{}).Warnings(); len(warnings) == 0 {
-		t.Error("no-auth produced no warning")
+// An unauthenticated inbound is usable by anyone who can reach it, so it is
+// warned about unless it listens on this machine only.
+func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
+	listenAt := func(address string) spec.Endpoint {
+		endpoint, err := spec.NewEndpoint(netip.MustParseAddr(address), 1080)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return endpoint
 	}
-	if warnings := (&socks5.Settings{Username: "u", Password: "p"}).Warnings(); len(warnings) != 0 {
-		t.Errorf("an authenticated proxy warned anyway: %v", warnings)
+	open := &socks5.Settings{}
+	for address, want := range map[string]bool{"127.0.0.1": false, "::1": false, "0.0.0.0": true, "192.168.1.5": true} {
+		if got := open.WarningsForListenAddress(listenAt(address)); (len(got) > 0) != want {
+			t.Errorf("no auth on %s: warnings %v, want a warning: %v", address, got, want)
+		}
+	}
+	if got := (&socks5.Settings{Username: "u", Password: "p"}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
+		t.Errorf("an authenticated proxy warned anyway: %v", got)
+	}
+	if got := open.Warnings(); len(got) != 0 {
+		t.Errorf("Warnings still carries the address-dependent warning: %v", got)
 	}
 }
 

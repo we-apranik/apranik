@@ -514,8 +514,9 @@ func TestUnknownNetworkIsRefused(t *testing.T) {
 
 // Each component's advisory findings, prefixed with where it sits.
 func TestComponentWarningsCarryTheirPath(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1)
+	document := strings.Replace(strings.Replace(goodDocument,
+		`"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1),
+		`"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
 	if failed {
@@ -808,7 +809,8 @@ func TestAMixedInboundDecodesBothHalves(t *testing.T) {
 }
 
 func TestAMixedInboundWithoutSettingsUsesTheModulesDefaults(t *testing.T) {
-	configuration, diagnostics := config.Parse([]byte(mixedDocument(`"protocol": {"type": "mixed"}`)), modules(t))
+	document := strings.Replace(mixedDocument(`"protocol": {"type": "mixed"}`), `"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
 	requireNoErrors(t, diagnostics)
 	checked := config.Check(configuration)
 	requireNoErrors(t, checked)
@@ -982,5 +984,38 @@ func TestAnInboundTLSServerIsCheckedToo(t *testing.T) {
 	diagnostics, failed := loadAndCheck(t, document)
 	if !failed || !find(diagnostics, "inbounds[0].transport[1].settings.alpn", "ws above it can speak only") {
 		t.Errorf("an inbound tls offering h2 under ws was not refused: %v", diagnostics)
+	}
+}
+
+// What depends on where an inbound listens is only said where others can reach it.
+func TestAnOpenInboundOnLoopbackIsNotWarnedAbout(t *testing.T) {
+	document := strings.Replace(goodDocument, `"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("an unauthenticated proxy is legal: %v", diagnostics.Err())
+	}
+	if find(diagnostics, "inbounds[0].protocol.settings", "no username") {
+		t.Errorf("a loopback inbound was warned about: %v", diagnostics)
+	}
+}
+
+func TestWebSocketReadingAHeaderWithoutVerificationIsWarnedAboutOnAnOpenAddress(t *testing.T) {
+	document := strings.Replace(strings.Replace(goodDocument,
+		`"transport": [{"type": "tcp"}]`, `"transport": [{"type": "tcp"}, {"type": "ws"}]`, 1),
+		`"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed {
+		t.Fatalf("legal config refused: %v", diagnostics.Err())
+	}
+	if !find(diagnostics, "inbounds[0].transport[1].settings", "original_source_ip") {
+		t.Errorf("no warning about the unverified header: %v", diagnostics)
+	}
+
+	verified := strings.Replace(document, `{"type": "ws"}`, `{"type": "ws", "settings": {"original_source_ip": {"verification": {"trusted_proxy_addresses": ["10.0.0.2"]}}}}`, 1)
+	diagnostics, _ = loadAndCheck(t, verified)
+	if find(diagnostics, "inbounds[0].transport[1].settings", "original_source_ip") {
+		t.Errorf("a verified setting was warned about: %v", diagnostics)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // No server address here: a proxy protocol never dials, so that belongs to the
@@ -48,8 +49,12 @@ func (s *Settings) Validate() error {
 	return nil
 }
 
-func (s *Settings) Warnings() []string {
-	if s.Username == "" {
+func (s *Settings) Warnings() []string { return nil }
+
+// An inbound with no username is open to whoever can reach its port: only a
+// listen address on this machine makes that safe.
+func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
+	if s.Username == "" && !listen.Addr().IsLoopback() {
 		return []string{"socks5: no username set, so any client that can reach this inbound may use it"}
 	}
 	return nil

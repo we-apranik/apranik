@@ -364,6 +364,28 @@ func TestBasicAuthIsWarnedAbout(t *testing.T) {
 	}
 }
 
+func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
+	listenAt := func(address string) spec.Endpoint {
+		endpoint, err := spec.NewEndpoint(netip.MustParseAddr(address), 8080)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return endpoint
+	}
+	open := &proxyhttp.Settings{}
+	for address, want := range map[string]bool{"127.0.0.1": false, "::1": false, "0.0.0.0": true, "192.168.1.5": true} {
+		if got := open.WarningsForListenAddress(listenAt(address)); (len(got) > 0) != want {
+			t.Errorf("no auth on %s: warnings %v, want a warning: %v", address, got, want)
+		}
+	}
+	if got := (&proxyhttp.Settings{Username: "u", Password: "p"}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
+		t.Errorf("an authenticated proxy warned about being open: %v", got)
+	}
+	if got := open.Warnings(); len(got) != 0 {
+		t.Errorf("Warnings still carries the address-dependent warning: %v", got)
+	}
+}
+
 func TestDecodeFillsPromotedFields(t *testing.T) {
 	module := proxyhttp.NewStreamProxyModule()
 
