@@ -9,11 +9,27 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/The-Apranik/Apranik/core/stats"
 )
 
 // A cache hit is what nearly every dial of a domain costs.
 func BenchmarkResolveCachedOneRecordType(b *testing.B) {
 	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only}, dualStackZone())
+	ctx := context.Background()
+	resolver.ResolveDomain(ctx, "example.com")
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := resolver.ResolveDomain(ctx, "example.com"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// The same cache hit with the resolver counting into statistics: what DNS
+// counters add to the path nearly every dial takes.
+func BenchmarkResolveCachedOneRecordTypeCounting(b *testing.B) {
+	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only}, dualStackZone())
+	resolver.SetStats(stats.NewDNSCounters([]string{"fake"}))
 	ctx := context.Background()
 	resolver.ResolveDomain(ctx, "example.com")
 	b.ReportAllocs()
@@ -46,6 +62,21 @@ func BenchmarkResolveCachedParallel(b *testing.B) {
 			resolver.ResolveDomain(ctx, "example.com")
 		}
 	})
+}
+
+// A miss: query built, answered by an in-memory server, read and cached.
+// Counting adds the two clock reads around the query and four atomic adds.
+func BenchmarkResolveUncachedCounting(b *testing.B) {
+	zone := dualStackZone()
+	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only, Cache: blueprint.DNSCache{Disable: true}}, zone)
+	resolver.SetStats(stats.NewDNSCounters([]string{"fake"}))
+	ctx := context.Background()
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := resolver.ResolveDomain(ctx, "example.com"); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 // A miss: query built, answered by an in-memory server, read and cached.
