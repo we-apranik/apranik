@@ -6,7 +6,6 @@ package http
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -66,7 +65,7 @@ func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, htt
 		return nil
 	}
 	writeStatusResponse(underlyingStream, httpVersion, statusProxyAuthenticationRequired, `Proxy-Authenticate: Basic realm="apranik"`)
-	return errors.New("http: missing or bad proxy credentials")
+	return fmt.Errorf("%w: http: missing or bad proxy credentials", spec.ErrAuthenticationFailed)
 }
 
 func parseRequestLine(requestLine string) (requestMethod, requestTarget, httpVersion string, err error) {
