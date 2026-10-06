@@ -80,7 +80,7 @@ func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wante
 
 	name, found := s.lookUp(request.PasswordHash)
 	if !found {
-		return spec.Metadata{}, fmt.Errorf("%w: trojan: unknown password", spec.ErrFallbackRequested)
+		return spec.Metadata{}, fmt.Errorf("%w: %w: trojan: unknown password", spec.ErrAuthenticationFailed, spec.ErrFallbackRequested)
 	}
 
 	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: name}
