@@ -18,4 +18,11 @@ var (
 	// the rest of the stream, to the inbound's fallback. Return it only before
 	// writing anything to the carrier.
 	ErrFallbackRequested = errors.New("spec: not this protocol's request; hand the stream to the fallback")
+
+	// ErrAuthenticationFailed is wrapped by Accept* when the request was
+	// valid for this protocol but its credentials were not accepted. Core
+	// counts it, so an operator sees a wave of guessed passwords apart from
+	// scanners that sent garbage; a malformed request is not this error. It
+	// may be returned together with ErrFallbackRequested.
+	ErrAuthenticationFailed = errors.New("spec: credentials were not accepted")
 )
