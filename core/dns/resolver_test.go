@@ -129,6 +129,29 @@ func TestResolverCachesNegativeAnswers(t *testing.T) {
 	}
 }
 
+func TestAFailedLookupMatchesErrLookupFailedAndKeepsItsText(t *testing.T) {
+	failing := dualStackZone()
+	failing.failWith = errFakeFailure
+	resolver := newTestResolver(t, Config{}, failing)
+
+	_, err := resolver.ResolveDomain(context.Background(), "example.com")
+	if !errors.Is(err, ErrLookupFailed) || !errors.Is(err, errFakeFailure) {
+		t.Fatalf("err = %v, want both ErrLookupFailed and the cause", err)
+	}
+	if err.Error() != errFakeFailure.Error() && !strings.Contains(err.Error(), errFakeFailure.Error()) {
+		t.Errorf("err text = %q, want the cause's text", err.Error())
+	}
+
+	_, err = newTestResolver(t, Config{}, newFakeZone()).ResolveDomain(context.Background(), "missing.example")
+	if !errors.Is(err, ErrLookupFailed) || !errors.Is(err, ErrNoAddresses) {
+		t.Errorf("an unanswerable name: err = %v, want ErrLookupFailed and ErrNoAddresses", err)
+	}
+
+	if _, err := resolver.ResolveDomainWithServer(context.Background(), "example.com", "no-such-server"); errors.Is(err, ErrLookupFailed) {
+		t.Errorf("an unknown server tag is misuse, not a failed lookup: %v", err)
+	}
+}
+
 func TestResolverDoesNotCacheFailures(t *testing.T) {
 	zone := dualStackZone()
 	zone.failWith = errFakeFailure
