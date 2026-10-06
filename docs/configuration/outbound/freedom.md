@@ -100,6 +100,16 @@ port sent to), `address-dependent` (any port of an IP sent to) or
 > `endpoint-independent` filtering lets an off-path sender inject packets into
 > the session once a mapping exists. It is accepted with a warning.
 
+### `nat.max_datagram_size`
+
+<span class="cfg cfg-type">integer, bytes</span>
+<span class="cfg cfg-def">Default: <code>8192</code></span>
+
+The largest reply the NAT passes on. A bigger one is dropped and counted as
+`too_large_from_outbound` on this outbound; the socket keeps reading. Match the inbound's
+[`udp_max_datagram_size`](../inbound/index.md#udp_max_datagram_size). `apranik check` refuses
+more than 65,507.
+
 ### `nat.idle_timeout`
 
 <span class="cfg cfg-type">duration</span>
