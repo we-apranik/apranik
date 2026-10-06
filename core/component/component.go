@@ -96,3 +96,25 @@ type ProbingOutbound interface {
 	Outbound
 	StartProbing(ctx context.Context)
 }
+
+// CarryingOutboundsReporter is implemented by the stream an outbound group
+// returns. It names the outbounds beneath the group that
+// carried it: the member, and for a group of groups the member's own member,
+// so statistics can count the traffic under each of them. Nothing else reads it.
+type CarryingOutboundsReporter interface {
+	CarryingOutboundTags() []string
+}
+
+// TagsOfOutboundsThatCarried lists outbound's own tag, then those the carrier
+// it returned reports beneath it. A carrier that reports nothing, as every
+// outbound but a group's does, adds nothing.
+func TagsOfOutboundsThatCarried(outbound Outbound, carrier any) []string {
+	reporter, reports := carrier.(CarryingOutboundsReporter)
+	if !reports {
+		return []string{outbound.Tag()}
+	}
+	beneath := reporter.CarryingOutboundTags()
+	tags := make([]string, 0, 1+len(beneath))
+	tags = append(tags, outbound.Tag())
+	return append(tags, beneath...)
+}
