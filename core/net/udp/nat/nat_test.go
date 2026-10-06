@@ -16,6 +16,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/logging"
+	coreudp "github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -879,6 +880,74 @@ func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
 	if notices != 1 {
 		t.Errorf("%d rejection notices for 20 sprayed packets, want 1", notices)
 	}
+}
+
+func TestEveryRejectedReplyIsReportedToTheCounter(t *testing.T) {
+	var rejected atomic.Int32
+	dial, _ := countingDialer(t)
+	natDatagram, err := nat.New(context.Background(), dial,
+		policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering), nil,
+		nat.WithReplyRejected(func() { rejected.Add(1) }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer natDatagram.Close()
+
+	contacted, contactedAddr := destination(t, "127.0.0.1")
+	sprayer, _ := destination(t, "127.0.0.2")
+	arrivals := startReading(t, natDatagram)
+	if _, err := natDatagram.WriteTo([]byte("hello"), contactedAddr); err != nil {
+		t.Fatal(err)
+	}
+	tableAddr := sourceSeenBy(t, contacted)
+
+	for range 20 {
+		mustSend(t, sprayer, "spray", tableAddr)
+	}
+	expectNothing(t, arrivals, shortWait)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for rejected.Load() < 20 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := rejected.Load(); got != 20 {
+		t.Errorf("%d rejected replies reported for 20 sprayed packets, want 20: the log samples them, the counter must not", got)
+	}
+}
+
+// A reply bigger than the NAT's buffers is lost and reported, and the socket
+// keeps reading: one oversized datagram must not end the mapping.
+func TestAReplyBiggerThanTheBuffersIsReportedAndTheMappingSurvives(t *testing.T) {
+	var tooLarge atomic.Int32
+	dial, _ := countingDialer(t)
+	natDatagram, err := nat.New(context.Background(), dial,
+		policy(nat.EndpointIndependentMapping, nat.AddressAndPortDependentFiltering), nil,
+		nat.WithBuffers(coreudp.NewBufferPool(100)),
+		nat.WithReplyTooLarge(func() { tooLarge.Add(1) }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer natDatagram.Close()
+
+	peer, peerAddr := destination(t, "127.0.0.1")
+	arrivals := startReading(t, natDatagram)
+	if _, err := natDatagram.WriteTo([]byte("hello"), peerAddr); err != nil {
+		t.Fatal(err)
+	}
+	tableAddr := sourceSeenBy(t, peer)
+
+	if _, err := peer.WriteToUDP(make([]byte, 300), tableAddr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := peer.WriteToUDP(make([]byte, 50), tableAddr); err != nil {
+		t.Fatal(err)
+	}
+
+	requireArrival(t, arrivals, shortWait)
+	if got := tooLarge.Load(); got != 1 {
+		t.Errorf("%d oversized replies reported, want 1", got)
+	}
+	expectNothing(t, arrivals, 100*time.Millisecond)
 }
 
 // benchSocket stands in for freedom's UDP socket: writes vanish, and reads
