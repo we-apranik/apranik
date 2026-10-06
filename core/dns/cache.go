@@ -1,11 +1,12 @@
 package dns
 
 import (
-	"container/list"
 	"sync"
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
+
+	"github.com/The-Apranik/Apranik/shared/lru"
 )
 
 // DefaultCacheMaxEntries bounds a cache: about a megabyte at a few hundred
@@ -26,8 +27,7 @@ type cacheKey struct {
 	server string
 }
 
-type cacheEntry struct {
-	key     cacheKey
+type cachedAnswer struct {
 	answer  answer
 	expires time.Time
 }
@@ -43,20 +43,16 @@ const (
 // answerCache is a least-recently-used cache of answers bounded by entry
 // count. Every method is safe for concurrent use.
 type answerCache struct {
-	maxEntries  int
 	maxStaleAge time.Duration // zero: expired entries are never served
 
 	mu      sync.Mutex
-	entries map[cacheKey]*list.Element
-	recency *list.List // of *cacheEntry, most recently used first
+	entries *lru.Cache[cacheKey, cachedAnswer]
 }
 
 func newAnswerCache(maxEntries int, maxStaleAge time.Duration) *answerCache {
 	return &answerCache{
-		maxEntries:  maxEntries,
 		maxStaleAge: maxStaleAge,
-		entries:     make(map[cacheKey]*list.Element),
-		recency:     list.New(),
+		entries:     lru.New[cacheKey, cachedAnswer](maxEntries),
 	}
 }
 
@@ -67,20 +63,17 @@ func (c *answerCache) lookup(key cacheKey, now time.Time) (answer, cacheFreshnes
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	element, found := c.entries[key]
+	cached, found := c.entries.Get(key)
 	if !found {
 		return answer{}, cacheMissing
 	}
-	entry := element.Value.(*cacheEntry)
-	if now.Before(entry.expires) {
-		c.recency.MoveToFront(element)
-		return entry.answer, cacheFresh
+	if now.Before(cached.expires) {
+		return cached.answer, cacheFresh
 	}
-	if c.maxStaleAge > 0 && now.Before(entry.expires.Add(c.maxStaleAge)) {
-		c.recency.MoveToFront(element)
-		return entry.answer, cacheStale
+	if c.maxStaleAge > 0 && now.Before(cached.expires.Add(c.maxStaleAge)) {
+		return cached.answer, cacheStale
 	}
-	c.remove(element)
+	c.entries.Remove(key)
 	return answer{}, cacheMissing
 }
 
@@ -90,32 +83,16 @@ func (c *answerCache) store(key cacheKey, stored answer, now time.Time) {
 	if stored.ttl <= 0 {
 		return
 	}
-	expires := now.Add(stored.ttl)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	if element, found := c.entries[key]; found {
-		entry := element.Value.(*cacheEntry)
-		entry.answer, entry.expires = stored, expires
-		c.recency.MoveToFront(element)
-		return
-	}
-	for c.recency.Len() >= c.maxEntries {
-		c.remove(c.recency.Back())
-	}
-	c.entries[key] = c.recency.PushFront(&cacheEntry{key: key, answer: stored, expires: expires})
-}
-
-func (c *answerCache) remove(element *list.Element) {
-	c.recency.Remove(element)
-	delete(c.entries, element.Value.(*cacheEntry).key)
+	c.entries.Add(key, cachedAnswer{answer: stored, expires: now.Add(stored.ttl)})
 }
 
 func (c *answerCache) len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.recency.Len()
+	return c.entries.Len()
 }
 
 // cacheSet is the resolver's caches: none, one shared, or one per server.
