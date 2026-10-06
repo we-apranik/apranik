@@ -90,10 +90,17 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		defer built.Close()
 
 		trafficHandler := handler.New(routing.Router, handler.Config{
-			StreamIdleTimeout:     inboundBlueprint.TCPIdleTimeout,
-			UDPSessionIdleTimeout: inboundBlueprint.UDPSessionIdleTimeout,
-			Resolver:              stackBuilder.Resolver(),
-			Logger:                logger,
+			StreamIdleTimeout:               inboundBlueprint.TCPIdleTimeout,
+			UDPSessionIdleTimeout:           inboundBlueprint.UDPSessionIdleTimeout,
+			UDPMaxDatagramSize:              inboundBlueprint.UDPMaxDatagramSize,
+			UDPSessionRouteCacheIdleTimeout: inboundBlueprint.UDPSessionRouteCacheIdleTimeout,
+			UDPSessionRouteCacheMaxEntries:  inboundBlueprint.UDPSessionRouteCacheMaxEntries,
+
+			UDPSessionLiveConnectionsIdleTimeout: inboundBlueprint.UDPSessionLiveConnectionsIdleTimeout,
+			UDPSessionLiveConnectionsMaxEntries:  inboundBlueprint.UDPSessionLiveConnectionsMaxEntries,
+			Resolver:                             stackBuilder.Resolver(),
+			Stats:                                stackBuilder.Stats(),
+			Logger:                               logger,
 		})
 		if err := built.Activate(ctx, trafficHandler); err != nil {
 			return err
