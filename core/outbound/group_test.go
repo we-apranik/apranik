@@ -285,6 +285,21 @@ func TestGroupCreatesDatagramsThroughTheFirstMemberThatWorks(t *testing.T) {
 	}
 }
 
+func TestAGroupsDatagramNamesTheMemberThatCarriedIt(t *testing.T) {
+	refusing, working := newMember(t, "refusing", 204), newMember(t, "working", 204)
+	refused := errors.New("refused")
+	refusing.dialFailure.Store(&refused)
+	group := newTestGroup(t, false, 0, refusing, working)
+
+	datagram, err := group.CreateDatagram(context.Background(), spec.Metadata{Network: spec.NetworkUDP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags := component.TagsOfOutboundsThatCarried(group, datagram); !slices.Equal(tags, []string{"group", "working"}) {
+		t.Errorf("TagsOfOutboundsThatCarried = %v, want [group working]", tags)
+	}
+}
+
 func TestGroupCarriesOnlyWhatEveryMemberCarries(t *testing.T) {
 	both := newMember(t, "both", 204)
 	both.networks = []spec.Network{spec.NetworkTCP, spec.NetworkUDP}
@@ -359,5 +374,72 @@ func TestAProbeNamesNeitherItselfNorTheClientLibrary(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the probe never arrived")
+	}
+}
+
+func TestAGroupsStreamNamesTheMemberThatCarriedIt(t *testing.T) {
+	refusing, working := newMember(t, "refusing", 204), newMember(t, "working", 204)
+	refused := errors.New("refused")
+	refusing.dialFailure.Store(&refused)
+	group := newTestGroup(t, false, 0, refusing, working)
+
+	stream, err := group.DialStream(context.Background(), realConnectionMetadata(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	reporter, reports := stream.(component.CarryingOutboundsReporter)
+	if !reports {
+		t.Fatal("a group's stream does not report which outbound carried it")
+	}
+	if tags := reporter.CarryingOutboundTags(); !slices.Equal(tags, []string{"working"}) {
+		t.Errorf("carrying outbound tags = %v, want [working]", tags)
+	}
+	if tags := component.TagsOfOutboundsThatCarried(group, stream); !slices.Equal(tags, []string{"group", "working"}) {
+		t.Errorf("TagsOfOutboundsThatCarried = %v, want [group working]", tags)
+	}
+}
+
+func TestAGroupOfGroupsNamesEveryLevelThatCarriedTheStream(t *testing.T) {
+	member := newMember(t, "member", 204)
+	inner, err := outbound.NewGroup(outbound.GroupConfig{
+		Tag:     "inner",
+		Members: []component.Outbound{member},
+		Probe:   outbound.ProbeConfig{URL: "http://probe.example/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outer, err := outbound.NewGroup(outbound.GroupConfig{
+		Tag:     "outer",
+		Members: []component.Outbound{inner},
+		Probe:   outbound.ProbeConfig{URL: "http://probe.example/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream, err := outer.DialStream(context.Background(), realConnectionMetadata(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	if tags := component.TagsOfOutboundsThatCarried(outer, stream); !slices.Equal(tags, []string{"outer", "inner", "member"}) {
+		t.Errorf("tags = %v, want [outer inner member]", tags)
+	}
+}
+
+func TestAPlainOutboundsCarrierNamesOnlyTheOutbound(t *testing.T) {
+	member := newMember(t, "member", 204)
+	stream, err := member.DialStream(context.Background(), realConnectionMetadata(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+
+	if tags := component.TagsOfOutboundsThatCarried(member, stream); !slices.Equal(tags, []string{"member"}) {
+		t.Errorf("tags = %v, want [member]", tags)
 	}
 }
