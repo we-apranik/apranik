@@ -17,6 +17,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -40,6 +41,7 @@ type fakeDatagram struct {
 	forgetWrites bool
 	closed       bool
 	readFail     error
+	writeFail    error
 
 	incoming chan spec.Destination
 	done     chan struct{}
@@ -54,6 +56,9 @@ func (f *fakeDatagram) WriteTo(payload []byte, to spec.Destination) (int, error)
 	defer f.mu.Unlock()
 	if f.closed {
 		return 0, errors.New("fake: closed")
+	}
+	if f.writeFail != nil {
+		return 0, f.writeFail
 	}
 	if !f.forgetWrites {
 		f.written = append(f.written, to)
@@ -99,6 +104,12 @@ func (f *fakeDatagram) failNextRead(err error) {
 	f.readFail = err
 	f.mu.Unlock()
 	f.incoming <- spec.Destination{}
+}
+
+func (f *fakeDatagram) failWrites(err error) {
+	f.mu.Lock()
+	f.writeFail = err
+	f.mu.Unlock()
 }
 
 func (f *fakeDatagram) writes() []spec.Destination {
@@ -456,12 +467,17 @@ func readSource(t *testing.T, peer *net.UDPConn) *net.UDPAddr {
 // timer starts, and stops its datagram recording what it is sent.
 func openBenchmarkSession(b *testing.B) (*session.Session, *fakeOutbound, *fakeDatagram, spec.Destination) {
 	b.Helper()
+	return openBenchmarkSessionWith(b, session.Config{})
+}
+
+func openBenchmarkSessionWith(b *testing.B, config session.Config) (*session.Session, *fakeOutbound, *fakeDatagram, spec.Destination) {
+	b.Helper()
 	destination, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
 	if err != nil {
 		b.Fatal(err)
 	}
 	out := newFakeOutbound("freedom")
-	udpSession := session.New(context.Background(), session.Config{})
+	udpSession := session.New(context.Background(), config)
 	b.Cleanup(func() { udpSession.Close() })
 	if err := udpSession.Send([]byte("open"), destination, out); err != nil {
 		b.Fatal(err)
@@ -497,4 +513,79 @@ func BenchmarkSessionReply(b *testing.B) {
 		reply := <-udpSession.Replies()
 		reply.Release()
 	}
+}
+
+func countingBenchmarkConfig() session.Config {
+	registry := stats.NewRegistry(stats.Config{
+		InboundTags: []string{"in"},
+		Outbounds:   []stats.OutboundDescription{{Tag: "freedom"}},
+	})
+	registry.User("alice")
+	return session.Config{Metadata: spec.Metadata{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"}, Stats: registry}
+}
+
+func BenchmarkSessionSendCounting(b *testing.B) {
+	udpSession, out, _, destination := openBenchmarkSessionWith(b, countingBenchmarkConfig())
+	payload := make([]byte, 512)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := udpSession.Send(payload, destination, out); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSessionReplyCounting(b *testing.B) {
+	udpSession, _, datagram, destination := openBenchmarkSessionWith(b, countingBenchmarkConfig())
+
+	b.ReportAllocs()
+	for b.Loop() {
+		datagram.incoming <- destination
+		reply := <-udpSession.Replies()
+		reply.Release()
+	}
+}
+
+// Every goroutine drives its own session, as concurrent clients do, and all of
+// them count into the same inbound, user and outbound: the shared counters are
+// what contends.
+func benchmarkSessionSendParallel(b *testing.B, shared session.Config) {
+	destination, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
+	if err != nil {
+		b.Fatal(err)
+	}
+	payload := make([]byte, 512)
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		out := newFakeOutbound("freedom")
+		udpSession := session.New(context.Background(), shared)
+		defer udpSession.Close()
+		if err := udpSession.Send([]byte("open"), destination, out); err != nil {
+			b.Error(err)
+			return
+		}
+		out.mu.Lock()
+		datagram := out.datagrams[0]
+		out.mu.Unlock()
+		datagram.mu.Lock()
+		datagram.forgetWrites = true
+		datagram.mu.Unlock()
+
+		for pb.Next() {
+			if err := udpSession.Send(payload, destination, out); err != nil {
+				b.Error(err)
+				return
+			}
+		}
+	})
+}
+
+func BenchmarkSessionSendParallelManySessions(b *testing.B) {
+	benchmarkSessionSendParallel(b, session.Config{})
+}
+
+func BenchmarkSessionSendParallelManySessionsCounting(b *testing.B) {
+	benchmarkSessionSendParallel(b, countingBenchmarkConfig())
 }
