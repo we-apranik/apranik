@@ -146,7 +146,7 @@ func (g *group) DialStream(ctx context.Context, metadata spec.Metadata) (spec.St
 		stream, err := member.DialStream(ctx, metadata)
 		if err == nil {
 			g.logger.Debug("Group member chosen", "member", member.Tag())
-			return stream, nil
+			return carriedStream{Stream: stream, carryingOutboundTags: component.TagsOfOutboundsThatCarried(member, stream)}, nil
 		}
 		failures = append(failures, err)
 		if ctx.Err() != nil {
@@ -165,7 +165,7 @@ func (g *group) CreateDatagram(ctx context.Context, metadata spec.Metadata) (spe
 		datagram, err := member.CreateDatagram(ctx, metadata)
 		if err == nil {
 			g.logger.Debug("Group member chosen", "member", member.Tag())
-			return datagram, nil
+			return carriedDatagram{Datagram: datagram, carryingOutboundTags: component.TagsOfOutboundsThatCarried(member, datagram)}, nil
 		}
 		failures = append(failures, err)
 		if ctx.Err() != nil {
@@ -174,6 +174,24 @@ func (g *group) CreateDatagram(ctx context.Context, metadata spec.Metadata) (spe
 	}
 	return nil, g.everyMemberFailed(failures)
 }
+
+// The streams a group returns say which outbounds beneath it carried them
+// (component.CarryingOutboundsReporter); every other call is the member's own.
+type carriedStream struct {
+	spec.Stream
+	carryingOutboundTags []string
+}
+
+func (s carriedStream) CarryingOutboundTags() []string { return s.carryingOutboundTags }
+
+// The datagrams a group returns say which outbounds beneath it carried them,
+// as its streams do; every other call is the member's own.
+type carriedDatagram struct {
+	spec.Datagram
+	carryingOutboundTags []string
+}
+
+func (d carriedDatagram) CarryingOutboundTags() []string { return d.carryingOutboundTags }
 
 func (g *group) everyMemberFailed(failures []error) error {
 	return fmt.Errorf("outbound %q: every member failed: %w", g.tag, errors.Join(failures...))
