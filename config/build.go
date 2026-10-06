@@ -91,6 +91,17 @@ func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
 	if raw.Routing != nil {
 		coreBlueprint.Routing = b.buildRouting(*raw.Routing, "routing")
 	}
+	if raw.Stats != nil {
+		coreBlueprint.Stats = &blueprint.Stats{
+			Disabled:  raw.Stats.Enabled != nil && !*raw.Stats.Enabled,
+			Inbounds:  raw.Stats.Inbounds,
+			Outbounds: raw.Stats.Outbounds,
+			Users:     raw.Stats.Users,
+
+			LiveConnections: raw.Stats.LiveConnections,
+			DialHealth:      raw.Stats.DialHealth,
+		}
+	}
 
 	return coreBlueprint, b.diagnostics
 }

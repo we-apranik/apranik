@@ -134,6 +134,7 @@ func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string, transport 
 
 	if settings.NAT != nil {
 		freedom.NAT = b.buildNATPolicy(*settings.NAT, fieldLocation(loc, "nat"))
+		freedom.NATMaxDatagramSize = settings.NAT.MaxDatagramSize
 	}
 	return freedom
 }
