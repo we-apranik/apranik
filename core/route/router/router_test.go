@@ -258,7 +258,7 @@ func TestDecisionNamesTheRule(t *testing.T) {
 		DefaultAction: route("proxy"),
 	})
 	decision, _ := router.Route(context.Background(), &fakeInformant{metadata: tcpTo(toDomain("a.com", 443))})
-	if decision.Rule != "routing.rules[1]" || !decision.IsBlock() {
+	if decision.Rule != "routing.rules[1]" || decision.Rule != RuleLocation(1) || !decision.IsBlock() {
 		t.Fatalf("got %+v, want a block by routing.rules[1]", decision)
 	}
 }
