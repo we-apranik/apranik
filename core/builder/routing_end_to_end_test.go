@@ -18,6 +18,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
 	"github.com/The-Apranik/Apranik/core/route/handler"
+	"github.com/The-Apranik/Apranik/core/stats"
 )
 
 // startRoutedSOCKS5 runs a config file's single SOCKS5 inbound the way
@@ -25,6 +26,13 @@ import (
 // per inbound. The config is loaded from a file beside its datasets, so
 // relative dataset paths resolve as they would for a user.
 func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
+	port, _ := startCountedSOCKS5(t, directory, configText)
+	return port
+}
+
+// startCountedSOCKS5 is startRoutedSOCKS5 that also returns the registry the
+// handler counts into: nil when the config switches counting off.
+func startCountedSOCKS5(t *testing.T, directory, configText string) (uint16, *stats.Registry) {
 	t.Helper()
 	configPath := filepath.Join(directory, "config.json")
 	if err := os.WriteFile(configPath, []byte(configText), 0o600); err != nil {
@@ -45,6 +53,7 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 	}
 	t.Cleanup(func() { built.Close() })
 
+	registry := built.BuildStats(coreBlueprint)
 	datasets, err := built.LoadDatasets(coreBlueprint.Datasets)
 	if err != nil {
 		t.Fatal(err)
@@ -72,10 +81,10 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inbound.Close() })
-	if err := inbound.Activate(context.Background(), handler.New(trafficRouter, handler.Config{Resolver: built.Resolver()})); err != nil {
+	if err := inbound.Activate(context.Background(), handler.New(trafficRouter, handler.Config{Resolver: built.Resolver(), Stats: registry})); err != nil {
 		t.Fatal(err)
 	}
-	return coreBlueprint.Inbounds[0].Bind.Port()
+	return coreBlueprint.Inbounds[0].Bind.Port(), registry
 }
 
 func startTCPEchoServer(t *testing.T) uint16 {
