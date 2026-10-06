@@ -59,6 +59,17 @@ neither. With neither, anyone who can reach the inbound may use it, and
 Accept UDP ASSOCIATE. When `false`, the command is refused and clients get TCP
 only. The UDP association ends when its control connection closes.
 
+### `udp_max_datagram_size`
+
+<span class="cfg cfg-type">integer, bytes</span>
+<span class="cfg cfg-def">Default: <code>8192</code></span>
+
+The largest UDP payload an association takes from a client, header aside. A bigger
+datagram is dropped and counted (`too_large_from_client`). Each association holds a buffer of
+this size plus up to 262 bytes of SOCKS5 header. Match the inbound's
+[`udp_max_datagram_size`](../inbound/index.md#udp_max_datagram_size). Must be from `0`
+(the default) to 65,507.
+
 ## Outbound
 
 ### `username`, `password`
