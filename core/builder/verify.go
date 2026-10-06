@@ -33,6 +33,8 @@ func (b *Builder) BuildRouting(coreBlueprint *blueprint.Blueprint) (Routing, err
 		return Routing{}, errors.New("no outbounds configured")
 	}
 
+	b.BuildStats(coreBlueprint)
+
 	datasets, err := b.LoadDatasets(coreBlueprint.Datasets)
 	if err != nil {
 		return Routing{}, err

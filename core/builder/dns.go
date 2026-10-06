@@ -33,6 +33,7 @@ func (b *Builder) UseDNS(section *blueprint.DNS) error {
 	}
 	previous := b.resolver
 	b.resolver = dns.NewResolver(dns.Config{IPVersions: section.IPVersions, Cache: section.Cache, Logger: b.logger})
+	b.resolver.SetStats(b.stats.DNSCounters())
 	return previous.Close()
 }
 
