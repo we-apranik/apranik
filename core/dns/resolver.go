@@ -19,12 +19,27 @@ import (
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // ErrNoAddresses: the name does not exist, or has no address of the versions
 // asked for.
 var ErrNoAddresses = errors.New("dns: no addresses")
+
+// ErrLookupFailed matches, through errors.Is, every error the resolver returns
+// because a name could not be answered: no server answered, or the answer had
+// no address. Statistics tell a dial that failed for this from one that failed
+// on the network. Misuse, such as an unknown server tag, does not match.
+var ErrLookupFailed = errors.New("dns: lookup failed")
+
+// lookupError keeps the cause's message and only adds that it was a failed
+// lookup, so an error's text is the same with or without it.
+type lookupError struct{ cause error }
+
+func (e lookupError) Error() string        { return e.cause.Error() }
+func (e lookupError) Unwrap() error        { return e.cause }
+func (e lookupError) Is(target error) bool { return target == ErrLookupFailed }
 
 var (
 	errResolverNotReady = errors.New("dns: the resolver has no servers yet")
@@ -58,6 +73,10 @@ type Resolver struct {
 	logger     *logging.Logger
 	now        func() time.Time
 
+	// Where lookups are counted; nil counts nothing. Set by SetStats before
+	// the resolver serves any lookup, then only read.
+	stats *stats.DNSCounters
+
 	servers atomic.Pointer[serverSet]
 
 	// One query in flight per cache key; later lookups wait for it.
@@ -83,6 +102,11 @@ type flight struct {
 	result answer
 	err    error
 }
+
+// SetStats says where to count lookups, cache hits and queries. Call it before
+// the resolver serves its first lookup; nil counts nothing. The counters need
+// an entry for each server tag, or that server's queries go uncounted.
+func (r *Resolver) SetStats(counters *stats.DNSCounters) { r.stats = counters }
 
 func NewResolver(config Config) *Resolver {
 	ipVersions := config.IPVersions
@@ -231,6 +255,7 @@ func (r *Resolver) resolve(ctx context.Context, domain, serverTag string) ([]net
 	if err := loopThrough(ctx, name.text, chosen.tag); err != nil {
 		return nil, err
 	}
+	r.stats.LookupStarted()
 
 	ipVersions := chosen.ipVersions
 	if ipVersions == "" {
@@ -239,7 +264,8 @@ func (r *Resolver) resolve(ctx context.Context, domain, serverTag string) ([]net
 	addresses, err := r.lookupRecordTypes(ctx, name, chosen, namedByCaller, recordTypesFor(ipVersions))
 	if err != nil {
 		r.logger.Debug("Lookup failed", "name", name.text, "server", chosen.tag, "error", err)
-		return nil, err
+		r.stats.LookupFailed(lookupFailureReason(err))
+		return nil, lookupError{cause: err}
 	}
 	return addresses, nil
 }
@@ -361,8 +387,10 @@ func (r *Resolver) cachedAnswer(ctx context.Context, name lookupName, chosen *se
 	cached, freshness := cache.lookup(key, r.now())
 	switch freshness {
 	case cacheFresh:
+		r.stats.CacheHit()
 		return cached, true
 	case cacheStale:
+		r.stats.StaleAnswerServed()
 		r.joinFlight(ctx, key, cache, name, chosen, recordType)
 		return cached, true
 	default:
@@ -409,7 +437,9 @@ func (r *Resolver) joinFlight(ctx context.Context, key cacheKey, cache *answerCa
 
 		exchangeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), exchangeSafetyLimit)
 		stopOnClose := context.AfterFunc(r.lifetime, cancel)
+		queryStarted := time.Now()
 		result, err := chosen.exchanger.exchange(contextWithDNSServerInLookupPath(exchangeCtx, chosen.tag), name, recordType)
+		r.stats.Server(chosen.tag).QueryFinished(time.Since(queryStarted), err != nil)
 		stopOnClose()
 		cancel()
 
@@ -461,4 +491,24 @@ func NewSystemResolver(logger *logging.Logger) *Resolver {
 		panic(err)
 	}
 	return resolver
+}
+
+// Why a lookup ended with no address, from what the servers said. A timeout is
+// read first: a lookup that asked two servers' worth of record types and timed
+// out on one is slow, whatever else it heard.
+func lookupFailureReason(err error) stats.DNSFailureReason {
+	var timeoutError interface{ Timeout() bool }
+	var serverFailure *ServerFailureError
+	switch {
+	case errors.As(err, &timeoutError) && timeoutError.Timeout():
+		return stats.DNSTimeout
+	case errors.Is(err, spec.ErrDNSAnswerTruncated):
+		return stats.DNSTruncated
+	case errors.As(err, &serverFailure):
+		return stats.DNSServerFailed
+	case errors.Is(err, ErrNoAddresses):
+		return stats.DNSNoAnswer
+	default:
+		return stats.DNSOther
+	}
 }
