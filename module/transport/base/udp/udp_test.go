@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -499,5 +500,42 @@ func TestSocketResolvesThroughTheResolverInItsOrder(t *testing.T) {
 	}
 	if got := resolver.lookups.Load(); got != 1 {
 		t.Fatalf("%d lookups for 5 datagrams, want 1", got)
+	}
+}
+
+// A datagram exactly the size of the buffer is whole, and one a byte over is
+// cut: telling them apart needs the kernel's flags, not the size read. The
+// datagram after a cut one is read as usual.
+func TestADatagramTheSizeOfTheBufferIsWholeAndOneByteOverIsReported(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("without message flags, a datagram that fills the buffer is treated as cut")
+	}
+	server, serverAddr := bindLocal(t)
+	dialer, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := dialer.CreateDatagram(context.Background(), spec.Endpoint{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	buffer := make([]byte, 100)
+
+	for _, size := range []int{100, 101, 40} {
+		if _, err := client.WriteTo(make([]byte, size), serverAddr); err != nil {
+			t.Fatal(err)
+		}
+		got, _, err := server.ReadFrom(buffer)
+		switch size {
+		case 101:
+			if !errors.Is(err, spec.ErrMessageTooLong) {
+				t.Errorf("a %d byte datagram into a 100 byte buffer: %v, want spec.ErrMessageTooLong", size, err)
+			}
+		default:
+			if err != nil || got != size {
+				t.Errorf("a %d byte datagram into a 100 byte buffer: %d bytes, %v, want it whole", size, got, err)
+			}
+		}
 	}
 }
