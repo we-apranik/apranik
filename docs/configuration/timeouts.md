@@ -22,6 +22,8 @@ stack's handshakes can together take the sum of their timeouts.
 | Sniffing wait | a `sniff` rule's [`settings.timeout`](routing/sniffing.md#timeout) | `300ms` |
 | TCP idle | [`inbounds[].tcp_idle_timeout`](inbound/index.md#tcp_idle_timeout) | `5m` |
 | UDP session idle | [`inbounds[].udp_session_idle_timeout`](inbound/index.md#udp_session_idle_timeout) | `5m` |
+| UDP route cache idle (a destination's routing decision kept) | [`inbounds[].udp_session_route_cache_idle_timeout`](inbound/index.md#udp_session_route_cache_idle_timeout) | `1m` |
+| UDP live entry idle (a destination listed as live, silence in either direction) | [`inbounds[].udp_session_live_connections_idle_timeout`](inbound/index.md#udp_session_live_connections_idle_timeout) | `1m` |
 | Trojan request wait for the first payload | internal | `100ms` |
 | Fallback dial | internal | `10s` |
 | `ws` Close frame on close | internal | `1s` |
@@ -34,5 +36,4 @@ stack's handshakes can together take the sum of their timeouts.
 | A domain's next address | `tcp` settings `next_address_delay` | `250ms` |
 | Remote config file download | `apranik run/check -fetch-timeout` | `30s` |
 
-Two stay internal: a cached UDP route is forgotten after 1 minute of silence, and
-the accept loop pauses 10ms after a failed accept.
+One stays internal: the accept loop pauses 10ms after a failed accept.
