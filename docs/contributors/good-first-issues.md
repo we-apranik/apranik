@@ -43,7 +43,7 @@ from `core` except the router.
 ## 3. Tests for the inbound accept loop
 
 **Description.** `core/inbound/inbound_test.go` covers dispatch, fallback and
-`max_connections`; `core/builder`'s end-to-end tests cover a silent TLS client.
+`max_tcp_connections`; `core/builder`'s end-to-end tests cover a silent TLS client.
 Still missing, with a fake `spec.StreamListener` and a fake
 `spec.StreamProxyServer`:
 

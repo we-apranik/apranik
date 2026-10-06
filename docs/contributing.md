@@ -181,6 +181,11 @@ Rules:
 - **Fallback.** If a request is not your protocol, return
   `spec.ErrFallbackRequested` from `Accept*` before writing anything; core
   replays every byte to the inbound's fallback.
+- **Credentials.** If the request is valid for your protocol but its credentials are
+  not accepted, wrap `spec.ErrAuthenticationFailed` in the error you return (it may
+  travel together with `ErrFallbackRequested`). Core counts these apart from
+  garbage, so an operator sees a guessing run. Without it, a failed login is counted as
+  a handshake that failed.
 - **Never dial.** The stream is handed to you. If your protocol truly needs a
   second socket, look at how SOCKS5 UDP ASSOCIATE receives a
   `spec.UDPAssociateSocketFunc`, and raise the design question first.
