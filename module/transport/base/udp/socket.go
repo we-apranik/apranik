@@ -13,10 +13,6 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// The largest a UDP payload can be over IPv4. A caller whose buffer is at
-// least this big cannot be handed a truncated datagram.
-const maxDatagram = 65507
-
 // Domains only appear here when a proxy layer passed one through unresolved,
 // so the working set is small; this bounds it so a long session can't grow it
 // without limit.
@@ -45,11 +41,6 @@ type socket struct {
 	// actually reach.
 	network string
 
-	// Used only when a caller's buffer is too small to rule out truncation,
-	// so the relay's full-size reads stay copy-free. One reader, so one
-	// buffer.
-	oversizeBuffer []byte
-
 	resolver spec.Resolver
 
 	mu       sync.Mutex
@@ -67,18 +58,11 @@ func newSocket(connection *net.UDPConn, network string, resolver spec.Resolver) 
 
 // A sender is always a resolved address, so this never yields a domain.
 //
-// A datagram larger than buffer would otherwise be truncated with no error at
-// all, so a short buffer reads through an internal one and reports the loss.
+// A datagram larger than buffer is cut by the kernel with no error at all, so
+// the message flags are read to find the loss and report it. The datagram is
+// gone either way; the next read gets the next one.
 func (s *socket) ReadFrom(buffer []byte) (int, spec.Destination, error) {
-	target := buffer
-	if len(buffer) < maxDatagram {
-		if s.oversizeBuffer == nil {
-			s.oversizeBuffer = make([]byte, maxDatagram)
-		}
-		target = s.oversizeBuffer
-	}
-
-	size, sender, err := s.connection.ReadFromUDPAddrPort(target)
+	size, _, flags, sender, err := s.connection.ReadMsgUDPAddrPort(buffer, nil)
 	if err != nil {
 		return 0, spec.Destination{}, err
 	}
@@ -88,12 +72,9 @@ func (s *socket) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 		return 0, spec.Destination{}, fmt.Errorf("udp: sender %s: %w", sender, err)
 	}
 
-	if len(buffer) < maxDatagram {
-		if size > len(buffer) {
-			return 0, from, fmt.Errorf("udp: %d byte datagram into a %d byte buffer: %w",
-				size, len(buffer), spec.ErrMessageTooLong)
-		}
-		copy(buffer, target[:size])
+	if wasTruncated(flags, size, len(buffer)) {
+		return 0, from, fmt.Errorf("udp: a datagram from %s did not fit a %d byte buffer: %w",
+			from, len(buffer), spec.ErrMessageTooLong)
 	}
 	return size, from, nil
 }
