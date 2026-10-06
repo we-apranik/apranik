@@ -1,8 +1,9 @@
 // Package handler is the component.TrafficHandler core gives every inbound. It
 // asks the router where traffic goes and hands the carriers to the relay:
 // once per TCP connection, and once per new destination in a UDP session,
-// whose answers it caches for the life of that session. It keeps the client's
-// stream to itself; the router learns about it through a traffic informant.
+// whose answers it caches in a bounded per-session cache that forgets idle
+// destinations. It keeps the client's stream to itself; the router learns
+// about it through a traffic informant.
 package handler
 
 import (
@@ -13,19 +14,35 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/relay"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // Handler is component.TrafficHandler. It decides nothing itself, asking the
 // router about every connection and every new UDP destination.
 type Handler struct {
-	router                component.Router
-	streamIdleTimeout     time.Duration
-	udpSessionIdleTimeout time.Duration
-	resolver              DomainResolver
-	logger                *logging.Logger
+	router                          component.Router
+	streamIdleTimeout               time.Duration
+	udpSessionIdleTimeout           time.Duration
+	udpSessionRouteCacheIdleTimeout time.Duration
+	udpSessionRouteCacheMaxEntries  int
+
+	udpSessionLiveConnectionsIdleTimeout time.Duration
+	udpSessionLiveConnectionsMaxEntries  int
+
+	udpMaxDatagramSize int
+	udpReplyBuffers    *udp.BufferPool
+
+	// Forgets idle routes, ends idle live entries and flushes the counts of
+	// every UDP session this handler serves, with one goroutine.
+	udpSweeper *periodicSweeper
+
+	resolver DomainResolver
+	stats    *stats.Registry
+	logger   *logging.Logger
 }
 
 // One per inbound, so each inbound's timeouts apply to its own traffic.
@@ -36,8 +53,34 @@ type Config struct {
 	// Zero means session.DefaultIdleTimeout.
 	UDPSessionIdleTimeout time.Duration
 
+	// How often a UDP session adds the datagrams it counted privately to the
+	// shared counters, besides every 64 datagrams and when it ends. Zero means
+	// one second. Not a config file setting: a reader lags by about this much.
+	UDPCountFlushInterval time.Duration
+
+	// Zero means udp.DefaultRouteCacheIdleTimeout.
+	UDPSessionRouteCacheIdleTimeout time.Duration
+
+	// Zero means udp.DefaultRouteCacheMaxEntries.
+	UDPSessionRouteCacheMaxEntries int
+
+	// The largest UDP datagram a client may send and a reply may be; a bigger
+	// one is dropped and counted. Zero means udp.DefaultMaxDatagramSize.
+	UDPMaxDatagramSize int
+
+	// A UDP destination's live entry ends after this much silence in either
+	// direction; zero means udp.DefaultLiveConnectionsIdleTimeout.
+	UDPSessionLiveConnectionsIdleTimeout time.Duration
+
+	// How many destinations of one UDP session are listed at once; zero means
+	// udp.DefaultLiveConnectionsMaxEntries.
+	UDPSessionLiveConnectionsMaxEntries int
+
 	// What a routing resolve action asks. Nil: a resolve finds nothing.
 	Resolver DomainResolver
+
+	// Where traffic is counted. Nil counts nothing.
+	Stats *stats.Registry
 
 	// Nil is allowed: New substitutes a silent logger.
 	Logger *logging.Logger
@@ -52,12 +95,46 @@ func New(router component.Router, config Config) *Handler {
 	if streamIdleTimeout == 0 {
 		streamIdleTimeout = relay.DefaultStreamIdleTimeout
 	}
+	udpSessionRouteCacheIdleTimeout := config.UDPSessionRouteCacheIdleTimeout
+	if udpSessionRouteCacheIdleTimeout <= 0 {
+		udpSessionRouteCacheIdleTimeout = udp.DefaultRouteCacheIdleTimeout
+	}
+	udpSessionRouteCacheMaxEntries := config.UDPSessionRouteCacheMaxEntries
+	if udpSessionRouteCacheMaxEntries <= 0 {
+		udpSessionRouteCacheMaxEntries = udp.DefaultRouteCacheMaxEntries
+	}
+	udpSessionLiveConnectionsIdleTimeout := config.UDPSessionLiveConnectionsIdleTimeout
+	if udpSessionLiveConnectionsIdleTimeout <= 0 {
+		udpSessionLiveConnectionsIdleTimeout = udp.DefaultLiveConnectionsIdleTimeout
+	}
+	udpSessionLiveConnectionsMaxEntries := config.UDPSessionLiveConnectionsMaxEntries
+	if udpSessionLiveConnectionsMaxEntries <= 0 {
+		udpSessionLiveConnectionsMaxEntries = udp.DefaultLiveConnectionsMaxEntries
+	}
+	udpMaxDatagramSize := config.UDPMaxDatagramSize
+	if udpMaxDatagramSize <= 0 {
+		udpMaxDatagramSize = udp.DefaultMaxDatagramSize
+	}
+	countFlushInterval := config.UDPCountFlushInterval
+	if countFlushInterval <= 0 {
+		countFlushInterval = defaultCountFlushInterval
+	}
+	sweepInterval := min(sweepIntervalFor(min(udpSessionRouteCacheIdleTimeout, udpSessionLiveConnectionsIdleTimeout)), countFlushInterval)
 	return &Handler{
-		router:                router,
-		streamIdleTimeout:     streamIdleTimeout,
-		udpSessionIdleTimeout: config.UDPSessionIdleTimeout,
-		resolver:              config.Resolver,
-		logger:                logger,
+		router:                          router,
+		streamIdleTimeout:               streamIdleTimeout,
+		udpSessionIdleTimeout:           config.UDPSessionIdleTimeout,
+		udpSessionRouteCacheIdleTimeout: udpSessionRouteCacheIdleTimeout,
+		udpSessionRouteCacheMaxEntries:  udpSessionRouteCacheMaxEntries,
+
+		udpSessionLiveConnectionsIdleTimeout: udpSessionLiveConnectionsIdleTimeout,
+		udpSessionLiveConnectionsMaxEntries:  udpSessionLiveConnectionsMaxEntries,
+		udpMaxDatagramSize:                   udpMaxDatagramSize,
+		udpReplyBuffers:                      udp.NewBufferPool(udpMaxDatagramSize),
+		udpSweeper:                           newPeriodicSweeper(sweepInterval),
+		resolver:                             config.Resolver,
+		stats:                                config.Stats,
+		logger:                               logger,
 	}
 }
 
@@ -70,20 +147,55 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 		clientStream.Close()
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
 	}
+	h.stats.RuleHit(decision.Rule)
 	if decision.IsBlock() {
 		clientStream.Close()
+		h.stats.Inbound(metadata.InboundTag).ConnectionRefusedFor(stats.RefusalBlockedByRule)
 		h.logger.Debug("Stream blocked", "inbound", metadata.InboundTag, "rule", decision.Rule)
 		return nil
 	}
 
+	timesDials := h.stats.TimesDials()
+	var dialStarted time.Time
+	if timesDials {
+		dialStarted = time.Now()
+	}
 	outboundStream, err := decision.Outbound.DialStream(ctx, metadata)
+	if err == nil && timesDials {
+		h.stats.Outbound(decision.Outbound.Tag()).DialSucceededIn(time.Since(dialStarted))
+	}
 	if err != nil {
 		clientStream.Close()
+		h.stats.Outbound(decision.Outbound.Tag()).DialFailedFor(classifyDialError(err))
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
 	}
 
+	var carryingOutboundTags []string
+	if h.stats != nil {
+		carryingOutboundTags = component.TagsOfOutboundsThatCarried(decision.Outbound, outboundStream)
+	}
+	counters := h.countersCarrying(metadata, carryingOutboundTags)
+	connection := h.stats.TrackConnection(stats.ConnectionInfo{
+		Network:      metadata.Network,
+		InboundTag:   metadata.InboundTag,
+		User:         metadata.User,
+		Source:       metadata.Transport.SourceEndpoint,
+		Destination:  metadata.Destination,
+		OutboundTags: carryingOutboundTags,
+		Rule:         decision.Rule,
+	})
+	defer connection.End()
+	for _, counted := range counters {
+		counted.ConnectionStarted()
+	}
+	defer func() {
+		for _, counted := range counters {
+			counted.ConnectionEnded()
+		}
+	}()
+
 	h.logger.Debug("Relaying stream", "inbound", metadata.InboundTag, "outbound", decision.Outbound.Tag(), "rule", decision.Rule)
-	relayErr := relay.Stream(ctx, clientStream, outboundStream, h.streamIdleTimeout)
+	relayErr := relay.Stream(ctx, clientStream, outboundStream, h.streamIdleTimeout, counters, connection.Bytes())
 	if errors.Is(relayErr, relay.ErrStreamIdle) {
 		return nil
 	}
@@ -94,29 +206,82 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 // relay asks for every packet; a per-session cache answers repeats. A session
 // that ends quietly, by Close or by going idle, is not an error.
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
-	udpSession := session.New(ctx, session.Config{Metadata: metadata, IdleTimeout: h.udpSessionIdleTimeout, Logger: h.logger})
+	udpSession := session.New(ctx, session.Config{
+		Metadata:             metadata,
+		IdleTimeout:          h.udpSessionIdleTimeout,
+		Stats:                h.stats,
+		Buffers:              h.udpReplyBuffers,
+		DialFailureReasonFor: classifyDialError,
+		Logger:               h.logger,
+	})
+
+	countFlusher := sessionCountFlusher{session: udpSession}
+	h.udpSweeper.add(countFlusher)
+	defer h.udpSweeper.remove(countFlusher)
 
 	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Decision, error) {
 		return h.routeUDPDestination(ctx, metadata, destination)
-	}, cachedRouteIdleTimeout)
-	defer routingCache.close()
+	}, h.udpSessionRouteCacheIdleTimeout, h.udpSessionRouteCacheMaxEntries)
+	h.udpSweeper.add(routingCache)
+	defer func() {
+		h.udpSweeper.remove(routingCache)
+		routingCache.close()
+	}()
+
+	var replyReceived func(from spec.Destination, size int)
+	if h.stats.TracksLiveConnections() {
+		live := newUDPSessionLiveEntries(h.stats, stats.ConnectionInfo{
+			Network:    spec.NetworkUDP,
+			InboundTag: metadata.InboundTag,
+			User:       metadata.User,
+			Source:     metadata.Transport.SourceEndpoint,
+		}, func(routed component.Outbound) []string {
+			if tags := udpSession.CarryingOutboundTags(routed); tags != nil {
+				return tags
+			}
+			return []string{routed.Tag()}
+		}, h.udpSessionLiveConnectionsIdleTimeout, h.udpSessionLiveConnectionsMaxEntries)
+		h.udpSweeper.add(live)
+		defer func() {
+			h.udpSweeper.remove(live)
+			live.close()
+		}()
+
+		routingCache.newUplinkAccepted = func(destination spec.Destination, decision component.Decision) func(size int) {
+			return func(size int) { live.uplinkAccepted(destination, decision, size) }
+		}
+		replyReceived = func(from spec.Destination, size int) {
+			if live.downlinkReceived(from, size) {
+				return
+			}
+			if decision, awaitingFirstReport := routingCache.decisionAwaitingFirstUplinkReport(from); awaitingFirstReport {
+				live.downlinkReceivedFromRoutedDestination(from, decision, size)
+			}
+		}
+	}
 
 	h.logger.Debug("Relaying datagrams", "inbound", metadata.InboundTag)
 
 	relayErr := relay.Datagrams(ctx, relay.DatagramRelayConfig{
 		ClientSide:    clientDatagram,
 		ClientSession: udpSession,
-		OutboundForDestination: func(ctx context.Context, destination spec.Destination) (component.Outbound, error) {
-			decision, err := routingCache.route(ctx, destination)
+		OutboundForDestination: func(ctx context.Context, destination spec.Destination) (relay.RoutedDestination, error) {
+			cached, err := routingCache.route(ctx, destination)
 			if err != nil {
-				return nil, err
+				return relay.RoutedDestination{}, err
 			}
-			if decision.IsBlock() {
-				return nil, relay.ErrDestinationBlocked
+			if cached.decision.IsBlock() {
+				return relay.RoutedDestination{}, relay.ErrDestinationBlocked
 			}
-			return decision.Outbound, nil
+			routed := relay.RoutedDestination{Outbound: cached.decision.Outbound}
+			routed.UplinkAccepted = cached.uplinkAccepted
+			return routed, nil
 		},
-		Logger: h.logger,
+		ReplyReceived:   replyReceived,
+		MaxDatagramSize: h.udpMaxDatagramSize,
+		Stats:           h.stats,
+		InboundTag:      metadata.InboundTag,
+		Logger:          h.logger,
 	})
 	switch {
 	case errors.Is(relayErr, session.ErrIdle), errors.Is(relayErr, session.ErrClosed):
@@ -135,6 +300,30 @@ func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.
 	if err != nil {
 		return component.Decision{}, fmt.Errorf("handler: routing %s: %w", destination, err)
 	}
+	h.stats.RuleHit(decision.Rule)
 	h.logger.Debug("Routed UDP destination", "inbound", sessionMetadata.InboundTag, "rule", decision.Rule, "blocked", decision.IsBlock())
 	return decision, nil
+}
+
+// Everything one connection adds to: the client's inbound, and its user once
+// the protocol authenticated one, then each outbound that carried it, which is
+// the outbound routing named and, for a group, each one beneath it. Worked out
+// once per connection, never per read.
+func (h *Handler) countersCarrying(metadata spec.Metadata, carryingOutboundTags []string) []*stats.Counters {
+	if h.stats == nil {
+		return nil
+	}
+	counters := make([]*stats.Counters, 0, 2+len(carryingOutboundTags))
+	if inbound := h.stats.Inbound(metadata.InboundTag).Base(); inbound != nil {
+		counters = append(counters, inbound)
+	}
+	if user := h.stats.User(metadata.User); user != nil {
+		counters = append(counters, user)
+	}
+	for _, tag := range carryingOutboundTags {
+		if outbound := h.stats.Outbound(tag).Base(); outbound != nil {
+			counters = append(counters, outbound)
+		}
+	}
+	return counters
 }

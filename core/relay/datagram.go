@@ -8,6 +8,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -16,12 +17,35 @@ import (
 // destination such as QUIC's UDP 443 can send many packets.
 var ErrDestinationBlocked = errors.New("relay: destination blocked by routing")
 
+// RoutedDestination is where one packet goes: the outbound that carries it,
+// and what the caller wants told once the outbound accepted it.
+type RoutedDestination struct {
+	Outbound component.Outbound
+
+	// Called with the packet's size after the outbound accepted it. Nil is allowed.
+	UplinkAccepted func(size int)
+}
+
 type DatagramRelayConfig struct {
 	ClientSide    spec.Datagram
 	ClientSession *session.Session
 
 	// Asked for every packet: UDP has no connection to pin a decision to.
-	OutboundForDestination func(ctx context.Context, destination spec.Destination) (component.Outbound, error)
+	OutboundForDestination func(ctx context.Context, destination spec.Destination) (RoutedDestination, error)
+
+	// Called with the sender and size of each reply taken from the session,
+	// before it is written to the client. Nil is allowed.
+	ReplyReceived func(from spec.Destination, size int)
+
+	// The largest datagram the client may send; a bigger one is dropped and
+	// counted. Zero means udp.DefaultMaxDatagramSize.
+	MaxDatagramSize int
+
+	// Where datagrams lost on the inbound's side are counted, under
+	// InboundTag, and a reply that could not be written to the client under the
+	// outbound it came from. Nil counts nothing.
+	Stats      *stats.Registry
+	InboundTag string
 
 	// Nil is allowed: Datagrams substitutes a silent logger.
 	Logger *logging.Logger
@@ -64,31 +88,60 @@ func Datagrams(ctx context.Context, config DatagramRelayConfig) error {
 // A destination that cannot be routed, or a send that fails, loses that packet
 // only. Neither ends the session.
 func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayConfig) error {
-	clientPacket := make([]byte, udp.MaxDatagramSize)
+	maxDatagramSize := config.MaxDatagramSize
+	if maxDatagramSize <= 0 {
+		maxDatagramSize = udp.DefaultMaxDatagramSize
+	}
+	clientPacket := make([]byte, maxDatagramSize)
+	inboundCounters := config.Stats.Inbound(config.InboundTag)
 
 	for {
 		packetSize, destination, err := config.ClientSide.ReadFrom(clientPacket)
 		if err != nil {
 			if errors.Is(err, spec.ErrMessageTooLong) {
+				inboundCounters.DatagramDroppedFor(stats.InboundDropTooLargeFromClient)
 				config.Logger.Debug("Datagram dropped on read", "error", err)
 				continue
 			}
 			return err
 		}
 
-		outbound, err := config.OutboundForDestination(ctx, destination)
+		routed, err := config.OutboundForDestination(ctx, destination)
 		if errors.Is(err, ErrDestinationBlocked) {
+			inboundCounters.DatagramDroppedFor(stats.InboundDropBlockedByRule)
 			continue
 		}
 		if err != nil {
+			inboundCounters.DatagramDroppedFor(stats.InboundDropRoutingFailed)
 			config.Logger.Debug("Datagram dropped, no outbound", "destination", destination, "error", err)
 			continue
 		}
 
-		if err := config.ClientSession.Send(clientPacket[:packetSize], destination, outbound); err != nil {
+		if err := config.ClientSession.Send(clientPacket[:packetSize], destination, routed.Outbound); err != nil {
+			if reason, lostOnInboundSide := inboundDropReasonOfSendFailure(err); lostOnInboundSide {
+				inboundCounters.DatagramDroppedFor(reason)
+			}
 			config.Logger.Debug("Datagram dropped on send", "destination", destination, "error", err)
 			continue
 		}
+		if routed.UplinkAccepted != nil {
+			routed.UplinkAccepted(packetSize)
+		}
+	}
+}
+
+// The session counts a failure to open or to write on the outbound itself, so
+// those are not an inbound drop: the datagram is counted once, where it was lost.
+func inboundDropReasonOfSendFailure(err error) (reason stats.InboundDatagramDropReason, lostOnInboundSide bool) {
+	switch {
+	case errors.Is(err, session.ErrOpeningOutbound), errors.Is(err, session.ErrSendingToOutbound):
+		return 0, false
+	case errors.Is(err, spec.ErrUnsupportedNetwork):
+		return stats.InboundDropOutboundCannotCarryUDP, true
+	case errors.Is(err, session.ErrClosed):
+		return stats.InboundDropSessionEnded, true
+	default:
+		return stats.InboundDropOther, true
 	}
 }
 
@@ -96,11 +149,16 @@ func forwardSessionRepliesToClient(config DatagramRelayConfig) error {
 	for {
 		select {
 		case reply := <-config.ClientSession.Replies():
+			replySize := len(reply.Payload)
+			if config.ReplyReceived != nil {
+				config.ReplyReceived(reply.From, replySize)
+			}
 			_, err := config.ClientSide.WriteTo(reply.Payload, reply.From)
 			reply.Release()
 			if err != nil {
+				config.Stats.Outbound(reply.OutboundTag).DatagramDroppedFor(stats.OutboundDropReplyNotDelivered)
 				if errors.Is(err, spec.ErrMessageTooLong) {
-					config.Logger.Debug("Reply dropped on write", "bytes", len(reply.Payload), "error", err)
+					config.Logger.Debug("Reply dropped on write", "bytes", replySize, "error", err)
 					continue
 				}
 				return err

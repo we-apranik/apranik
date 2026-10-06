@@ -33,6 +33,22 @@ type rawConfig struct {
 	Datasets  []rawDataset  `json:"datasets"`
 	DNS       *rawDNS       `json:"dns"`
 	Routing   *rawRouting   `json:"routing"`
+	Stats     *rawStats     `json:"stats"`
+}
+
+// Counting is on unless enabled is false. A list narrows counting to the
+// names in it; absent or empty means all.
+type rawStats struct {
+	Enabled   *bool    `json:"enabled"`
+	Inbounds  []string `json:"inbounds"`
+	Outbounds []string `json:"outbounds"`
+	Users     []string `json:"users"`
+
+	// Absent means the default: off now, on once an API reads them.
+	LiveConnections *bool `json:"live_connections"`
+
+	// Off when absent: it reads the clock on every dial.
+	DialHealth bool `json:"dial_health"`
 }
 
 type rawInbound struct {
@@ -49,8 +65,20 @@ type rawInbound struct {
 	TCPIdleTimeout        types.Duration `json:"tcp_idle_timeout"`
 	UDPSessionIdleTimeout types.Duration `json:"udp_session_idle_timeout"`
 
+	UDPMaxDatagramSize int `json:"udp_max_datagram_size"`
+
+	UDPSessionRouteCacheIdleTimeout types.Duration `json:"udp_session_route_cache_idle_timeout"`
+	UDPSessionRouteCacheMaxEntries  int            `json:"udp_session_route_cache_max_entries"`
+
+	UDPSessionLiveConnectionsIdleTimeout types.Duration `json:"udp_session_live_connections_idle_timeout"`
+	UDPSessionLiveConnectionsMaxEntries  int            `json:"udp_session_live_connections_max_entries"`
+
 	// Zero, the default, means no limit.
-	MaxConnections int `json:"max_connections"`
+	MaxTCPConnections int `json:"max_tcp_connections"`
+	MaxUDPSessions    int `json:"max_udp_sessions"`
+
+	// Renamed max_tcp_connections; read only to say so.
+	MovedMaxConnections json.RawMessage `json:"max_connections"`
 
 	Transport []rawModule `json:"transport"`
 	Protocol  rawModule   `json:"protocol"`
@@ -132,6 +160,9 @@ type rawNAT struct {
 	Mapping     string         `json:"mapping"`
 	Filtering   string         `json:"filtering"`
 	IdleTimeout types.Duration `json:"idle_timeout"`
+
+	// Not RFC 4787: how big a reply the NAT's buffers hold.
+	MaxDatagramSize int `json:"max_datagram_size"`
 }
 
 type rawLog struct {

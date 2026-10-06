@@ -13,7 +13,16 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 		Network:               b.parseNetwork(raw.Network, fieldLocation(loc, "network")),
 		TCPIdleTimeout:        time.Duration(raw.TCPIdleTimeout),
 		UDPSessionIdleTimeout: time.Duration(raw.UDPSessionIdleTimeout),
-		MaxConnections:        raw.MaxConnections,
+
+		UDPMaxDatagramSize: raw.UDPMaxDatagramSize,
+
+		UDPSessionRouteCacheIdleTimeout: time.Duration(raw.UDPSessionRouteCacheIdleTimeout),
+		UDPSessionRouteCacheMaxEntries:  raw.UDPSessionRouteCacheMaxEntries,
+
+		UDPSessionLiveConnectionsIdleTimeout: time.Duration(raw.UDPSessionLiveConnectionsIdleTimeout),
+		UDPSessionLiveConnectionsMaxEntries:  raw.UDPSessionLiveConnectionsMaxEntries,
+		MaxTCPConnections:                    raw.MaxTCPConnections,
+		MaxUDPSessions:                       raw.MaxUDPSessions,
 	}
 
 	if raw.Listen != "" {
@@ -60,6 +69,11 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 	if raw.MovedSniffing != nil {
 		b.diagnostics.errorf(fieldLocation(loc, "sniffing"),
 			`sniffing moved to a routing rule: {"match": {"inbound": [%q]}, "action": {"type": "sniff", "settings": {"sniffers": [...]}}}`, raw.Tag)
+	}
+
+	if raw.MovedMaxConnections != nil {
+		b.diagnostics.errorf(fieldLocation(loc, "max_connections"),
+			"max_connections was renamed max_tcp_connections; UDP sessions have their own limit, max_udp_sessions")
 	}
 
 	if raw.MovedHandshakeTimeout != nil {

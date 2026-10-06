@@ -18,6 +18,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/peekable"
 	"github.com/The-Apranik/Apranik/core/relay"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -70,10 +71,19 @@ type StreamConfig struct {
 	// needing one must refuse.
 	AssociateSocket spec.UDPAssociateSocketFunc
 
-	// Connections held at once. One accepted beyond it is closed at once,
+	// Where this inbound counts connections it refused or handed to its
+	// fallback. Nil counts nothing.
+	Counters *stats.InboundCounters
+
+	// TCP connections held at once. One accepted beyond it is closed at once,
 	// before any handshake: refusing early is cheaper than queueing. Zero
 	// means no limit.
-	MaxConnections int
+	MaxTCPConnections int
+
+	// UDP sessions held at once: a SOCKS5 association and a datagram-over-stream
+	// session such as Trojan's. One requested beyond it is refused. Each such
+	// session also holds its TCP connection's slot. Zero means no limit.
+	MaxUDPSessions int
 
 	// Nil is allowed: NewStream substitutes a silent logger.
 	Logger *logging.Logger
@@ -91,22 +101,20 @@ func NewStream(config StreamConfig) component.Inbound {
 		config.Fallback = &fallback
 	}
 
-	var connectionSlots chan struct{}
-	if config.MaxConnections > 0 {
-		connectionSlots = make(chan struct{}, config.MaxConnections)
-	}
-
 	return &streamInbound{
-		connectionSlots:    connectionSlots,
-		refusedLogSampler:  logging.NewSampler(refusedConnectionLogInterval),
-		tag:                config.Tag,
-		listener:           config.Listener,
-		overlays:           config.Overlays,
-		proxyServer:        config.ProxyServer,
-		datagramServer:     config.DatagramOverStreamServer,
-		fallback:           config.Fallback,
-		udpAssociateSocket: config.AssociateSocket,
-		logger:             logger.With("inbound", config.Tag),
+		tcpConnectionSlots:          newSlots(config.MaxTCPConnections),
+		udpSessionSlots:             newSlots(config.MaxUDPSessions),
+		refusedLogSampler:           logging.NewSampler(refusedConnectionLogInterval),
+		refusedUDPSessionLogSampler: logging.NewSampler(refusedConnectionLogInterval),
+		tag:                         config.Tag,
+		listener:                    config.Listener,
+		overlays:                    config.Overlays,
+		proxyServer:                 config.ProxyServer,
+		datagramServer:              config.DatagramOverStreamServer,
+		fallback:                    config.Fallback,
+		udpAssociateSocket:          config.AssociateSocket,
+		counters:                    config.Counters,
+		logger:                      logger.With("inbound", config.Tag),
 	}
 }
 
@@ -118,11 +126,15 @@ type streamInbound struct {
 	datagramServer     spec.DatagramOverStreamProxyServer
 	fallback           *Fallback
 	udpAssociateSocket spec.UDPAssociateSocketFunc
+	counters           *stats.InboundCounters
 	logger             *logging.Logger
 
-	// Nil means no limit. Full means the next connection is refused.
-	connectionSlots   chan struct{}
-	refusedLogSampler *logging.Sampler
+	// Nil means no limit. Full means the next one is refused.
+	tcpConnectionSlots *slots
+	udpSessionSlots    *slots
+
+	refusedLogSampler           *logging.Sampler
+	refusedUDPSessionLogSampler *logging.Sampler
 
 	mu             sync.Mutex
 	stopAccepting  context.CancelFunc
@@ -144,7 +156,7 @@ func (i *streamInbound) Activate(ctx context.Context, handler component.TrafficH
 	// Only when there is a socket to grant: otherwise a proxy handed one that
 	// always fails would answer with a general failure instead of X'07'.
 	if associateHandler, ok := i.proxyServer.(spec.UDPAssociateHandler); ok && i.udpAssociateSocket != nil {
-		associateHandler.SetAssociateSocket(i.udpAssociateSocket)
+		associateHandler.SetAssociateSocket(i.associateSocketWithinLimit(i.udpAssociateSocket))
 	}
 
 	ctx, stopAccepting := context.WithCancel(ctx)
@@ -197,11 +209,12 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler component.Traffi
 			continue
 		}
 
-		if !i.takeConnectionSlot() {
+		if !i.tcpConnectionSlots.take() {
 			stream.Close()
+			i.counters.ConnectionRefusedFor(stats.RefusalMaxTCPConnections)
 			if allowed, alsoRefused := i.refusedLogSampler.Allow(); allowed {
-				i.logger.Warn("Connection refused: max_connections reached",
-					"max_connections", cap(i.connectionSlots), "also_refused_since_last_warning", alsoRefused)
+				i.logger.Warn("Connection refused: max_tcp_connections reached",
+					"max_tcp_connections", i.tcpConnectionSlots.capacity(), "also_refused_since_last_warning", alsoRefused)
 			}
 			continue
 		}
@@ -209,27 +222,9 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler component.Traffi
 		i.liveConnections.Add(1)
 		go func() {
 			defer i.liveConnections.Done()
-			defer i.releaseConnectionSlot()
+			defer i.tcpConnectionSlots.release()
 			i.handleStream(ctx, handler, stream)
 		}()
-	}
-}
-
-func (i *streamInbound) takeConnectionSlot() bool {
-	if i.connectionSlots == nil {
-		return true
-	}
-	select {
-	case i.connectionSlots <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-
-func (i *streamInbound) releaseConnectionSlot() {
-	if i.connectionSlots != nil {
-		<-i.connectionSlots
 	}
 }
 
@@ -272,6 +267,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 	// client sent inside them, not TLS records.
 	stream, transport, err := i.wrapServerOverlays(ctx, stream, acceptedSocket)
 	if err != nil {
+		i.counters.ConnectionRefusedFor(refusalReasonFor(err, stats.RefusalTransportHandshakeFailed))
 		i.logger.Debug("Transport handshake failed", "error", err)
 		return
 	}
@@ -287,6 +283,7 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 		isDatagram, err := i.datagramServer.IsDatagramOverStream(ctx, recording)
 		if err != nil {
 			stream.Close()
+			i.counters.ConnectionRefusedFor(refusalReasonFor(err, stats.RefusalProxyHandshakeFailed))
 			i.logger.Warn("Handshake failed", "error", err)
 			return
 		}
@@ -298,6 +295,12 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 			}
 			recording.StopRecording()
 			metadata.Transport = transport
+			if !i.udpSessionSlots.take() {
+				datagram.Close()
+				i.refuseUDPSession()
+				return
+			}
+			defer i.udpSessionSlots.release()
 			i.handleDatagramOverStream(ctx, handler, datagram, metadata)
 			return
 		}
@@ -336,8 +339,12 @@ func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler co
 // A refusal goes to the fallback only when the protocol asked for it, one is
 // configured, and every byte read so far was kept. Anything else is closed.
 func (i *streamInbound) refuse(ctx context.Context, recording *peekable.Stream, stream spec.Stream, err error) {
+	if errors.Is(err, spec.ErrAuthenticationFailed) {
+		i.counters.AuthenticationFailed()
+	}
 	if !errors.Is(err, spec.ErrFallbackRequested) || i.fallback == nil || recording.Rewind() != nil {
 		stream.Close()
+		i.counters.ConnectionRefusedFor(refusalReasonFor(err, stats.RefusalProxyHandshakeFailed))
 		i.logger.Warn("Handshake failed", "error", err)
 		return
 	}
@@ -349,11 +356,13 @@ func (i *streamInbound) refuse(ctx context.Context, recording *peekable.Stream, 
 	endDial()
 	if dialErr != nil {
 		recording.Close()
+		i.counters.ConnectionRefusedFor(stats.RefusalFallbackUnreachable)
 		i.logger.Warn("Fallback unreachable", "fallback", i.fallback.Destination, "error", dialErr)
 		return
 	}
 
-	relayErr := relay.Stream(ctx, recording, fallbackStream, i.fallback.IdleTimeout)
+	i.counters.ConnectionSentToFallback()
+	relayErr := relay.Stream(ctx, recording, fallbackStream, i.fallback.IdleTimeout, nil, nil)
 	if relayErr != nil && !errors.Is(relayErr, relay.ErrStreamIdle) {
 		i.logger.Debug("Fallback stream ended in error", "error", relayErr)
 	}
@@ -376,7 +385,9 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler componen
 	session, err := associateHandler.Associate(ctx, controlStream, metadata)
 	if err != nil {
 		controlStream.Close()
-		i.logger.Warn("Datagram negotiation failed", "error", err)
+		if !errors.Is(err, errUDPSessionLimitReached) {
+			i.logger.Warn("Datagram negotiation failed", "error", err)
+		}
 		return
 	}
 

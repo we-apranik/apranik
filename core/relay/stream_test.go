@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/relay"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -23,7 +24,7 @@ func relayedPipes(t *testing.T, idleTimeout time.Duration) (client, remote net.C
 	remoteSide, remote := net.Pipe()
 	ended := make(chan error, 1)
 	go func() {
-		ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, idleTimeout)
+		ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, idleTimeout, nil, nil)
 	}()
 	t.Cleanup(func() { client.Close(); remote.Close() })
 	return client, remote, ended
@@ -88,7 +89,7 @@ func BenchmarkStreamRelayOneShortExchange(b *testing.B) {
 		remoteSide, remote := net.Pipe()
 		ended := make(chan error, 1)
 		go func() {
-			ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, relay.DefaultStreamIdleTimeout)
+			ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, relay.DefaultStreamIdleTimeout, nil, nil)
 		}()
 
 		go client.Write(request)
@@ -100,4 +101,146 @@ func BenchmarkStreamRelayOneShortExchange(b *testing.B) {
 		remote.Close()
 		<-ended
 	}
+}
+
+func TestRelayedBytesAreCountedAsUplinkAndDownlinkOnEveryCounters(t *testing.T) {
+	var first, second stats.Counters
+	client, clientSide := net.Pipe()
+	remoteSide, remote := net.Pipe()
+	ended := make(chan error, 1)
+	go func() {
+		ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, 0,
+			[]*stats.Counters{&first, nil, &second}, nil)
+	}()
+
+	request, response := make([]byte, 700), make([]byte, 5000)
+	go client.Write(request)
+	io.ReadFull(remote, make([]byte, len(request)))
+	go remote.Write(response)
+	io.ReadFull(client, make([]byte, len(response)))
+	client.Close()
+	remote.Close()
+	<-ended
+
+	for name, counters := range map[string]*stats.Counters{"first": &first, "second": &second} {
+		if got := counters.Snapshot().UplinkBytes; got != uint64(len(request)) {
+			t.Errorf("%s uplink = %d, want %d", name, got, len(request))
+		}
+		if got := counters.Snapshot().DownlinkBytes; got != uint64(len(response)) {
+			t.Errorf("%s downlink = %d, want %d", name, got, len(response))
+		}
+	}
+}
+
+func TestBytesAreCountedWhileTheConnectionIsStillOpen(t *testing.T) {
+	var counters stats.Counters
+	client, clientSide := net.Pipe()
+	remoteSide, remote := net.Pipe()
+	go relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, 0, []*stats.Counters{&counters}, nil)
+	t.Cleanup(func() { client.Close(); remote.Close() })
+
+	go client.Write(make([]byte, 100))
+	io.ReadFull(remote, make([]byte, 100))
+
+	if got := counters.Snapshot().UplinkBytes; got != 100 {
+		t.Errorf("uplink = %d while the connection is open, want 100", got)
+	}
+}
+
+func TestRelayedBytesAreCountedOnTheConnectionsOwnBytesToo(t *testing.T) {
+	registry := stats.NewRegistry(stats.Config{TrackLiveConnections: true})
+	connection := registry.TrackConnection(stats.ConnectionInfo{})
+	client, clientSide := net.Pipe()
+	remoteSide, remote := net.Pipe()
+	go relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, 0, nil, connection.Bytes())
+	t.Cleanup(func() { client.Close(); remote.Close() })
+
+	go client.Write(make([]byte, 70))
+	io.ReadFull(remote, make([]byte, 70))
+	go remote.Write(make([]byte, 500))
+	io.ReadFull(client, make([]byte, 500))
+
+	live := registry.LiveConnections()
+	if len(live) != 1 || live[0].UplinkBytes != 70 || live[0].DownlinkBytes != 500 {
+		t.Errorf("live connections = %+v, want one with 70 up and 500 down", live)
+	}
+}
+
+func BenchmarkStreamRelayOneShortExchangeCounted(b *testing.B) {
+	var inbound, outbound, user stats.Counters
+	counters := []*stats.Counters{&inbound, &outbound, &user}
+	request, response := make([]byte, 512), make([]byte, 4096)
+	b.ReportAllocs()
+	for b.Loop() {
+		client, clientSide := net.Pipe()
+		remoteSide, remote := net.Pipe()
+		ended := make(chan error, 1)
+		go func() {
+			ended <- relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, relay.DefaultStreamIdleTimeout, counters, nil)
+		}()
+
+		go client.Write(request)
+		io.ReadFull(remote, make([]byte, len(request)))
+		go remote.Write(response)
+		io.ReadFull(client, make([]byte, len(response)))
+
+		client.Close()
+		remote.Close()
+		<-ended
+	}
+}
+
+// Bulk transfer over a real loopback connection, where reads are large and
+// the cost of counting each one is what matters.
+func benchmarkStreamRelayBulk(b *testing.B, counters []*stats.Counters) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer listener.Close()
+	sink := make(chan net.Conn, 1)
+	go func() {
+		conn, _ := listener.Accept()
+		sink <- conn
+	}()
+	remoteEnd, err := net.Dial("tcp", listener.Addr().String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	remoteSide := <-sink
+
+	clientListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer clientListener.Close()
+	go func() {
+		conn, _ := clientListener.Accept()
+		sink <- conn
+	}()
+	client, err := net.Dial("tcp", clientListener.Addr().String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	clientSide := <-sink
+
+	go relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteEnd}, relay.DefaultStreamIdleTimeout, counters, nil)
+	go io.Copy(io.Discard, remoteSide)
+	defer client.Close()
+	defer remoteSide.Close()
+
+	chunk := make([]byte, 32<<10)
+	b.SetBytes(int64(len(chunk)))
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := client.Write(chunk); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkStreamRelayBulkUncounted(b *testing.B) { benchmarkStreamRelayBulk(b, nil) }
+
+func BenchmarkStreamRelayBulkCountedUnderThreeCounters(b *testing.B) {
+	benchmarkStreamRelayBulk(b, []*stats.Counters{{}, {}, {}})
 }

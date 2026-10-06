@@ -20,6 +20,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
 	"github.com/The-Apranik/Apranik/core/route/router"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
 	"github.com/The-Apranik/Apranik/spec"
@@ -45,6 +46,10 @@ type Builder struct {
 	// UseDNS must come before any outbound, which takes the resolver.
 	outboundsBuilt bool
 
+	// Nil until BuildStats, and nil when the blueprint switches counting off:
+	// nothing is counted then.
+	stats *stats.Registry
+
 	// Built here, not from the blueprint, so closed here: the internal
 	// freedom DNS servers without an outbound go through.
 	internalOutbounds []component.Outbound
@@ -61,6 +66,52 @@ func New(log blueprint.Log) (*Builder, error) {
 }
 
 func (b *Builder) Logger() *logging.Logger { return b.logger }
+
+// BuildStats makes the registry every inbound and handler counts into. Counting
+// is on unless the blueprint's stats section disables it, so a blueprint
+// written in Go with no section counts everything. Call it before BuildInbound
+// and hand Stats to each handler; BuildRouting calls it for run and Verify.
+func (b *Builder) BuildStats(coreBlueprint *blueprint.Blueprint) *stats.Registry {
+	section := coreBlueprint.Stats
+	if section != nil && section.Disabled {
+		b.stats = nil
+		b.resolver.SetStats(nil)
+		return nil
+	}
+
+	statsConfig := stats.Config{DNSServerTags: []string{dns.SystemServerTag}}
+	if coreBlueprint.DNS != nil {
+		for _, server := range coreBlueprint.DNS.Servers {
+			statsConfig.DNSServerTags = append(statsConfig.DNSServerTags, server.Tag)
+		}
+	}
+	for _, inbound := range coreBlueprint.Inbounds {
+		statsConfig.InboundTags = append(statsConfig.InboundTags, inbound.Tag)
+	}
+	for _, outbound := range coreBlueprint.Outbounds {
+		statsConfig.Outbounds = append(statsConfig.Outbounds, stats.OutboundDescription{Tag: outbound.Tag, IsGroup: outbound.Group != nil})
+	}
+	if coreBlueprint.Routing != nil {
+		for index := range coreBlueprint.Routing.Rules {
+			statsConfig.RuleLocations = append(statsConfig.RuleLocations, router.RuleLocation(index))
+		}
+	}
+	statsConfig.RuleLocations = append(statsConfig.RuleLocations, router.DefaultRuleLocation)
+	if section != nil {
+		statsConfig.TrackedInboundTags = section.Inbounds
+		statsConfig.TrackedOutboundTags = section.Outbounds
+		statsConfig.TrackedUsers = section.Users
+		statsConfig.TrackLiveConnections = section.LiveConnections != nil && *section.LiveConnections
+		statsConfig.TimeDials = section.DialHealth
+	}
+	b.stats = stats.NewRegistry(statsConfig)
+	b.resolver.SetStats(b.stats.DNSCounters())
+	return b.stats
+}
+
+// Stats is the registry BuildStats made: nil before it, and when counting is
+// off. Its reads are how an embedder gets the numbers.
+func (b *Builder) Stats() *stats.Registry { return b.stats }
 
 // Close closes the resolver and the DNS servers it holds, the outbounds this
 // builder made for them, then the log.
@@ -96,7 +147,9 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 		DatagramOverStreamServer: prepared.datagramServer,
 		Fallback:                 prepared.fallback,
 		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
-		MaxConnections:           inboundBlueprint.MaxConnections,
+		MaxTCPConnections:        inboundBlueprint.MaxTCPConnections,
+		MaxUDPSessions:           inboundBlueprint.MaxUDPSessions,
+		Counters:                 b.stats.Inbound(inboundBlueprint.Tag),
 		Logger:                   b.logger,
 	}), nil
 }
@@ -327,11 +380,13 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (co
 	}
 
 	return outbound.NewFreedom(outbound.FreedomConfig{
-		Tag:            outboundBlueprint.Tag,
-		Dialer:         dialer,
-		DatagramDialer: datagramDialer,
-		DatagramPolicy: freedom.NAT,
-		Logger:         b.logger,
+		Tag:             outboundBlueprint.Tag,
+		Dialer:          dialer,
+		DatagramDialer:  datagramDialer,
+		DatagramPolicy:  freedom.NAT,
+		MaxDatagramSize: freedom.NATMaxDatagramSize,
+		Counters:        b.stats.Outbound(outboundBlueprint.Tag),
+		Logger:          b.logger,
 	}), nil
 }
 

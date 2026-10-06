@@ -1,26 +1,70 @@
 // Package udp holds what core's UDP packages share.
 package udp
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
-// Largest UDP payload over IPv4.
-const MaxDatagramSize = 65507
+// How long a UDP session keeps one destination's routing decision (and its
+// live entry) after the last packet to it. PROVISIONAL: 1 minute. The inbound's
+// udp_session_route_cache_idle_timeout sets it.
+const DefaultRouteCacheIdleTimeout = time.Minute
 
-// Every reply packet needs a full-size buffer only until the next layer has
-// copied it on, so NAT and session take theirs from here instead of
-// allocating one per packet.
-var datagramBuffers = sync.Pool{New: func() any {
-	buffer := make([]byte, MaxDatagramSize)
-	return &buffer
-}}
+// How many destinations a UDP session remembers a routing decision for: when
+// it is full, the destination used longest ago is forgotten. PROVISIONAL: 1024.
+// The inbound's udp_session_route_cache_max_entries sets it.
+const DefaultRouteCacheMaxEntries = 1024
 
-// AcquireDatagramBuffer returns a MaxDatagramSize buffer, so no read into it
-// can be truncated. Hand it back with ReleaseDatagramBuffer, exactly once,
+// How long a UDP destination's live entry survives silence in either
+// direction. PROVISIONAL: 1 minute. The inbound's
+// udp_session_live_connections_idle_timeout sets it.
+const DefaultLiveConnectionsIdleTimeout = time.Minute
+
+// How many destinations of one UDP session are listed as live at once: when it
+// is full, the entry used longest ago, in either direction, ends. PROVISIONAL:
+// 1024, about 0.5 MB a session in the worst case (an entry measured at about
+// 490 bytes). The inbound's
+// udp_session_live_connections_max_entries sets it.
+const DefaultLiveConnectionsMaxEntries = 1024
+
+// Largest UDP payload over IPv4: no setting may ask for more.
+const LargestDatagramSize = 65507
+
+// How big a UDP datagram core's buffers hold: a datagram over it is dropped and
+// counted, not cut short. PROVISIONAL: 8192, above what any network carries
+// without fragmenting (about 1472 bytes) and above DNS's largest (4096), and
+// small enough that a session's few buffers stay a few tens of kilobytes. The
+// inbound's udp_max_datagram_size, freedom's nat.max_datagram_size and socks5's
+// udp_max_datagram_size set it.
+const DefaultMaxDatagramSize = 8192
+
+// BufferPool lends buffers of one size, so a reply is read into a buffer that
+// is handed back once the next layer has copied it on, instead of one being
+// allocated per datagram. Safe for concurrent use.
+type BufferPool struct {
+	size int
+	pool sync.Pool
+}
+
+// NewBufferPool makes a pool of size-byte buffers. A size below one, or above
+// the largest datagram, means DefaultMaxDatagramSize.
+func NewBufferPool(size int) *BufferPool {
+	if size < 1 || size > LargestDatagramSize {
+		size = DefaultMaxDatagramSize
+	}
+	pool := &BufferPool{size: size}
+	pool.pool.New = func() any {
+		buffer := make([]byte, size)
+		return &buffer
+	}
+	return pool
+}
+
+func (p *BufferPool) Size() int { return p.size }
+
+// Acquire returns a Size() buffer. Hand it back with Release, exactly once,
 // after the last use of anything sliced from it.
-func AcquireDatagramBuffer() *[]byte {
-	return datagramBuffers.Get().(*[]byte)
-}
+func (p *BufferPool) Acquire() *[]byte { return p.pool.Get().(*[]byte) }
 
-func ReleaseDatagramBuffer(buffer *[]byte) {
-	datagramBuffers.Put(buffer)
-}
+func (p *BufferPool) Release(buffer *[]byte) { p.pool.Put(buffer) }

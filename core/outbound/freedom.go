@@ -6,7 +6,9 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -17,6 +19,14 @@ type FreedomConfig struct {
 
 	// Nil means nat.NewDefaultPolicy().
 	DatagramPolicy *nat.Policy
+
+	// The largest reply the NAT passes on; a bigger one is dropped and counted
+	// as too_large_from_outbound. Zero means udp.DefaultMaxDatagramSize.
+	MaxDatagramSize int
+
+	// Where replies the NAT's filtering drops are counted, as this outbound's
+	// rejected_by_nat drops. Nil counts nothing.
+	Counters *stats.OutboundCounters
 
 	// Nil is allowed: NewFreedom substitutes a silent logger.
 	Logger *logging.Logger
@@ -35,6 +45,8 @@ func NewFreedom(config FreedomConfig) component.Outbound {
 		streamDialer:   config.Dialer,
 		datagramDialer: config.DatagramDialer,
 		datagramPolicy: config.DatagramPolicy,
+		counters:       config.Counters,
+		replyBuffers:   udp.NewBufferPool(config.MaxDatagramSize),
 		logger:         logger.With("outbound", config.Tag),
 	}
 }
@@ -44,7 +56,12 @@ type freedomOutbound struct {
 	streamDialer   spec.StreamDialer
 	datagramDialer spec.DatagramDialer
 	datagramPolicy *nat.Policy
-	logger         *logging.Logger
+	counters       *stats.OutboundCounters
+
+	// Shared by every NAT this outbound makes, so its replies are read into
+	// buffers lent for the read, not one set per session.
+	replyBuffers *udp.BufferPool
+	logger       *logging.Logger
 }
 
 func (o *freedomOutbound) Tag() string { return o.tag }
@@ -99,7 +116,13 @@ func (o *freedomOutbound) CreateDatagram(ctx context.Context, metadata spec.Meta
 		return o.datagramDialer.CreateDatagram(ctx, spec.Endpoint{})
 	}
 
-	natDatagram, err := nat.New(ctx, dial, policy, o.logger)
+	options := []nat.Option{nat.WithBuffers(o.replyBuffers)}
+	if o.counters != nil {
+		options = append(options,
+			nat.WithReplyRejected(func() { o.counters.DatagramDroppedFor(stats.OutboundDropRejectedByNAT) }),
+			nat.WithReplyTooLarge(func() { o.counters.DatagramDroppedFor(stats.OutboundDropTooLargeFromOutbound) }))
+	}
+	natDatagram, err := nat.New(ctx, dial, policy, o.logger, options...)
 	if err != nil {
 		return nil, fmt.Errorf("outbound %q: %w", o.tag, err)
 	}

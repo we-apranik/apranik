@@ -34,6 +34,11 @@ type clientDatagram struct {
 	outgoing chan spec.Destination
 	returned chan spec.Destination
 
+	// A read fails with each error sent here, in order.
+	readFailures chan error
+	// What WriteTo fails with when set.
+	writeFailure atomic.Pointer[error]
+
 	mu     sync.Mutex
 	closed bool
 	done   chan struct{}
@@ -41,9 +46,10 @@ type clientDatagram struct {
 
 func newClientDatagram() *clientDatagram {
 	return &clientDatagram{
-		outgoing: make(chan spec.Destination, 16),
-		returned: make(chan spec.Destination, 16),
-		done:     make(chan struct{}),
+		outgoing:     make(chan spec.Destination, 16),
+		returned:     make(chan spec.Destination, 16),
+		readFailures: make(chan error, 4),
+		done:         make(chan struct{}),
 	}
 }
 
@@ -51,12 +57,17 @@ func (c *clientDatagram) ReadFrom(payload []byte) (int, spec.Destination, error)
 	select {
 	case to := <-c.outgoing:
 		return copy(payload, []byte("packet")), to, nil
+	case failure := <-c.readFailures:
+		return 0, spec.Destination{}, failure
 	case <-c.done:
 		return 0, spec.Destination{}, errors.New("client: closed")
 	}
 }
 
 func (c *clientDatagram) WriteTo(payload []byte, from spec.Destination) (int, error) {
+	if failure := c.writeFailure.Load(); failure != nil {
+		return 0, *failure
+	}
 	select {
 	case c.returned <- from:
 		return len(payload), nil
@@ -130,19 +141,32 @@ func (o *outboundDatagram) writes() []spec.Destination {
 type fakeOutbound struct {
 	tag string
 
+	// When set, CreateDatagram fails with it.
+	dialErr error
+	// When set, the outbound carries only these networks; default UDP.
+	networks []spec.Network
+
 	mu        sync.Mutex
 	datagrams []*outboundDatagram
 }
 
-func (o *fakeOutbound) Tag() string              { return o.tag }
-func (o *fakeOutbound) Networks() []spec.Network { return []spec.Network{spec.NetworkUDP} }
-func (o *fakeOutbound) Close() error             { return nil }
+func (o *fakeOutbound) Tag() string { return o.tag }
+func (o *fakeOutbound) Networks() []spec.Network {
+	if o.networks != nil {
+		return o.networks
+	}
+	return []spec.Network{spec.NetworkUDP}
+}
+func (o *fakeOutbound) Close() error { return nil }
 
 func (o *fakeOutbound) DialStream(context.Context, spec.Metadata) (spec.Stream, error) {
 	return nil, spec.ErrUnsupportedNetwork
 }
 
 func (o *fakeOutbound) CreateDatagram(context.Context, spec.Metadata) (spec.Datagram, error) {
+	if o.dialErr != nil {
+		return nil, o.dialErr
+	}
 	datagram := newOutboundDatagram()
 	o.mu.Lock()
 	o.datagrams = append(o.datagrams, datagram)
@@ -166,9 +190,10 @@ type countingRouter struct {
 	pick  func(spec.Destination) (component.Outbound, error)
 }
 
-func (r *countingRouter) outboundForDestination(_ context.Context, destination spec.Destination) (component.Outbound, error) {
+func (r *countingRouter) outboundForDestination(_ context.Context, destination spec.Destination) (relay.RoutedDestination, error) {
 	r.asked.Add(1)
-	return r.pick(destination)
+	outbound, err := r.pick(destination)
+	return relay.RoutedDestination{Outbound: outbound}, err
 }
 
 func runLoop(t *testing.T, client *clientDatagram, router *countingRouter) *session.Session {

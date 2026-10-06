@@ -692,6 +692,129 @@ func TestANegativeUDPSessionIdleTimeoutIsRefused(t *testing.T) {
 	}
 }
 
+func TestTheUDPSessionRouteCacheIdleTimeoutDecodesAndDefaultsToZero(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	if got := configuration.Inbounds[0].UDPSessionRouteCacheIdleTimeout; got != 0 {
+		t.Errorf("default = %s, want zero, which means the built-in default", got)
+	}
+
+	if got := configuration.Inbounds[0].UDPSessionRouteCacheMaxEntries; got != 0 {
+		t.Errorf("default max entries = %d, want zero, which means the built-in default", got)
+	}
+
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_route_cache_idle_timeout": "20s", "udp_session_route_cache_max_entries": 300,`, 1)
+	configuration, diagnostics = config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+	if got := configuration.Inbounds[0].UDPSessionRouteCacheIdleTimeout; got != 20*time.Second {
+		t.Errorf("udp_session_route_cache_idle_timeout = %s, want 20s", got)
+	}
+	if got := configuration.Inbounds[0].UDPSessionRouteCacheMaxEntries; got != 300 {
+		t.Errorf("udp_session_route_cache_max_entries = %d, want 300", got)
+	}
+}
+
+func TestTheUDPLiveConnectionsSettingsDecodeCheckAndWarn(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	inbound := configuration.Inbounds[0]
+	if inbound.UDPSessionLiveConnectionsIdleTimeout != 0 || inbound.UDPSessionLiveConnectionsMaxEntries != 0 {
+		t.Errorf("defaults = %s and %d, want zero for both: the built-in defaults", inbound.UDPSessionLiveConnectionsIdleTimeout, inbound.UDPSessionLiveConnectionsMaxEntries)
+	}
+
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_live_connections_idle_timeout": "30s", "udp_session_live_connections_max_entries": 50,`, 1)
+	configuration, diagnostics = config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+	inbound = configuration.Inbounds[0]
+	if inbound.UDPSessionLiveConnectionsIdleTimeout != 30*time.Second || inbound.UDPSessionLiveConnectionsMaxEntries != 50 {
+		t.Errorf("settings = %s and %d, want 30s and 50", inbound.UDPSessionLiveConnectionsIdleTimeout, inbound.UDPSessionLiveConnectionsMaxEntries)
+	}
+
+	diagnostics, _ = loadAndCheck(t, document)
+	if !find(diagnostics, "inbounds[0].udp_session_live_connections_idle_timeout", "does nothing") ||
+		!find(diagnostics, "inbounds[0].udp_session_live_connections_max_entries", "does nothing") {
+		t.Errorf("settings that do nothing without stats.live_connections were not warned about: %v", diagnostics)
+	}
+	withLiveConnections := strings.Replace(document, `"version": 1,`, `"version": 1, "stats": {"live_connections": true},`, 1)
+	diagnostics, _ = loadAndCheck(t, withLiveConnections)
+	if find(diagnostics, "inbounds[0].udp_session_live_connections_idle_timeout", "does nothing") {
+		t.Errorf("a warning that the settings do nothing, though live_connections is true: %v", diagnostics)
+	}
+
+	for key, value := range map[string]string{
+		"udp_session_live_connections_idle_timeout": `"-1s"`,
+		"udp_session_live_connections_max_entries":  `-1`,
+	} {
+		document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "`+key+`": `+value+`,`, 1)
+		diagnostics, failed := loadAndCheck(t, document)
+		if !failed || !find(diagnostics, "inbounds[0]."+key, "must not be negative") {
+			t.Errorf("%s = %s was not refused with its path: %v", key, value, diagnostics)
+		}
+	}
+
+	document = strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_live_connections_idle_timeout": "10m",`, 1)
+	diagnostics, _ = loadAndCheck(t, document)
+	if !find(diagnostics, "inbounds[0].udp_session_live_connections_idle_timeout", "longer than udp_session_idle_timeout") {
+		t.Errorf("10m against the default 5m session idle time was not warned about: %v", diagnostics)
+	}
+}
+
+func TestANegativeUDPRouteCacheMaxEntriesIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_route_cache_max_entries": -1,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].udp_session_route_cache_max_entries", "must not be negative") {
+		t.Errorf("a negative max entries was not refused with its path: %v", diagnostics)
+	}
+}
+
+func TestANegativeUDPSessionRouteCacheIdleTimeoutIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_route_cache_idle_timeout": "-1s",`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].udp_session_route_cache_idle_timeout", "must not be negative") {
+		t.Errorf("a negative UDP destination idle timeout was not refused with its path: %v", diagnostics)
+	}
+}
+
+func TestARouteCacheIdleTimeoutLongerThanTheSessionIdleTimeoutIsWarnedAbout(t *testing.T) {
+	document := strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_idle_timeout": "30s", "udp_session_route_cache_idle_timeout": "2m",`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed || !find(diagnostics, "inbounds[0].udp_session_route_cache_idle_timeout", "longer than udp_session_idle_timeout") {
+		t.Errorf("the longer destination idle time was not warned about (failed=%v): %v", failed, diagnostics)
+	}
+
+	document = strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_route_cache_idle_timeout": "2m",`, 1)
+	diagnostics, _ = loadAndCheck(t, document)
+	if find(diagnostics, "inbounds[0].udp_session_route_cache_idle_timeout", "longer than udp_session_idle_timeout") {
+		t.Errorf("2m was warned about against the default 5m session idle time: %v", diagnostics)
+	}
+
+	document = strings.Replace(goodDocument,
+		`"listen": "127.0.0.1",`,
+		`"listen": "127.0.0.1", "udp_session_route_cache_idle_timeout": "10m",`, 1)
+	diagnostics, _ = loadAndCheck(t, document)
+	if !find(diagnostics, "inbounds[0].udp_session_route_cache_idle_timeout", "longer than udp_session_idle_timeout") {
+		t.Errorf("10m against the default 5m session idle time was not warned about: %v", diagnostics)
+	}
+}
+
 // The old keys beside the components are refused with where they moved.
 func TestTheMovedTimeoutKeysPointToTheirNewPlace(t *testing.T) {
 	document := strings.Replace(goodDocument,
@@ -880,34 +1003,71 @@ func TestAnOutboundCannotBeMixed(t *testing.T) {
 	}
 }
 
-// ---------- max_connections ----------
+// ---------- max_tcp_connections ----------
 
-func TestMaxConnectionsIsDecoded(t *testing.T) {
-	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": 500,`, 1)
+func TestMaxTCPConnectionsIsDecoded(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_tcp_connections": 500,`, 1)
 
 	configuration, diagnostics := config.Parse([]byte(document), modules(t))
 	requireNoErrors(t, diagnostics)
 	requireNoErrors(t, config.Check(configuration))
-	if got := configuration.Inbounds[0].MaxConnections; got != 500 {
-		t.Errorf("MaxConnections = %d, want 500", got)
+	if got := configuration.Inbounds[0].MaxTCPConnections; got != 500 {
+		t.Errorf("MaxTCPConnections = %d, want 500", got)
 	}
 }
 
-func TestNegativeMaxConnectionsIsRefused(t *testing.T) {
-	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": -1,`, 1)
+func TestNegativeMaxTCPConnectionsIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_tcp_connections": -1,`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "inbounds[0].max_connections", "negative") {
-		t.Errorf("a negative max_connections was not refused at its path: %v", diagnostics)
+	if !failed || !find(diagnostics, "inbounds[0].max_tcp_connections", "negative") {
+		t.Errorf("a negative max_tcp_connections was not refused at its path: %v", diagnostics)
 	}
 }
 
-func TestMaxConnectionsOnAUDPInboundIsRefused(t *testing.T) {
-	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "network": "udp", "max_connections": 5,`, 1)
+func TestMaxTCPConnectionsOnAUDPInboundIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "network": "udp", "max_tcp_connections": 5,`, 1)
 
 	diagnostics, _ := loadAndCheck(t, document)
-	if !find(diagnostics, "inbounds[0].max_connections", "udp") {
-		t.Errorf("max_connections on a udp inbound was not refused at its path: %v", diagnostics)
+	if !find(diagnostics, "inbounds[0].max_tcp_connections", "udp") {
+		t.Errorf("max_tcp_connections on a udp inbound was not refused at its path: %v", diagnostics)
+	}
+}
+
+func TestMaxUDPSessionsIsDecoded(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_udp_sessions": 8192,`, 1)
+
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+	if got := configuration.Inbounds[0].MaxUDPSessions; got != 8192 {
+		t.Errorf("MaxUDPSessions = %d, want 8192", got)
+	}
+}
+
+func TestNegativeMaxUDPSessionsIsRefused(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_udp_sessions": -1,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].max_udp_sessions", "negative") {
+		t.Errorf("a negative max_udp_sessions was not refused at its path: %v", diagnostics)
+	}
+}
+
+func TestNoLimitIsSetUnlessTheConfigAsksForOne(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	if inbound := configuration.Inbounds[0]; inbound.MaxTCPConnections != 0 || inbound.MaxUDPSessions != 0 {
+		t.Errorf("limits = %d TCP connections, %d UDP sessions, want 0 and 0 (no limit)", inbound.MaxTCPConnections, inbound.MaxUDPSessions)
+	}
+}
+
+func TestTheOldMaxConnectionsKeyIsRefusedWithItsNewName(t *testing.T) {
+	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": 500,`, 1)
+
+	diagnostics, failed := loadAndCheck(t, document)
+	if !failed || !find(diagnostics, "inbounds[0].max_connections", "max_tcp_connections") {
+		t.Errorf("max_connections was not refused with its new name: %v", diagnostics)
 	}
 }
 
@@ -1017,5 +1177,52 @@ func TestWebSocketReadingAHeaderWithoutVerificationIsWarnedAboutOnAnOpenAddress(
 	diagnostics, _ = loadAndCheck(t, verified)
 	if find(diagnostics, "inbounds[0].transport[1].settings", "original_source_ip") {
 		t.Errorf("a verified setting was warned about: %v", diagnostics)
+	}
+}
+
+func TestTheUDPDatagramSizeSettingsDecodeAndAreChecked(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "udp_max_datagram_size": 4096,`, 1)
+	document = strings.Replace(document, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"nat": {"max_datagram_size": 2048}}}`, 1)
+	document = strings.Replace(document, `"settings": {"username": "u", "password": "p"}`, `"settings": {"username": "u", "password": "p", "udp_max_datagram_size": 4096}`, 1)
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	requireNoErrors(t, config.Check(configuration))
+	if got := configuration.Inbounds[0].UDPMaxDatagramSize; got != 4096 {
+		t.Errorf("inbound udp_max_datagram_size = %d, want 4096", got)
+	}
+	if got := configuration.Outbounds[0].Freedom.NATMaxDatagramSize; got != 2048 {
+		t.Errorf("freedom nat.max_datagram_size = %d, want 2048", got)
+	}
+
+	configuration, diagnostics = config.Parse([]byte(goodDocument), modules(t))
+	requireNoErrors(t, diagnostics)
+	if configuration.Inbounds[0].UDPMaxDatagramSize != 0 || configuration.Outbounds[0].Freedom.NATMaxDatagramSize != 0 {
+		t.Error("the defaults are not zero, which means the built-in default")
+	}
+}
+
+func TestADatagramSizeOutOfRangeIsRefusedWithItsPath(t *testing.T) {
+	for _, test := range []struct{ name, from, to, path string }{
+		{"inbound negative", `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "udp_max_datagram_size": -1,`, "inbounds[0].udp_max_datagram_size"},
+		{"inbound too big", `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "udp_max_datagram_size": 70000,`, "inbounds[0].udp_max_datagram_size"},
+		{"freedom too big", `"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"nat": {"max_datagram_size": 70000}}}`, "outbounds[0].protocol.settings.nat.max_datagram_size"},
+	} {
+		diagnostics, failed := loadAndCheck(t, strings.Replace(goodDocument, test.from, test.to, 1))
+		if !failed || !find(diagnostics, test.path, "") {
+			t.Errorf("%s: not refused with its path %s: %v", test.name, test.path, diagnostics)
+		}
+	}
+
+	document := strings.Replace(goodDocument, `"settings": {"username": "u", "password": "p"}`, `"settings": {"username": "u", "password": "p", "udp_max_datagram_size": 70000}`, 1)
+	if _, failed := loadAndCheck(t, document); !failed {
+		t.Error("a socks5 udp_max_datagram_size over the largest datagram was accepted")
+	}
+}
+
+func TestADatagramSizeBelowADNSMessageIsWarnedAbout(t *testing.T) {
+	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "udp_max_datagram_size": 100,`, 1)
+	diagnostics, failed := loadAndCheck(t, document)
+	if failed || !find(diagnostics, "inbounds[0].udp_max_datagram_size", "512") {
+		t.Errorf("a 100 byte limit was not warned about (failed=%v): %v", failed, diagnostics)
 	}
 }

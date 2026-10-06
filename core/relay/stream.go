@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -23,7 +24,12 @@ var ErrStreamIdle = errors.New("relay: stream idle timeout")
 // Cancelling ctx closes both streams, the only thing that unblocks a blocked
 // Read. So does silence in both directions for idleTimeout; zero or negative
 // means no idle bound.
-func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout time.Duration) error {
+//
+// Every counters entry, and the connection's own bytes, get the bytes read
+// from the client as uplink and the bytes read from the remote side as
+// downlink, as they pass. Nil entries are skipped; nothing to count means
+// nothing is counted and nothing is wrapped.
+func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout time.Duration, counters []*stats.Counters, connectionBytes *stats.ConnectionBytes) error {
 	defer clientSide.Close()
 	defer remoteSide.Close()
 
@@ -35,13 +41,11 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 	stopClosingOnCancel := context.AfterFunc(ctx, closeBoth)
 	defer stopClosingOnCancel()
 
-	var clientSource, remoteSource io.Reader = clientSide, remoteSide
+	var activity *streamActivity
 	var idled atomic.Bool
 	if idleTimeout > 0 {
-		activity := &streamActivity{}
+		activity = &streamActivity{}
 		activity.markActive()
-		clientSource = activityReader{source: clientSide, activity: activity}
-		remoteSource = activityReader{source: remoteSide, activity: activity}
 
 		var idleTimer *time.Timer
 		idleTimer = time.AfterFunc(idleTimeout, func() {
@@ -54,6 +58,9 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 		})
 		defer idleTimer.Stop()
 	}
+	countedCounters := withoutNil(counters)
+	clientSource := observe(clientSide, activity, countedCounters, connectionBytes, uplink)
+	remoteSource := observe(remoteSide, activity, countedCounters, connectionBytes, downlink)
 
 	// Buffered for both, and the caller copies one direction itself, so the
 	// errors still arrive in the order the directions ended.
@@ -108,15 +115,61 @@ func (a *streamActivity) silentFor() time.Duration {
 	return time.Since(time.Unix(0, a.lastActiveUnixNano.Load()))
 }
 
-type activityReader struct {
-	source   io.Reader
-	activity *streamActivity
+func withoutNil(counters []*stats.Counters) []*stats.Counters {
+	withoutNil := make([]*stats.Counters, 0, len(counters))
+	for _, counted := range counters {
+		if counted != nil {
+			withoutNil = append(withoutNil, counted)
+		}
+	}
+	return withoutNil
 }
 
-func (r activityReader) Read(buffer []byte) (int, error) {
+type byteDirection bool
+
+const (
+	uplink   byteDirection = true
+	downlink byteDirection = false
+)
+
+// The source itself when there is nothing to watch, so a connection with no
+// idle timeout and no counters reads straight from the stream.
+func observe(source io.Reader, activity *streamActivity, counters []*stats.Counters, connectionBytes *stats.ConnectionBytes, direction byteDirection) io.Reader {
+	if activity == nil && len(counters) == 0 && connectionBytes == nil {
+		return source
+	}
+	return observedReader{source: source, activity: activity, counters: counters, connectionBytes: connectionBytes, direction: direction}
+}
+
+// Marks activity for the idle timeout and adds the bytes read to each
+// counters entry as uplink or downlink. Both are optional.
+type observedReader struct {
+	source   io.Reader
+	activity *streamActivity
+	counters []*stats.Counters
+
+	// Nil when the connection is not tracked.
+	connectionBytes *stats.ConnectionBytes
+	direction       byteDirection
+}
+
+func (r observedReader) Read(buffer []byte) (int, error) {
 	readSize, err := r.source.Read(buffer)
 	if readSize > 0 {
-		r.activity.markActive()
+		if r.activity != nil {
+			r.activity.markActive()
+		}
+		if r.direction == uplink {
+			for _, counted := range r.counters {
+				counted.AddUplinkBytes(uint64(readSize))
+			}
+			r.connectionBytes.AddUplinkBytes(uint64(readSize))
+		} else {
+			for _, counted := range r.counters {
+				counted.AddDownlinkBytes(uint64(readSize))
+			}
+			r.connectionBytes.AddDownlinkBytes(uint64(readSize))
+		}
 	}
 	return readSize, err
 }

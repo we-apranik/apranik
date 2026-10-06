@@ -318,6 +318,8 @@ type receivedPacket struct {
 	from    spec.Destination
 }
 
+var defaultBuffers = udp.NewBufferPool(udp.DefaultMaxDatagramSize)
+
 type Datagram struct {
 	// spec.Datagram's WriteTo takes no context, so a dial it triggers has
 	// nowhere else to get one.
@@ -325,6 +327,16 @@ type Datagram struct {
 	createDatagram CreateDatagramFunc
 	policy         Policy
 	logger         *logging.Logger
+
+	// Where reply buffers come from, which also sets the largest reply: a
+	// bigger one is dropped and reported as spec.ErrMessageTooLong.
+	buffers *udp.BufferPool
+
+	// Called once for every reply bigger than the buffer. Nil when nobody counts them.
+	onReplyTooLarge func()
+
+	// Called once for every reply filtering rejects. Nil when nobody counts them.
+	onReplyRejected func()
 
 	// Rejections are what a sprayer causes, so they are logged at most once
 	// per interval with a count, not once per packet.
@@ -341,7 +353,30 @@ type Datagram struct {
 	closeOnce sync.Once
 }
 
-func New(ctx context.Context, createDatagram CreateDatagramFunc, policy Policy, logger *logging.Logger) (*Datagram, error) {
+// An Option changes how New builds a Datagram.
+type Option func(*Datagram)
+
+// WithBuffers takes reply buffers from pool, whose buffer size is the largest
+// reply the NAT passes on. Without it, buffers hold udp.DefaultMaxDatagramSize.
+func WithBuffers(pool *udp.BufferPool) Option {
+	return func(d *Datagram) { d.buffers = pool }
+}
+
+// WithReplyTooLarge calls onTooLarge for every reply bigger than the NAT's
+// buffers, which is dropped. It runs on the socket's read loop, so it must not
+// block.
+func WithReplyTooLarge(onTooLarge func()) Option {
+	return func(d *Datagram) { d.onReplyTooLarge = onTooLarge }
+}
+
+// WithReplyRejected calls onRejected for every reply that filtering drops, so
+// the owner can count what a sprayer sends, which the log only samples. It runs
+// on the socket's read loop, so it must not block.
+func WithReplyRejected(onRejected func()) Option {
+	return func(d *Datagram) { d.onReplyRejected = onRejected }
+}
+
+func New(ctx context.Context, createDatagram CreateDatagramFunc, policy Policy, logger *logging.Logger, options ...Option) (*Datagram, error) {
 	if policy == (Policy{}) {
 		return nil, errors.New("nat: zero Policy; use NewDefaultPolicy or NewPolicy")
 	}
@@ -349,7 +384,7 @@ func New(ctx context.Context, createDatagram CreateDatagramFunc, policy Policy, 
 		logger = logging.Discard()
 	}
 
-	return &Datagram{
+	datagram := &Datagram{
 		ctx:            ctx,
 		createDatagram: createDatagram,
 		policy:         policy,
@@ -359,7 +394,14 @@ func New(ctx context.Context, createDatagram CreateDatagramFunc, policy Policy, 
 		rejectedLogSampler: logging.NewSampler(rejectedLogInterval),
 		received:           make(chan receivedPacket),
 		done:               make(chan struct{}),
-	}, nil
+	}
+	for _, option := range options {
+		option(datagram)
+	}
+	if datagram.buffers == nil {
+		datagram.buffers = defaultBuffers
+	}
+	return datagram, nil
 }
 
 func (d *Datagram) closed() bool {
@@ -452,7 +494,7 @@ func (d *Datagram) insert(key mappingKey, datagram spec.Datagram) (*mapping, err
 func (d *Datagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 	select {
 	case packet := <-d.received:
-		defer udp.ReleaseDatagramBuffer(packet.buffer)
+		defer d.buffers.Release(packet.buffer)
 		if len(buffer) < len(packet.payload) {
 			return 0, packet.from, fmt.Errorf("nat: %d byte datagram into a %d byte buffer: %w",
 				len(packet.payload), len(buffer), spec.ErrMessageTooLong)
@@ -469,15 +511,26 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 	// Each packet is read straight into its own pooled buffer, which travels
 	// with it to ReadFrom; the next read takes a fresh one. That replaces a
 	// per-packet copy and allocation.
-	buffer := udp.AcquireDatagramBuffer()
-	defer func() { udp.ReleaseDatagramBuffer(buffer) }()
+	buffer := d.buffers.Acquire()
+	defer func() { d.buffers.Release(buffer) }()
 	for {
 		size, sender, err := mapped.datagram.ReadFrom(*buffer)
 		if err != nil {
+			// A reply too big for the buffer is lost and the socket goes on: one
+			// oversized datagram must not end the mapping.
+			if errors.Is(err, spec.ErrMessageTooLong) {
+				if d.onReplyTooLarge != nil {
+					d.onReplyTooLarge()
+				}
+				continue
+			}
 			return
 		}
 
 		if !mapped.allows(sender, d.policy.filtering) {
+			if d.onReplyRejected != nil {
+				d.onReplyRejected()
+			}
 			// Notice, not Debug: under the default filtering this is the
 			// spoofing case the policy exists to stop.
 			if allowed, alsoRejected := d.rejectedLogSampler.Allow(); allowed {
@@ -493,7 +546,7 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 
 		select {
 		case d.received <- packet:
-			buffer = udp.AcquireDatagramBuffer()
+			buffer = d.buffers.Acquire()
 		case <-mapped.stop:
 			return
 		case <-d.done:
