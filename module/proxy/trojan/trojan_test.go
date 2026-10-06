@@ -227,6 +227,41 @@ func TestRefusalsAskForTheFallback(t *testing.T) {
 	}
 }
 
+// A wrong password is a valid Trojan request nobody may make; garbage is not.
+// Core counts the first apart from the second, so a guessing run shows.
+func TestOnlyAWrongPasswordIsAnAuthenticationFailure(t *testing.T) {
+	validHeader := func(password string) []byte {
+		header, _ := wire.AppendRequest(nil, wire.Request{
+			PasswordHash: wire.HashPassword(password), Command: wire.CommandConnect,
+			Destination: domainDestination("example.com", 443),
+		})
+		return header
+	}
+
+	for _, tc := range []struct {
+		name                    string
+		bytes                   []byte
+		wantAuthenticationError bool
+	}{
+		{"wrong password", validHeader("wrong"), true},
+		{"HTTP probe", []byte("GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: probe/1.0 (compatible)\r\n\r\n"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clientSide, serverSide := pipe(t)
+			results := serveStream(t, serverSide)
+			go clientSide.Write(tc.bytes)
+
+			got := <-results
+			if !errors.Is(got.err, spec.ErrFallbackRequested) {
+				t.Errorf("err = %v, want spec.ErrFallbackRequested too", got.err)
+			}
+			if gotAuthenticationError := errors.Is(got.err, spec.ErrAuthenticationFailed); gotAuthenticationError != tc.wantAuthenticationError {
+				t.Errorf("errors.Is(ErrAuthenticationFailed) = %v, want %v (err = %v)", gotAuthenticationError, tc.wantAuthenticationError, got.err)
+			}
+		})
+	}
+}
+
 func TestAClosedConnectionIsNotAFallback(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	results := serveStream(t, serverSide)
