@@ -172,8 +172,14 @@ silently ignored is a setting the user believes is in effect and is not; set
 | `listen`, `port` | IP address and port to listen on; an address is required, so nothing is exposed on every interface by omission |
 | `network` | `tcp` (default) or `udp` |
 | `tcp_idle_timeout` | a TCP connection silent in both directions for this long is closed; default `5m`, negative disables |
-| `max_connections` | connections held at once; one more is closed as soon as it is accepted; default `0`, no limit |
+| `max_tcp_connections` | TCP connections held at once; one more is closed as soon as it is accepted; default `0`, no limit |
+| `max_udp_sessions` | UDP sessions held at once (a SOCKS5 association, Trojan's UDP); one more is refused; default `0`, no limit |
 | `udp_session_idle_timeout` | a UDP session silent for this long is ended; default `5m` |
+| `udp_max_datagram_size` | the largest UDP datagram a client may send and a reply may be; a bigger one is dropped and counted; default `8192` |
+| `udp_session_route_cache_idle_timeout` | a UDP session forgets a destination's routing decision after this much silence to it; default `1m` |
+| `udp_session_route_cache_max_entries` | destinations one UDP session remembers a routing decision for; the one used longest ago is forgotten when full; default `1024` |
+| `udp_session_live_connections_idle_timeout` | a UDP destination's live entry ends after this much silence in either direction; default `1m` |
+| `udp_session_live_connections_max_entries` | destinations one UDP session lists as live at once; the one used longest ago ends when full; default `1024` |
 | `transport` | the transport stack, base first, e.g. `[{ "type": "tcp" }, { "type": "tls", ... }]` |
 | `protocol` | the proxy protocol, `{ "type": ..., "settings": {...} }`, or the special protocol `mixed` |
 | `sniffing` | absent means off; see below |
