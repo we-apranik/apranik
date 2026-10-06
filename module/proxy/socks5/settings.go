@@ -21,6 +21,12 @@ type Settings struct {
 	// without one the command is refused with X'07' whatever this says.
 	UDPRelay bool `json:"udp_relay"`
 
+	// The largest UDP datagram the server takes from a client through UDP
+	// ASSOCIATE; a bigger one is dropped. Zero means defaultMaxDatagramSize.
+	// Match the inbound's udp_max_datagram_size, which bounds what core
+	// relays. Server only.
+	UDPMaxDatagramSize int `json:"udp_max_datagram_size"`
+
 	// Both: how long the handshake may take; on a server, UDP ASSOCIATE's
 	// reply too. Zero means defaultHandshakeTimeout.
 	HandshakeTimeout types.Duration `json:"handshake_timeout"`
@@ -28,6 +34,21 @@ type Settings struct {
 
 // PROVISIONAL.
 const defaultHandshakeTimeout = 10 * time.Second
+
+// Above what any network carries without fragmenting and above DNS's largest,
+// and far below the 65507 a datagram can hold, so an association's buffer is
+// 8 KB, not 64. PROVISIONAL; core's own default is the same.
+const defaultMaxDatagramSize = 8192
+
+// The most a datagram can hold over IPv4.
+const largestDatagramSize = 65507
+
+func (s *Settings) maxDatagramSize() int {
+	if s.UDPMaxDatagramSize == 0 {
+		return defaultMaxDatagramSize
+	}
+	return s.UDPMaxDatagramSize
+}
 
 func (s *Settings) handshakeTimeout() time.Duration {
 	if s.HandshakeTimeout == 0 {
@@ -37,6 +58,9 @@ func (s *Settings) handshakeTimeout() time.Duration {
 }
 
 func (s *Settings) Validate() error {
+	if s.UDPMaxDatagramSize < 0 || s.UDPMaxDatagramSize > largestDatagramSize {
+		return fmt.Errorf("socks5: udp_max_datagram_size %d must be from 0 (the default, %d) to %d", s.UDPMaxDatagramSize, defaultMaxDatagramSize, largestDatagramSize)
+	}
 	if s.HandshakeTimeout < 0 {
 		return fmt.Errorf("socks5: handshake_timeout %s must not be negative", s.HandshakeTimeout)
 	}

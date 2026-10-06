@@ -253,8 +253,12 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 		}); err == nil {
 			t.Fatal("RequestStream with a wrong password succeeded")
 		}
-		if got := <-results; got.err == nil {
+		got := <-results
+		if got.err == nil {
 			t.Fatal("AcceptStream accepted a wrong password")
+		}
+		if !errors.Is(got.err, spec.ErrAuthenticationFailed) {
+			t.Errorf("err = %v, want spec.ErrAuthenticationFailed", got.err)
 		}
 	})
 

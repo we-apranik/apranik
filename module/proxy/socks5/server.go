@@ -27,6 +27,9 @@ type streamServer struct {
 
 	handshakeTimeout time.Duration
 
+	// The largest payload an association takes from a client.
+	maxDatagramSize int
+
 	socket spec.UDPAssociateSocketFunc
 }
 
@@ -118,7 +121,7 @@ func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream,
 		return nil, fmt.Errorf("socks5: sending reply: %w", err)
 	}
 
-	return newAssociation(socket, declaredClient), nil
+	return newAssociation(socket, declaredClient, s.maxDatagramSize), nil
 }
 
 // A wildcard bind is useless to the client, so the control stream supplies the
@@ -202,7 +205,7 @@ func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
 	passwordMatches := subtle.ConstantTimeCompare(password, []byte(s.password)) == 1
 	if !usernameMatches || !passwordMatches {
 		underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthFailed})
-		return errors.New("socks5: bad username or password")
+		return fmt.Errorf("%w: socks5: bad username or password", spec.ErrAuthenticationFailed)
 	}
 
 	if _, err := underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthSucceeded}); err != nil {

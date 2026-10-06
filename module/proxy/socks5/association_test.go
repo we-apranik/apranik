@@ -41,8 +41,8 @@ func BenchmarkAssociationReadFrom(b *testing.B) {
 		b.Fatal(err)
 	}
 	datagram = append(datagram, make([]byte, 512)...)
-	udpAssociation := newAssociation(endlessDatagram{datagram: datagram, from: client}, spec.Destination{})
-	payload := make([]byte, maxDatagramSize)
+	udpAssociation := newAssociation(endlessDatagram{datagram: datagram, from: client}, spec.Destination{}, defaultMaxDatagramSize)
+	payload := make([]byte, defaultMaxDatagramSize)
 
 	b.ReportAllocs()
 	for b.Loop() {
@@ -54,7 +54,7 @@ func BenchmarkAssociationReadFrom(b *testing.B) {
 
 func BenchmarkAssociationWriteTo(b *testing.B) {
 	client := benchmarkDestination(b, "127.0.0.1", 40000)
-	udpAssociation := newAssociation(endlessDatagram{from: client}, client)
+	udpAssociation := newAssociation(endlessDatagram{from: client}, client, defaultMaxDatagramSize)
 	source := benchmarkDestination(b, "1.1.1.1", 53)
 	reply := make([]byte, 512)
 
@@ -62,6 +62,30 @@ func BenchmarkAssociationWriteTo(b *testing.B) {
 	for b.Loop() {
 		if _, err := udpAssociation.WriteTo(reply, source); err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+func TestAnAssociationsBufferIsTheLargestPayloadPlusTheLargestHeader(t *testing.T) {
+	udpAssociation := newAssociation(endlessDatagram{}, spec.Destination{}, 1000)
+	if got, want := len(udpAssociation.readBuffer), 1000+largestUDPHeader; got != want {
+		t.Errorf("buffer = %d bytes, want %d", got, want)
+	}
+}
+
+func TestTheUDPDatagramSizeSettingDefaultsAndIsChecked(t *testing.T) {
+	settings := Settings{UDPRelay: true}
+	if got := settings.maxDatagramSize(); got != defaultMaxDatagramSize {
+		t.Errorf("default = %d, want %d", got, defaultMaxDatagramSize)
+	}
+	settings.UDPMaxDatagramSize = 1500
+	if settings.maxDatagramSize() != 1500 || settings.Validate() != nil {
+		t.Error("1500 was not accepted as it is")
+	}
+	for _, refused := range []int{-1, largestDatagramSize + 1} {
+		settings.UDPMaxDatagramSize = refused
+		if settings.Validate() == nil {
+			t.Errorf("udp_max_datagram_size %d was accepted", refused)
 		}
 	}
 }

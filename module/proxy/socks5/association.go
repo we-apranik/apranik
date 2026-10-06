@@ -12,7 +12,9 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-const maxDatagramSize = 65507
+// The most the RFC 1928 UDP header can take before the payload: 3 reserved and
+// fragment bytes, the address type, a 255 byte domain with its length, a port.
+const largestUDPHeader = 3 + 1 + 1 + 255 + 2
 
 // association is the RFC 1928 UDP request header on top of a bound socket: below
 // it addresses are the client's, above it they are the real destination.
@@ -35,8 +37,11 @@ type association struct {
 // declaredClientAddress is the address the client said it would send from.
 // Most clients send 0.0.0.0:0, in which case the first datagram teaches us
 // instead, and everything after it is filtered against that.
-func newAssociation(socket spec.Datagram, declaredClientAddress spec.Destination) *association {
-	created := &association{socket: socket, readBuffer: make([]byte, maxDatagramSize)}
+//
+// maxPayload is the largest datagram it takes from the client, header aside; a
+// bigger one is dropped.
+func newAssociation(socket spec.Datagram, declaredClientAddress spec.Destination, maxPayload int) *association {
+	created := &association{socket: socket, readBuffer: make([]byte, maxPayload+largestUDPHeader)}
 	if ip, isIP := declaredClientAddress.IP(); isIP && !ip.IsUnspecified() && declaredClientAddress.Port() != 0 {
 		created.clientAddress, created.clientAddressKnown = declaredClientAddress, true
 	}

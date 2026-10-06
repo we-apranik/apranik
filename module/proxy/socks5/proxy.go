@@ -18,6 +18,7 @@ func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {
 		password:         p.Password.Reveal(),
 		udpRelay:         p.UDPRelay,
 		handshakeTimeout: p.handshakeTimeout(),
+		maxDatagramSize:  p.maxDatagramSize(),
 	}, nil
 }
 
