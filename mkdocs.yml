@@ -118,6 +118,7 @@ nav:
           - configuration/routing/datasets.md
           - configuration/routing/sniffing.md
       - DNS: configuration/dns/index.md
+      - Stats: configuration/stats.md
       - Timeouts: configuration/timeouts.md
       - Examples: configuration/examples.md
   - How it works:

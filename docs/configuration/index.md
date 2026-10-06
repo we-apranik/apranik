@@ -3,7 +3,7 @@
 Apranik reads one JSON config file. It describes **inbounds** (how traffic
 arrives), **outbounds** (how it leaves), **routing** (which outbound each
 request takes), **dns** (how names are resolved), the **datasets** routing and
-DNS rules look up, and the **log**. The format is version
+DNS rules look up, the **stats** that count traffic, and the **log**. The format is version
 `1`. How stable it stays over time is still an open question.
 
 ## Structure
@@ -20,7 +20,8 @@ DNS rules look up, and the **log**. The format is version
   "outbounds": [],
   "datasets": [],
   "dns": {},
-  "routing": {}
+  "routing": {},
+  "stats": {}
 }
 ```
 
@@ -38,6 +39,7 @@ DNS rules look up, and the **log**. The format is version
 | `datasets` | [Datasets](routing/datasets.md) |
 | `dns` | [DNS](dns/index.md) |
 | `routing` | [Routing](routing/index.md) |
+| `stats` | [Stats](stats.md) |
 
 ### `version`
 
