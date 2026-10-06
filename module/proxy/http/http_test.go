@@ -228,8 +228,12 @@ func TestProxyAuthentication(t *testing.T) {
 		if !strings.Contains(status, "407") {
 			t.Errorf("status = %q, want 407", status)
 		}
-		if got := <-results; got.err == nil {
+		got := <-results
+		if got.err == nil {
 			t.Fatal("AcceptStream accepted an unauthenticated client")
+		}
+		if !errors.Is(got.err, spec.ErrAuthenticationFailed) {
+			t.Errorf("err = %v, want spec.ErrAuthenticationFailed", got.err)
 		}
 	})
 
