@@ -124,14 +124,14 @@ so the builder composes a stack without knowing what any layer is:
   `WrapClientStream` in stack order. Each layer bounds its own part: `tcp` with
   its `dial_timeout`, each overlay with its own `handshake_timeout`.
 - **Inbound.** The listener is the base alone. `core/inbound` accepts, counts the
-  connection against `max_connections`, and starts a goroutine for it; there it
+  connection against `max_tcp_connections`, and starts a goroutine for it; there it
   runs each overlay's `WrapServerStream`, then the proxy server, each within its
   own `handshake_timeout`. A client that stalls a TLS handshake holds up
   only its own goroutine.
 
 [![Stack composition. Inbound, reading up from the wire: the client connection, the tcp base listener that returns at once, overlays (tls, ws, httpupgrade) wrapping the connection in its own goroutine within handshake_timeout, the proxy server returning payload and Metadata, then core/inbound handing the stream to the handler, where the router chooses an outbound or blocks. Proxy outbound, writing down: the proxy client, overlays wrapping the dialed stream within dial_timeout, the tcp base transport, then the proxy server. Freedom has no stack. Block is not an outbound: it is a routing action.](assets/diagrams/stack-composition.excalidraw.svg)](assets/diagrams/stack-composition.excalidraw.svg)
 
-[![Stream overlays run per connection: the accept loop only accepts, takes a max_connections slot and starts a goroutine; that goroutine runs the tls and ws server sides, the proxy server and the handler, bounded by handshake_timeout. A silent client holds only its own goroutine. A failed overlay handshake is closed; fallback recording starts above the overlays. On a proxy outbound the same layers run after the base dials.](assets/diagrams/overlay-per-connection.excalidraw.svg)](assets/diagrams/overlay-per-connection.excalidraw.svg)
+[![Stream overlays run per connection: the accept loop only accepts, takes a max_tcp_connections slot and starts a goroutine; that goroutine runs the tls and ws server sides, the proxy server and the handler, bounded by handshake_timeout. A silent client holds only its own goroutine. A failed overlay handshake is closed; fallback recording starts above the overlays. On a proxy outbound the same layers run after the base dials.](assets/diagrams/overlay-per-connection.excalidraw.svg)](assets/diagrams/overlay-per-connection.excalidraw.svg)
 
 Protocols that carry many streams over one connection (HTTP/2, gRPC) do not fit
 this shape and will get their own kind (open question Q17). Datagram overlays
@@ -195,7 +195,7 @@ Because each UDP session has its own NAT, two clients never receive each other's
 replies. Timeouts are PROVISIONAL and configured beside what they bound: a silent
 session ends after the inbound's `udp_session_idle_timeout` (5 minutes), a silent
 NAT socket closes after freedom's `nat.idle_timeout` (5 minutes), and a cached
-route is forgotten after 1 minute (internal).
+route is forgotten after the inbound's `udp_session_route_cache_idle_timeout` (1 minute).
 
 [![One UDP session: client A's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for a decision, an outbound or a block, and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram with its local socket reaching several destinations. The router is shared. Client B has its own session and NAT, so replies never cross.](assets/diagrams/udp-session-structure.excalidraw.svg)](assets/diagrams/udp-session-structure.excalidraw.svg)
 

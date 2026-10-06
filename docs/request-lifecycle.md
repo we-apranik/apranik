@@ -31,7 +31,7 @@ Every function named here exists in the repository today.
 Step by step:
 
 1. **Accept.** `streamInbound.acceptLoop` (in `core/inbound/inbound.go`) calls the
-   base listener's `AcceptStream`, takes a `max_connections` slot, and starts
+   base listener's `AcceptStream`, takes a `max_tcp_connections` slot, and starts
    `handleStream` in a goroutine for each connection.
 2. **Handshake.** `handleStream` bounds the handshake with `handshakeContext`
    (default 10 seconds). If the inbound's stack has overlays,
