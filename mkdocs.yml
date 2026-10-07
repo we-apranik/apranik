@@ -1,5 +1,6 @@
 site_name: Apranik
 site_description: An embeddable, open-source proxy core for censorship circumvention.
+site_url: https://the-apranik.github.io/Apranik/
 repo_url: https://github.com/The-Apranik/Apranik
 repo_name: The-Apranik/Apranik
 edit_uri: edit/main/docs/
@@ -10,10 +11,11 @@ exclude_docs: |
   _report.md
   context/
   plans/
+  overrides/
 
 theme:
   name: material
-  custom_dir: overrides
+  custom_dir: docs/overrides
   logo: assets/logo.svg
   icon:
     logo: material/shield-lock-outline
@@ -66,6 +68,31 @@ extra:
 
 plugins:
   - search
+  - privacy
+  - offline
+  - social
+  - glightbox
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+  - llmstxt:
+      markdown_description: An embeddable, open-source proxy core for censorship circumvention, written in Go.
+      sections:
+        Get started:
+          - overview.md
+          - cli.md
+          - glossary.md
+          - faq.md
+        Configuration:
+          - configuration/*.md
+          - configuration/*/*.md
+        How it works:
+          - architecture.md
+          - request-lifecycle.md
+        Design:
+          - design/open-questions.md
+          - design/threat-model.md
 
 markdown_extensions:
   - tables
@@ -119,6 +146,7 @@ nav:
           - configuration/routing/sniffing.md
       - DNS: configuration/dns/index.md
       - Stats: configuration/stats.md
+      - APIs: configuration/api.md
       - Timeouts: configuration/timeouts.md
       - Examples: configuration/examples.md
   - How it works:
