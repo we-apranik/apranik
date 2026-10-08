@@ -25,4 +25,15 @@ var (
 	// scanners that sent garbage; a malformed request is not this error. It
 	// may be returned together with ErrFallbackRequested.
 	ErrAuthenticationFailed = errors.New("spec: credentials were not accepted")
+
+	// The errors an APICoreProvider method returns, each for one thing an API
+	// module can tell its client.
+	ErrAPIStatisticsDisabled        = errors.New("spec: statistics are disabled")
+	ErrAPILiveConversationsDisabled = errors.New("spec: live conversations are not tracked")
+	ErrAPINoSuchOutbound            = errors.New("spec: no outbound has this tag")
+	ErrAPIOutboundNotSelectable     = errors.New("spec: this outbound is not a selector")
+	ErrAPINoSuchMember              = errors.New("spec: the selector has no such member")
+	ErrAPINoSuchLiveConversation    = errors.New("spec: no live conversation has this id")
+	ErrAPINoLogFileOutput           = errors.New("spec: no file log output is configured")
+	ErrAPIInvalidDelayTest          = errors.New("spec: the delay test request is not valid")
 )
