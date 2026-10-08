@@ -5,8 +5,8 @@
 //
 // # Modules
 //
-// A module is a transport, a proxy protocol or a sniffer, added without
-// touching core dispatch. In Go it is a package.
+// A module is a transport, a proxy protocol, a sniffer, a DNS server or an
+// API, added without touching core dispatch. In Go it is a package.
 //
 // It contributes one value per kind it fills, and that value both carries the
 // user's settings and builds the working component from them, the way
@@ -26,6 +26,9 @@
 //	// sniffer/tls
 //	func NewSnifferModule() spec.SnifferModule
 //
+//	// api/clash
+//	func NewAPIModule() spec.APIModule
+//
 // The return type is the kind declaration, so registering a module under the
 // wrong kind does not compile and nothing here needs a type assertion.
 //
@@ -39,6 +42,7 @@
 //   - metadata.go: Metadata and SniffResult
 //   - sniffer.go: the sniffer kind
 //   - dns.go: the DNS server kinds, DNSServer and Resolver
+//   - api.go: the API kind and what core provides to it
 //   - udpassociate.go: the SOCKS5 UDP ASSOCIATE hand-off
 //   - errors.go: the sentinel errors
 package spec
