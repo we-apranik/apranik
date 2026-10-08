@@ -98,10 +98,18 @@ func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
 			Outbounds: raw.Stats.Outbounds,
 			Users:     raw.Stats.Users,
 
-			LiveConnections: raw.Stats.LiveConnections,
-			DialHealth:      raw.Stats.DialHealth,
+			DialHealth: raw.Stats.DialHealth,
+		}
+		if tracking := raw.Stats.Tracking; tracking != nil {
+			coreBlueprint.Stats.Tracking = blueprint.StatsTracking{
+				Enabled:                 tracking.Enabled,
+				UDPEntryIdleTimeout:     durationOrNil(tracking.UDPEntryIdleTimeout),
+				UDPMaxEntriesPerSession: tracking.UDPMaxEntriesPerSession,
+			}
 		}
 	}
+
+	coreBlueprint.APIs = b.buildAPIs(raw.APIs, "apis")
 
 	return coreBlueprint, b.diagnostics
 }

@@ -3,6 +3,7 @@ package config_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/The-Apranik/Apranik/config"
 )
@@ -99,20 +100,64 @@ func TestAnUnknownStatsKeyIsRefusedInStrictMode(t *testing.T) {
 	}
 }
 
-func TestTheLiveConnectionsAndDialHealthSwitchesAreRead(t *testing.T) {
-	configuration, diagnostics := config.Parse([]byte(documentWithStats(`{"live_connections": false, "dial_health": true}`)), modules(t))
+func TestTheTrackingObjectAndDialHealthAreRead(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(documentWithStats(
+		`{"tracking": {"enabled": false, "udp_entry_idle_timeout": "30s", "udp_max_entries_per_session": 50}, "dial_health": true}`)), modules(t))
 	requireNoErrors(t, diagnostics)
 
 	section := configuration.Stats
-	if section == nil || section.LiveConnections == nil || *section.LiveConnections || !section.DialHealth {
-		t.Errorf("Stats = %+v, want live_connections false and dial_health true", section)
+	if section == nil || !section.DialHealth || section.Tracking.Enabled == nil || *section.Tracking.Enabled ||
+		section.Tracking.UDPEntryIdleTimeout == nil || *section.Tracking.UDPEntryIdleTimeout != 30*time.Second ||
+		section.Tracking.UDPMaxEntriesPerSession == nil || *section.Tracking.UDPMaxEntriesPerSession != 50 {
+		t.Errorf("Stats = %+v, want tracking off with 30s and 50, and dial_health true", section)
 	}
 }
 
 func TestTheSwitchesAreUnsetUntilTheConfigSaysSo(t *testing.T) {
 	configuration, _ := config.Parse([]byte(documentWithStats(`{}`)), modules(t))
-	if configuration.Stats.LiveConnections != nil || configuration.Stats.DialHealth {
-		t.Errorf("Stats = %+v, want live_connections unset (the default) and dial_health off", configuration.Stats)
+	tracking := configuration.Stats.Tracking
+	if tracking.Enabled != nil || tracking.UDPEntryIdleTimeout != nil || tracking.UDPMaxEntriesPerSession != nil || configuration.Stats.DialHealth {
+		t.Errorf("Stats = %+v, want tracking absent (the defaults) and dial_health off", configuration.Stats)
+	}
+}
+
+func TestZeroAndNegativeTrackingSettingsAreRefused(t *testing.T) {
+	for key, values := range map[string][]string{
+		"udp_entry_idle_timeout":      {`"0s"`, `"-1s"`},
+		"udp_max_entries_per_session": {`0`, `-1`},
+	} {
+		for _, value := range values {
+			diagnostics, failed := loadAndCheck(t, documentWithStats(`{"tracking": {"`+key+`": `+value+`}}`))
+			if !failed || !find(diagnostics, "stats.tracking."+key, "must be greater than zero") {
+				t.Errorf("%s = %s was not refused with its path: %v", key, value, diagnostics)
+			}
+		}
+	}
+}
+
+func TestTrackingUDPSettingsThatDoNothingAreWarnedAbout(t *testing.T) {
+	const settings = `"udp_entry_idle_timeout": "30s", "udp_max_entries_per_session": 50`
+	for name, tracking := range map[string]string{
+		"no API, tracking absent": `{"tracking": {` + settings + `}}`,
+		"tracking turned off":     `{"tracking": {"enabled": false, ` + settings + `}}`,
+	} {
+		diagnostics, failed := loadAndCheck(t, documentWithStats(tracking))
+		if failed || !find(diagnostics, "stats.tracking.udp_entry_idle_timeout", "does nothing") ||
+			!find(diagnostics, "stats.tracking.udp_max_entries_per_session", "does nothing") {
+			t.Errorf("%s: settings that do nothing were not warned about (failed=%v): %v", name, failed, diagnostics)
+		}
+	}
+
+	diagnostics, _ := loadAndCheck(t, documentWithStats(`{"tracking": {"enabled": true, `+settings+`}}`))
+	if find(diagnostics, "stats.tracking.udp_entry_idle_timeout", "does nothing") {
+		t.Errorf("warned that the settings do nothing, though tracking is on: %v", diagnostics)
+	}
+}
+
+func TestATrackingEntryIdleTimeoutLongerThanASessionsIsWarnedAbout(t *testing.T) {
+	diagnostics, _ := loadAndCheck(t, documentWithStats(`{"tracking": {"enabled": true, "udp_entry_idle_timeout": "10m"}}`))
+	if !find(diagnostics, "stats.tracking.udp_entry_idle_timeout", "longer than the udp_session_idle_timeout of inbounds[0]") {
+		t.Errorf("10m against the default 5m session idle time was not warned about: %v", diagnostics)
 	}
 }
 

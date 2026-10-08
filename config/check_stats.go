@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/The-Apranik/Apranik/core/net/udp"
 )
 
 // A tag a list names must exist, or the user would count nothing and never
@@ -9,9 +10,14 @@ import (
 // protocol authenticates one.
 func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	section := coreBlueprint.Stats
-	warnAboutLiveConnectionSettingsThatDoNothing(diagnostics, coreBlueprint)
+	warnAboutTrackingSettingsThatDoNothing(diagnostics, coreBlueprint)
 	if section == nil {
 		return
+	}
+
+	if len(coreBlueprint.APIs) > 0 && !section.Disabled && section.Tracking.Enabled != nil && !*section.Tracking.Enabled {
+		diagnostics.warnf(fieldLocation("stats", "tracking", "enabled"),
+			"is false, so an API cannot list or close live conversations or show online users")
 	}
 
 	namesListed := len(section.Inbounds)+len(section.Outbounds)+len(section.Users) > 0
@@ -19,8 +25,8 @@ func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 		diagnostics.warnf("stats", "counting is disabled, so the lists of inbounds, outbounds and users are ignored")
 		return
 	}
-	if section.Disabled && (section.LiveConnections != nil || section.DialHealth) {
-		diagnostics.warnf("stats", "counting is disabled, so live_connections and dial_health are ignored")
+	if section.Disabled && (section.Tracking != (blueprint.StatsTracking{}) || section.DialHealth) {
+		diagnostics.warnf("stats", "counting is disabled, so tracking and dial_health are ignored")
 		return
 	}
 
@@ -36,6 +42,7 @@ func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	checkStatsNames(diagnostics, section.Inbounds, inboundTags, "inbound", fieldLocation("stats", "inbounds"))
 	checkStatsNames(diagnostics, section.Outbounds, outboundTags, "outbound", fieldLocation("stats", "outbounds"))
 	checkStatsNames(diagnostics, section.Users, nil, "user", fieldLocation("stats", "users"))
+	checkTracking(diagnostics, coreBlueprint)
 }
 
 // existing is nil when the names cannot be looked up.
@@ -57,22 +64,44 @@ func checkStatsNames(diagnostics *Diagnostics, names []string, existing map[stri
 	}
 }
 
-// An inbound's UDP live connection settings are read only while live
-// connections are listed, which is off unless the stats section turns it on.
-func warnAboutLiveConnectionSettingsThatDoNothing(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
-	section := coreBlueprint.Stats
-	if section != nil && !section.Disabled && section.LiveConnections != nil && *section.LiveConnections {
+// The UDP settings of stats.tracking are read only while live conversations are
+// tracked: when stats.tracking.enabled is true, or absent with an API
+// configured.
+func warnAboutTrackingSettingsThatDoNothing(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
+	if coreBlueprint.Stats == nil || coreBlueprint.IsLiveTrackingEnabled() {
 		return
 	}
-	for index, inbound := range coreBlueprint.Inbounds {
-		inboundLocation := indexLocation("inbounds", index)
-		if inbound.UDPSessionLiveConnectionsIdleTimeout != 0 {
-			diagnostics.warnf(fieldLocation(inboundLocation, "udp_session_live_connections_idle_timeout"),
-				"does nothing: live connections are listed only when stats.live_connections is true")
-		}
-		if inbound.UDPSessionLiveConnectionsMaxEntries != 0 {
-			diagnostics.warnf(fieldLocation(inboundLocation, "udp_session_live_connections_max_entries"),
-				"does nothing: live connections are listed only when stats.live_connections is true")
+	tracking := coreBlueprint.Stats.Tracking
+	if tracking.UDPEntryIdleTimeout != nil {
+		diagnostics.warnf(fieldLocation("stats", "tracking", "udp_entry_idle_timeout"),
+			"does nothing: live conversations are tracked only when stats.tracking.enabled is true, or absent while an API is configured")
+	}
+	if tracking.UDPMaxEntriesPerSession != nil {
+		diagnostics.warnf(fieldLocation("stats", "tracking", "udp_max_entries_per_session"),
+			"does nothing: live conversations are tracked only when stats.tracking.enabled is true, or absent while an API is configured")
+	}
+}
+
+// A written value must be positive: zero never stands for the default.
+func checkTracking(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
+	tracking := coreBlueprint.Stats.Tracking
+	idleLocation := fieldLocation("stats", "tracking", "udp_entry_idle_timeout")
+	if tracking.UDPEntryIdleTimeout != nil {
+		if *tracking.UDPEntryIdleTimeout <= 0 {
+			diagnostics.errorf(idleLocation,
+				"must be greater than zero (leave it out for the default, %s): an entry silent for this long leaves the list, and a UDP session has no other way to end one",
+				udp.DefaultLiveTrackingUDPEntryIdleTimeout)
+		} else {
+			for index, inbound := range coreBlueprint.Inbounds {
+				sessionIdle := effectiveUDPSessionIdleTimeout(inbound)
+				if *tracking.UDPEntryIdleTimeout <= sessionIdle {
+					continue
+				}
+				diagnostics.warnf(idleLocation, "%s is longer than the udp_session_idle_timeout of inbounds[%d] (%s): its session ends first, so this setting never takes effect there",
+					*tracking.UDPEntryIdleTimeout, index, sessionIdle)
+			}
 		}
 	}
+	checkUDPMaxEntriesPerSession(diagnostics, fieldLocation("stats", "tracking", "udp_max_entries_per_session"),
+		tracking.UDPMaxEntriesPerSession, udp.DefaultLiveTrackingUDPMaxEntriesPerSession)
 }

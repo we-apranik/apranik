@@ -36,8 +36,8 @@ func checkGroups(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 			continue
 		}
 		loc := fieldLocation(indexLocation("outbounds", index), "protocol", "settings")
-		checkGroupMembers(diagnostics, outbound, outbounds, fieldLocation(loc, "outbounds"))
-		checkGroupProbe(diagnostics, *outbound.Group, fieldLocation(loc, "probe"))
+		checkGroupMembers(diagnostics, outbound, outbounds, fieldLocation(loc, "members"))
+		checkGroupProbe(diagnostics, outbound.Group.Probe, fieldLocation(loc, "probe"))
 		checkGroupTolerance(diagnostics, *outbound.Group, fieldLocation(loc, "tolerance"))
 	}
 	checkGroupLoops(diagnostics, coreBlueprint, outbounds)
@@ -74,42 +74,33 @@ func hasOutbound(outbounds map[string]blueprint.Outbound, tag string) bool {
 	return found
 }
 
-func checkGroupProbe(diagnostics *Diagnostics, group blueprint.Group, loc string) {
-	probe := group.Probe
-	switch probe.Type {
-	case "":
-		diagnostics.errorf(fieldLocation(loc, "type"), `a %s group needs a probe: {"type": "http"} or {"type": "https"}`, group.Type)
-		return
-	case blueprint.ProbeTypeHTTP, blueprint.ProbeTypeHTTPS:
-	default:
-		diagnostics.errorf(fieldLocation(loc, "type"), "unknown probe type %q; want %s or %s", probe.Type, blueprint.ProbeTypeHTTP, blueprint.ProbeTypeHTTPS)
-		return
-	}
-
+// Every field of a probe is optional: a field left out takes the group's own
+// default. What is written must be usable.
+func checkGroupProbe(diagnostics *Diagnostics, probe blueprint.Probe, loc string) {
 	if probe.URL != "" {
 		parsed, err := url.Parse(probe.URL)
 		switch {
 		case err != nil:
 			diagnostics.report(fieldLocation(loc, "url"), err)
-		case parsed.Scheme != string(probe.Type):
-			diagnostics.errorf(fieldLocation(loc, "url"), "a %s probe needs a url starting with %s://, got %q", probe.Type, probe.Type, probe.URL)
+		case parsed.Scheme != "http" && parsed.Scheme != "https":
+			diagnostics.errorf(fieldLocation(loc, "url"), "a probe url must start with http:// or https://, got %q", probe.URL)
 		case parsed.Hostname() == "":
 			diagnostics.errorf(fieldLocation(loc, "url"), "url %q names no host", probe.URL)
 		}
 	}
-	if probe.Interval < 0 {
-		diagnostics.errorf(fieldLocation(loc, "interval"), "interval must not be negative")
+	if probe.Interval != nil && *probe.Interval <= 0 {
+		diagnostics.errorf(fieldLocation(loc, "interval"), "interval must be greater than zero; leave it out for the default")
 	}
-	if probe.Timeout < 0 {
-		diagnostics.errorf(fieldLocation(loc, "timeout"), "timeout must not be negative")
+	if probe.Timeout != nil && *probe.Timeout <= 0 {
+		diagnostics.errorf(fieldLocation(loc, "timeout"), "timeout must be greater than zero; leave it out for the default")
 	}
 }
 
 func checkGroupTolerance(diagnostics *Diagnostics, group blueprint.Group, loc string) {
 	switch {
-	case group.Tolerance < 0:
-		diagnostics.errorf(loc, "tolerance must not be negative")
-	case group.Tolerance != 0 && group.Type != blueprint.GroupTypeURLTest:
+	case group.Tolerance != nil && *group.Tolerance <= 0:
+		diagnostics.errorf(loc, "tolerance must be greater than zero; leave it out for the default")
+	case group.Tolerance != nil && group.Type != blueprint.GroupTypeURLTest:
 		diagnostics.errorf(loc, "tolerance is how much faster another member must be before %s switches to it; %s never compares speed, so it takes none",
 			blueprint.GroupTypeURLTest, group.Type)
 	}

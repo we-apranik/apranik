@@ -34,6 +34,7 @@ type rawConfig struct {
 	DNS       *rawDNS       `json:"dns"`
 	Routing   *rawRouting   `json:"routing"`
 	Stats     *rawStats     `json:"stats"`
+	APIs      []rawModule   `json:"apis"`
 }
 
 // Counting is on unless enabled is false. A list narrows counting to the
@@ -44,11 +45,19 @@ type rawStats struct {
 	Outbounds []string `json:"outbounds"`
 	Users     []string `json:"users"`
 
-	// Absent means the default: off now, on once an API reads them.
-	LiveConnections *bool `json:"live_connections"`
+	Tracking *rawStatsTracking `json:"tracking"`
 
 	// Off when absent: it reads the clock on every dial.
 	DialHealth bool `json:"dial_health"`
+}
+
+// Every field absent means its default; a written zero is refused, never
+// read as the default. Tracking is on exactly when an API is configured,
+// unless enabled says otherwise.
+type rawStatsTracking struct {
+	Enabled                 *bool           `json:"enabled"`
+	UDPEntryIdleTimeout     *types.Duration `json:"udp_entry_idle_timeout"`
+	UDPMaxEntriesPerSession *int            `json:"udp_max_entries_per_session"`
 }
 
 type rawInbound struct {
@@ -62,20 +71,18 @@ type rawInbound struct {
 	// "tcp" or "udp", default "tcp". Selects which registry the lookups use.
 	Network string `json:"network"`
 
-	TCPIdleTimeout        types.Duration `json:"tcp_idle_timeout"`
-	UDPSessionIdleTimeout types.Duration `json:"udp_session_idle_timeout"`
+	TCPIdleTimeout        *types.Duration `json:"tcp_idle_timeout"`
+	UDPSessionIdleTimeout *types.Duration `json:"udp_session_idle_timeout"`
 
-	UDPMaxDatagramSize int `json:"udp_max_datagram_size"`
+	UDPMaxDatagramSize *int `json:"udp_max_datagram_size"`
 
-	UDPSessionRouteCacheIdleTimeout types.Duration `json:"udp_session_route_cache_idle_timeout"`
-	UDPSessionRouteCacheMaxEntries  int            `json:"udp_session_route_cache_max_entries"`
+	// Absent means the default; a written zero is refused.
+	UDPRoutingCacheEntryIdleTimeout     *types.Duration `json:"udp_routing_cache_entry_idle_timeout"`
+	UDPRoutingCacheMaxEntriesPerSession *int            `json:"udp_routing_cache_max_entries_per_session"`
 
-	UDPSessionLiveConnectionsIdleTimeout types.Duration `json:"udp_session_live_connections_idle_timeout"`
-	UDPSessionLiveConnectionsMaxEntries  int            `json:"udp_session_live_connections_max_entries"`
-
-	// Zero, the default, means no limit.
-	MaxTCPConnections int `json:"max_tcp_connections"`
-	MaxUDPSessions    int `json:"max_udp_sessions"`
+	// Absent means no limit; a written zero is refused.
+	MaxTCPConnections *int `json:"max_tcp_connections"`
+	MaxUDPSessions    *int `json:"max_udp_sessions"`
 
 	// Renamed max_tcp_connections; read only to say so.
 	MovedMaxConnections json.RawMessage `json:"max_connections"`
@@ -124,16 +131,16 @@ type rawOutbound struct {
 // A group's members and the probe that tests them. Tolerance is the urltest
 // type's; Check refuses it on fallback.
 type rawGroupSettings struct {
-	Outbounds []string       `json:"outbounds"`
-	Probe     *rawProbe      `json:"probe"`
-	Tolerance types.Duration `json:"tolerance"`
+	Members   []string        `json:"members"`
+	Probe     *rawProbe       `json:"probe"`
+	Tolerance *types.Duration `json:"tolerance"`
 }
 
 type rawProbe struct {
-	Type     string         `json:"type"`
-	URL      string         `json:"url"`
-	Interval types.Duration `json:"interval"`
-	Timeout  types.Duration `json:"timeout"`
+	URL            string                 `json:"url"`
+	Interval       *types.Duration        `json:"interval"`
+	Timeout        *types.Duration        `json:"timeout"`
+	ExpectedStatus types.HTTPStatusRanges `json:"expected_status"`
 }
 
 // Freedom's TCP is its outbound's transport stack; its UDP is always plain
@@ -152,17 +159,17 @@ type rawMixedSettings struct {
 	SOCKS5 json.RawMessage `json:"socks5"`
 	HTTP   json.RawMessage `json:"http"`
 
-	FirstByteTimeout types.Duration `json:"first_byte_timeout"`
+	FirstByteTimeout *types.Duration `json:"first_byte_timeout"`
 }
 
 // The RFC 4787 vocabulary, spelled the way nat's String writes it.
 type rawNAT struct {
-	Mapping     string         `json:"mapping"`
-	Filtering   string         `json:"filtering"`
-	IdleTimeout types.Duration `json:"idle_timeout"`
+	Mapping     string          `json:"mapping"`
+	Filtering   string          `json:"filtering"`
+	IdleTimeout *types.Duration `json:"idle_timeout"`
 
 	// Not RFC 4787: how big a reply the NAT's buffers hold.
-	MaxDatagramSize int `json:"max_datagram_size"`
+	MaxDatagramSize *int `json:"max_datagram_size"`
 }
 
 type rawLog struct {
@@ -182,7 +189,7 @@ type rawOutput struct {
 	Format   string `json:"format"`
 	Color    bool   `json:"color"`
 	Path     string `json:"path"`
-	Capacity int    `json:"capacity"`
+	Capacity *int   `json:"capacity"`
 	Network  string `json:"network"`
 	Address  string `json:"address"`
 	Tag      string `json:"tag"`

@@ -17,6 +17,7 @@ const (
 
 	urlTestProtocol  = registry.URLTestProtocolName
 	fallbackProtocol = registry.FallbackProtocolName
+	selectorProtocol = registry.SelectorProtocolName
 
 	// Named here as freedom's udp is: the base that reaches destinations.
 	freedomBaseTransport = "tcp"
@@ -54,7 +55,7 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		b.diagnostics.report(protocolLoc, errMissingField("type", "protocol"))
 	case freedomProtocol:
 		outbound.Freedom = b.buildFreedom(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"), raw.Transport, transportLoc)
-	case urlTestProtocol, fallbackProtocol:
+	case urlTestProtocol, fallbackProtocol, selectorProtocol:
 		outbound.Group = b.buildGroup(raw.Protocol, fieldLocation(protocolLoc, "settings"))
 	case mixedProtocol:
 		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol or freedom")
@@ -88,15 +89,19 @@ func (b *configBuilder) buildGroup(protocol rawModule, loc string) *blueprint.Gr
 
 	group := &blueprint.Group{
 		Type:      blueprint.GroupType(protocol.Type),
-		Members:   settings.Outbounds,
-		Tolerance: time.Duration(settings.Tolerance),
+		Members:   settings.Members,
+		Tolerance: durationOrNil(settings.Tolerance),
 	}
-	if settings.Probe != nil {
+	if settings.Probe != nil && group.Type == blueprint.GroupTypeSelector {
+		b.diagnostics.errorf(fieldLocation(loc, "probe"),
+			"a selector never measures anything, so it takes no probe; to have members chosen by probing, put the selector's members in a %s or %s group and choose that",
+			blueprint.GroupTypeURLTest, blueprint.GroupTypeFallback)
+	} else if settings.Probe != nil {
 		group.Probe = blueprint.Probe{
-			Type:     blueprint.ProbeType(settings.Probe.Type),
-			URL:      settings.Probe.URL,
-			Interval: time.Duration(settings.Probe.Interval),
-			Timeout:  time.Duration(settings.Probe.Timeout),
+			URL:              settings.Probe.URL,
+			Interval:         durationOrNil(settings.Probe.Interval),
+			Timeout:          durationOrNil(settings.Probe.Timeout),
+			ExpectedStatuses: settings.Probe.ExpectedStatus.Ranges(),
 		}
 	}
 	return group
@@ -225,11 +230,11 @@ func (b *configBuilder) buildNATPolicy(raw rawNAT, loc string) *nat.Policy {
 		}
 	}
 
-	if raw.IdleTimeout != 0 {
-		if candidate := time.Duration(raw.IdleTimeout); candidate > 0 {
+	if raw.IdleTimeout != nil {
+		if candidate := time.Duration(*raw.IdleTimeout); candidate > 0 {
 			idleTimeout = candidate
 		} else {
-			b.diagnostics.errorf(fieldLocation(loc, "idle_timeout"), "idle_timeout must be positive")
+			b.diagnostics.errorf(fieldLocation(loc, "idle_timeout"), "idle_timeout must be greater than zero; leave it out for the default (%s)", defaults.IdleTimeout())
 		}
 	}
 

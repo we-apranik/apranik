@@ -1,8 +1,12 @@
 package config
 
 import (
+	"fmt"
+
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/logging/sink"
 )
 
 func (b *configBuilder) buildLog(raw rawLog, loc string) blueprint.Log {
@@ -35,13 +39,16 @@ func (b *configBuilder) buildLog(raw rawLog, loc string) blueprint.Log {
 func buildOutput(raw rawOutput) (logging.Output, error) {
 	switch raw.Type {
 	case "stderr":
-		return logging.StderrOutput{Format: logging.Format(raw.Format), Color: raw.Color}, nil
+		return sink.StderrOutput{Format: sink.Format(raw.Format), Color: raw.Color}, nil
 	case "file":
-		return logging.FileOutput{Path: raw.Path, Format: logging.Format(raw.Format)}, nil
+		return sink.FileOutput{Path: raw.Path, Format: sink.Format(raw.Format)}, nil
 	case "memory":
-		return logging.MemoryOutput{Capacity: raw.Capacity}, nil
+		if err := types.CheckPositive(raw.Capacity); err != nil {
+			return nil, fmt.Errorf("capacity %w", err)
+		}
+		return sink.MemoryOutput{Capacity: types.ValueOrDefault(raw.Capacity, 0)}, nil
 	case "syslog":
-		return logging.SyslogOutput{Network: raw.Network, Address: raw.Address, Tag: raw.Tag}, nil
+		return sink.SyslogOutput{Network: raw.Network, Address: raw.Address, Tag: raw.Tag}, nil
 	case "":
 		return nil, errMissingField("type", "log output")
 	default:

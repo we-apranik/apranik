@@ -40,6 +40,7 @@ func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	checkGroups(&diagnostics, coreBlueprint)
 	checkRouting(&diagnostics, coreBlueprint, datasetKinds)
 	checkStats(&diagnostics, coreBlueprint)
+	checkAPIs(&diagnostics, coreBlueprint)
 
 	if len(coreBlueprint.Inbounds) == 0 {
 		diagnostics.warnf("inbounds", "no inbounds configured, so nothing will accept traffic")
@@ -164,38 +165,28 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		}
 	}
 
-	if inbound.MaxTCPConnections < 0 {
-		diagnostics.errorf(fieldLocation(loc, "max_tcp_connections"), "must not be negative; 0 means no limit")
-	}
-	if inbound.MaxTCPConnections > 0 && inbound.Network == spec.NetworkUDP {
+	checkLimitIsPositive(diagnostics, fieldLocation(loc, "max_tcp_connections"), inbound.MaxTCPConnections)
+	if inbound.MaxTCPConnections != nil && inbound.Network == spec.NetworkUDP {
 		diagnostics.errorf(fieldLocation(loc, "max_tcp_connections"), "limits TCP connections; a udp inbound has none")
 	}
-	if inbound.MaxUDPSessions < 0 {
-		diagnostics.errorf(fieldLocation(loc, "max_udp_sessions"), "must not be negative; 0 means no limit")
-	}
+	checkLimitIsPositive(diagnostics, fieldLocation(loc, "max_udp_sessions"), inbound.MaxUDPSessions)
 
-	if inbound.UDPSessionIdleTimeout < 0 {
+	if inbound.TCPIdleTimeout != nil && *inbound.TCPIdleTimeout == 0 {
+		diagnostics.errorf(fieldLocation(loc, "tcp_idle_timeout"),
+			"must not be zero: leave it out for the default, or write a negative duration to disable the bound")
+	}
+	if inbound.UDPSessionIdleTimeout != nil && *inbound.UDPSessionIdleTimeout <= 0 {
 		diagnostics.errorf(fieldLocation(loc, "udp_session_idle_timeout"),
-			"must not be negative: a UDP session has no other end, so it would never be released")
+			"must be greater than zero (leave it out for the default, %s): a UDP session has no other end, so it would never be released", session.DefaultIdleTimeout)
 	}
 
-	sessionIdle := inbound.UDPSessionIdleTimeout
-	if sessionIdle <= 0 {
-		sessionIdle = session.DefaultIdleTimeout
-	}
-	checkUDPSessionIdleSetting(diagnostics, fieldLocation(loc, "udp_session_route_cache_idle_timeout"),
-		inbound.UDPSessionRouteCacheIdleTimeout, udp.DefaultRouteCacheIdleTimeout, sessionIdle,
+	sessionIdle := effectiveUDPSessionIdleTimeout(inbound)
+	checkUDPEntryIdleTimeout(diagnostics, fieldLocation(loc, "udp_routing_cache_entry_idle_timeout"),
+		inbound.UDPRoutingCacheEntryIdleTimeout, udp.DefaultRoutingCacheEntryIdleTimeout, sessionIdle,
 		"a destination silent for this long is forgotten, and a UDP session has no other way to forget one")
-	checkUDPSessionIdleSetting(diagnostics, fieldLocation(loc, "udp_session_live_connections_idle_timeout"),
-		inbound.UDPSessionLiveConnectionsIdleTimeout, udp.DefaultLiveConnectionsIdleTimeout, sessionIdle,
-		"a destination silent for this long ends its live entry, and a UDP session has no other way to end one")
 	checkUDPMaxDatagramSize(diagnostics, fieldLocation(loc, "udp_max_datagram_size"), inbound.UDPMaxDatagramSize)
-	if inbound.UDPSessionRouteCacheMaxEntries < 0 {
-		diagnostics.errorf(fieldLocation(loc, "udp_session_route_cache_max_entries"), "must not be negative; 0 means the default")
-	}
-	if inbound.UDPSessionLiveConnectionsMaxEntries < 0 {
-		diagnostics.errorf(fieldLocation(loc, "udp_session_live_connections_max_entries"), "must not be negative; 0 means the default")
-	}
+	checkUDPMaxEntriesPerSession(diagnostics, fieldLocation(loc, "udp_routing_cache_max_entries_per_session"),
+		inbound.UDPRoutingCacheMaxEntriesPerSession, udp.DefaultRoutingCacheMaxEntriesPerSession)
 
 	if inbound.Fallback.IsValid() {
 		if inbound.Network == spec.NetworkUDP {
@@ -218,7 +209,7 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 	}
 	switch {
 	case protocols == 0:
-		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol, freedom or a group (%s, %s)", urlTestProtocol, fallbackProtocol)
+		diagnostics.errorf(protocolLoc, "an outbound needs a protocol: a proxy protocol, freedom or a group (%s, %s, %s)", urlTestProtocol, fallbackProtocol, selectorProtocol)
 		return
 	case protocols > 1:
 		diagnostics.errorf(protocolLoc, "an outbound has exactly one protocol")
@@ -396,30 +387,54 @@ func collectListenAddressWarnings(diagnostics *Diagnostics, component any, liste
 
 // A UDP session's per-destination timeout must not be negative, and a value
 // written beyond the session's own idle time is pointless: the session ends first.
-func checkUDPSessionIdleSetting(diagnostics *Diagnostics, location string, configured, defaultValue, sessionIdle time.Duration, whyItMustNotBeNegative string) {
-	if configured < 0 {
-		diagnostics.errorf(location, "must not be negative: %s", whyItMustNotBeNegative)
+// A setting that was left out has its default, and a written value must be
+// positive: zero never stands for the default.
+func checkUDPEntryIdleTimeout(diagnostics *Diagnostics, location string, configured *time.Duration, defaultValue, sessionIdle time.Duration, whyItMustBePositive string) {
+	if configured == nil {
 		return
 	}
-	effective := configured
-	if effective == 0 {
-		effective = defaultValue
+	if *configured <= 0 {
+		diagnostics.errorf(location, "must be greater than zero (leave it out for the default, %s): %s", defaultValue, whyItMustBePositive)
+		return
 	}
-	if configured > 0 && effective > sessionIdle {
+	if *configured > sessionIdle {
 		diagnostics.warnf(location, "%s is longer than udp_session_idle_timeout (%s): the session ends first, so this setting never takes effect",
-			effective, sessionIdle)
+			*configured, sessionIdle)
 	}
 }
 
-// A datagram buffer of zero means the default; one beyond the largest UDP
-// payload could never fill, and would only waste memory.
-func checkUDPMaxDatagramSize(diagnostics *Diagnostics, location string, configured int) {
+func checkUDPMaxEntriesPerSession(diagnostics *Diagnostics, location string, configured *int, defaultValue int) {
+	if configured != nil && *configured <= 0 {
+		diagnostics.errorf(location, "must be greater than zero (leave it out for the default, %d)", defaultValue)
+	}
+}
+
+// One beyond the largest UDP payload could never fill, and would only waste
+// memory.
+func checkUDPMaxDatagramSize(diagnostics *Diagnostics, location string, configured *int) {
+	if configured == nil {
+		return
+	}
 	switch {
-	case configured < 0:
-		diagnostics.errorf(location, "must not be negative; 0 means the default (%d)", udp.DefaultMaxDatagramSize)
-	case configured > udp.LargestDatagramSize:
-		diagnostics.errorf(location, "%d is more than a UDP datagram can hold (%d)", configured, udp.LargestDatagramSize)
-	case configured > 0 && configured < 512:
-		diagnostics.warnf(location, "%d bytes is below the smallest datagram a DNS message needs (512): such traffic is dropped", configured)
+	case *configured <= 0:
+		diagnostics.errorf(location, "must be greater than zero (leave it out for the default, %d)", udp.DefaultMaxDatagramSize)
+	case *configured > udp.LargestDatagramSize:
+		diagnostics.errorf(location, "%d is more than a UDP datagram can hold (%d)", *configured, udp.LargestDatagramSize)
+	case *configured < 512:
+		diagnostics.warnf(location, "%d bytes is below the smallest datagram a DNS message needs (512): such traffic is dropped", *configured)
+	}
+}
+
+func effectiveUDPSessionIdleTimeout(inbound blueprint.Inbound) time.Duration {
+	if inbound.UDPSessionIdleTimeout != nil && *inbound.UDPSessionIdleTimeout > 0 {
+		return *inbound.UDPSessionIdleTimeout
+	}
+	return session.DefaultIdleTimeout
+}
+
+// A limit that was left out is no limit; zero is not a way to say so.
+func checkLimitIsPositive(diagnostics *Diagnostics, location string, configured *int) {
+	if configured != nil && *configured <= 0 {
+		diagnostics.errorf(location, "must be greater than zero; leave it out for no limit")
 	}
 }

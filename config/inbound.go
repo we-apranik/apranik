@@ -1,8 +1,6 @@
 package config
 
 import (
-	"time"
-
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -11,18 +9,15 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 	inbound := blueprint.Inbound{
 		Tag:                   raw.Tag,
 		Network:               b.parseNetwork(raw.Network, fieldLocation(loc, "network")),
-		TCPIdleTimeout:        time.Duration(raw.TCPIdleTimeout),
-		UDPSessionIdleTimeout: time.Duration(raw.UDPSessionIdleTimeout),
+		TCPIdleTimeout:        durationOrNil(raw.TCPIdleTimeout),
+		UDPSessionIdleTimeout: durationOrNil(raw.UDPSessionIdleTimeout),
 
 		UDPMaxDatagramSize: raw.UDPMaxDatagramSize,
 
-		UDPSessionRouteCacheIdleTimeout: time.Duration(raw.UDPSessionRouteCacheIdleTimeout),
-		UDPSessionRouteCacheMaxEntries:  raw.UDPSessionRouteCacheMaxEntries,
-
-		UDPSessionLiveConnectionsIdleTimeout: time.Duration(raw.UDPSessionLiveConnectionsIdleTimeout),
-		UDPSessionLiveConnectionsMaxEntries:  raw.UDPSessionLiveConnectionsMaxEntries,
-		MaxTCPConnections:                    raw.MaxTCPConnections,
-		MaxUDPSessions:                       raw.MaxUDPSessions,
+		UDPRoutingCacheEntryIdleTimeout:     durationOrNil(raw.UDPRoutingCacheEntryIdleTimeout),
+		UDPRoutingCacheMaxEntriesPerSession: raw.UDPRoutingCacheMaxEntriesPerSession,
+		MaxTCPConnections:                   raw.MaxTCPConnections,
+		MaxUDPSessions:                      raw.MaxUDPSessions,
 	}
 
 	if raw.Listen != "" {
