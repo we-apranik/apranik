@@ -5,6 +5,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"time"
 
@@ -96,6 +97,31 @@ type ProbingOutbound interface {
 	Outbound
 	StartProbing(ctx context.Context)
 }
+
+// GroupStateReporter is implemented by an outbound group so that something
+// outside core's data path, such as an API, can say what it holds. Nothing on
+// the data path reads it.
+type GroupStateReporter interface {
+	// The members' tags, in the order the group was configured.
+	MemberTags() []string
+
+	// The member the group uses now: a selector's choice, the member urltest's
+	// probes favour, or the first member a fallback tries.
+	CurrentMemberTag() string
+}
+
+// SelectableOutbound is an outbound group a person drives, such as a selector.
+// An automatic group, which chooses by its probes, does not implement it.
+type SelectableOutbound interface {
+	// SelectMember makes the member with this tag the one new connections use,
+	// and returns the one it replaced. ErrNoSuchMember leaves the choice alone.
+	SelectMember(memberTag string) (previousMemberTag string, err error)
+}
+
+var (
+	ErrNoSuchMember  = errors.New("component: the group has no member with this tag")
+	ErrNotSelectable = errors.New("component: this outbound is not a group a person drives")
+)
 
 // CarryingOutboundsReporter is implemented by the stream an outbound group
 // returns. It names the outbounds beneath the group that
