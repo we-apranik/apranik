@@ -49,16 +49,16 @@ type Settings struct {
 	// an IP but the service is a name (8.8.8.8 is dns.google).
 	Host string `json:"host"`
 
-	// Bounds one query, the dial included. Zero means DefaultTimeout.
-	Timeout types.Duration `json:"timeout"`
+	// Bounds one query, the dial included. Absent means DefaultTimeout; a written zero is refused.
+	Timeout *types.Duration `json:"timeout"`
 }
 
 func (s *Settings) Validate() error {
 	if s.Server.IsZero() {
 		return errors.New("doh: server is required")
 	}
-	if s.Timeout < 0 {
-		return fmt.Errorf("doh: timeout %s must not be negative", s.Timeout)
+	if err := types.CheckPositive(s.Timeout); err != nil {
+		return fmt.Errorf("doh: timeout %w", err)
 	}
 	if s.Path != "" {
 		parsed, err := url.Parse(s.Path)
@@ -98,10 +98,7 @@ func (s *Server) NewStreamDNSServer(dialer spec.StreamDialer) (spec.DNSServer, e
 	if err != nil {
 		return nil, fmt.Errorf("doh: server: %w", err)
 	}
-	timeout := time.Duration(s.Timeout)
-	if timeout == 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := time.Duration(types.ValueOrDefault(s.Timeout, types.Duration(DefaultTimeout)))
 	path := s.Path
 	if path == "" {
 		path = DefaultPath
