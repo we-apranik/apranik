@@ -103,13 +103,22 @@ type APITrafficTotal struct {
 
 // One live conversation, or one live UDP entry.
 type APILiveConversation struct {
-	ID          string
-	Network     Network
-	InboundTag  string
-	User        string
-	Source      Endpoint
-	Destination Destination // a domain stays a domain
-	StartedAt   time.Time
+	ID         string
+	Network    Network
+	InboundTag string
+
+	// The inbound's protocol as the registry names it: "socks5", "http",
+	// "trojan", or "mixed".
+	InboundProtocol string
+	User            string
+	Source          Endpoint
+	Destination     Destination // a domain stays a domain
+
+	// The name a sniffer found in the payload, when a routing rule asked for a
+	// sniff and it found one; empty otherwise, always for UDP. It never replaces
+	// Destination.
+	SniffedDomain string
+	StartedAt     time.Time
 
 	// The outbound that carried it, then the ones beneath it when it is a group's.
 	OutboundTags []string
