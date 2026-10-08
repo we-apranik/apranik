@@ -34,16 +34,16 @@ type Settings struct {
 	// hostname here would have to be resolved by the resolver it serves.
 	Server types.ServerAddress `json:"server"`
 
-	// Bounds one query. Zero means DefaultTimeout.
-	Timeout types.Duration `json:"timeout"`
+	// Bounds one query. Absent means DefaultTimeout; a written zero is refused.
+	Timeout *types.Duration `json:"timeout"`
 }
 
 func (s *Settings) Validate() error {
 	if s.Server.IsZero() {
 		return errors.New("udp: server is required")
 	}
-	if s.Timeout < 0 {
-		return fmt.Errorf("udp: timeout %s must not be negative", s.Timeout)
+	if err := types.CheckPositive(s.Timeout); err != nil {
+		return fmt.Errorf("udp: timeout %w", err)
 	}
 	return nil
 }
@@ -71,10 +71,7 @@ func (s *Server) NewDatagramDNSServer(dialer spec.DatagramDialer) (spec.DNSServe
 	if err != nil {
 		return nil, fmt.Errorf("udp: server: %w", err)
 	}
-	timeout := time.Duration(s.Timeout)
-	if timeout == 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := time.Duration(types.ValueOrDefault(s.Timeout, types.Duration(DefaultTimeout)))
 	return &client{dialer: dialer, server: destination, timeout: timeout}, nil
 }
 
