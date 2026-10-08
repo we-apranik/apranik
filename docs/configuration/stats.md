@@ -20,8 +20,12 @@ it off, narrows it, or turns on the two things that cost extra.
     "inbounds": ["socks-in"],
     "outbounds": ["server-a", "auto"],
     "users": ["alice"],
-    "live_connections": true,
-    "dial_health": true
+    "dial_health": true,
+    "tracking": {
+      "enabled": true,
+      "udp_entry_idle_timeout": "1m",
+      "udp_max_entries_per_session": 1024
+    }
   }
 }
 ```
@@ -38,30 +42,50 @@ it off, narrows it, or turns on the two things that cost extra.
 | `inbounds` | inbound tags to count | all |
 | `outbounds` | outbound tags to count | all |
 | `users` | user names to count | all |
-| `live_connections` | `true` or `false`: list the connections open now | off; on once an API is configured to read them (no API exists yet) |
 | `dial_health` | `true` or `false`: time each outbound's dials | `false` |
+| `tracking` | the live list, see [below](#tracking) | on when an [API](api.md) is configured, otherwise off |
 
 </div>
 
 A list narrows counting to the names in it; an empty or absent list means everything of
 that kind. `apranik check` refuses an inbound or outbound tag that does not exist.
 A user name is not checked: core learns a user only when a protocol authenticates one.
-With `"enabled": false` the lists, `live_connections` and `dial_health` are ignored and
+With `"enabled": false` the lists, `tracking` and `dial_health` are ignored and
 `check` warns about them.
 
 Memory stays fixed by the config and never grows with traffic, with two exceptions that
 follow what is asked for. Users are counted as they authenticate. Each open TCP connection
-costs about 250 bytes while `live_connections` is on (measured: 10 000 hold about 2.5 MB),
+costs about 250 bytes while `tracking.enabled` is on (measured: 10 000 hold about 2.5 MB),
 and nothing when it is off. A UDP destination listed as live costs about 490 bytes, and a
 remembered routing decision about 230 (both measured, 10 000 each). A UDP session lists at most
-[`udp_session_live_connections_max_entries`](inbound/index.md#udp_session_live_connections_max_entries)
+[`tracking.udp_max_entries_per_session`](#tracking)
 destinations (1024 by default) and remembers a routing decision for at most
-[`udp_session_route_cache_max_entries`](inbound/index.md#udp_session_route_cache_max_entries)
+[`udp_routing_cache_max_entries_per_session`](inbound/index.md#udp_routing_cache_max_entries_per_session)
 (1024 by default); a client that sends to more destinations than that has the ones used
 longest ago forgotten, so memory per session is bounded: with the defaults at most about
 0.5 MB of live entries and 0.24 MB of routing decisions, reached only by a client that talks
 to over a thousand destinations at once (a normal session holds a few dozen). Nothing else is
 kept per destination.
+
+## Tracking
+
+`tracking` is the live list: every TCP connection and every UDP entry open now, kept so they can be
+listed, closed and attributed to online users. Counting does not need it; see
+[Live conversations and online users](#live-conversations-and-online-users) for what it enables.
+A UDP **entry** is one destination inside a UDP session; the limits below say whether they count
+entries or sessions.
+
+| Key | Format | Default |
+| --- | --- | --- |
+| `tracking.enabled` | `true` or `false` | on when an [API](api.md) is configured, otherwise off |
+| `tracking.udp_entry_idle_timeout` | duration, greater than zero: one entry leaves the list after this much silence in either direction (the UDP session goes on) | `1m` |
+| `tracking.udp_max_entries_per_session` | integer, greater than zero: how many entries one UDP session lists at once; the one used longest ago ends when it is full | `1024` |
+
+Leaving a key out gives its default. A written zero is refused, never read as the default.
+`apranik check` warns when the two UDP keys are set while tracking is off, when
+`udp_entry_idle_timeout` is longer than an inbound's `udp_session_idle_timeout` (its session ends
+first), and when an API is configured with `tracking.enabled` false (the API cannot list or close
+connections or show online users). With `"enabled": false` for the whole section, tracking is off.
 
 ## What is counted
 
@@ -136,7 +160,7 @@ therefore behind by up to a second and 63 datagrams for each direction of each s
 exact once the session has ended. The live entries' own bytes are not delayed.
 
 A UDP session may send to many destinations through many outbounds, and has no end but
-silence. So there is no "active UDP sessions" number; with `live_connections` on, the live
+silence. So there is no "active UDP sessions" number; with `tracking.enabled` on, the live
 list shows what is open. Bytes are payload, counted when the outbound accepted a
 datagram (uplink) and when one was received from the outbound (downlink). A reply that
 was received and then lost is still downlink, and also a drop.
@@ -175,7 +199,7 @@ sees which rules do nothing. A `block` action counts a hit too.
 
 A UDP session routes each destination, so a hit is **one routing decision**, not one
 packet: a destination counts one hit, and counts again if its decision was forgotten after
-[`udp_session_route_cache_idle_timeout`](inbound/index.md#udp_session_route_cache_idle_timeout) of silence.
+[`udp_routing_cache_entry_idle_timeout`](inbound/index.md#udp_routing_cache_entry_idle_timeout) of silence.
 
 So the same traffic can count different hits under different settings. For example, a client
 that sends to `1.1.1.1:443` every 90 seconds counts a hit on every packet with the default
@@ -209,25 +233,32 @@ members', so a reader adding up traffic across outbounds must add only the entri
 where `IsGroup` is false, or it counts the same bytes twice. Probe requests are not
 counted.
 
-## Live connections and online users
+## Live conversations and online users
 
-With `live_connections` on, each TCP connection is listed from the moment it is dialed
+With `tracking.enabled` on, each TCP connection is listed from the moment it is dialed
 until it ends, with its inbound, user, source address, destination, the outbounds that
 carried it (the group, then the member), the rule that decided it, when it began and its
 own bytes. A connection still in its handshake or dial is not listed. Each connection has
 a number, the next in a sequence, shown as text; a larger number began later.
 
 A UDP session is listed **one entry per destination**, from the destination's first
-datagram or reply. It ends after [`udp_session_live_connections_idle_timeout`](inbound/index.md#udp_session_live_connections_idle_timeout)
+datagram or reply. It ends after [`tracking.udp_entry_idle_timeout`](#tracking)
 of silence in either direction (swept every quarter of that time), or when the session ends, or
 when the session lists more than
-[`udp_session_live_connections_max_entries`](inbound/index.md#udp_session_live_connections_max_entries)
+[`tracking.udp_max_entries_per_session`](#tracking)
 and it is the one used longest ago. It does not depend on the routing cache: forgetting a
 routing decision leaves the entry. A reply from an address that is not a listed destination (or
 that two domains of the session share) counts on the inbound, outbound and user but on no entry.
 
-A user is **online** when at least one live connection is theirs, a live UDP entry
-included. A UDP entry stays up to a quarter more than `udp_session_live_connections_idle_timeout` after
+A live conversation can be **closed** by an [API](api.md). A TCP connection ends. Closing a UDP entry ends
+the **whole UDP session** it belongs to, every destination of it, because the relay and the session
+can only end together; closing just one entry would change nothing, since the next datagram to that
+destination would list a new one. A close is a request: it returns at once, and the entry leaves the
+list a moment later. With `tracking.enabled` off nothing is listed and nothing can be closed; the
+answer says so.
+
+A user is **online** when at least one live conversation is theirs, a live UDP entry
+included. A UDP entry stays up to a quarter more than `tracking.udp_entry_idle_timeout` after
 the last datagram or reply, so a user is online for that long after their last UDP packet; a panel
 that limits IPs should allow for the lag. For example, a user whose phone moves from home wifi to
 mobile data stops sending from the old address, but the old address stays listed for up to
@@ -235,7 +266,7 @@ mobile data stops sending from the old address, but the old address stays listed
 that bans on the first sighting would ban them; one that waits a minute or two does not.
 Lower the setting to shorten the lag, at the cost of more entries coming and going. Each online user comes
 with the distinct source addresses of those connections, and for each address when its
-newest live connection began. The list is built when asked, from the live connections,
+newest live conversation began. The list is built when asked, from the live conversations,
 so it costs nothing while nobody asks. **Nothing is kept once the last connection from an
 address ends**: there is no history of who connected from where. A protocol that does
 not authenticate has no users, so there are none to list.
@@ -256,8 +287,8 @@ Each kind of data has its own read, so a reader pays only for what it asks for:
 | `UserTraffic()` | numbers per authenticated user | grows with the users |
 | `RuleHits()` | hits per rule location | the rules |
 | `DNS()` | the resolver's numbers | the DNS servers |
-| `LiveConnections()` | the connections open now, oldest first | grows with open connections |
-| `OnlineUsers()` | users with a live connection, and their addresses | grows with open connections |
+| `LiveConversations()` | the connections open now, oldest first | grows with open connections |
+| `OnlineUsers()` | users with a live conversation, and their addresses | grows with open connections |
 
 `Builder.Stats()` gives the registry; every read is a copy, so any number of readers can
 read at once. Counters never reset and nothing is written to disk. They count from the
