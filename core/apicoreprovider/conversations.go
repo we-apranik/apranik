@@ -19,17 +19,19 @@ func (p *Provider) LiveConversations() ([]spec.APILiveConversation, error) {
 	conversations := make([]spec.APILiveConversation, 0, len(snapshots))
 	for _, snapshot := range snapshots {
 		conversations = append(conversations, spec.APILiveConversation{
-			ID:            snapshot.ID,
-			Network:       snapshot.Info.Network,
-			InboundTag:    snapshot.Info.InboundTag,
-			User:          snapshot.Info.User,
-			Source:        snapshot.Info.Source,
-			Destination:   snapshot.Info.Destination,
-			StartedAt:     snapshot.StartedAt,
-			OutboundTags:  snapshot.Info.OutboundTags,
-			RuleLocation:  snapshot.Info.Rule,
-			UplinkBytes:   snapshot.UplinkBytes,
-			DownlinkBytes: snapshot.DownlinkBytes,
+			ID:              snapshot.ID,
+			Network:         snapshot.Info.Network,
+			InboundTag:      snapshot.Info.InboundTag,
+			InboundProtocol: snapshot.Info.InboundProtocol,
+			SniffedDomain:   snapshot.Info.SniffedDomain,
+			User:            snapshot.Info.User,
+			Source:          snapshot.Info.Source,
+			Destination:     snapshot.Info.Destination,
+			StartedAt:       snapshot.StartedAt,
+			OutboundTags:    snapshot.Info.OutboundTags,
+			RuleLocation:    snapshot.Info.Rule,
+			UplinkBytes:     snapshot.UplinkBytes,
+			DownlinkBytes:   snapshot.DownlinkBytes,
 		})
 	}
 	return conversations, nil
