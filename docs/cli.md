@@ -27,6 +27,13 @@ Go 1.27 or newer. The one dependency, uTLS, is fetched by `go build`.
 Loads the config file, checks it, builds every inbound and outbound, and serves
 until `SIGINT` or `SIGTERM`.
 
+`SIGHUP` loads the config again, from the same file or URL. A config with
+errors is reported in the log and the running one keeps serving. Otherwise
+everything is closed and started again from the new config in the same
+process, and the statistics count from zero. If the new config still does not
+start, the previous one is started again. Windows has no `SIGHUP`
+.
+
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `-config` | `config.json` | a file path, or an `http://` or `https://` URL |
