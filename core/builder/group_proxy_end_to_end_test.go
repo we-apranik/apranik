@@ -13,7 +13,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
 	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -81,20 +81,23 @@ func TestAGroupProbesThroughTrojanAndLeavesAMemberWithTheWrongPassword(t *testin
 
 	for _, groupType := range []string{"fallback", "urltest"} {
 		t.Run(groupType, func(t *testing.T) {
-			group, err := outbound.NewGroup(outbound.GroupConfig{
-				Tag:          "group",
-				Members:      []component.Outbound{wrongPassword, rightPassword},
-				PicksFastest: groupType == "urltest",
-				Probe:        outbound.ProbeConfig{URL: probeTarget.URL + "/", Interval: 50 * time.Millisecond, Timeout: time.Second},
-			})
+			members := []component.Outbound{wrongPassword, rightPassword}
+			probe := group.ProbeConfig{URL: probeTarget.URL + "/", Interval: 50 * time.Millisecond, Timeout: time.Second}
+			var groupOutbound component.ProbingOutbound
+			var err error
+			if groupType == "urltest" {
+				groupOutbound, err = group.NewURLTest(group.URLTestConfig{Tag: "group", Members: members, Probe: probe})
+			} else {
+				groupOutbound, err = group.NewFallback(group.FallbackConfig{Tag: "group", Members: members, Probe: probe})
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { group.Close() })
-			group.StartProbing(t.Context())
+			t.Cleanup(func() { groupOutbound.Close() })
+			groupOutbound.StartProbing(t.Context())
 
-			if !eventuallyTrue(20*time.Second, func() bool { return echoesThrough(group, echoPort) }) {
-				t.Fatal("the group never moved to the member with the right password")
+			if !eventuallyTrue(20*time.Second, func() bool { return echoesThrough(groupOutbound, echoPort) }) {
+				t.Fatal("the groupOutbound never moved to the member with the right password")
 			}
 		})
 	}
@@ -135,8 +138,8 @@ func TestAGroupMemberMayBeARealSOCKS5Proxy(t *testing.T) {
 		}],
 		"outbounds": [
 			{"tag": "only-upstream", "protocol": {"type": "urltest", "settings": {
-				"outbounds": ["upstream"],
-				"probe": {"type": "http", "url": %q, "interval": "50ms", "timeout": "2s"}
+				"members": ["upstream"],
+				"probe": {"url": %q, "interval": "50ms", "timeout": "2s"}
 			}}},
 			{"tag": "upstream", "server": "127.0.0.1", "server_port": %d,
 			 "transport": [{"type": "tcp"}], "protocol": {"type": "socks5"}}

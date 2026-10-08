@@ -40,8 +40,8 @@ func statsConfig(inboundPort uint16, probeURL, extraSections string) string {
 		}],
 		"outbounds": [
 			{"tag": "auto", "protocol": {"type": "fallback", "settings": {
-				"outbounds": ["direct"],
-				"probe": {"type": "http", "url": %q, "interval": "1h"}
+				"members": ["direct"],
+				"probe": {"url": %q, "interval": "1h"}
 			}}},
 			{"tag": "direct", "protocol": {"type": "freedom"}},
 			{"tag": "unused", "protocol": {"type": "freedom"}}
@@ -124,23 +124,23 @@ func TestRuleHitsAreCountedPerRuleLocationThroughTheBuilder(t *testing.T) {
 	}
 }
 
-func TestLiveConnectionsAreListedOnlyWhenTheConfigSwitchesThemOn(t *testing.T) {
+func TestLiveConversationsAreListedOnlyWhenTheConfigSwitchesThemOn(t *testing.T) {
 	echoPort := startTCPEchoServer(t)
 
 	t.Run("on", func(t *testing.T) {
 		port, registry := startCountedSOCKS5(t, t.TempDir(),
-			statsConfig(freeLoopbackPort(t), startProbeTarget(t), `, "stats": {"live_connections": true}`))
+			statsConfig(freeLoopbackPort(t), startProbeTarget(t), `, "stats": {"tracking": {"enabled": true}}`))
 
 		connection := socks5Connect(t, port, "127.0.0.1", echoPort)
 		if !echoed(t, connection, "listed while open") {
 			t.Fatal("the connection was not relayed")
 		}
-		if !registry.TracksLiveConnections() {
-			t.Fatal("live_connections is true, yet the registry does not track them")
+		if !registry.IsLiveTrackingEnabled() {
+			t.Fatal("tracking is enabled, yet the registry does not track them")
 		}
-		var live []stats.ConnectionSnapshot
+		var live []stats.ConversationSnapshot
 		eventuallySnapshot(t, registry, "the connection listed", func(trafficView) bool {
-			live = registry.LiveConnections()
+			live = registry.LiveConversations()
 			return len(live) == 1
 		})
 		if live[0].Info.InboundTag != "socks-in" || live[0].Info.Source.Addr().String() != "127.0.0.1" ||
@@ -150,7 +150,7 @@ func TestLiveConnectionsAreListedOnlyWhenTheConfigSwitchesThemOn(t *testing.T) {
 
 		connection.Close()
 		eventuallySnapshot(t, registry, "the connection gone after the client left",
-			func(trafficView) bool { return len(registry.LiveConnections()) == 0 })
+			func(trafficView) bool { return len(registry.LiveConversations()) == 0 })
 	})
 
 	t.Run("off by default", func(t *testing.T) {
@@ -161,8 +161,8 @@ func TestLiveConnectionsAreListedOnlyWhenTheConfigSwitchesThemOn(t *testing.T) {
 		if !echoed(t, connection, "not listed") {
 			t.Fatal("the connection was not relayed")
 		}
-		if registry.TracksLiveConnections() || len(registry.LiveConnections()) != 0 {
-			t.Error("connections were listed without live_connections")
+		if registry.IsLiveTrackingEnabled() || len(registry.LiveConversations()) != 0 {
+			t.Error("connections were listed without tracking")
 		}
 	})
 }

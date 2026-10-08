@@ -30,8 +30,8 @@ func TestAGroupRoutesPastAMemberThatFails(t *testing.T) {
 				}],
 				"outbounds": [
 					{"tag": "auto", "protocol": {"type": %q, "settings": {
-						"outbounds": ["dead", "direct"],
-						"probe": {"type": "http", "url": %q, "interval": "50ms", "timeout": "1s"}
+						"members": ["dead", "direct"],
+						"probe": {"url": %q, "interval": "50ms", "timeout": "1s"}
 					}}},
 					{"tag": "dead", "server": "127.0.0.1", "server_port": %d,
 					 "transport": [{"type": "tcp"}], "protocol": {"type": "socks5"}},
@@ -69,8 +69,8 @@ func TestADNSServerMayGoThroughAGroup(t *testing.T) {
 		"outbounds": [
 			{"tag": "direct", "protocol": {"type": "freedom"}},
 			{"tag": "auto", "protocol": {"type": "fallback", "settings": {
-				"outbounds": ["direct"],
-				"probe": {"type": "http", "url": %q, "interval": "1h"}
+				"members": ["direct"],
+				"probe": {"url": %q, "interval": "1h"}
 			}}}
 		],
 		"dns": {"servers": [{"tag": "s", "type": "udp", "settings": {"server": %q}, "outbound": "auto"}],

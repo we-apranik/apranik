@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/dns"
@@ -17,6 +18,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
 	"github.com/The-Apranik/Apranik/core/route/router"
@@ -36,7 +38,7 @@ var (
 // Builder holds no registry: every module in a Config is already constructed
 // and validated, so there is nothing left to look up or dispatch on.
 type Builder struct {
-	logging *logging.System
+	logging *logging.LoggerManager
 	logger  *logging.Logger
 
 	// What every base transport resolves through. The system resolver until
@@ -66,6 +68,11 @@ func New(log blueprint.Log) (*Builder, error) {
 }
 
 func (b *Builder) Logger() *logging.Logger { return b.logger }
+
+// SubscribeToLog starts a live view of the log; see logging.LoggerManager.SubscribeToLog.
+func (b *Builder) SubscribeToLog(minimumLevel logging.Level, bufferedRecords int) (*logging.Subscription, error) {
+	return b.logging.SubscribeToLog(minimumLevel, bufferedRecords)
+}
 
 // BuildStats makes the registry every inbound and handler counts into. Counting
 // is on unless the blueprint's stats section disables it, so a blueprint
@@ -101,9 +108,9 @@ func (b *Builder) BuildStats(coreBlueprint *blueprint.Blueprint) *stats.Registry
 		statsConfig.TrackedInboundTags = section.Inbounds
 		statsConfig.TrackedOutboundTags = section.Outbounds
 		statsConfig.TrackedUsers = section.Users
-		statsConfig.TrackLiveConnections = section.LiveConnections != nil && *section.LiveConnections
 		statsConfig.TimeDials = section.DialHealth
 	}
+	statsConfig.TrackLiveConversations = coreBlueprint.IsLiveTrackingEnabled()
 	b.stats = stats.NewRegistry(statsConfig)
 	b.resolver.SetStats(b.stats.DNSCounters())
 	return b.stats
@@ -147,8 +154,8 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 		DatagramOverStreamServer: prepared.datagramServer,
 		Fallback:                 prepared.fallback,
 		AssociateSocket:          b.buildUDPAssociateSocket(inboundBlueprint.Bind),
-		MaxTCPConnections:        inboundBlueprint.MaxTCPConnections,
-		MaxUDPSessions:           inboundBlueprint.MaxUDPSessions,
+		MaxTCPConnections:        types.ValueOrDefault(inboundBlueprint.MaxTCPConnections, 0),
+		MaxUDPSessions:           types.ValueOrDefault(inboundBlueprint.MaxUDPSessions, 0),
 		Counters:                 b.stats.Inbound(inboundBlueprint.Tag),
 		Logger:                   b.logger,
 	}), nil
@@ -214,7 +221,7 @@ func (b *Builder) prepareInbound(inboundBlueprint blueprint.Inbound) (preparedIn
 		prepared.fallback = &inbound.Fallback{
 			Dialer:      dialer,
 			Destination: inboundBlueprint.Fallback,
-			IdleTimeout: inboundBlueprint.TCPIdleTimeout,
+			IdleTimeout: types.ValueOrDefault(inboundBlueprint.TCPIdleTimeout, 0),
 		}
 	}
 
@@ -246,7 +253,7 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	if err != nil {
 		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.HTTP.Info().Name, err)
 	}
-	return mixed.NewStreamServer(socks5Server, httpServer, inboundBlueprint.Mixed.FirstByteTimeout), nil
+	return mixed.NewStreamServer(socks5Server, httpServer, types.ValueOrDefault(inboundBlueprint.Mixed.FirstByteTimeout, 0)), nil
 }
 
 func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
@@ -336,24 +343,34 @@ func membersBuiltSoFar(tags []string, builtByTag map[string]component.Outbound) 
 }
 
 func (b *Builder) buildGroupOutbound(outboundBlueprint blueprint.Outbound, members []component.Outbound) (component.Outbound, error) {
-	group := outboundBlueprint.Group
-	built, err := outbound.NewGroup(outbound.GroupConfig{
-		Tag:          outboundBlueprint.Tag,
-		Members:      members,
-		PicksFastest: group.Type == blueprint.GroupTypeURLTest,
-		Probe: outbound.ProbeConfig{
-			UseTLS:   group.Probe.Type == blueprint.ProbeTypeHTTPS,
-			URL:      group.Probe.URL,
-			Interval: group.Probe.Interval,
-			Timeout:  group.Probe.Timeout,
-		},
-		Tolerance: group.Tolerance,
-		Logger:    b.logger,
-	})
+	groupBlueprint := outboundBlueprint.Group
+	probe := group.ProbeConfig{
+		URL:              groupBlueprint.Probe.URL,
+		Interval:         types.ValueOrDefault(groupBlueprint.Probe.Interval, 0),
+		Timeout:          types.ValueOrDefault(groupBlueprint.Probe.Timeout, 0),
+		ExpectedStatuses: groupBlueprint.Probe.ExpectedStatuses,
+	}
+
+	var built component.Outbound
+	var err error
+	switch groupBlueprint.Type {
+	case blueprint.GroupTypeURLTest:
+		built, err = group.NewURLTest(group.URLTestConfig{
+			Tag: outboundBlueprint.Tag, Members: members, Probe: probe, Tolerance: types.ValueOrDefault(groupBlueprint.Tolerance, 0), Logger: b.logger,
+		})
+	case blueprint.GroupTypeFallback:
+		built, err = group.NewFallback(group.FallbackConfig{
+			Tag: outboundBlueprint.Tag, Members: members, Probe: probe, Logger: b.logger,
+		})
+	case blueprint.GroupTypeSelector:
+		built, err = group.NewSelector(group.SelectorConfig{Tag: outboundBlueprint.Tag, Members: members, Logger: b.logger})
+	default:
+		err = fmt.Errorf("outbound %q: unknown group type %q", outboundBlueprint.Tag, groupBlueprint.Type)
+	}
 	if err != nil {
 		return nil, err
 	}
-	b.logger.Debug("Outbound group built", "outbound", outboundBlueprint.Tag, "type", group.Type, "members", len(members))
+	b.logger.Debug("Outbound group built", "outbound", outboundBlueprint.Tag, "type", groupBlueprint.Type, "members", len(members))
 	return built, nil
 }
 
@@ -384,7 +401,7 @@ func (b *Builder) buildFreedomOutbound(outboundBlueprint blueprint.Outbound) (co
 		Dialer:          dialer,
 		DatagramDialer:  datagramDialer,
 		DatagramPolicy:  freedom.NAT,
-		MaxDatagramSize: freedom.NATMaxDatagramSize,
+		MaxDatagramSize: types.ValueOrDefault(freedom.NATMaxDatagramSize, 0),
 		Counters:        b.stats.Outbound(outboundBlueprint.Tag),
 		Logger:          b.logger,
 	}), nil

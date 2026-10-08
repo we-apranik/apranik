@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config"
+	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
 	"github.com/The-Apranik/Apranik/core/route/handler"
@@ -33,6 +35,13 @@ func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 // startCountedSOCKS5 is startRoutedSOCKS5 that also returns the registry the
 // handler counts into: nil when the config switches counting off.
 func startCountedSOCKS5(t *testing.T, directory, configText string) (uint16, *stats.Registry) {
+	port, registry, _, _ := startSOCKS5WithOutbounds(t, directory, configText)
+	return port, registry
+}
+
+// startSOCKS5WithOutbounds is startCountedSOCKS5 that also returns the built
+// outbounds, for a test that drives one, such as a selector.
+func startSOCKS5WithOutbounds(t *testing.T, directory, configText string) (uint16, *stats.Registry, []component.Outbound, *blueprint.Blueprint) {
 	t.Helper()
 	configPath := filepath.Join(directory, "config.json")
 	if err := os.WriteFile(configPath, []byte(configText), 0o600); err != nil {
@@ -84,7 +93,7 @@ func startCountedSOCKS5(t *testing.T, directory, configText string) (uint16, *st
 	if err := inbound.Activate(context.Background(), handler.New(trafficRouter, handler.Config{Resolver: built.Resolver(), Stats: registry})); err != nil {
 		t.Fatal(err)
 	}
-	return coreBlueprint.Inbounds[0].Bind.Port(), registry
+	return coreBlueprint.Inbounds[0].Bind.Port(), registry, outbounds, coreBlueprint
 }
 
 func startTCPEchoServer(t *testing.T) uint16 {

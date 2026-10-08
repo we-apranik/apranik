@@ -82,7 +82,7 @@ func socks5UDPExchange(t *testing.T, relaySide *net.UDPConn, port uint16, payloa
 func TestUDPThroughSOCKS5IsCountedByNetworkAndListedPerDestination(t *testing.T) {
 	firstPort, secondPort := startUDPEchoServer(t), startUDPEchoServer(t)
 	port, registry := startCountedSOCKS5(t, t.TempDir(),
-		statsConfig(freeLoopbackPort(t), startProbeTarget(t), `, "stats": {"live_connections": true}`))
+		statsConfig(freeLoopbackPort(t), startProbeTarget(t), `, "stats": {"tracking": {"enabled": true}}`))
 	relaySide, _ := socks5Associate(t, port)
 
 	for _, payload := range []string{"one", "three", "seven.."} {
@@ -120,7 +120,7 @@ func TestUDPThroughSOCKS5IsCountedByNetworkAndListedPerDestination(t *testing.T)
 		t.Errorf("totals = %+v", totals)
 	}
 
-	live := registry.LiveConnections()
+	live := registry.LiveConversations()
 	if len(live) != 2 {
 		t.Fatalf("%d live entries, want one per destination", len(live))
 	}
