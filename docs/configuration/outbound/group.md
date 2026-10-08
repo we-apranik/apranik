@@ -5,15 +5,13 @@ A group is an outbound that connects nowhere itself. It holds other outbounds, i
 points at a group by its tag, like at any outbound, and a [DNS server's
 `outbound`](../dns/index.md) can be a group too.
 
-There are two types, and they differ in how they choose:
+There are three types, and they differ in how they choose:
 
-| Type | Picks | Needs |
+| Type | Picks | Takes |
 | --- | --- | --- |
-| `urltest` | the member whose probe answered fastest | `probe`, and optionally `tolerance` |
-| `fallback` | the first member, in list order, whose probe passed | `probe` |
-
-A person choosing a member by hand (`selector`) is not built: it needs a way for a
-client to tell the core which member to use, and there is none yet.
+| `urltest` | the member whose probe answered fastest | `members`, optionally `probe` and `tolerance` |
+| `fallback` | the first member, in list order, whose probe passed | `members`, optionally `probe` |
+| [`selector`](#selector) | the member a person chose through an [API](../api.md) | `members` only |
 
 ## Structure
 
@@ -27,8 +25,8 @@ client to tell the core which member to use, and there is none yet.
       "protocol": {
         "type": "urltest",
         "settings": {
-          "outbounds": ["server-a", "server-b", "direct"],
-          "probe": { "type": "https", "interval": "5m", "timeout": "10s" },
+          "members": ["server-a", "server-b", "direct"],
+          "probe": { "url": "https://www.gstatic.com/generate_204", "interval": "5m", "timeout": "10s", "expected_status": "200-299" },
           "tolerance": "50ms"
         }
       }
@@ -77,7 +75,7 @@ should never cause. `check` warns when a rule sends UDP to a group that cannot c
 
 ## Fields
 
-### `outbounds`
+### `members`
 
 <span class="cfg cfg-type">list of tags</span>
 <span class="cfg cfg-req">Required</span>
@@ -89,9 +87,10 @@ pick, and `check` warns about it.
 ### `probe`
 
 <span class="cfg cfg-type">object</span>
-<span class="cfg cfg-req">Required</span>
+<span class="cfg cfg-note">urltest and fallback only; every field is optional</span>
 
-How the group tests its members. See [Probes](#probes).
+How the group tests its members. See [Probes](#probes). A `selector` never measures
+anything, so `check` refuses a `probe` there.
 
 ### `tolerance`
 
@@ -118,35 +117,29 @@ transport stack, the proxy protocol and, for `https`, TLS to the target. Measuri
 the connection would miss the proxy handshake, which a proxy client may send with the
 first write.
 
-A probe **passes** when the target answers with a `2xx` status. A redirect, an error
-page, a timeout or a failed connection counts as failed.
+A probe **passes** when the target answers with a status in `expected_status`, by
+default any `2xx`. A redirect, an error page, a timeout or a failed connection counts as
+failed.
 
 The request carries no `User-Agent`, so it does not name Apranik or Go's HTTP client.
 
 <div class="cfg-fields" markdown>
 
-### `probe.type`
-
-<span class="cfg cfg-type">string</span>
-<span class="cfg cfg-req">Required</span>
-
-| Value | Sends |
-| --- | --- |
-| `http` | a plain `GET` to the URL |
-| `https` | the same `GET` after a TLS handshake with the target |
-
-Use `https` where plain HTTP is filtered or rewritten. It costs a handshake per probe.
-The TLS to the target uses Go's own `crypto/tls` (verified against the system's
-certificate roots), not [`tls`'s `fingerprint`](../transport/tls.md). Through a proxy
-member it travels inside the tunnel; through a `freedom` member it leaves directly.
-
 ### `probe.url`
 
 <span class="cfg cfg-type">string</span>
-<span class="cfg cfg-def">Default: <code>http://www.gstatic.com/generate_204</code>, or the <code>https://</code> one for the <code>https</code> type</span>
+<span class="cfg cfg-def">Default: <code>https://www.gstatic.com/generate_204</code></span>
 
-The target. Its scheme must match `probe.type`. Pick something that answers quickly
-with a `2xx` and is reachable from wherever your members exit.
+The target, `http://` or `https://`. Its scheme decides whether the request is
+encrypted toward the target: with `https`, a TLS handshake comes first, which costs a
+handshake per probe. Use `https` where plain HTTP is filtered or rewritten. The TLS to
+the target uses Go's own `crypto/tls` (verified against the system's certificate
+roots), not [`tls`'s `fingerprint`](../transport/tls.md). Through a proxy member it
+travels inside the tunnel; through a `freedom` member it leaves directly.
+
+Pick something that answers quickly with a status you expect and is reachable from
+wherever your members exit. The default is a Google address; where it is blocked,
+write another.
 
 ### `probe.interval`
 
@@ -164,6 +157,25 @@ failure sooner and shows the network a pattern more often.
 
 How long one member may take, from the start of its probe to the status line. A member
 that takes longer counts as failed.
+
+### `probe.expected_status`
+
+<span class="cfg cfg-type">string</span>
+<span class="cfg cfg-def">Default: <code>200-299</code></span>
+
+The statuses that make a probe pass: codes and inclusive ranges separated by commas.
+Spaces are ignored.
+
+| Value | Passes |
+| --- | --- |
+| `"204"` | only 204 |
+| `"200-299"` | any 2xx |
+| `"200,204,301"` | 200, 204 or 301 |
+| `"100-599"` | any answer at all |
+
+Codes run from 100 to 599. A range must not end before it starts, and an empty part
+(`"200,,204"`) is refused. Write it as a string: `204` without quotes is refused, so the
+file reads the same everywhere.
 
 </div>
 
@@ -203,8 +215,8 @@ Choosing a value:
   matters, not how slow they all are, so a tolerance that suits one network may need
   tuning on another.
 
-`tolerance` is a duration written as a string, such as `"50ms"`. Zero means the
-default, and a value less than zero is refused. To make the group switch for any
+`tolerance` is a duration written as a string, such as `"50ms"`. Leaving it out gives the
+default, and a value of zero or less is refused. To make the group switch for any
 improvement, write a very small value such as `"1ms"`.
 
 When no probe passes in a round, `urltest` keeps the member it had, the last good one.
@@ -212,7 +224,7 @@ Before any round has finished it uses the first member in the list.
 
 ## When every probe fails
 
-Neither type refuses connections because probes failed. `urltest` keeps its last good
+Neither probing type refuses connections because probes failed. `urltest` keeps its last good
 member, and `fallback` uses list order. Each connection still tries the other members
 if the first fails to connect, so the group degrades to retrying instead of stopping.
 
@@ -220,9 +232,10 @@ if the first fails to connect, so the group degrades to retrying instead of stop
 
 - a member tag that no outbound has, a group listing itself, or groups that choose
   among each other in a loop;
-- a missing `probe`, an unknown `probe.type`, a `probe.url` whose scheme does not match
-  the type, or a negative `interval`, `timeout` or `tolerance`;
-- `tolerance` on a `fallback` group;
+- a `probe.url` that is not `http://` or `https://` or names no host, an
+  `expected_status` that does not parse, or an `interval`, `timeout` or
+  `tolerance` that is zero or negative;
+- `tolerance` on a `fallback` or `selector`, and a `probe` on a `selector`;
 - `server`, `transport` or `dns_server` on a group;
 - a DNS server whose outbound is a group with a member that needs the same DNS server
   for its own name, which is a lookup loop.
@@ -234,3 +247,30 @@ with a member that cannot carry it.
 [`apranik run`](../../cli.md) starts, and the logs say which member a connection used
 (`Group member chosen`, at debug level) and when a group changes its choice
 (`Group switched member`).
+
+## Selector {#selector}
+
+A `selector` is the group a person drives. It uses one member, starts on the **first**,
+and changes only when someone chooses another through an [API](../api.md) (for
+example the Clash API's `PUT /proxies/{name}`). It never measures and never moves by
+itself.
+
+```json
+{ "tag": "proxy", "protocol": { "type": "selector",
+    "settings": { "members": ["auto", "server-a", "server-b"] } } }
+```
+
+- **Settings:** `members` only. `check` refuses a `probe` or a `tolerance`, and warns
+  when a selector exists but no `apis` entry is configured, because then nothing can
+  change it.
+- **Nothing is saved.** Every start begins on the first member.
+- **When the chosen member fails, the connection fails.** The choice is the person's,
+  so the selector does not quietly use another member. To have a member chosen
+  automatically, make it a `fallback` or `urltest` group and choose that one.
+- **A switch ends the live conversations that went through the previous member**, so it
+  takes hold for connections that are already open and for UDP sessions, which choose
+  their member once. New connections use the new member. Two limits: connections are
+  tracked only when [`stats.tracking.enabled`](../stats.md) is on, and without it a
+  switch moves new connections only; and a connection that was dialled through the old
+  member but was not yet listed at that moment keeps its member.
+- A selector may hold other groups, including another selector.
