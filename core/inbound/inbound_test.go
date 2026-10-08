@@ -62,7 +62,7 @@ func startCountingTrojanInbound(t *testing.T, fallback *inbound.Fallback, counte
 	}
 	proxy := &trojan.Proxy{Settings: trojan.Settings{
 		Users:            []trojan.User{{Name: "alice", Password: "secret"}},
-		HandshakeTimeout: types.Duration(500 * time.Millisecond),
+		HandshakeTimeout: types.Pointer(types.Duration(500 * time.Millisecond)),
 	}}
 	streamServer, err := proxy.NewStreamServer()
 	if err != nil {

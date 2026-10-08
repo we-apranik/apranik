@@ -493,7 +493,7 @@ func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
 
 func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
 	settings := serverSettings
-	settings.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+	settings.HandshakeTimeout = types.Pointer(types.Duration(100 * time.Millisecond))
 	server, err := (&trojan.Proxy{Settings: settings}).NewStreamServer()
 	if err != nil {
 		t.Fatal(err)

@@ -23,18 +23,15 @@ type Settings struct {
 
 	// Server: how long a client may take to send its request. A client sends
 	// its request with the first payload and waits for no answer, so it has
-	// nothing to bound. Zero means defaultHandshakeTimeout.
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// nothing to bound. Absent means defaultHandshakeTimeout; a written zero is refused.
+	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
 // PROVISIONAL.
 const defaultHandshakeTimeout = 10 * time.Second
 
 func (s *Settings) handshakeTimeout() time.Duration {
-	if s.HandshakeTimeout == 0 {
-		return defaultHandshakeTimeout
-	}
-	return time.Duration(s.HandshakeTimeout)
+	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
 type User struct {
@@ -43,8 +40,8 @@ type User struct {
 }
 
 func (s *Settings) Validate() error {
-	if s.HandshakeTimeout < 0 {
-		return fmt.Errorf("trojan: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
+		return fmt.Errorf("trojan: handshake_timeout %w", err)
 	}
 	if s.Password == "" && len(s.Users) == 0 {
 		return errors.New("trojan: set password for an outbound, or users for an inbound")
