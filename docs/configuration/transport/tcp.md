@@ -31,21 +31,21 @@ The base stream transport.
 <span class="cfg cfg-def">Default: <code>15s</code></span>
 
 How long a connection is idle before the first keep-alive probe. Negative
-disables keep-alive.
+disables keep-alive; a written `0` is refused.
 
 ### `keep_alive_interval`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>15s</code></span>
 
-Time between probes.
+Time between probes. Greater than zero.
 
 ### `keep_alive_count`
 
 <span class="cfg cfg-type">integer</span>
 <span class="cfg cfg-def">Default: <code>9</code></span>
 
-Unanswered probes before the connection is dropped.
+Unanswered probes before the connection is dropped. From 1 to 255.
 
 ### `next_address_delay`
 
@@ -57,7 +57,7 @@ before the next starts beside it (Happy Eyeballs, RFC 8305). The
 [resolver](../dns/index.md) orders the addresses by `ip_versions`; `tcp`
 alternates IPv4 and IPv6 from the first, and the first connection to succeed
 wins. A dead first address therefore costs this delay, not the whole
-`dial_timeout`. Must not be negative. Outbound only.
+`dial_timeout`. Must be greater than zero. Outbound only.
 
 ### `no_delay`
 
