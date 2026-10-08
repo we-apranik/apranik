@@ -16,11 +16,19 @@ import (
 // once it is dialed, or one UDP destination of a session once it has carried a
 // datagram. It is filled by core, never by a module.
 type ConversationInfo struct {
-	Network     spec.Network
-	InboundTag  string
-	User        string // empty when the protocol does not authenticate
-	Source      spec.Endpoint
-	Destination spec.Destination
+	Network    spec.Network
+	InboundTag string
+
+	// The inbound's protocol, as the registry names it ("socks5", "mixed").
+	InboundProtocol string
+	User            string // empty when the protocol does not authenticate
+	Source          spec.Endpoint
+	Destination     spec.Destination
+
+	// The name a sniffer read from the start of the payload, when a rule asked
+	// for a sniff and it found one. Empty otherwise, and for UDP, which sniffs
+	// nothing. The destination is never replaced by it.
+	SniffedDomain string
 
 	// The outbound routing named, then each outbound beneath it that carried
 	// the conversation when it is a group.
