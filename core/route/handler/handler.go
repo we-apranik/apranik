@@ -17,6 +17,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/relay"
+	"github.com/The-Apranik/Apranik/core/route/informant"
 	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -24,14 +25,14 @@ import (
 // Handler is component.TrafficHandler. It decides nothing itself, asking the
 // router about every connection and every new UDP destination.
 type Handler struct {
-	router                          component.Router
-	streamIdleTimeout               time.Duration
-	udpSessionIdleTimeout           time.Duration
-	udpSessionRouteCacheIdleTimeout time.Duration
-	udpSessionRouteCacheMaxEntries  int
+	router                              component.Router
+	streamIdleTimeout                   time.Duration
+	udpSessionIdleTimeout               time.Duration
+	udpRoutingCacheEntryIdleTimeout     time.Duration
+	udpRoutingCacheMaxEntriesPerSession int
 
-	udpSessionLiveConnectionsIdleTimeout time.Duration
-	udpSessionLiveConnectionsMaxEntries  int
+	liveTrackingUDPEntryIdleTimeout     time.Duration
+	liveTrackingUDPMaxEntriesPerSession int
 
 	udpMaxDatagramSize int
 	udpReplyBuffers    *udp.BufferPool
@@ -40,7 +41,7 @@ type Handler struct {
 	// every UDP session this handler serves, with one goroutine.
 	udpSweeper *periodicSweeper
 
-	resolver DomainResolver
+	resolver informant.DomainResolver
 	stats    *stats.Registry
 	logger   *logging.Logger
 }
@@ -58,26 +59,26 @@ type Config struct {
 	// one second. Not a config file setting: a reader lags by about this much.
 	UDPCountFlushInterval time.Duration
 
-	// Zero means udp.DefaultRouteCacheIdleTimeout.
-	UDPSessionRouteCacheIdleTimeout time.Duration
+	// Zero means udp.DefaultRoutingCacheEntryIdleTimeout.
+	UDPRoutingCacheEntryIdleTimeout time.Duration
 
-	// Zero means udp.DefaultRouteCacheMaxEntries.
-	UDPSessionRouteCacheMaxEntries int
+	// Zero means udp.DefaultRoutingCacheMaxEntriesPerSession.
+	UDPRoutingCacheMaxEntriesPerSession int
 
 	// The largest UDP datagram a client may send and a reply may be; a bigger
 	// one is dropped and counted. Zero means udp.DefaultMaxDatagramSize.
 	UDPMaxDatagramSize int
 
 	// A UDP destination's live entry ends after this much silence in either
-	// direction; zero means udp.DefaultLiveConnectionsIdleTimeout.
-	UDPSessionLiveConnectionsIdleTimeout time.Duration
+	// direction; zero means udp.DefaultLiveTrackingUDPEntryIdleTimeout.
+	LiveTrackingUDPEntryIdleTimeout time.Duration
 
 	// How many destinations of one UDP session are listed at once; zero means
-	// udp.DefaultLiveConnectionsMaxEntries.
-	UDPSessionLiveConnectionsMaxEntries int
+	// udp.DefaultLiveTrackingUDPMaxEntriesPerSession.
+	LiveTrackingUDPMaxEntriesPerSession int
 
 	// What a routing resolve action asks. Nil: a resolve finds nothing.
-	Resolver DomainResolver
+	Resolver informant.DomainResolver
 
 	// Where traffic is counted. Nil counts nothing.
 	Stats *stats.Registry
@@ -95,21 +96,21 @@ func New(router component.Router, config Config) *Handler {
 	if streamIdleTimeout == 0 {
 		streamIdleTimeout = relay.DefaultStreamIdleTimeout
 	}
-	udpSessionRouteCacheIdleTimeout := config.UDPSessionRouteCacheIdleTimeout
-	if udpSessionRouteCacheIdleTimeout <= 0 {
-		udpSessionRouteCacheIdleTimeout = udp.DefaultRouteCacheIdleTimeout
+	udpRoutingCacheEntryIdleTimeout := config.UDPRoutingCacheEntryIdleTimeout
+	if udpRoutingCacheEntryIdleTimeout <= 0 {
+		udpRoutingCacheEntryIdleTimeout = udp.DefaultRoutingCacheEntryIdleTimeout
 	}
-	udpSessionRouteCacheMaxEntries := config.UDPSessionRouteCacheMaxEntries
-	if udpSessionRouteCacheMaxEntries <= 0 {
-		udpSessionRouteCacheMaxEntries = udp.DefaultRouteCacheMaxEntries
+	udpRoutingCacheMaxEntriesPerSession := config.UDPRoutingCacheMaxEntriesPerSession
+	if udpRoutingCacheMaxEntriesPerSession <= 0 {
+		udpRoutingCacheMaxEntriesPerSession = udp.DefaultRoutingCacheMaxEntriesPerSession
 	}
-	udpSessionLiveConnectionsIdleTimeout := config.UDPSessionLiveConnectionsIdleTimeout
-	if udpSessionLiveConnectionsIdleTimeout <= 0 {
-		udpSessionLiveConnectionsIdleTimeout = udp.DefaultLiveConnectionsIdleTimeout
+	liveTrackingUDPEntryIdleTimeout := config.LiveTrackingUDPEntryIdleTimeout
+	if liveTrackingUDPEntryIdleTimeout <= 0 {
+		liveTrackingUDPEntryIdleTimeout = udp.DefaultLiveTrackingUDPEntryIdleTimeout
 	}
-	udpSessionLiveConnectionsMaxEntries := config.UDPSessionLiveConnectionsMaxEntries
-	if udpSessionLiveConnectionsMaxEntries <= 0 {
-		udpSessionLiveConnectionsMaxEntries = udp.DefaultLiveConnectionsMaxEntries
+	liveTrackingUDPMaxEntriesPerSession := config.LiveTrackingUDPMaxEntriesPerSession
+	if liveTrackingUDPMaxEntriesPerSession <= 0 {
+		liveTrackingUDPMaxEntriesPerSession = udp.DefaultLiveTrackingUDPMaxEntriesPerSession
 	}
 	udpMaxDatagramSize := config.UDPMaxDatagramSize
 	if udpMaxDatagramSize <= 0 {
@@ -119,30 +120,30 @@ func New(router component.Router, config Config) *Handler {
 	if countFlushInterval <= 0 {
 		countFlushInterval = defaultCountFlushInterval
 	}
-	sweepInterval := min(sweepIntervalFor(min(udpSessionRouteCacheIdleTimeout, udpSessionLiveConnectionsIdleTimeout)), countFlushInterval)
+	sweepInterval := min(sweepIntervalFor(min(udpRoutingCacheEntryIdleTimeout, liveTrackingUDPEntryIdleTimeout)), countFlushInterval)
 	return &Handler{
-		router:                          router,
-		streamIdleTimeout:               streamIdleTimeout,
-		udpSessionIdleTimeout:           config.UDPSessionIdleTimeout,
-		udpSessionRouteCacheIdleTimeout: udpSessionRouteCacheIdleTimeout,
-		udpSessionRouteCacheMaxEntries:  udpSessionRouteCacheMaxEntries,
+		router:                              router,
+		streamIdleTimeout:                   streamIdleTimeout,
+		udpSessionIdleTimeout:               config.UDPSessionIdleTimeout,
+		udpRoutingCacheEntryIdleTimeout:     udpRoutingCacheEntryIdleTimeout,
+		udpRoutingCacheMaxEntriesPerSession: udpRoutingCacheMaxEntriesPerSession,
 
-		udpSessionLiveConnectionsIdleTimeout: udpSessionLiveConnectionsIdleTimeout,
-		udpSessionLiveConnectionsMaxEntries:  udpSessionLiveConnectionsMaxEntries,
-		udpMaxDatagramSize:                   udpMaxDatagramSize,
-		udpReplyBuffers:                      udp.NewBufferPool(udpMaxDatagramSize),
-		udpSweeper:                           newPeriodicSweeper(sweepInterval),
-		resolver:                             config.Resolver,
-		stats:                                config.Stats,
-		logger:                               logger,
+		liveTrackingUDPEntryIdleTimeout:     liveTrackingUDPEntryIdleTimeout,
+		liveTrackingUDPMaxEntriesPerSession: liveTrackingUDPMaxEntriesPerSession,
+		udpMaxDatagramSize:                  udpMaxDatagramSize,
+		udpReplyBuffers:                     udp.NewBufferPool(udpMaxDatagramSize),
+		udpSweeper:                          newPeriodicSweeper(sweepInterval),
+		resolver:                            config.Resolver,
+		stats:                               config.Stats,
+		logger:                              logger,
 	}
 }
 
 func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, metadata spec.Metadata) error {
-	informant := newStreamTrafficInformant(metadata, clientStream, h.resolver, h.logger)
-	decision, err := h.router.Route(ctx, informant)
-	clientStream = informant.streamToRelay()
-	metadata = informant.Metadata()
+	trafficInformant := informant.NewStream(metadata, clientStream, h.resolver, h.logger)
+	decision, err := h.router.Route(ctx, trafficInformant)
+	clientStream = trafficInformant.StreamToRelay()
+	metadata = trafficInformant.Metadata()
 	if err != nil {
 		clientStream.Close()
 		return fmt.Errorf("handler: %s -> %s: %w", metadata.InboundTag, metadata.Destination, err)
@@ -175,7 +176,12 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 		carryingOutboundTags = component.TagsOfOutboundsThatCarried(decision.Outbound, outboundStream)
 	}
 	counters := h.countersCarrying(metadata, carryingOutboundTags)
-	connection := h.stats.TrackConnection(stats.ConnectionInfo{
+	relayContext, closeRequested := ctx, context.CancelFunc(nil)
+	if h.stats.IsLiveTrackingEnabled() {
+		relayContext, closeRequested = context.WithCancel(ctx)
+		defer closeRequested()
+	}
+	connection := h.stats.TrackConversation(stats.ConversationInfo{
 		Network:      metadata.Network,
 		InboundTag:   metadata.InboundTag,
 		User:         metadata.User,
@@ -183,7 +189,7 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 		Destination:  metadata.Destination,
 		OutboundTags: carryingOutboundTags,
 		Rule:         decision.Rule,
-	})
+	}, closeRequested)
 	defer connection.End()
 	for _, counted := range counters {
 		counted.ConnectionStarted()
@@ -195,8 +201,12 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 	}()
 
 	h.logger.Debug("Relaying stream", "inbound", metadata.InboundTag, "outbound", decision.Outbound.Tag(), "rule", decision.Rule)
-	relayErr := relay.Stream(ctx, clientStream, outboundStream, h.streamIdleTimeout, counters, connection.Bytes())
-	if errors.Is(relayErr, relay.ErrStreamIdle) {
+	relayErr := relay.Stream(relayContext, clientStream, outboundStream, h.streamIdleTimeout, counters, connection.Bytes())
+	switch {
+	case errors.Is(relayErr, relay.ErrStreamIdle):
+		return nil
+	case errors.Is(relayErr, context.Canceled) && ctx.Err() == nil:
+		h.logger.Info("Connection closed by request", "inbound", metadata.InboundTag, "outbound", decision.Outbound.Tag(), "rule", decision.Rule)
 		return nil
 	}
 	return relayErr
@@ -206,6 +216,12 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 // relay asks for every packet; a per-session cache answers repeats. A session
 // that ends quietly, by Close or by going idle, is not an error.
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
+	parentContext := ctx
+	closeSession := context.CancelFunc(nil)
+	if h.stats.IsLiveTrackingEnabled() {
+		ctx, closeSession = context.WithCancel(ctx)
+		defer closeSession()
+	}
 	udpSession := session.New(ctx, session.Config{
 		Metadata:             metadata,
 		IdleTimeout:          h.udpSessionIdleTimeout,
@@ -221,7 +237,7 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 
 	routingCache := newUDPSessionRoutingCache(func(ctx context.Context, destination spec.Destination) (component.Decision, error) {
 		return h.routeUDPDestination(ctx, metadata, destination)
-	}, h.udpSessionRouteCacheIdleTimeout, h.udpSessionRouteCacheMaxEntries)
+	}, h.udpRoutingCacheEntryIdleTimeout, h.udpRoutingCacheMaxEntriesPerSession)
 	h.udpSweeper.add(routingCache)
 	defer func() {
 		h.udpSweeper.remove(routingCache)
@@ -229,8 +245,8 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	}()
 
 	var replyReceived func(from spec.Destination, size int)
-	if h.stats.TracksLiveConnections() {
-		live := newUDPSessionLiveEntries(h.stats, stats.ConnectionInfo{
+	if h.stats.IsLiveTrackingEnabled() {
+		live := newUDPSessionLiveEntries(h.stats, stats.ConversationInfo{
 			Network:    spec.NetworkUDP,
 			InboundTag: metadata.InboundTag,
 			User:       metadata.User,
@@ -240,7 +256,7 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 				return tags
 			}
 			return []string{routed.Tag()}
-		}, h.udpSessionLiveConnectionsIdleTimeout, h.udpSessionLiveConnectionsMaxEntries)
+		}, closeSession, h.liveTrackingUDPEntryIdleTimeout, h.liveTrackingUDPMaxEntriesPerSession)
 		h.udpSweeper.add(live)
 		defer func() {
 			h.udpSweeper.remove(live)
@@ -286,6 +302,9 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	switch {
 	case errors.Is(relayErr, session.ErrIdle), errors.Is(relayErr, session.ErrClosed):
 		return nil
+	case errors.Is(relayErr, context.Canceled) && parentContext.Err() == nil:
+		h.logger.Info("UDP session closed by request", "inbound", metadata.InboundTag)
+		return nil
 	default:
 		return relayErr
 	}
@@ -296,7 +315,7 @@ func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.
 	packetMetadata.Network = spec.NetworkUDP
 	packetMetadata.Destination = destination
 
-	decision, err := h.router.Route(ctx, &udpSessionTrafficInformant{metadata: packetMetadata, resolver: h.resolver, logger: h.logger})
+	decision, err := h.router.Route(ctx, informant.NewUDPSession(packetMetadata, h.resolver, h.logger))
 	if err != nil {
 		return component.Decision{}, fmt.Errorf("handler: routing %s: %w", destination, err)
 	}

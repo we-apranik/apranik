@@ -62,10 +62,10 @@ func BenchmarkUDPLiveEntryMemory(b *testing.B) {
 	destinations := distinctDestinations(b, entries)
 
 	for range b.N {
-		registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConnections: true})
+		registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConversations: true})
 		before := heapInUse()
-		live := newUDPSessionLiveEntries(registry, stats.ConnectionInfo{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"},
-			func(component.Outbound) []string { return []string{"auto", "member"} }, time.Hour, entries)
+		live := newUDPSessionLiveEntries(registry, stats.ConversationInfo{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"},
+			func(component.Outbound) []string { return []string{"auto", "member"} }, nil, time.Hour, entries)
 		decision := component.Decision{Outbound: stubOutbound{}, Rule: "routing.rules[3]"}
 		for _, destination := range destinations {
 			live.uplinkAccepted(destination, decision, 100)

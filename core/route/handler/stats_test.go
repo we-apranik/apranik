@@ -10,7 +10,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
 	"github.com/The-Apranik/Apranik/core/stats"
@@ -83,26 +83,26 @@ func TestAConnectionWithoutAnAuthenticatedUserCreatesNoUserCounters(t *testing.T
 func TestAStreamThroughAGroupIsCountedUnderTheGroupAndTheMemberThatCarriedIt(t *testing.T) {
 	first := capturingOutbound{tag: "first", dialed: make(chan net.Conn, 1)}
 	second := capturingOutbound{tag: "second", dialed: make(chan net.Conn, 1)}
-	group, err := outbound.NewGroup(outbound.GroupConfig{
+	groupOutbound, err := group.NewFallback(group.FallbackConfig{
 		Tag:     "auto",
 		Members: []component.Outbound{first, second},
-		Probe:   outbound.ProbeConfig{URL: "http://probe.example/"},
+		Probe:   group.ProbeConfig{URL: "http://probe.example/"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer group.Close()
+	defer groupOutbound.Close()
 	registry := newStatsRegistry(
 		stats.OutboundDescription{Tag: "auto", IsGroup: true},
 		stats.OutboundDescription{Tag: "first"},
 		stats.OutboundDescription{Tag: "second"})
-	trafficHandler := handler.New(router.NewWithDefaultOutbound(group), handler.Config{Stats: registry})
+	trafficHandler := handler.New(router.NewWithDefaultOutbound(groupOutbound), handler.Config{Stats: registry})
 
 	relayOneExchange(t, trafficHandler, first.dialed, spec.Metadata{Network: spec.NetworkTCP, InboundTag: "in"}, 50, 80)
 
 	snapshot := viewOf(registry)
 	if got := snapshot.Outbounds["auto"]; !got.IsGroup || got.UplinkBytes != 50 || got.DownlinkBytes != 80 {
-		t.Errorf("group = %+v, want the group's 50 up and 80 down", got)
+		t.Errorf("group = %+v, want the groupOutbound's 50 up and 80 down", got)
 	}
 	if got := snapshot.Outbounds["first"]; got.UplinkBytes != 50 || got.DownlinkBytes != 80 || got.TCP.TotalConnections != 1 {
 		t.Errorf("first = %+v, want the connection it carried", got)

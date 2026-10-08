@@ -12,9 +12,9 @@ import (
 
 func newLiveEntriesForTest(t *testing.T, idleTimeout time.Duration, maxEntries int) (*udpSessionLiveEntries, *stats.Registry) {
 	t.Helper()
-	registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConnections: true})
-	live := newUDPSessionLiveEntries(registry, stats.ConnectionInfo{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"},
-		func(routed component.Outbound) []string { return []string{"out"} }, idleTimeout, maxEntries)
+	registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConversations: true})
+	live := newUDPSessionLiveEntries(registry, stats.ConversationInfo{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"},
+		func(routed component.Outbound) []string { return []string{"out"} }, nil, idleTimeout, maxEntries)
 	sweeper := newPeriodicSweeper(sweepIntervalFor(idleTimeout))
 	sweeper.add(live)
 	t.Cleanup(func() {
@@ -37,7 +37,7 @@ func TestADestinationIsListedFromItsFirstDatagramWithItsBytes(t *testing.T) {
 		t.Fatal("a reply found no entry for a listed destination")
 	}
 
-	entries := registry.LiveConnections()
+	entries := registry.LiveConversations()
 	if len(entries) != 1 || entries[0].UplinkBytes != 30 || entries[0].DownlinkBytes != 50 ||
 		entries[0].Info.User != "alice" || entries[0].Info.Rule != "default" || entries[0].Info.Destination != target {
 		t.Errorf("entries = %+v, want one with 30 up, 50 down, alice, the rule and the destination", entries)
@@ -50,7 +50,7 @@ func TestAReplyFromAnUnlistedDestinationFindsNoEntryAndCreatesNone(t *testing.T)
 	if live.downlinkReceived(destinationForTest(t, "192.0.2.1", 53), 10) {
 		t.Error("a reply found an entry that does not exist")
 	}
-	if len(registry.LiveConnections()) != 0 {
+	if len(registry.LiveConversations()) != 0 {
 		t.Error("a reply from an unknown destination listed an entry")
 	}
 }
@@ -62,7 +62,7 @@ func TestAReplyThatBeatsTheUplinkReportStillListsTheEntry(t *testing.T) {
 	live.downlinkReceivedFromRoutedDestination(target, decisionForTest(), 7)
 	live.uplinkAccepted(target, decisionForTest(), 3)
 
-	entries := registry.LiveConnections()
+	entries := registry.LiveConversations()
 	if len(entries) != 1 || entries[0].UplinkBytes != 3 || entries[0].DownlinkBytes != 7 {
 		t.Errorf("entries = %+v, want one entry with both directions", entries)
 	}
@@ -78,7 +78,7 @@ func TestTheEntryUsedLongestAgoEndsWhenTheSessionListsTooMany(t *testing.T) {
 	live.uplinkAccepted(third, decisionForTest(), 1)
 
 	listed := map[spec.Destination]bool{}
-	for _, entry := range registry.LiveConnections() {
+	for _, entry := range registry.LiveConversations() {
 		listed[entry.Info.Destination] = true
 	}
 	if len(listed) != 2 || !listed[first] || !listed[third] {
@@ -97,13 +97,13 @@ func TestAnEntryThatKeepsReceivingRepliesDoesNotGoIdle(t *testing.T) {
 			t.Fatal("the entry ended while replies kept arriving")
 		}
 	}
-	if len(registry.LiveConnections()) != 1 {
+	if len(registry.LiveConversations()) != 1 {
 		t.Fatal("the entry is not listed after 600 ms of replies against a 200 ms idle time")
 	}
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if len(registry.LiveConnections()) == 0 {
+		if len(registry.LiveConversations()) == 0 {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -119,15 +119,15 @@ func TestClosingTheSessionsLiveEntriesEndsEveryEntry(t *testing.T) {
 
 	live.close()
 
-	if len(registry.LiveConnections()) != 0 {
-		t.Errorf("%d entries left after the session ended", len(registry.LiveConnections()))
+	if len(registry.LiveConversations()) != 0 {
+		t.Errorf("%d entries left after the session ended", len(registry.LiveConversations()))
 	}
 }
 
 func BenchmarkLiveEntryUplinkAccepted(b *testing.B) {
-	registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConnections: true})
-	live := newUDPSessionLiveEntries(registry, stats.ConnectionInfo{InboundTag: "in"},
-		func(component.Outbound) []string { return []string{"out"} }, time.Minute, 1024)
+	registry := stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, TrackLiveConversations: true})
+	live := newUDPSessionLiveEntries(registry, stats.ConversationInfo{InboundTag: "in"},
+		func(component.Outbound) []string { return []string{"out"} }, nil, time.Minute, 1024)
 	b.Cleanup(live.close)
 	target, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
 	if err != nil {

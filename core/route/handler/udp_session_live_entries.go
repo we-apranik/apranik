@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,7 +19,7 @@ import (
 // cache: forgetting a routing decision does not end it, because the
 // destination may still be sending and receiving.
 type liveEntry struct {
-	connection         *stats.Connection
+	conversation       *stats.Conversation
 	lastActiveUnixNano atomic.Int64
 }
 
@@ -36,11 +37,15 @@ type udpSessionLiveEntries struct {
 
 	// What every entry of the session shares; each adds its destination, rule
 	// and outbounds.
-	sessionInfo stats.ConnectionInfo
+	sessionInfo stats.ConversationInfo
 
 	// The outbounds that carried the session's datagram through the routed
 	// outbound, known once something was sent through it.
 	carryingOutboundTags func(routed component.Outbound) []string
+
+	// Ends the whole UDP session: what closing any one entry means, since the
+	// relay and the session can only be cancelled together.
+	closeSession context.CancelFunc
 
 	idleTimeout time.Duration
 
@@ -48,11 +53,12 @@ type udpSessionLiveEntries struct {
 	entries *lru.Cache[spec.Destination, *liveEntry]
 }
 
-func newUDPSessionLiveEntries(registry *stats.Registry, sessionInfo stats.ConnectionInfo, carryingOutboundTags func(routed component.Outbound) []string, idleTimeout time.Duration, maxEntries int) *udpSessionLiveEntries {
+func newUDPSessionLiveEntries(registry *stats.Registry, sessionInfo stats.ConversationInfo, carryingOutboundTags func(routed component.Outbound) []string, closeSession context.CancelFunc, idleTimeout time.Duration, maxEntries int) *udpSessionLiveEntries {
 	live := &udpSessionLiveEntries{
 		registry:             registry,
 		sessionInfo:          sessionInfo,
 		carryingOutboundTags: carryingOutboundTags,
+		closeSession:         closeSession,
 		idleTimeout:          idleTimeout,
 		entries:              lru.New[spec.Destination, *liveEntry](maxEntries),
 	}
@@ -62,7 +68,7 @@ func newUDPSessionLiveEntries(registry *stats.Registry, sessionInfo stats.Connec
 // A datagram of size bytes was accepted by the outbound for destination, which
 // the decision routed.
 func (l *udpSessionLiveEntries) uplinkAccepted(destination spec.Destination, decision component.Decision, size int) {
-	l.entryFor(destination, decision).connection.Bytes().AddUplinkBytes(uint64(size))
+	l.entryFor(destination, decision).conversation.Bytes().AddUplinkBytes(uint64(size))
 }
 
 // A reply of size bytes arrived from destination. It counts on the destination's
@@ -75,7 +81,7 @@ func (l *udpSessionLiveEntries) downlinkReceived(destination spec.Destination, s
 		return false
 	}
 	entry.markActive()
-	entry.connection.Bytes().AddDownlinkBytes(uint64(size))
+	entry.conversation.Bytes().AddDownlinkBytes(uint64(size))
 	return true
 }
 
@@ -83,7 +89,7 @@ func (l *udpSessionLiveEntries) downlinkReceived(destination spec.Destination, s
 // answers was accepted, so a reply from a destination that is still routed
 // lists its entry too.
 func (l *udpSessionLiveEntries) downlinkReceivedFromRoutedDestination(destination spec.Destination, decision component.Decision, size int) {
-	l.entryFor(destination, decision).connection.Bytes().AddDownlinkBytes(uint64(size))
+	l.entryFor(destination, decision).conversation.Bytes().AddDownlinkBytes(uint64(size))
 }
 
 // The destination's entry, made when there is none, and used now.
@@ -97,9 +103,9 @@ func (l *udpSessionLiveEntries) entryFor(destination spec.Destination, decision 
 		info.Destination = destination
 		info.Rule = decision.Rule
 		info.OutboundTags = l.carryingOutboundTags(decision.Outbound)
-		entry = &liveEntry{connection: l.registry.TrackConnection(info)}
+		entry = &liveEntry{conversation: l.registry.TrackConversation(info, l.closeSession)}
 		if _, forgotten, wasFull := l.entries.Add(destination, entry); wasFull {
-			forgotten.connection.End()
+			forgotten.conversation.End()
 		}
 	}
 	entry.markActive()
@@ -111,7 +117,7 @@ func (l *udpSessionLiveEntries) close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.entries.Each(func(_ spec.Destination, entry *liveEntry) bool {
-		entry.connection.End()
+		entry.conversation.End()
 		return true
 	})
 	l.entries.Clear()
@@ -129,6 +135,6 @@ func (l *udpSessionLiveEntries) sweep() {
 			return
 		}
 		l.entries.RemoveOldest()
-		oldest.connection.End()
+		oldest.conversation.End()
 	}
 }

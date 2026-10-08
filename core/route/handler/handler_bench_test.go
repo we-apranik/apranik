@@ -50,10 +50,10 @@ func BenchmarkHandleOneShortStreamCounting(b *testing.B) {
 	}))
 }
 
-func BenchmarkHandleOneShortStreamCountingWithLiveConnections(b *testing.B) {
+func BenchmarkHandleOneShortStreamCountingWithLiveConversations(b *testing.B) {
 	benchmarkHandleOneShortStream(b, stats.NewRegistry(stats.Config{
 		InboundTags: []string{"in"}, Outbounds: []stats.OutboundDescription{{Tag: "out"}},
-		RuleLocations: []string{router.DefaultRuleLocation}, TrackLiveConnections: true,
+		RuleLocations: []string{router.DefaultRuleLocation}, TrackLiveConversations: true,
 	}))
 }
 

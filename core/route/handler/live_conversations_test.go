@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
 	"github.com/The-Apranik/Apranik/core/stats"
@@ -19,7 +19,7 @@ import (
 
 func trackingRegistry(outbounds ...stats.OutboundDescription) *stats.Registry {
 	return stats.NewRegistry(stats.Config{
-		InboundTags: []string{"in"}, Outbounds: outbounds, TrackLiveConnections: true,
+		InboundTags: []string{"in"}, Outbounds: outbounds, TrackLiveConversations: true,
 		RuleLocations: []string{router.DefaultRuleLocation},
 	})
 }
@@ -78,7 +78,7 @@ func clientAt(t *testing.T, address string) spec.TransportMetadata {
 	return spec.TransportMetadata{SourceEndpoint: endpoint}
 }
 
-func TestALiveConnectionIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
+func TestALiveConversationIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
 	registry := trackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry})
@@ -91,11 +91,11 @@ func TestALiveConnectionIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	go connection.client.Write(make([]byte, 100))
 	io.ReadFull(connection.remote, make([]byte, 100))
 	eventually(t, "the 100 bytes listed on the connection", func() bool {
-		live := registry.LiveConnections()
+		live := registry.LiveConversations()
 		return len(live) == 1 && live[0].UplinkBytes == 100
 	})
 
-	live := registry.LiveConnections()[0]
+	live := registry.LiveConversations()[0]
 	if live.Info.InboundTag != "in" || live.Info.User != "alice" || live.Info.Rule != router.DefaultRuleLocation ||
 		live.Info.Source.Addr().String() != "203.0.113.7" || live.Info.Destination != destination ||
 		!slices.Equal(live.Info.OutboundTags, []string{"out"}) {
@@ -111,7 +111,7 @@ func TestALiveConnectionIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	}
 
 	connection.end(t)
-	if live := registry.LiveConnections(); len(live) != 0 {
+	if live := registry.LiveConversations(); len(live) != 0 {
 		t.Errorf("%d connections still listed after the handler returned", len(live))
 	}
 	if users := registry.OnlineUsers(); len(users) != 0 {
@@ -119,35 +119,35 @@ func TestALiveConnectionIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	}
 }
 
-func TestALiveConnectionThroughAGroupNamesTheGroupThenTheMember(t *testing.T) {
+func TestALiveConversationThroughAGroupNamesTheGroupThenTheMember(t *testing.T) {
 	first := capturingOutbound{tag: "first", dialed: make(chan net.Conn, 1)}
 	second := capturingOutbound{tag: "second", dialed: make(chan net.Conn, 1)}
-	group, err := outbound.NewGroup(outbound.GroupConfig{
+	groupOutbound, err := group.NewFallback(group.FallbackConfig{
 		Tag:     "auto",
 		Members: []component.Outbound{first, second},
-		Probe:   outbound.ProbeConfig{URL: "http://probe.example/"},
+		Probe:   group.ProbeConfig{URL: "http://probe.example/"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer group.Close()
+	defer groupOutbound.Close()
 	registry := trackingRegistry(
 		stats.OutboundDescription{Tag: "auto", IsGroup: true},
 		stats.OutboundDescription{Tag: "first"},
 		stats.OutboundDescription{Tag: "second"})
-	trafficHandler := handler.New(router.NewWithDefaultOutbound(group), handler.Config{Stats: registry})
+	trafficHandler := handler.New(router.NewWithDefaultOutbound(groupOutbound), handler.Config{Stats: registry})
 
 	connection := openThrough(t, trafficHandler, first.dialed, spec.Metadata{Network: spec.NetworkTCP, InboundTag: "in"})
 	defer connection.end(t)
 
-	eventually(t, "the connection is listed", func() bool { return len(registry.LiveConnections()) == 1 })
-	live := registry.LiveConnections()
+	eventually(t, "the connection is listed", func() bool { return len(registry.LiveConversations()) == 1 })
+	live := registry.LiveConversations()
 	if len(live) != 1 || !slices.Equal(live[0].Info.OutboundTags, []string{"auto", "first"}) {
 		t.Errorf("live = %+v, want one connection through auto then first", live)
 	}
 }
 
-func TestAConnectionWithNoAuthenticatedUserIsListedButIsNoOnlineUser(t *testing.T) {
+func TestAConversationWithNoAuthenticatedUserIsListedButIsNoOnlineUser(t *testing.T) {
 	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
 	registry := trackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry})
@@ -155,13 +155,13 @@ func TestAConnectionWithNoAuthenticatedUserIsListedButIsNoOnlineUser(t *testing.
 	connection := openThrough(t, trafficHandler, out.dialed, spec.Metadata{Network: spec.NetworkTCP, InboundTag: "in"})
 	defer connection.end(t)
 
-	eventually(t, "the connection is listed", func() bool { return len(registry.LiveConnections()) == 1 })
-	if len(registry.LiveConnections()) != 1 || len(registry.OnlineUsers()) != 0 {
-		t.Errorf("live = %d, online users = %v, want 1 and none", len(registry.LiveConnections()), registry.OnlineUsers())
+	eventually(t, "the connection is listed", func() bool { return len(registry.LiveConversations()) == 1 })
+	if len(registry.LiveConversations()) != 1 || len(registry.OnlineUsers()) != 0 {
+		t.Errorf("live = %d, online users = %v, want 1 and none", len(registry.LiveConversations()), registry.OnlineUsers())
 	}
 }
 
-func TestNothingIsListedWhenLiveConnectionsAreNotTracked(t *testing.T) {
+func TestNothingIsListedWhenLiveConversationsAreNotTracked(t *testing.T) {
 	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
 	registry := newStatsRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry})
@@ -169,7 +169,7 @@ func TestNothingIsListedWhenLiveConnectionsAreNotTracked(t *testing.T) {
 	connection := openThrough(t, trafficHandler, out.dialed, spec.Metadata{Network: spec.NetworkTCP, InboundTag: "in", User: "alice"})
 	defer connection.end(t)
 
-	if registry.TracksLiveConnections() || len(registry.LiveConnections()) != 0 {
+	if registry.IsLiveTrackingEnabled() || len(registry.LiveConversations()) != 0 {
 		t.Error("connections were listed with tracking off")
 	}
 	eventually(t, "the connection is counted", func() bool { return registry.InboundTraffic()["in"].TCP.ActiveConnections == 1 })

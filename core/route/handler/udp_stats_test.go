@@ -11,7 +11,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound"
+	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
 	"github.com/The-Apranik/Apranik/core/stats"
@@ -71,16 +71,16 @@ func (d *echoDatagram) LocalAddr() net.Addr { return nil }
 // A member of a group, carrying UDP like echoUDPOutbound.
 func newUDPGroup(t *testing.T, members ...component.Outbound) component.Outbound {
 	t.Helper()
-	group, err := outbound.NewGroup(outbound.GroupConfig{
+	groupOutbound, err := group.NewFallback(group.FallbackConfig{
 		Tag:     "auto",
 		Members: members,
-		Probe:   outbound.ProbeConfig{URL: "http://probe.example/"},
+		Probe:   group.ProbeConfig{URL: "http://probe.example/"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { group.Close() })
-	return group
+	t.Cleanup(func() { groupOutbound.Close() })
+	return groupOutbound
 }
 
 func udpTarget(t *testing.T, host string, port uint16) spec.Destination {
@@ -94,7 +94,7 @@ func udpTarget(t *testing.T, host string, port uint16) spec.Destination {
 
 func udpTrackingRegistry(outbounds ...stats.OutboundDescription) *stats.Registry {
 	return stats.NewRegistry(stats.Config{
-		InboundTags: []string{"in"}, Outbounds: outbounds, TrackLiveConnections: true,
+		InboundTags: []string{"in"}, Outbounds: outbounds, TrackLiveConversations: true,
 		RuleLocations: []string{router.DefaultRuleLocation},
 	})
 }
@@ -187,11 +187,11 @@ func TestEachDestinationOfASessionIsOneLiveEntryWithItsOwnBytes(t *testing.T) {
 	session.exchange(t, second)
 
 	eventually(t, "both destinations are listed with their bytes", func() bool {
-		live := registry.LiveConnections()
+		live := registry.LiveConversations()
 		return len(live) == 2 && live[0].DownlinkBytes+live[1].DownlinkBytes == 12
 	})
-	live := registry.LiveConnections()
-	byDestination := map[string]stats.ConnectionSnapshot{}
+	live := registry.LiveConversations()
+	byDestination := map[string]stats.ConversationSnapshot{}
 	for _, entry := range live {
 		byDestination[entry.Info.Destination.String()] = entry
 		if entry.Info.Network != spec.NetworkUDP || entry.Info.InboundTag != "in" || entry.Info.User != "alice" ||
@@ -206,7 +206,7 @@ func TestEachDestinationOfASessionIsOneLiveEntryWithItsOwnBytes(t *testing.T) {
 	if got := byDestination[second.String()]; got.UplinkBytes != 4 || got.DownlinkBytes != 4 {
 		t.Errorf("second destination = %d up, %d down, want 4 and 4", got.UplinkBytes, got.DownlinkBytes)
 	}
-	if users := registry.OnlineUsers(); len(users) != 1 || users[0].Name != "alice" || users[0].Connections != 2 {
+	if users := registry.OnlineUsers(); len(users) != 1 || users[0].Name != "alice" || users[0].Conversations != 2 {
 		t.Errorf("online users = %+v, want alice online through her two live UDP entries", users)
 	}
 }
@@ -214,32 +214,32 @@ func TestEachDestinationOfASessionIsOneLiveEntryWithItsOwnBytes(t *testing.T) {
 func TestAUDPLiveEntryEndsWhenItsDestinationHasBeenSilentAndWhenTheSessionEnds(t *testing.T) {
 	registry := udpTrackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(echoUDPOutbound{tag: "out"}),
-		handler.Config{Stats: registry, UDPSessionLiveConnectionsIdleTimeout: 200 * time.Millisecond})
+		handler.Config{Stats: registry, LiveTrackingUDPEntryIdleTimeout: 200 * time.Millisecond})
 	session := startUDPSession(t, trafficHandler, udpMetadata("alice"), "abcd")
 
 	session.exchange(t, udpTarget(t, "192.0.2.1", 53))
-	eventually(t, "the destination is listed", func() bool { return len(registry.LiveConnections()) == 1 })
-	eventually(t, "the idle destination is forgotten", func() bool { return len(registry.LiveConnections()) == 0 })
+	eventually(t, "the destination is listed", func() bool { return len(registry.LiveConversations()) == 1 })
+	eventually(t, "the idle destination is forgotten", func() bool { return len(registry.LiveConversations()) == 0 })
 
 	session.exchange(t, udpTarget(t, "192.0.2.1", 53))
-	eventually(t, "the destination is listed again after a new packet", func() bool { return len(registry.LiveConnections()) == 1 })
+	eventually(t, "the destination is listed again after a new packet", func() bool { return len(registry.LiveConversations()) == 1 })
 
 	session.cancel()
-	eventually(t, "the entry ends with the session", func() bool { return len(registry.LiveConnections()) == 0 })
+	eventually(t, "the entry ends with the session", func() bool { return len(registry.LiveConversations()) == 0 })
 }
 
 func TestASessionNeverListsMoreDestinationsThanItsLiveEntriesHold(t *testing.T) {
 	registry := udpTrackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(echoUDPOutbound{tag: "out"}),
-		handler.Config{Stats: registry, UDPSessionLiveConnectionsMaxEntries: 2, UDPCountFlushInterval: 5 * time.Millisecond})
+		handler.Config{Stats: registry, LiveTrackingUDPMaxEntriesPerSession: 2, UDPCountFlushInterval: 5 * time.Millisecond})
 	session := startUDPSession(t, trafficHandler, udpMetadata(""), "abcd")
 
 	for host := 1; host <= 5; host++ {
 		session.exchange(t, udpTarget(t, "192.0.2.1", uint16(host)))
 	}
 
-	eventually(t, "only the two destinations used last are listed", func() bool { return len(registry.LiveConnections()) == 2 })
-	for _, entry := range registry.LiveConnections() {
+	eventually(t, "only the two destinations used last are listed", func() bool { return len(registry.LiveConversations()) == 2 })
+	for _, entry := range registry.LiveConversations() {
 		if port := entry.Info.Destination.Port(); port != 4 && port != 5 {
 			t.Errorf("destination port %d is listed, want only the last two used (4 and 5)", port)
 		}
@@ -250,14 +250,14 @@ func TestASessionNeverListsMoreDestinationsThanItsLiveEntriesHold(t *testing.T) 
 func TestForgettingARoutingDecisionLeavesTheDestinationsLiveEntry(t *testing.T) {
 	registry := udpTrackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(echoUDPOutbound{tag: "out"}),
-		handler.Config{Stats: registry, UDPSessionRouteCacheMaxEntries: 1})
+		handler.Config{Stats: registry, UDPRoutingCacheMaxEntriesPerSession: 1})
 	session := startUDPSession(t, trafficHandler, udpMetadata(""), "abcd")
 
 	for host := 1; host <= 3; host++ {
 		session.exchange(t, udpTarget(t, "192.0.2.1", uint16(host)))
 	}
 
-	eventually(t, "all three destinations are listed", func() bool { return len(registry.LiveConnections()) == 3 })
+	eventually(t, "all three destinations are listed", func() bool { return len(registry.LiveConversations()) == 3 })
 	if hits := registry.RuleHits()[router.DefaultRuleLocation]; hits != 3 {
 		t.Errorf("rule hits = %d, want 3", hits)
 	}
@@ -265,8 +265,8 @@ func TestForgettingARoutingDecisionLeavesTheDestinationsLiveEntry(t *testing.T) 
 	eventually(t, "the destination routed again is a fourth hit", func() bool {
 		return registry.RuleHits()[router.DefaultRuleLocation] == 4
 	})
-	if len(registry.LiveConnections()) != 3 {
-		t.Errorf("%d live entries, want 3: routing a destination again is not a new entry", len(registry.LiveConnections()))
+	if len(registry.LiveConversations()) != 3 {
+		t.Errorf("%d live entries, want 3: routing a destination again is not a new entry", len(registry.LiveConversations()))
 	}
 }
 
@@ -313,7 +313,7 @@ func TestABlockedUDPDestinationCountsADropPerPacketAndHasNoEntry(t *testing.T) {
 	eventually(t, "each blocked packet is a drop", func() bool {
 		return registry.InboundTraffic()["in"].DatagramDropsByReason["blocked_by_rule"] == 3
 	})
-	live := registry.LiveConnections()
+	live := registry.LiveConversations()
 	if len(live) != 1 || live[0].Info.Destination.String() == blocked.String() {
 		t.Errorf("live entries = %+v, want only the allowed destination", live)
 	}
@@ -333,12 +333,12 @@ func TestTwoUDPSessionsToOneDestinationHaveTheirOwnEntries(t *testing.T) {
 	first.exchange(t, target)
 	second.exchange(t, target)
 
-	eventually(t, "two entries", func() bool { return len(registry.LiveConnections()) == 2 })
+	eventually(t, "two entries", func() bool { return len(registry.LiveConversations()) == 2 })
 	if sessions := registry.InboundTraffic()["in"].UDP.Sessions; sessions != 2 {
 		t.Errorf("sessions = %d, want 2", sessions)
 	}
 	bytesByUser := map[string]uint64{}
-	for _, entry := range registry.LiveConnections() {
+	for _, entry := range registry.LiveConversations() {
 		bytesByUser[entry.Info.User] = entry.UplinkBytes
 	}
 	if bytesByUser["alice"] != 2 || bytesByUser["bob"] != 4 {
@@ -348,9 +348,9 @@ func TestTwoUDPSessionsToOneDestinationHaveTheirOwnEntries(t *testing.T) {
 
 func TestAUDPSessionThroughAGroupIsCountedUnderTheGroupAndTheMember(t *testing.T) {
 	member := echoUDPOutbound{tag: "member"}
-	group := newUDPGroup(t, member)
+	groupOutbound := newUDPGroup(t, member)
 	registry := udpTrackingRegistry(stats.OutboundDescription{Tag: "auto", IsGroup: true}, stats.OutboundDescription{Tag: "member"})
-	trafficHandler := handler.New(router.NewWithDefaultOutbound(group), handler.Config{Stats: registry, UDPCountFlushInterval: 5 * time.Millisecond})
+	trafficHandler := handler.New(router.NewWithDefaultOutbound(groupOutbound), handler.Config{Stats: registry, UDPCountFlushInterval: 5 * time.Millisecond})
 	session := startUDPSession(t, trafficHandler, udpMetadata(""), "abcd")
 
 	session.exchange(t, udpTarget(t, "192.0.2.1", 53))
@@ -363,13 +363,13 @@ func TestAUDPSessionThroughAGroupIsCountedUnderTheGroupAndTheMember(t *testing.T
 			t.Errorf("%s UDP = %+v, want 4 up, 4 down, 1 session", tag, got)
 		}
 	}
-	eventually(t, "the entry is listed", func() bool { return len(registry.LiveConnections()) == 1 })
-	if tags := registry.LiveConnections()[0].Info.OutboundTags; !slices.Equal(tags, []string{"auto", "member"}) {
+	eventually(t, "the entry is listed", func() bool { return len(registry.LiveConversations()) == 1 })
+	if tags := registry.LiveConversations()[0].Info.OutboundTags; !slices.Equal(tags, []string{"auto", "member"}) {
 		t.Errorf("entry outbound tags = %v, want [auto member]", tags)
 	}
 }
 
-func TestNothingIsListedForUDPWhenLiveConnectionsAreNotTracked(t *testing.T) {
+func TestNothingIsListedForUDPWhenLiveConversationsAreNotTracked(t *testing.T) {
 	registry := newStatsRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(echoUDPOutbound{tag: "out"}), handler.Config{Stats: registry, UDPCountFlushInterval: 5 * time.Millisecond})
 	session := startUDPSession(t, trafficHandler, udpMetadata(""), "abcd")
@@ -377,7 +377,7 @@ func TestNothingIsListedForUDPWhenLiveConnectionsAreNotTracked(t *testing.T) {
 	session.exchange(t, udpTarget(t, "192.0.2.1", 53))
 	eventually(t, "the datagram is counted", func() bool { return registry.InboundTraffic()["in"].UDP.DownlinkPackets == 1 })
 
-	if registry.TracksLiveConnections() || len(registry.LiveConnections()) != 0 {
+	if registry.IsLiveTrackingEnabled() || len(registry.LiveConversations()) != 0 {
 		t.Error("UDP entries were listed with tracking off")
 	}
 	if got := registry.InboundTraffic()["in"].UDP; got.UplinkPackets != 1 || got.DownlinkPackets != 1 {
@@ -401,7 +401,7 @@ func TestTheLiveEntriesAddUpToWhatTheInboundCounted(t *testing.T) {
 	eventually(t, "the entries have every byte the inbound counted", func() bool {
 		inbound := registry.InboundTraffic()["in"].UDP
 		var up, down uint64
-		for _, entry := range registry.LiveConnections() {
+		for _, entry := range registry.LiveConversations() {
 			up += entry.UplinkBytes
 			down += entry.DownlinkBytes
 		}
