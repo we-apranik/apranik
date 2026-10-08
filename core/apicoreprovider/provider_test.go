@@ -158,8 +158,8 @@ func TestLiveConversationsAreConvertedFieldForField(t *testing.T) {
 	s := newSetup(t, true, true)
 	destination, _ := spec.NewDestinationFromDomain("example.com", 443)
 	connection := s.registry.TrackConversation(stats.ConversationInfo{
-		Network: spec.NetworkTCP, InboundTag: "in", User: "alice", Destination: destination,
-		OutboundTags: []string{"choose", "proxy"}, Rule: "routing.rules[3]",
+		Network: spec.NetworkTCP, InboundTag: "in", InboundProtocol: "socks5", User: "alice", Destination: destination,
+		SniffedDomain: "sniffed.example", OutboundTags: []string{"choose", "proxy"}, Rule: "routing.rules[3]",
 	}, nil)
 	connection.Bytes().AddUplinkBytes(7)
 	connection.Bytes().AddDownlinkBytes(9)
@@ -169,7 +169,7 @@ func TestLiveConversationsAreConvertedFieldForField(t *testing.T) {
 		t.Fatalf("LiveConnections = %v, %v", live, err)
 	}
 	got := live[0]
-	if got.ID == "" || got.Network != spec.NetworkTCP || got.InboundTag != "in" || got.User != "alice" || got.Destination != destination ||
+	if got.ID == "" || got.Network != spec.NetworkTCP || got.InboundTag != "in" || got.InboundProtocol != "socks5" || got.SniffedDomain != "sniffed.example" || got.User != "alice" || got.Destination != destination ||
 		got.RuleLocation != "routing.rules[3]" || got.UplinkBytes != 7 || got.DownlinkBytes != 9 || len(got.OutboundTags) != 2 || got.StartedAt.IsZero() {
 		t.Errorf("connection = %+v", got)
 	}
