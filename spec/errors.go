@@ -36,4 +36,8 @@ var (
 	ErrAPINoSuchLiveConversation    = errors.New("spec: no live conversation has this id")
 	ErrAPINoLogFileOutput           = errors.New("spec: no file log output is configured")
 	ErrAPIInvalidDelayTest          = errors.New("spec: the delay test request is not valid")
+	ErrAPIInvalidDNSQuery           = errors.New("spec: the DNS query is not valid")
+	ErrAPIInvalidConfiguration      = errors.New("spec: the configuration cannot be loaded")
+	ErrAPIReloadInProgress          = errors.New("spec: a reload is already waiting to be applied")
+	ErrAPIReloadUnavailable         = errors.New("spec: reloading the configuration is not available")
 )

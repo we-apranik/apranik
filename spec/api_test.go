@@ -21,7 +21,8 @@ func TestEveryAPIErrorIsDistinctAndSaysItIsFromSpec(t *testing.T) {
 	apiErrors := []error{
 		spec.ErrAPIStatisticsDisabled, spec.ErrAPILiveConversationsDisabled, spec.ErrAPINoSuchOutbound,
 		spec.ErrAPIOutboundNotSelectable, spec.ErrAPINoSuchMember, spec.ErrAPINoSuchLiveConversation,
-		spec.ErrAPINoLogFileOutput, spec.ErrAPIInvalidDelayTest,
+		spec.ErrAPINoLogFileOutput, spec.ErrAPIInvalidDelayTest, spec.ErrAPIInvalidDNSQuery,
+		spec.ErrAPIInvalidConfiguration, spec.ErrAPIReloadInProgress, spec.ErrAPIReloadUnavailable,
 	}
 	for index, err := range apiErrors {
 		if !strings.HasPrefix(err.Error(), "spec: ") {
