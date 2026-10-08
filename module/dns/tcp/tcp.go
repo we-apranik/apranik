@@ -23,16 +23,16 @@ type Settings struct {
 	// Where the DNS server is; the port defaults to DefaultPort.
 	Server types.ServerAddress `json:"server"`
 
-	// Bounds one query, the dial included. Zero means DefaultTimeout.
-	Timeout types.Duration `json:"timeout"`
+	// Bounds one query, the dial included. Absent means DefaultTimeout; a written zero is refused.
+	Timeout *types.Duration `json:"timeout"`
 }
 
 func (s *Settings) Validate() error {
 	if s.Server.IsZero() {
 		return errors.New("tcp: server is required")
 	}
-	if s.Timeout < 0 {
-		return fmt.Errorf("tcp: timeout %s must not be negative", s.Timeout)
+	if err := types.CheckPositive(s.Timeout); err != nil {
+		return fmt.Errorf("tcp: timeout %w", err)
 	}
 	return nil
 }
@@ -55,10 +55,7 @@ func (s *Server) NewStreamDNSServer(dialer spec.StreamDialer) (spec.DNSServer, e
 	if err != nil {
 		return nil, fmt.Errorf("tcp: server: %w", err)
 	}
-	timeout := time.Duration(s.Timeout)
-	if timeout == 0 {
-		timeout = DefaultTimeout
-	}
+	timeout := time.Duration(types.ValueOrDefault(s.Timeout, types.Duration(DefaultTimeout)))
 	return dnsstream.NewClient(dialer, destination, timeout), nil
 }
 
