@@ -16,6 +16,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/logging/sink"
 	coreudp "github.com/The-Apranik/Apranik/core/net/udp"
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/module/transport/base/udp"
@@ -846,8 +847,8 @@ func TestALiteralDestinationIsNeverRelabelled(t *testing.T) {
 // A sprayer sending many packets that filtering rejects must not produce one
 // log line per packet.
 func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
-	sink := logging.NewMemorySink(64, logging.LevelDebug)
-	system, err := logging.New(logging.Config{Level: logging.LevelDebug, Outputs: []logging.Output{logging.HandlerOutput{Handler: sink}}})
+	memory := sink.NewMemory(64, logging.LevelDebug)
+	system, err := logging.New(logging.Config{Level: logging.LevelDebug, Outputs: []logging.Output{logging.HandlerOutput{Handler: memory}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -872,7 +873,7 @@ func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
 	expectNothing(t, arrivals, shortWait)
 
 	notices := 0
-	for _, record := range sink.Records() {
+	for _, record := range memory.Records() {
 		if record.Message == "Inbound datagram rejected by filtering policy" {
 			notices++
 		}
