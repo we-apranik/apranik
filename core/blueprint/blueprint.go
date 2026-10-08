@@ -36,6 +36,10 @@ type Blueprint struct {
 
 	// Nil counts everything.
 	Stats *Stats
+
+	// The ways other programs read and drive a running Apranik. Empty means
+	// none; each is started after everything else is running.
+	APIs []spec.APIModule
 }
 
 // Log's zero value is a silent logger.
@@ -82,44 +86,37 @@ type Inbound struct {
 	// Zero means close it instead.
 	Fallback spec.Destination
 
-	// Silence in both directions ends a TCP connection. Zero means
-	// relay.DefaultStreamIdleTimeout; negative means no bound.
-	TCPIdleTimeout time.Duration
+	// Silence in both directions ends a TCP connection. Nil means
+	// relay.DefaultStreamIdleTimeout; negative means no bound; zero is refused.
+	TCPIdleTimeout *time.Duration
 
-	// Silence ends a UDP session. Zero means session.DefaultIdleTimeout.
-	UDPSessionIdleTimeout time.Duration
+	// Silence ends a UDP session. Nil means session.DefaultIdleTimeout; a
+	// value must be positive.
+	UDPSessionIdleTimeout *time.Duration
 
 	// The largest UDP datagram a client may send and a reply may be; a bigger
-	// one is dropped and counted. Zero means udp.DefaultMaxDatagramSize.
-	UDPMaxDatagramSize int
+	// one is dropped and counted. Nil means udp.DefaultMaxDatagramSize; a
+	// value must be positive.
+	UDPMaxDatagramSize *int
 
 	// Silence from the client to one destination of a UDP session makes the
-	// session forget that destination's routing decision. Zero means
-	// udp.DefaultRouteCacheIdleTimeout.
-	UDPSessionRouteCacheIdleTimeout time.Duration
+	// session forget that destination's routing decision. Nil means
+	// udp.DefaultRoutingCacheEntryIdleTimeout; a value must be positive.
+	UDPRoutingCacheEntryIdleTimeout *time.Duration
 
 	// How many destinations a UDP session remembers at once; the one used
-	// longest ago is forgotten when it is full. Zero means
-	// udp.DefaultRouteCacheMaxEntries.
-	UDPSessionRouteCacheMaxEntries int
-
-	// A UDP destination's live entry ends after this much silence in either
-	// direction. Zero means udp.DefaultLiveConnectionsIdleTimeout.
-	UDPSessionLiveConnectionsIdleTimeout time.Duration
-
-	// How many destinations of one UDP session are listed as live at once; the
-	// one used longest ago ends when it is full. Zero means
-	// udp.DefaultLiveConnectionsMaxEntries.
-	UDPSessionLiveConnectionsMaxEntries int
+	// longest ago is forgotten when it is full. Nil means
+	// udp.DefaultRoutingCacheMaxEntriesPerSession; a value must be positive.
+	UDPRoutingCacheMaxEntriesPerSession *int
 
 	// TCP connections held at once; one more is closed as soon as it is
-	// accepted. Zero means no limit.
-	MaxTCPConnections int
+	// accepted. Nil means no limit; a value must be positive.
+	MaxTCPConnections *int
 
 	// UDP sessions held at once, over a stream protocol that carries UDP (a
 	// SOCKS5 association, Trojan's UDP); a request for one more is refused.
-	// Zero means no limit.
-	MaxUDPSessions int
+	// Nil means no limit; a value must be positive.
+	MaxUDPSessions *int
 }
 
 // Exactly one of Proxy, Freedom and Group is set; config.Check refuses anything
@@ -158,9 +155,9 @@ type Mixed struct {
 	HTTP   spec.StreamProxyModule
 
 	// How long a client may take to send the byte that picks SOCKS5 or HTTP;
-	// each then bounds its own handshake. Zero means
-	// mixed.DefaultFirstByteTimeout.
-	FirstByteTimeout time.Duration
+	// each then bounds its own handshake. Nil means
+	// mixed.DefaultFirstByteTimeout; a value must be positive.
+	FirstByteTimeout *time.Duration
 }
 
 // Freedom sends straight to each destination, so its transports are always
@@ -173,6 +170,6 @@ type Freedom struct {
 	NAT *nat.Policy
 
 	// The largest reply the NAT passes on; a bigger one is dropped and
-	// counted. Zero means udp.DefaultMaxDatagramSize.
-	NATMaxDatagramSize int
+	// counted. Nil means udp.DefaultMaxDatagramSize; a value must be positive.
+	NATMaxDatagramSize *int
 }
