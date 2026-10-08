@@ -22,14 +22,15 @@ type Settings struct {
 	UDPRelay bool `json:"udp_relay"`
 
 	// The largest UDP datagram the server takes from a client through UDP
-	// ASSOCIATE; a bigger one is dropped. Zero means defaultMaxDatagramSize.
+	// ASSOCIATE; a bigger one is dropped. Absent means defaultMaxDatagramSize; a
+	// written zero is refused.
 	// Match the inbound's udp_max_datagram_size, which bounds what core
 	// relays. Server only.
-	UDPMaxDatagramSize int `json:"udp_max_datagram_size"`
+	UDPMaxDatagramSize *int `json:"udp_max_datagram_size"`
 
 	// Both: how long the handshake may take; on a server, UDP ASSOCIATE's
-	// reply too. Zero means defaultHandshakeTimeout.
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// reply too. Absent means defaultHandshakeTimeout; a written zero is refused.
+	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
 // PROVISIONAL.
@@ -44,25 +45,22 @@ const defaultMaxDatagramSize = 8192
 const largestDatagramSize = 65507
 
 func (s *Settings) maxDatagramSize() int {
-	if s.UDPMaxDatagramSize == 0 {
-		return defaultMaxDatagramSize
-	}
-	return s.UDPMaxDatagramSize
+	return types.ValueOrDefault(s.UDPMaxDatagramSize, defaultMaxDatagramSize)
 }
 
 func (s *Settings) handshakeTimeout() time.Duration {
-	if s.HandshakeTimeout == 0 {
-		return defaultHandshakeTimeout
-	}
-	return time.Duration(s.HandshakeTimeout)
+	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
 func (s *Settings) Validate() error {
-	if s.UDPMaxDatagramSize < 0 || s.UDPMaxDatagramSize > largestDatagramSize {
-		return fmt.Errorf("socks5: udp_max_datagram_size %d must be from 0 (the default, %d) to %d", s.UDPMaxDatagramSize, defaultMaxDatagramSize, largestDatagramSize)
+	if err := types.CheckPositive(s.UDPMaxDatagramSize); err != nil {
+		return fmt.Errorf("socks5: udp_max_datagram_size %w", err)
 	}
-	if s.HandshakeTimeout < 0 {
-		return fmt.Errorf("socks5: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	if s.UDPMaxDatagramSize != nil && *s.UDPMaxDatagramSize > largestDatagramSize {
+		return fmt.Errorf("socks5: udp_max_datagram_size %d is more than a UDP datagram can hold (%d)", *s.UDPMaxDatagramSize, largestDatagramSize)
+	}
+	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
+		return fmt.Errorf("socks5: handshake_timeout %w", err)
 	}
 	if (s.Username == "") != (s.Password == "") {
 		return errors.New("socks5: username and password must be set together or not at all")

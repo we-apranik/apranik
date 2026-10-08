@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/shared/socksaddr"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -78,12 +79,12 @@ func TestTheUDPDatagramSizeSettingDefaultsAndIsChecked(t *testing.T) {
 	if got := settings.maxDatagramSize(); got != defaultMaxDatagramSize {
 		t.Errorf("default = %d, want %d", got, defaultMaxDatagramSize)
 	}
-	settings.UDPMaxDatagramSize = 1500
+	settings.UDPMaxDatagramSize = types.Pointer(1500)
 	if settings.maxDatagramSize() != 1500 || settings.Validate() != nil {
 		t.Error("1500 was not accepted as it is")
 	}
-	for _, refused := range []int{-1, largestDatagramSize + 1} {
-		settings.UDPMaxDatagramSize = refused
+	for _, refused := range []int{-1, 0, largestDatagramSize + 1} {
+		settings.UDPMaxDatagramSize = types.Pointer(refused)
 		if settings.Validate() == nil {
 			t.Errorf("udp_max_datagram_size %d was accepted", refused)
 		}
