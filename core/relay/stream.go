@@ -29,7 +29,7 @@ var ErrStreamIdle = errors.New("relay: stream idle timeout")
 // from the client as uplink and the bytes read from the remote side as
 // downlink, as they pass. Nil entries are skipped; nothing to count means
 // nothing is counted and nothing is wrapped.
-func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout time.Duration, counters []*stats.Counters, connectionBytes *stats.ConnectionBytes) error {
+func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout time.Duration, counters []*stats.Counters, connectionBytes *stats.ConversationBytes) error {
 	defer clientSide.Close()
 	defer remoteSide.Close()
 
@@ -134,7 +134,7 @@ const (
 
 // The source itself when there is nothing to watch, so a connection with no
 // idle timeout and no counters reads straight from the stream.
-func observe(source io.Reader, activity *streamActivity, counters []*stats.Counters, connectionBytes *stats.ConnectionBytes, direction byteDirection) io.Reader {
+func observe(source io.Reader, activity *streamActivity, counters []*stats.Counters, connectionBytes *stats.ConversationBytes, direction byteDirection) io.Reader {
 	if activity == nil && len(counters) == 0 && connectionBytes == nil {
 		return source
 	}
@@ -149,7 +149,7 @@ type observedReader struct {
 	counters []*stats.Counters
 
 	// Nil when the connection is not tracked.
-	connectionBytes *stats.ConnectionBytes
+	connectionBytes *stats.ConversationBytes
 	direction       byteDirection
 }
 

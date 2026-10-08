@@ -148,8 +148,8 @@ func TestBytesAreCountedWhileTheConnectionIsStillOpen(t *testing.T) {
 }
 
 func TestRelayedBytesAreCountedOnTheConnectionsOwnBytesToo(t *testing.T) {
-	registry := stats.NewRegistry(stats.Config{TrackLiveConnections: true})
-	connection := registry.TrackConnection(stats.ConnectionInfo{})
+	registry := stats.NewRegistry(stats.Config{TrackLiveConversations: true})
+	connection := registry.TrackConversation(stats.ConversationInfo{}, nil)
 	client, clientSide := net.Pipe()
 	remoteSide, remote := net.Pipe()
 	go relay.Stream(context.Background(), pipeStream{clientSide}, pipeStream{remoteSide}, 0, nil, connection.Bytes())
@@ -160,9 +160,9 @@ func TestRelayedBytesAreCountedOnTheConnectionsOwnBytesToo(t *testing.T) {
 	go remote.Write(make([]byte, 500))
 	io.ReadFull(client, make([]byte, 500))
 
-	live := registry.LiveConnections()
+	live := registry.LiveConversations()
 	if len(live) != 1 || live[0].UplinkBytes != 70 || live[0].DownlinkBytes != 500 {
-		t.Errorf("live connections = %+v, want one with 70 up and 500 down", live)
+		t.Errorf("live conversations = %+v, want one with 70 up and 500 down", live)
 	}
 }
 
