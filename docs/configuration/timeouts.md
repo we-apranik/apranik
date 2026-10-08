@@ -22,8 +22,8 @@ stack's handshakes can together take the sum of their timeouts.
 | Sniffing wait | a `sniff` rule's [`settings.timeout`](routing/sniffing.md#timeout) | `300ms` |
 | TCP idle | [`inbounds[].tcp_idle_timeout`](inbound/index.md#tcp_idle_timeout) | `5m` |
 | UDP session idle | [`inbounds[].udp_session_idle_timeout`](inbound/index.md#udp_session_idle_timeout) | `5m` |
-| UDP route cache idle (a destination's routing decision kept) | [`inbounds[].udp_session_route_cache_idle_timeout`](inbound/index.md#udp_session_route_cache_idle_timeout) | `1m` |
-| UDP live entry idle (a destination listed as live, silence in either direction) | [`inbounds[].udp_session_live_connections_idle_timeout`](inbound/index.md#udp_session_live_connections_idle_timeout) | `1m` |
+| UDP route cache idle (a destination's routing decision kept) | [`inbounds[].udp_routing_cache_entry_idle_timeout`](inbound/index.md#udp_routing_cache_entry_idle_timeout) | `1m` |
+| UDP live entry idle (a destination listed as live, silence in either direction) | [`stats.tracking.udp_entry_idle_timeout`](stats.md#tracking) | `1m` |
 | Trojan request wait for the first payload | internal | `100ms` |
 | Fallback dial | internal | `10s` |
 | `ws` Close frame on close | internal | `1s` |
