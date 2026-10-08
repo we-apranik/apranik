@@ -51,7 +51,7 @@ Step by step:
    and relays, and the steps below do not happen.
 3. **Route.** The inbound hands the payload and `Metadata` to
    `Handler.HandleStream` in `core/route/handler/handler.go`, which wraps them
-   in a `streamTrafficInformant` and calls `Router.Route`. The router walks the
+   in a `informant.Stream` and calls `Router.Route`. The router walks the
    rules in order and returns a `Decision`: an outbound, or block, which closes
    the stream.
 4. **Sniff (when a rule asks).** A rule whose action is `sniff` calls the
@@ -93,7 +93,7 @@ Step by step:
    `udpSessionRoutingCache`, then runs `relay.Datagrams`.
 4. **Client → destination.** `forwardClientDatagramsToSession` reads a packet,
    asks `OutboundForDestination` (the cache's `route` method, which calls
-   `Handler.routeUDPDestination` on a miss with a `udpSessionTrafficInformant`,
+   `Handler.routeUDPDestination` on a miss with a `informant.UDPSession`,
    which sniffs nothing), then calls `Session.Send`. The cache keeps each
    destination's decision, block included. A packet that is blocked, or cannot
    be routed or sent, is dropped and logged at Debug; the session continues.
