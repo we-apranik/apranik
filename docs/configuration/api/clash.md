@@ -46,6 +46,7 @@ listener. It sees the core only through the provider core gives every API.
 | `port` | 1 to 65535 | required |
 | `secret` | text | required |
 | `allow_origins` | list of `scheme://host[:port]`, or `"*"` | none: no browser page may call the API |
+| `external_ui` | an absolute path to a directory | none: no `/ui` |
 | `log_buffer_records` | whole number, 1 to 100000 | `256` |
 | `delay_test` | `url`, `timeout`, `expected_status`, each optional | see [delay tests](#delay-tests) |
 
@@ -113,9 +114,18 @@ chunked JSON lines.
 `PUT` and `PATCH /configs` answer 405 with a message: the mode and the ports are not settable
 through the API. Nothing is a silent no-op.
 
+### The dashboard
+
+`external_ui` is a directory holding a dashboard's files (MetaCubeXD, yacd, zashboard: unpack a
+release into it). They are served at `/ui/` (`/ui` redirects there) **without the secret**: the
+page has to load before it can ask for the secret, and every API call it then makes carries it.
+Only `GET` and `HEAD` are answered, and a symbolic link inside the directory cannot lead outside
+it. The directory is opened when the API starts, so a missing one fails `run`, not `check`. The
+path must be absolute. Apranik does not download dashboards.
+
 ### Not built
 
-`/providers/*` (404: Apranik has no providers), `/ui`, `/restart`, `/upgrade`, the fake-IP
+`/providers/*` (404: Apranik has no providers), `/restart`, `/upgrade`, the fake-IP
 cache, `/script`, `/profile`, `/storage`. A dashboard page that needs one of them shows an
 error or an empty view.
 
