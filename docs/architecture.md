@@ -10,7 +10,7 @@ bottom layer, `spec`, imports nothing from the project.
 | --- | --- | --- |
 | `spec` | the module contract: interfaces, the address types (with their constructors) and the sentinel errors; no state | nothing from the project |
 | `shared/*` | helper code two or more modules need that is not contract, one concept per package | `spec` and the standard library |
-| `module/*` | transports, proxy protocols and sniffers, one folder each | `spec`, `shared/*`, and `config/types` for shared JSON values; never another module |
+| `module/*` | transports, proxy protocols, sniffers, DNS servers and APIs, one folder each | `spec`, `shared/*`, and `config/types` for shared JSON values; never another module |
 | `core/*` | registry, building, routing, relaying, UDP sessions and NAT, logging; `core/component` declares the roles core's parts play for each other | `spec`, `shared/*` and modules |
 | `config` | the JSON config file → `blueprint.Blueprint` | `spec`, `core` |
 | `cmd/apranik` | the standalone command | everything above |
@@ -78,6 +78,13 @@ inbound's fallback.
 `NewSniffer()`; the `Sniffer` has `Sniff(payloadPrefix []byte) (SniffResult,
 error)`, returning `ErrSniffNeedMoreData` while the bytes so far are only a
 prefix.
+
+**API.** `APIModule` holds the settings, which include the address it listens on, and builds an
+`APIServer` with `NewAPIServer()`. `Start(ctx, coreProvider)` binds and returns once listening;
+`Close()` stops and waits. The server reaches the running core only through one
+`APICoreProvider`: small questions about statistics, live conversations, the log, outbounds, a delay
+test and a selector. `core/apicoreprovider` implements it, converting core's types to `spec`'s; the
+API imports `spec` and nothing from core.
 
 **Core-facing declarations.** `Metadata` (network, destination, source, inbound
 tag, user, sniff result), and for SOCKS5's second socket
@@ -159,17 +166,21 @@ real modules need it:
 | `core/builder` | blueprint → `component.Inbound` / `component.Outbound` / `component.Router`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket; loads datasets for the router |
 | `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, handing a UDP association to the handler |
 | `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
+| `core/apicoreprovider` | the one `spec.APICoreProvider` every API module gets: statistics, live conversations and closing them, a log subscription, outbound state, a delay test, choosing a selector's member |
 | `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers; called by the handler when a rule's `sniff` action asks |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
 | `core/route/router` | `component.Router`: rules compiled once, evaluated in order, first decision wins; shared by every inbound |
-| `core/route/match` | the lookup structures rules compile into: domains (exact, suffix by label, keyword, regex), IP ranges (sorted, merged, binary search), ports; `ip_is_private` |
+| `core/route/router/match` | the lookup structures rules compile into: domains (exact, suffix by label, keyword, regex), IP ranges (sorted, merged, binary search), ports; `ip_is_private` |
 | `core/route/dataset` | loads datasets, reading each file once; `dataset/geodata` decodes V2Ray's `geosite.dat` and `geoip.dat` with the standard library |
-| `core/route/handler` | `component.TrafficHandler`: gives the router a traffic informant (and sniffs when it asks), dials, relays; owns each UDP session and its routing cache |
+| `core/route/handler` | `component.TrafficHandler`: dials, relays; owns each UDP session and its routing cache |
+| `core/route/informant` | the handler's `component.RouterTrafficInformant`s: `Stream` (sniffs when a rule asks, replays what it peeked) and `UDPSession`; both resolve the destination when a rule asks |
 | `core/relay` | `relay.Stream` copies both ways and carries half-close; `relay.Datagrams` moves packets between a client and its UDP session |
-| `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams) and freedom |
+| `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams), freedom and the delay test |
+| `core/outbound/group` | the outbound groups `urltest`, `fallback` and `selector` |
 | `core/net/udp/session` | one UDP session: one datagram per outbound, replies merged, closed on silence |
 | `core/net/udp/nat` | freedom's UDP: which local socket carries each destination, and which senders may reply (RFC 4787) |
-| `core/logging` | eight RFC 5424 levels over `log/slog`, fanned out to stderr, file, memory or syslog |
+| `core/logging` | eight RFC 5424 levels over `log/slog`, fanned out to every output, the live subscription hub and the sampler |
+| `core/logging/sink` | the outputs: stderr, file, memory and syslog, each a `logging.Output` |
 
 ## UDP design
 
@@ -195,7 +206,7 @@ Because each UDP session has its own NAT, two clients never receive each other's
 replies. Timeouts are PROVISIONAL and configured beside what they bound: a silent
 session ends after the inbound's `udp_session_idle_timeout` (5 minutes), a silent
 NAT socket closes after freedom's `nat.idle_timeout` (5 minutes), and a cached
-route is forgotten after the inbound's `udp_session_route_cache_idle_timeout` (1 minute).
+route is forgotten after the inbound's `udp_routing_cache_entry_idle_timeout` (1 minute).
 
 [![One UDP session: client A's SOCKS5 association feeds relay.Datagrams, which asks the per-session routing cache for a decision, an outbound or a block, and sends through session.Session; the session holds one datagram per outbound, such as freedom's nat.Datagram with its local socket reaching several destinations. The router is shared. Client B has its own session and NAT, so replies never cross.](assets/diagrams/udp-session-structure.excalidraw.svg)](assets/diagrams/udp-session-structure.excalidraw.svg)
 
