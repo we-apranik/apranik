@@ -83,7 +83,7 @@ prefix.
 `APIServer` with `NewAPIServer()`. `Start(ctx, coreProvider)` binds and returns once listening;
 `Close()` stops and waits. The server reaches the running core only through one
 `APICoreProvider`: small questions about statistics, live conversations, the log, outbounds, a delay
-test and a selector. `core/apicoreprovider` implements it, converting core's types to `spec`'s; the
+test, a selector, a DNS lookup, the routing rules and reloading the configuration. `core/apicoreprovider` implements it, converting core's types to `spec`'s; the
 API imports `spec` and nothing from core.
 
 **Core-facing declarations.** `Metadata` (network, destination, source, inbound
@@ -166,7 +166,7 @@ real modules need it:
 | `core/builder` | blueprint → `component.Inbound` / `component.Outbound` / `component.Router`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket; loads datasets for the router |
 | `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, handing a UDP association to the handler |
 | `core/inbound/mixed` | the special inbound protocol `mixed`: a `spec.StreamProxyServer` that picks the SOCKS5 or HTTP server from the first byte |
-| `core/apicoreprovider` | the one `spec.APICoreProvider` every API module gets: statistics, live conversations and closing them, a log subscription, outbound state, a delay test, choosing a selector's member |
+| `core/apicoreprovider` | the one `spec.APICoreProvider` every API module gets: statistics, live conversations and closing them, a log subscription, outbound state, a delay test, choosing a selector's member, a DNS lookup and flushing its cache, the routing rules as text, asking for a reload |
 | `core/sniff` | peeks the start of a stream through `core/net/peekable`, runs sniffers; called by the handler when a rule's `sniff` action asks |
 | `core/net/peekable` | `spec.PeekableStream`; a recording mode that replays a refused handshake to the fallback |
 | `core/route/router` | `component.Router`: rules compiled once, evaluated in order, first decision wins; shared by every inbound |
