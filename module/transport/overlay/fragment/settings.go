@@ -39,7 +39,8 @@ type Settings struct {
 	// between.
 	PieceDelays []DurationRange `json:"piece_delays"`
 
-	// The most pieces; the last takes the rest. 0 means no limit.
+	// The most pieces; the last takes the rest. At least 2; there is no way to
+	// ask for no limit, only a large one.
 	MaxPieces Range `json:"max_pieces"`
 
 	// Guarantee one cut inside the server name, so no piece holds it whole.
@@ -66,11 +67,8 @@ func (s *Settings) Validate() error {
 	if s.PieceDelays != nil && len(s.PieceDelays) == 0 {
 		problems = append(problems, errors.New("fragment: piece_delays needs at least one entry; leave it out for the default"))
 	}
-	if s.MaxPieces.Min == 1 {
-		problems = append(problems, errors.New("fragment: max_pieces must allow at least 2 pieces (or 0 for no limit); one piece splits nothing"))
-	}
-	if s.MaxPieces.Min == 0 && s.MaxPieces.Max != 0 {
-		problems = append(problems, errors.New("fragment: max_pieces is 0 for no limit, or a range from 2"))
+	if s.MaxPieces.Min < 2 {
+		problems = append(problems, errors.New("fragment: max_pieces must allow at least 2 pieces; one piece splits nothing, and zero is not a way to ask for no limit"))
 	}
 	return errors.Join(problems...)
 }

@@ -203,7 +203,7 @@ func TestSplitSNIOffLeavesTheCutsToTheSizes(t *testing.T) {
 		s.TLSRecords = false
 		s.SplitSNI = false
 		s.PieceSizes = []Range{{Min: 3, Max: 3}, {Min: 10, Max: 10}}
-		s.MaxPieces = Range{}
+		s.MaxPieces = Range{Min: 1000, Max: 1000}
 		noDelays(s)
 	}), below)
 	if _, err := stream.Write(record); err != nil {
@@ -495,7 +495,7 @@ func TestSettingsDecodeAndValidate(t *testing.T) {
 		return &settings, settings.Validate()
 	}
 
-	settings, err := decode(`{"piece_sizes": ["3-5", 7, "10"], "piece_delays": ["10-20ms", "1s", "0", "5ms-1s"], "max_pieces": 0}`)
+	settings, err := decode(`{"piece_sizes": ["3-5", 7, "10"], "piece_delays": ["10-20ms", "1s", "0", "5ms-1s"], "max_pieces": 8}`)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -522,6 +522,7 @@ func TestSettingsDecodeAndValidate(t *testing.T) {
 		"delays without packets": `{"tcp_packets": false, "piece_delays": ["10ms"]}`,
 		"delay without unit":     `{"piece_delays": ["10"]}`,
 		"one piece":              `{"max_pieces": 1}`,
+		"zero pieces":            `{"max_pieces": 0}`,
 		"not a range":            `{"piece_sizes": ["big"]}`,
 	}
 	for name, text := range refused {
