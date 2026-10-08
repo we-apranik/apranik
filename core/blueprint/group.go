@@ -1,6 +1,10 @@
 package blueprint
 
-import "time"
+import (
+	"time"
+
+	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+)
 
 // GroupType is what a group does with its members.
 type GroupType string
@@ -13,14 +17,10 @@ const (
 	// GroupTypeFallback sends new connections to the first member, in list
 	// order, that passed its probe.
 	GroupTypeFallback GroupType = "fallback"
-)
 
-// ProbeType is how a group tests a member.
-type ProbeType string
-
-const (
-	ProbeTypeHTTP  ProbeType = "http"
-	ProbeTypeHTTPS ProbeType = "https"
+	// GroupTypeSelector sends new connections to the member a person chose,
+	// the first until then. It takes no probe.
+	GroupTypeSelector GroupType = "selector"
 )
 
 // Group is an outbound that connects nowhere itself: it picks one of its
@@ -35,20 +35,21 @@ type Group struct {
 	Probe Probe
 
 	// Only for GroupTypeURLTest: how much faster than the current member
-	// another must be before the group switches to it. Zero means
-	// outbound.DefaultGroupTolerance.
-	Tolerance time.Duration
+	// another must be before the group switches to it. Nil means the
+	// group's own default; a value must be positive.
+	Tolerance *time.Duration
 }
 
 // Probe is one request sent through each member to learn whether it works and
-// how long it takes. Zero fields mean the defaults in package outbound; a
-// negative duration is refused.
+// how long it takes. A field left out (nil) takes the group's own default; a
+// written zero or negative duration is refused.
 type Probe struct {
-	Type ProbeType
-
-	// Empty means outbound.DefaultHTTPProbeURL or DefaultHTTPSProbeURL.
+	// Must be http or https; its scheme decides whether the request is encrypted.
 	URL string
 
-	Interval time.Duration
-	Timeout  time.Duration
+	Interval *time.Duration
+	Timeout  *time.Duration
+
+	// The statuses that count as a pass.
+	ExpectedStatuses []httpstatusranges.Range
 }
