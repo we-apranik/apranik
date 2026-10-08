@@ -225,7 +225,7 @@ func (b *Builder) prepareInbound(inboundBlueprint blueprint.Inbound) (preparedIn
 		}
 	}
 
-	b.logger.With("module", inboundProtocolName(inboundBlueprint)).
+	b.logger.With("module", InboundProtocolName(inboundBlueprint)).
 		Debug("Stream proxy server built", "inbound", inboundBlueprint.Tag, "udp", prepared.datagramServer != nil, "fallback", prepared.fallback != nil)
 	return prepared, nil
 }
@@ -256,7 +256,7 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	return mixed.NewStreamServer(socks5Server, httpServer, types.ValueOrDefault(inboundBlueprint.Mixed.FirstByteTimeout, 0)), nil
 }
 
-func inboundProtocolName(inboundBlueprint blueprint.Inbound) string {
+func InboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 	if inboundBlueprint.Mixed != nil {
 		return registry.MixedProtocolName
 	}
