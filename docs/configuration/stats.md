@@ -4,7 +4,8 @@ Apranik counts the traffic it carries: bytes and connections per inbound, per ou
 and per user, why connections fail, which routing rule decided each connection, the
 resolver's work, and, when asked, the connections that are open now. The core only
 counts. Reading the numbers is done by whatever sits on top: an embedding program calls
-the functions below, and a network API for the `apranik` binary is not built yet.
+the functions below, and the `apranik` binary offers them through an [API](api.md), the
+[Clash API](api/clash.md).
 
 Counting is **on by default** and needs no configuration. The `stats` section switches
 it off, narrows it, or turns on the two things that cost extra.
