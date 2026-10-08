@@ -462,11 +462,41 @@ func TestASnifferIsRegisteredOnceAndLookedUpByName(t *testing.T) {
 }
 
 func TestProxyProtocolRegistryRefusesReservedNames(t *testing.T) {
-	for _, name := range []string{registry.FreedomProtocolName, registry.BlockProtocolName, registry.MixedProtocolName, registry.URLTestProtocolName, registry.FallbackProtocolName} {
+	for _, name := range []string{registry.FreedomProtocolName, registry.BlockProtocolName, registry.MixedProtocolName, registry.URLTestProtocolName, registry.SelectorProtocolName, registry.FallbackProtocolName} {
 		err := registry.New().ProxyProtocols().RegisterStream(newStreamProxy(name))
 		var reserved *registry.ReservedNameError
 		if !errors.As(err, &reserved) {
 			t.Fatalf("registering %q: got %v, want ReservedNameError", name, err)
 		}
+	}
+}
+
+type apiModule struct{ settings }
+
+func (apiModule) NewAPIServer() (spec.APIServer, error) { return nil, nil }
+
+func TestAnAPIIsRegisteredOnceListedAndLookedUpByName(t *testing.T) {
+	modules := registry.New()
+	newAPI := func() spec.APIModule { return apiModule{settings{name: "fake"}} }
+
+	if err := modules.APIs().Register(newAPI); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	var duplicate *registry.DuplicateModuleError
+	if err := modules.APIs().Register(newAPI); !errors.As(err, &duplicate) {
+		t.Errorf("second Register returned %v, want DuplicateModuleError", err)
+	}
+	if _, err := modules.APIs().Lookup("fake"); err != nil {
+		t.Errorf("Lookup: %v", err)
+	}
+	if _, err := modules.APIs().Lookup("missing"); err == nil {
+		t.Error("Lookup of an unregistered API succeeded")
+	}
+	listings := modules.APIs().Modules()
+	if len(listings) != 1 || listings[0].Name != "fake" || listings[0].Kind != registry.KindAPI {
+		t.Errorf("Modules = %+v, want the one fake API", listings)
+	}
+	if registry.KindAPI.String() != "API" {
+		t.Errorf("KindAPI is %q", registry.KindAPI.String())
 	}
 }

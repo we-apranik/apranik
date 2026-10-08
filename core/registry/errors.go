@@ -30,6 +30,7 @@ const (
 	// The outbound groups: protocols that choose among other outbounds.
 	URLTestProtocolName  = "urltest"
 	FallbackProtocolName = "fallback"
+	SelectorProtocolName = "selector"
 )
 
 type ReservedNameError struct {
