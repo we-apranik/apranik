@@ -454,3 +454,28 @@ func TestASwitchWithoutLiveConversationsStillSwitches(t *testing.T) {
 		t.Fatalf("a switch with live conversations off failed: %v", err)
 	}
 }
+
+func TestRequestReloadAsksTheFunctionItWasGivenAndReportsItsAnswer(t *testing.T) {
+	refused := errors.New("refused")
+	asked := 0
+	provider, err := apicoreprovider.New(apicoreprovider.Parts{
+		Blueprint:     &blueprint.Blueprint{},
+		RequestReload: func() error { asked++; return refused },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.RequestReload(); !errors.Is(err, refused) || asked != 1 {
+		t.Errorf("RequestReload = %v after %d asks, want the function's error after 1", err, asked)
+	}
+}
+
+func TestRequestReloadSaysWhenNothingCanReload(t *testing.T) {
+	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.RequestReload(); !errors.Is(err, apicoreprovider.ErrReloadUnavailable) {
+		t.Errorf("RequestReload = %v, want ErrReloadUnavailable", err)
+	}
+}
