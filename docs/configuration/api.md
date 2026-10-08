@@ -6,8 +6,8 @@ choice of server. An API is a [module](../architecture.md) like a proxy protocol
 server: it is named by `type`, takes its own `settings`, and is registered in
 `core/registry/default.go`. Which APIs a build has is in [`apranik modules`](../cli.md).
 
-No API is built into this build's registry yet; the Clash API module is the next one.
-This page is about the section every API shares.
+This build has one API, the [Clash API](api/clash.md). This page is about the section every
+API shares.
 
 <div class="cfg-structure" markdown>
 
@@ -47,7 +47,8 @@ and warnings only, so **a taken port shows when you run, not when you check.**
 
 An API never imports core. Core gives it one provider with small, separate questions:
 the totals, the live conversations, closing one, the log, the outbounds and their state,
-a delay test, and choosing a selector's member. An API that asks for something that is
+a delay test, choosing a selector's member, a DNS lookup and flushing the DNS cache, the
+routing rules, and loading the config again. An API that asks for something that is
 switched off gets a plain answer saying so: statistics disabled, live conversations not
 tracked.
 
