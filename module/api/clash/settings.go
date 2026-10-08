@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
@@ -30,6 +31,10 @@ type Settings struct {
 	// How many log records one /logs client may fall behind before records are
 	// dropped. Absent means defaultLogBufferRecords; a written zero is refused.
 	LogBufferRecords *int `json:"log_buffer_records"`
+
+	// An absolute path to a directory of a dashboard's files (MetaCubeXD, yacd,
+	// zashboard...), served at /ui/ without the secret. Absent: no /ui.
+	ExternalUI string `json:"external_ui"`
 
 	// What a delay test uses for the values its request leaves out.
 	DelayTest *DelayTestSettings `json:"delay_test"`
@@ -73,6 +78,9 @@ func (s *Settings) Validate() error {
 		if err := checkOrigin(origin); err != nil {
 			return err
 		}
+	}
+	if s.ExternalUI != "" && !filepath.IsAbs(s.ExternalUI) {
+		return fmt.Errorf("clash: external_ui %q is not an absolute path", s.ExternalUI)
 	}
 	if err := types.CheckPositive(s.LogBufferRecords); err != nil {
 		return fmt.Errorf("clash: log_buffer_records %w", err)

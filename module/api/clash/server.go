@@ -23,6 +23,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/rules"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/traffic"
+	"github.com/The-Apranik/Apranik/module/api/clash/internal/ui"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -41,6 +42,7 @@ type server struct {
 	hub      *stream.Hub
 
 	httpServer *http.Server
+	dashboard  *ui.Files
 
 	mu      sync.Mutex
 	started bool
@@ -79,8 +81,16 @@ func (s *server) Start(ctx context.Context, coreProvider spec.APICoreProvider) e
 		return errors.New("clash: the server was already started or closed")
 	}
 
+	if s.settings.ExternalUI != "" {
+		dashboard, err := ui.Open(s.settings.ExternalUI)
+		if err != nil {
+			return err
+		}
+		s.dashboard = dashboard
+	}
 	listener, err := net.Listen("tcp", net.JoinHostPort(s.settings.Listen, strconv.Itoa(s.settings.Port)))
 	if err != nil {
+		s.closeDashboard()
 		return fmt.Errorf("clash: %w", err)
 	}
 	s.started = true
@@ -120,7 +130,24 @@ func (s *server) handler(provider spec.APICoreProvider) http.Handler {
 	dns.Register(router, provider)
 	reload.Register(router, provider)
 
-	return web.CORS(s.settings.AllowOrigins, web.Authenticate(s.settings.Secret.Reveal(), router))
+	api := web.CORS(s.settings.AllowOrigins, web.Authenticate(s.settings.Secret.Reveal(), router))
+	if s.dashboard == nil {
+		return api
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ui.Serves(r.URL.Path) {
+			s.dashboard.ServeHTTP(w, r)
+			return
+		}
+		api.ServeHTTP(w, r)
+	})
+}
+
+func (s *server) closeDashboard() {
+	if s.dashboard != nil {
+		s.dashboard.Close()
+		s.dashboard = nil
+	}
 }
 
 // Close stops accepting, ends every stream, lets a request that is being answered
@@ -145,6 +172,7 @@ func (s *server) Close() error {
 		}
 		s.hub.Wait()
 		<-s.serving
+		s.closeDashboard()
 	})
 	return s.closeErr
 }
