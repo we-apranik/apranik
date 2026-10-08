@@ -28,10 +28,10 @@ type Config struct {
 	// which a config with no dns section uses.
 	DNSServerTags []string
 
-	// Whether live connections are listed: each TCP connection, and each UDP
+	// Whether live conversations are listed: each TCP connection, and each UDP
 	// destination of a session. Each one costs a small entry for as long as it lives, which is why it is a setting: the builder turns it
 	// on when something reads it, such as an API.
-	TrackLiveConnections bool
+	TrackLiveConversations bool
 
 	// Whether each outbound's dials are timed (dial health). The handler reads
 	// the clock around a dial only when this is on.
@@ -61,11 +61,11 @@ type Registry struct {
 	// One counter per rule location, made once so reads take no lock.
 	ruleHits map[string]*atomic.Uint64
 
-	dns                  *DNSCounters
-	timeDials            bool
-	trackLiveConnections bool
-	lastConnectionID     atomic.Uint64
-	liveShards           [liveShardCount]liveShard
+	dns                    *DNSCounters
+	timeDials              bool
+	trackLiveConversations bool
+	lastConversationID     atomic.Uint64
+	liveShards             [liveShardCount]liveShard
 
 	trackedUsers []string
 
@@ -73,14 +73,14 @@ type Registry struct {
 	users     map[string]*Counters
 }
 
-// The live connections are split by number over several locks, so connections
+// The live conversations are split by number over several locks, so connections
 // that begin and end at the same moment, as UDP destinations do, rarely wait
 // for each other.
 const liveShardCount = 16
 
 type liveShard struct {
-	mu          sync.Mutex
-	connections map[uint64]*Connection
+	mu            sync.Mutex
+	conversations map[uint64]*Conversation
 
 	// Keeps two shards' locks off one cache line.
 	_ [48]byte
@@ -93,15 +93,15 @@ type outboundCounters struct {
 
 func NewRegistry(config Config) *Registry {
 	registry := &Registry{
-		startedAt:            time.Now(),
-		inbounds:             make(map[string]*InboundCounters, len(config.InboundTags)),
-		outbounds:            make(map[string]*outboundCounters, len(config.Outbounds)),
-		ruleHits:             make(map[string]*atomic.Uint64, len(config.RuleLocations)),
-		dns:                  NewDNSCounters(config.DNSServerTags),
-		timeDials:            config.TimeDials,
-		trackLiveConnections: config.TrackLiveConnections,
-		trackedUsers:         slices.Clone(config.TrackedUsers),
-		users:                make(map[string]*Counters),
+		startedAt:              time.Now(),
+		inbounds:               make(map[string]*InboundCounters, len(config.InboundTags)),
+		outbounds:              make(map[string]*outboundCounters, len(config.Outbounds)),
+		ruleHits:               make(map[string]*atomic.Uint64, len(config.RuleLocations)),
+		dns:                    NewDNSCounters(config.DNSServerTags),
+		timeDials:              config.TimeDials,
+		trackLiveConversations: config.TrackLiveConversations,
+		trackedUsers:           slices.Clone(config.TrackedUsers),
+		users:                  make(map[string]*Counters),
 	}
 	for _, location := range config.RuleLocations {
 		registry.ruleHits[location] = &atomic.Uint64{}

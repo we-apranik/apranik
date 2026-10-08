@@ -26,7 +26,7 @@ type TCPTraffic struct {
 // UDPTraffic is what a key carried as UDP datagrams. Sessions are UDP sessions
 // started since the process began; there is no active count, because a UDP
 // session has no end but silence, so such a count would stay high for minutes
-// after the last packet. The live connections list is what shows what is open.
+// after the last packet. The live conversations list is what shows what is open.
 type UDPTraffic struct {
 	UplinkBytes     uint64
 	DownlinkBytes   uint64
