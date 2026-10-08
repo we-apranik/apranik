@@ -6,27 +6,25 @@ import (
 	"time"
 )
 
-// How long a UDP session keeps one destination's routing decision (and its
-// live entry) after the last packet to it. PROVISIONAL: 1 minute. The inbound's
-// udp_session_route_cache_idle_timeout sets it.
-const DefaultRouteCacheIdleTimeout = time.Minute
+// How long a UDP session keeps one destination's routing decision after the
+// last packet to it. PROVISIONAL: 1 minute. The inbound's
+// udp_routing_cache_entry_idle_timeout sets it.
+const DefaultRoutingCacheEntryIdleTimeout = time.Minute
 
 // How many destinations a UDP session remembers a routing decision for: when
 // it is full, the destination used longest ago is forgotten. PROVISIONAL: 1024.
-// The inbound's udp_session_route_cache_max_entries sets it.
-const DefaultRouteCacheMaxEntries = 1024
+// The inbound's udp_routing_cache_max_entries_per_session sets it.
+const DefaultRoutingCacheMaxEntriesPerSession = 1024
 
 // How long a UDP destination's live entry survives silence in either
-// direction. PROVISIONAL: 1 minute. The inbound's
-// udp_session_live_connections_idle_timeout sets it.
-const DefaultLiveConnectionsIdleTimeout = time.Minute
+// direction. PROVISIONAL: 1 minute. stats.tracking.udp_entry_idle_timeout sets it.
+const DefaultLiveTrackingUDPEntryIdleTimeout = time.Minute
 
 // How many destinations of one UDP session are listed as live at once: when it
 // is full, the entry used longest ago, in either direction, ends. PROVISIONAL:
 // 1024, about 0.5 MB a session in the worst case (an entry measured at about
-// 490 bytes). The inbound's
-// udp_session_live_connections_max_entries sets it.
-const DefaultLiveConnectionsMaxEntries = 1024
+// 490 bytes). stats.tracking.udp_max_entries_per_session sets it.
+const DefaultLiveTrackingUDPMaxEntriesPerSession = 1024
 
 // Largest UDP payload over IPv4: no setting may ask for more.
 const LargestDatagramSize = 65507
