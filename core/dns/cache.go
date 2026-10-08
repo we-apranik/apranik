@@ -89,6 +89,12 @@ func (c *answerCache) store(key cacheKey, stored answer, now time.Time) {
 	c.entries.Add(key, cachedAnswer{answer: stored, expires: now.Add(stored.ttl)})
 }
 
+func (c *answerCache) clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries.Clear()
+}
+
 func (c *answerCache) len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -123,6 +129,17 @@ func newCacheSet(disabled, perServer bool, maxEntries int, maxStaleAge time.Dura
 		set.shared = newAnswerCache(maxEntries, maxStaleAge)
 	}
 	return set
+}
+
+func (s *cacheSet) flush() {
+	if s.shared != nil {
+		s.shared.clear()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, cache := range s.byServer {
+		cache.clear()
+	}
 }
 
 // forServer returns the cache that holds the server's answers, or nil when
