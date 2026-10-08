@@ -194,7 +194,7 @@ The type's own settings:
   [`dns_server`](#dns_server) first. A `udp` server should be an IP.
 - **`timeout`** (all types; default `5s`): how long one query may take. For
   `tcp`, `dot` and `doh` it includes reaching the server; the outbound's own
-  layers keep their own timeouts too. Must not be negative.
+  layers keep their own timeouts too. Must be greater than zero.
 - **`path`** (`doh`; default `/dns-query`): the request path.
 - **`host`** (`doh`; default: the server's host): the `Host` header. Set it
   when `server` is an IP: `8.8.8.8` serves `dns.google`.
@@ -341,7 +341,7 @@ Errors:
 - `outbound` or `dns_server` on `system`;
 - a rule field other than the name fields, or a rule after one that matches
   every name;
-- `serve_stale` with the cache disabled, a negative `max_entries`, an unknown
+- `serve_stale` with the cache disabled, a `max_entries` or `max_stale_age` that is zero or negative, an unknown
   `ip_versions`;
 - a loop of lookups that wait on each other;
 - `dns_server` on freedom, which has no server name of its own;
