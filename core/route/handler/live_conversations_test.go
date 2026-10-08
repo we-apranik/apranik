@@ -9,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/outbound/group"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/core/route/router"
 	"github.com/The-Apranik/Apranik/core/stats"
+	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -81,7 +83,7 @@ func clientAt(t *testing.T, address string) spec.TransportMetadata {
 func TestALiveConversationIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
 	registry := trackingRegistry(stats.OutboundDescription{Tag: "out"})
-	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry})
+	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry, InboundProtocolName: "socks5"})
 	destination, _ := spec.NewDestinationFromDomain("example.com", 443)
 
 	connection := openThrough(t, trafficHandler, out.dialed, spec.Metadata{
@@ -96,7 +98,7 @@ func TestALiveConversationIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	})
 
 	live := registry.LiveConversations()[0]
-	if live.Info.InboundTag != "in" || live.Info.User != "alice" || live.Info.Rule != router.DefaultRuleLocation ||
+	if live.Info.InboundTag != "in" || live.Info.InboundProtocol != "socks5" || live.Info.SniffedDomain != "" || live.Info.User != "alice" || live.Info.Rule != router.DefaultRuleLocation ||
 		live.Info.Source.Addr().String() != "203.0.113.7" || live.Info.Destination != destination ||
 		!slices.Equal(live.Info.OutboundTags, []string{"out"}) {
 		t.Errorf("info = %+v", live.Info)
@@ -234,5 +236,38 @@ func TestAFailedDialIsNotTimedAsAConnectedOne(t *testing.T) {
 	}
 	if got := registry.OutboundTraffic()["out"]; got.TimedDials != 0 || got.DialFailures != 1 {
 		t.Errorf("outbound = %+v, want a failure and no timed dial", got)
+	}
+}
+
+func TestASniffedNameIsListedBesideTheDestinationAndNeverReplacesIt(t *testing.T) {
+	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
+	registry := trackingRegistry(stats.OutboundDescription{Tag: "out"})
+	sniffingRouter, err := router.New(router.Config{
+		Routing: blueprint.Routing{
+			Rules:         []blueprint.Rule{{Action: blueprint.Action{Sniff: &blueprint.SniffAction{Sniffers: []spec.SnifferModule{httpsniffer.NewSnifferModule()}}}}},
+			DefaultAction: blueprint.Action{Route: &blueprint.RouteAction{Outbound: "out"}},
+		},
+		Outbounds: map[string]component.Outbound{"out": out},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	trafficHandler := handler.New(sniffingRouter, handler.Config{Stats: registry})
+	clientSide, inboundSide := net.Pipe()
+	defer clientSide.Close()
+	destination, _ := spec.NewDestinationFromIP(netip.MustParseAddr("185.143.233.2"), 80)
+	go trafficHandler.HandleStream(context.Background(), deadlineStream{inboundSide}, spec.Metadata{Network: spec.NetworkTCP, Destination: destination, InboundTag: "in"})
+	go clientSide.Write([]byte("GET / HTTP/1.1\r\nHost: digikala.ir\r\n\r\n"))
+
+	select {
+	case remote := <-out.dialed:
+		defer remote.Close()
+	case <-time.After(5 * time.Second):
+		t.Fatal("nothing was dialed")
+	}
+	eventually(t, "the conversation is listed", func() bool { return len(registry.LiveConversations()) == 1 })
+	info := registry.LiveConversations()[0].Info
+	if info.SniffedDomain != "digikala.ir" || info.Destination != destination {
+		t.Errorf("sniffed domain %q, destination %v; want digikala.ir and the client's IP", info.SniffedDomain, info.Destination)
 	}
 }
