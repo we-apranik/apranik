@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config"
+	"github.com/The-Apranik/Apranik/core/apicoreprovider"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
 	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/The-Apranik/Apranik/core/logging/sink"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 )
@@ -82,6 +84,10 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 	defer stop()
 	routing.StartProbing(ctx)
 
+	var tracking blueprint.StatsTracking
+	if coreBlueprint.Stats != nil {
+		tracking = coreBlueprint.Stats.Tracking
+	}
 	for _, inboundBlueprint := range coreBlueprint.Inbounds {
 		built, err := stackBuilder.BuildInbound(inboundBlueprint)
 		if err != nil {
@@ -90,17 +96,17 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		defer built.Close()
 
 		trafficHandler := handler.New(routing.Router, handler.Config{
-			StreamIdleTimeout:               inboundBlueprint.TCPIdleTimeout,
-			UDPSessionIdleTimeout:           inboundBlueprint.UDPSessionIdleTimeout,
-			UDPMaxDatagramSize:              inboundBlueprint.UDPMaxDatagramSize,
-			UDPSessionRouteCacheIdleTimeout: inboundBlueprint.UDPSessionRouteCacheIdleTimeout,
-			UDPSessionRouteCacheMaxEntries:  inboundBlueprint.UDPSessionRouteCacheMaxEntries,
+			StreamIdleTimeout:                   valueOrZero(inboundBlueprint.TCPIdleTimeout),
+			UDPSessionIdleTimeout:               valueOrZero(inboundBlueprint.UDPSessionIdleTimeout),
+			UDPMaxDatagramSize:                  valueOrZero(inboundBlueprint.UDPMaxDatagramSize),
+			UDPRoutingCacheEntryIdleTimeout:     valueOrZero(inboundBlueprint.UDPRoutingCacheEntryIdleTimeout),
+			UDPRoutingCacheMaxEntriesPerSession: valueOrZero(inboundBlueprint.UDPRoutingCacheMaxEntriesPerSession),
 
-			UDPSessionLiveConnectionsIdleTimeout: inboundBlueprint.UDPSessionLiveConnectionsIdleTimeout,
-			UDPSessionLiveConnectionsMaxEntries:  inboundBlueprint.UDPSessionLiveConnectionsMaxEntries,
-			Resolver:                             stackBuilder.Resolver(),
-			Stats:                                stackBuilder.Stats(),
-			Logger:                               logger,
+			LiveTrackingUDPEntryIdleTimeout:     valueOrZero(tracking.UDPEntryIdleTimeout),
+			LiveTrackingUDPMaxEntriesPerSession: valueOrZero(tracking.UDPMaxEntriesPerSession),
+			Resolver:                            stackBuilder.Resolver(),
+			Stats:                               stackBuilder.Stats(),
+			Logger:                              logger,
 		})
 		if err := built.Activate(ctx, trafficHandler); err != nil {
 			return err
@@ -108,7 +114,28 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 		logger.Info("Inbound active", "tag", inboundBlueprint.Tag, "network", inboundBlueprint.Network)
 	}
 
-	logger.Info("Apranik is running", "version", blueprint.Version, "inbounds", len(coreBlueprint.Inbounds))
+	if len(coreBlueprint.APIs) > 0 {
+		coreProvider, err := apicoreprovider.New(apicoreprovider.Parts{
+			Version:   blueprint.Version,
+			Stats:     stackBuilder.Stats(),
+			Logs:      stackBuilder.SubscribeToLog,
+			Logger:    logger,
+			Blueprint: coreBlueprint,
+			Outbounds: routing.Outbounds,
+		})
+		if err != nil {
+			return err
+		}
+		// Registered after the inbounds' closes, so it runs first: an API stops
+		// serving before anything it reads goes away.
+		servers, err := startAPIs(ctx, coreBlueprint.APIs, coreProvider, logger)
+		if err != nil {
+			return err
+		}
+		defer closeAPIs(servers, logger)
+	}
+
+	logger.Info("Apranik is running", "version", blueprint.Version, "inbounds", len(coreBlueprint.Inbounds), "apis", len(coreBlueprint.APIs))
 	<-ctx.Done()
 	logger.Info("Shutting down")
 	return nil
@@ -136,10 +163,10 @@ func load(source string, fetchTimeout time.Duration) (*blueprint.Blueprint, conf
 // stderr, since the config may be unreadable or silence the log, and in the
 // format of the config's stderr output when it has a valid one.
 func newBootstrapLogger(coreBlueprint *blueprint.Blueprint) *logging.Logger {
-	var stderr logging.StderrOutput
+	var stderr sink.StderrOutput
 	if coreBlueprint != nil {
 		for _, output := range coreBlueprint.Log.Outputs {
-			if configured, ok := output.(logging.StderrOutput); ok && configured.Validate() == nil {
+			if configured, ok := output.(sink.StderrOutput); ok && configured.Validate() == nil {
 				stderr = configured
 			}
 		}
@@ -182,4 +209,14 @@ func diagnosticAttributes(diagnostic config.Diagnostic) []any {
 		return []any{"problem", diagnostic.Message}
 	}
 	return []any{"location", diagnostic.Location, "problem", diagnostic.Message}
+}
+
+// valueOrZero reads a setting that was left absent as zero, which the handler
+// reads as its default.
+func valueOrZero[T any](setting *T) T {
+	var zero T
+	if setting == nil {
+		return zero
+	}
+	return *setting
 }
