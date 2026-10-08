@@ -36,9 +36,9 @@ type Settings struct {
 	AcceptWebSocketKey bool `json:"accept_websocket_key"`
 
 	// Both: how long the upgrade handshake may take, including a pipelining
-	// client's wait for the 101 on its first Read. Zero means
-	// defaultHandshakeTimeout.
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// client's wait for the 101 on its first Read. Absent means
+	// defaultHandshakeTimeout; a written zero is refused.
+	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 
 	// Server: read the client's IP from a header a proxy in front added.
 	OriginalSourceIP types.OriginalSourceIP `json:"original_source_ip"`
@@ -48,10 +48,7 @@ type Settings struct {
 const defaultHandshakeTimeout = 10 * time.Second
 
 func (s *Settings) handshakeTimeout() time.Duration {
-	if s.HandshakeTimeout == 0 {
-		return defaultHandshakeTimeout
-	}
-	return time.Duration(s.HandshakeTimeout)
+	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
 // Headers the module writes itself; setting them would break the handshake.
@@ -67,8 +64,8 @@ func (s *Settings) Validate() error {
 	if err := handshake.ValidateHeaders(s.Headers, headersTheModuleOwns); err != nil {
 		return fmt.Errorf("httpupgrade: headers: %w", err)
 	}
-	if s.HandshakeTimeout < 0 {
-		return fmt.Errorf("httpupgrade: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
+		return fmt.Errorf("httpupgrade: handshake_timeout %w", err)
 	}
 	if err := s.OriginalSourceIP.Validate(); err != nil {
 		return fmt.Errorf("httpupgrade: original_source_ip: %w", err)
