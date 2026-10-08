@@ -3,6 +3,7 @@ package registry
 import (
 	"errors"
 
+	"github.com/The-Apranik/Apranik/module/api/clash"
 	dnsdoh "github.com/The-Apranik/Apranik/module/dns/doh"
 	dnsdot "github.com/The-Apranik/Apranik/module/dns/dot"
 	dnstcp "github.com/The-Apranik/Apranik/module/dns/tcp"
@@ -45,5 +46,6 @@ func Default() (*Registry, error) {
 		moduleRegistry.DNSServers().RegisterStream(dnstcp.NewStreamDNSServerModule),
 		moduleRegistry.DNSServers().RegisterStream(dnsdot.NewStreamDNSServerModule),
 		moduleRegistry.DNSServers().RegisterStream(dnsdoh.NewStreamDNSServerModule),
+		moduleRegistry.APIs().Register(clash.NewAPIModule),
 	)
 }
