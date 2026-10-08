@@ -53,7 +53,7 @@ architecture is not optimised for rapid, Iran-specific adaptation.
 
 ## Status
 
-Early and working. Two dependencies: uTLS, and `golang.org/x/net` for its DNS message codec.
+Early and working. Two dependencies: uTLS, and `golang.org/x/net` for its DNS message codec and the Clash API's WebSocket.
 
 | Area | Available |
 | --- | --- |
