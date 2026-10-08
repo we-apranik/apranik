@@ -143,9 +143,9 @@ layer's `handshake_timeout`.
 <span class="cfg cfg-def">Default: <code>"4-8"</code></span>
 
 The most pieces the ClientHello is cut into, picked per connection; the last
-piece takes all the remaining bytes. `0` means no limit. Without a limit, a
-ClientHello of about 1.8 KB cut into 10–20 byte pieces becomes over a hundred
-writes and waits.
+piece takes all the remaining bytes. At least 2; `0` is refused, and there is no way to
+ask for no limit, since a ClientHello of about 1.8 KB cut into 10–20 byte pieces
+becomes over a hundred writes and waits.
 
 ### `split_sni`
 
