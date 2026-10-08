@@ -14,7 +14,7 @@ type Settings struct {
 	// How long a peer may take to send the header. The sender writes it as soon
 	// as it connects and waits for no answer, so a second is generous. Zero
 	// means defaultTimeout.
-	Timeout types.Duration `json:"timeout"`
+	Timeout *types.Duration `json:"timeout"`
 }
 
 type Verification struct {
@@ -28,18 +28,15 @@ type Verification struct {
 const defaultTimeout = time.Second
 
 func (s *Settings) timeout() time.Duration {
-	if s.Timeout == 0 {
-		return defaultTimeout
-	}
-	return time.Duration(s.Timeout)
+	return time.Duration(types.ValueOrDefault(s.Timeout, types.Duration(defaultTimeout)))
 }
 
 func (s *Settings) Validate() error {
 	if len(s.Verification.TrustedProxyAddresses) == 0 {
 		return errors.New(`proxy_protocol: verification.trusted_proxy_addresses is empty, so no peer could connect; list your proxies, or "0.0.0.0/0" and "::/0" to accept every peer`)
 	}
-	if s.Timeout < 0 {
-		return fmt.Errorf("proxy_protocol: timeout %s must not be negative", s.Timeout)
+	if err := types.CheckPositive(s.Timeout); err != nil {
+		return fmt.Errorf("proxy_protocol: timeout %w", err)
 	}
 	return nil
 }

@@ -249,7 +249,8 @@ func TestSettings(t *testing.T) {
 	}{
 		"defaults":           {`{}`, ""},
 		"an empty list":      {`{"verification": {"trusted_proxy_addresses": []}}`, "empty"},
-		"a negative timeout": {`{"timeout": "-1s"}`, "negative"},
+		"a negative timeout": {`{"timeout": "-1s"}`, "greater than zero"},
+		"a zero timeout":     {`{"timeout": "0s"}`, "greater than zero"},
 		"a bad address":      {`{"verification": {"trusted_proxy_addresses": ["nope"]}}`, "decode"},
 	} {
 		t.Run(name, func(t *testing.T) {
