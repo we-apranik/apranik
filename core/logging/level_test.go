@@ -61,7 +61,7 @@ func TestAddedSeveritiesRenderByName(t *testing.T) {
 		var out bytes.Buffer
 		handler := slog.NewTextHandler(&out, &slog.HandlerOptions{
 			Level:       LevelDebug,
-			ReplaceAttr: replaceLevel,
+			ReplaceAttr: ReplaceLevelWithName,
 		})
 		newLogger(handler).Log(t.Context(), testCase.level, "checking")
 

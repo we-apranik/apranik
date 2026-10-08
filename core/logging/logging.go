@@ -18,17 +18,20 @@ type Config struct {
 	Outputs []Output
 }
 
-type System struct {
+// LoggerManager owns the opened outputs, hands out the logger, takes live
+// subscribers and closes everything.
+type LoggerManager struct {
 	logger *Logger
 	sinks  []slog.Handler
+	hub    *subscriptionHub
 }
 
 // New is where outputs are opened. On a failure partway through, what was
 // opened is closed again, so a bad third output does not leak the first two.
-func New(config Config) (*System, error) {
+func New(config Config) (*LoggerManager, error) {
 	sinks := make([]slog.Handler, 0, len(config.Outputs))
 	for _, output := range config.Outputs {
-		sink, err := output.open(config.Level)
+		sink, err := output.Open(config.Level)
 		if err != nil {
 			closeSinks(sinks)
 			return nil, err
@@ -36,22 +39,34 @@ func New(config Config) (*System, error) {
 		sinks = append(sinks, sink)
 	}
 
+	// Always in the chain, whatever the outputs are: a component's logger is
+	// derived once, at build time, and a sink added afterwards would never be
+	// seen by it. With no subscriber the hub is disabled, so no outputs still
+	// means silent.
+	hub := newSubscriptionHub()
+	sinks = append(sinks, hub)
+
 	var handler slog.Handler
-	switch len(sinks) {
-	case 0:
-		handler = slog.DiscardHandler
-	case 1:
-		handler = sinks[0]
-	default:
+	if len(sinks) == 1 {
+		handler = hub
+	} else {
 		handler = &multiHandler{sinks: sinks}
 	}
 
-	return &System{logger: newLogger(handler), sinks: sinks}, nil
+	return &LoggerManager{logger: newLogger(handler), sinks: sinks, hub: hub}, nil
 }
 
-func (s *System) Logger() *Logger { return s.logger }
+// SubscribeToLog starts a live view of the log at minimumLevel or above, with room
+// for bufferedRecords records. A subscriber may ask for a lower level than the
+// outputs use: records of that level exist while it is subscribed, and only
+// it receives them. The records are read-only.
+func (s *LoggerManager) SubscribeToLog(minimumLevel Level, bufferedRecords int) (*Subscription, error) {
+	return s.hub.add(minimumLevel, bufferedRecords)
+}
 
-func (s *System) Close() error { return closeSinks(s.sinks) }
+func (s *LoggerManager) Logger() *Logger { return s.logger }
+
+func (s *LoggerManager) Close() error { return closeSinks(s.sinks) }
 
 func closeSinks(sinks []slog.Handler) error {
 	var failures []error

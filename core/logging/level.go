@@ -58,7 +58,7 @@ func ParseLevel(name string) (Level, error) {
 
 // slog prints a level it does not know as an offset from one it does, so
 // LevelNotice would reach a sink as "INFO+2". Every sink installs this.
-func replaceLevel(_ []string, attr slog.Attr) slog.Attr {
+func ReplaceLevelWithName(_ []string, attr slog.Attr) slog.Attr {
 	if attr.Key == slog.LevelKey {
 		if level, ok := attr.Value.Any().(slog.Level); ok {
 			attr.Value = slog.StringValue(LevelName(level))
