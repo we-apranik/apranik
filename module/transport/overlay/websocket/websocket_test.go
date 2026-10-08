@@ -561,7 +561,8 @@ func TestValidateRefusesMalformedSettings(t *testing.T) {
 		"too much early data":  func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: maxEarlyDataLimit + 1} },
 		"unknown location":     func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 1, Location: "query"} },
 		"header name for path": func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 1, Location: "path", HeaderName: "X-Early"} },
-		"negative timeout":     func(s *Settings) { s.HandshakeTimeout = -1 },
+		"negative timeout":     func(s *Settings) { s.HandshakeTimeout = types.Pointer(types.Duration(-1)) },
+		"zero timeout":         func(s *Settings) { s.HandshakeTimeout = types.Pointer(types.Duration(0)) },
 		"bad header name":      func(s *Settings) { s.Headers = map[string]string{"X Bad": "1"} },
 		"line break in value":  func(s *Settings) { s.Headers = map[string]string{"X-A": "1\r\nX-B: 2"} },
 		"owned header":         func(s *Settings) { s.Headers = map[string]string{"Host": "a"} },
@@ -646,7 +647,7 @@ func TestTheDeferredHandshakeIsBoundedByItsTimeout(t *testing.T) {
 	go io.Copy(io.Discard, serverSide)
 	module := newModule(t, func(s *Settings) {
 		s.EarlyData = &EarlyData{MaxBytes: 64}
-		s.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+		s.HandshakeTimeout = types.Pointer(types.Duration(100 * time.Millisecond))
 	})
 	overlayClient, _ := module.NewStreamOverlayClient()
 	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))
@@ -735,7 +736,7 @@ func TestADeadlineSetDuringTheDeferredHandshakeKeepsItsTimeout(t *testing.T) {
 	go io.Copy(io.Discard, serverSide)
 	module := newModule(t, func(s *Settings) {
 		s.EarlyData = &EarlyData{MaxBytes: 64}
-		s.HandshakeTimeout = types.Duration(200 * time.Millisecond)
+		s.HandshakeTimeout = types.Pointer(types.Duration(200 * time.Millisecond))
 	})
 	overlayClient, _ := module.NewStreamOverlayClient()
 	client, err := overlayClient.WrapClientStream(context.Background(), clientSide, testServer(t))

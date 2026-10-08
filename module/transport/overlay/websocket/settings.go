@@ -49,9 +49,9 @@ type Settings struct {
 	EarlyData *EarlyData `json:"early_data"`
 
 	// Both: how long the upgrade handshake may take, including a client's
-	// handshake deferred to the first write. Zero means
-	// defaultHandshakeTimeout.
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// handshake deferred to the first write. Absent means
+	// defaultHandshakeTimeout; a written zero is refused.
+	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 
 	// Server: read the client's IP from a header a proxy in front added.
 	OriginalSourceIP types.OriginalSourceIP `json:"original_source_ip"`
@@ -80,10 +80,7 @@ func (e *EarlyData) effectiveHeaderName() string {
 }
 
 func (s *Settings) handshakeTimeout() time.Duration {
-	if s.HandshakeTimeout == 0 {
-		return defaultHandshakeTimeout
-	}
-	return time.Duration(s.HandshakeTimeout)
+	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
 // Headers the module writes itself; setting them would break the handshake.
@@ -102,8 +99,8 @@ func (s *Settings) Validate() error {
 	if err := handshake.ValidateHeaders(s.Headers, headersTheModuleOwns); err != nil {
 		return fmt.Errorf("websocket: headers: %w", err)
 	}
-	if s.HandshakeTimeout < 0 {
-		return fmt.Errorf("websocket: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
+		return fmt.Errorf("websocket: handshake_timeout %w", err)
 	}
 	if s.EarlyData != nil {
 		if err := s.EarlyData.validate(s.Headers); err != nil {
