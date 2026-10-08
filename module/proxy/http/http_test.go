@@ -428,7 +428,7 @@ func BenchmarkAcceptConnect(b *testing.B) {
 
 func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
 	_, serverSide := pipe(t)
-	result := serverOn(t, &proxyhttp.Settings{HandshakeTimeout: types.Duration(100 * time.Millisecond)}, serverSide)
+	result := serverOn(t, &proxyhttp.Settings{HandshakeTimeout: types.Pointer(types.Duration(100 * time.Millisecond))}, serverSide)
 	select {
 	case got := <-result:
 		if got.err == nil {
