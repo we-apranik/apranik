@@ -155,3 +155,16 @@ below.
     </div>
 
     Not available on Windows or Plan 9; there it is refused at startup.
+
+## Live view for an API
+
+Besides the outputs above, the logging system always carries one more handler that nobody
+configures: a hub an [API](api.md) can subscribe to for a live view of the log. With nobody
+subscribed it is switched off, so a record is not even built for it, and **no outputs still
+means silent**: nothing is kept, nothing is written.
+
+A subscriber asks for its own level, which may be lower than the outputs use. While a
+`debug` subscriber is connected, debug records exist and only it receives them; the file and
+stderr still get what their level says. A subscriber that cannot keep up loses records, never
+slows logging, and finds one warning in its stream saying how many were dropped and how big
+its buffer was.
