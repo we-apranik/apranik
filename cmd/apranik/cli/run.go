@@ -106,6 +106,7 @@ func serve(coreBlueprint *blueprint.Blueprint) error {
 			LiveTrackingUDPMaxEntriesPerSession: valueOrZero(tracking.UDPMaxEntriesPerSession),
 			Resolver:                            stackBuilder.Resolver(),
 			Stats:                               stackBuilder.Stats(),
+			InboundProtocolName:                 builder.InboundProtocolName(inboundBlueprint),
 			Logger:                              logger,
 		})
 		if err := built.Activate(ctx, trafficHandler); err != nil {
