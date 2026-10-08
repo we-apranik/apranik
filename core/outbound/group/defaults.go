@@ -1,0 +1,24 @@
+package group
+
+import (
+	"time"
+
+	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+)
+
+// What a group does when its settings leave a field out, all in one place. They
+// belong to the groups, not to measuring: the DelayTester has no defaults.
+// PROVISIONAL.
+const (
+	defaultGroupProbeURL      = "https://www.gstatic.com/generate_204"
+	defaultGroupProbeInterval = 5 * time.Minute
+	defaultGroupProbeTimeout  = 10 * time.Second
+
+	// How much faster than the current member another must be before urltest
+	// switches to it.
+	defaultURLTestTolerance = 50 * time.Millisecond
+)
+
+func defaultGroupProbeExpectedStatuses() []httpstatusranges.Range {
+	return []httpstatusranges.Range{{First: 200, Last: 299}}
+}
