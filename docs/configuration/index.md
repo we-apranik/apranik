@@ -21,7 +21,8 @@ DNS rules look up, the **stats** that count traffic, and the **log**. The format
   "datasets": [],
   "dns": {},
   "routing": {},
-  "stats": {}
+  "stats": {},
+  "apis": []
 }
 ```
 
@@ -40,6 +41,7 @@ DNS rules look up, the **stats** that count traffic, and the **log**. The format
 | `dns` | [DNS](dns/index.md) |
 | `routing` | [Routing](routing/index.md) |
 | `stats` | [Stats](stats.md) |
+| `apis` | [APIs](api.md) |
 
 ### `version`
 
@@ -111,7 +113,7 @@ The steps split along one line, **reading** and **running**:
 
 | Type | Written as |
 | --- | --- |
-| duration | a quoted Go duration: `"300ms"`, `"10s"`, `"5m"`, `"1h30m"`. A bare number is refused, since no unit can be assumed. Where noted, a negative value disables the limit. |
+| duration | a quoted Go duration: `"300ms"`, `"10s"`, `"5m"`, `"1h30m"`. A bare number is refused, since no unit can be assumed. A setting left out takes its default; a written `0` is refused, never read as the default. Where noted, a negative value disables the limit. |
 | secret | a string. Apranik never prints it in logs, errors or warnings. |
 | address | an IP literal for `listen`; an IP or a domain for `server`. A domain stays unresolved until the base transport dials it, through the [resolver](dns/index.md). |
 
