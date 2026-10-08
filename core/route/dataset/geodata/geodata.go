@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
 // Domain.Type in the protobuf.

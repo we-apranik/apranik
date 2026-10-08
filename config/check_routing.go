@@ -205,11 +205,11 @@ func (c routingChecker) checkAction(action blueprint.Action, loc string, fields 
 		if len(action.Sniff.Sniffers) == 0 {
 			c.diagnostics.errorf(fieldLocation(settingsLoc, "sniffers"), "a sniff action needs at least one sniffer")
 		}
-		if action.Sniff.Timeout < 0 {
-			c.diagnostics.errorf(fieldLocation(settingsLoc, "timeout"), "timeout must not be negative")
-		} else if action.Sniff.Timeout > longSniffTimeout {
+		if action.Sniff.Timeout != nil && *action.Sniff.Timeout <= 0 {
+			c.diagnostics.errorf(fieldLocation(settingsLoc, "timeout"), "timeout must be greater than zero; leave it out for the default")
+		} else if action.Sniff.Timeout != nil && *action.Sniff.Timeout > longSniffTimeout {
 			c.diagnostics.warnf(fieldLocation(settingsLoc, "timeout"),
-				"timeout %s delays every connection whose client does not speak first, such as SSH", action.Sniff.Timeout)
+				"timeout %s delays every connection whose client does not speak first, such as SSH", *action.Sniff.Timeout)
 		}
 		if fields.Network == spec.NetworkUDP {
 			c.diagnostics.warnf(loc, "sniffing works on TCP only for now, so this sniff does nothing")

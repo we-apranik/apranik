@@ -11,11 +11,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
 // The routing section. Its datasets moved to the top
@@ -99,8 +98,8 @@ type rawResolveSettings struct {
 }
 
 type rawSniffSettings struct {
-	Sniffers []rawModule    `json:"sniffers"`
-	Timeout  types.Duration `json:"timeout"`
+	Sniffers []rawModule     `json:"sniffers"`
+	Timeout  *types.Duration `json:"timeout"`
 }
 
 // Action types, as the config file names them.
@@ -342,7 +341,7 @@ func (b *configBuilder) buildAction(raw rawModule, loc string) blueprint.Action 
 }
 
 func (b *configBuilder) buildSniffAction(settings rawSniffSettings, loc string) *blueprint.SniffAction {
-	sniff := &blueprint.SniffAction{Timeout: time.Duration(settings.Timeout)}
+	sniff := &blueprint.SniffAction{Timeout: durationOrNil(settings.Timeout)}
 	for index, rawSniffer := range settings.Sniffers {
 		snifferLoc := indexLocation(fieldLocation(loc, "sniffers"), index)
 		newModule, err := b.modules.Sniffers().Lookup(rawSniffer.Type)

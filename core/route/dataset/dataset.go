@@ -11,7 +11,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/route/dataset/geodata"
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
 // Dataset is one loaded list: Domains for a domain dataset, IPs for an IP one.

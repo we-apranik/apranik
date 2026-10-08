@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -190,7 +191,7 @@ func (c ruleCompiler) compileAction(action blueprint.Action) (compiledAction, er
 			}
 			sniffers = append(sniffers, sniffer)
 		}
-		return compiledAction{kind: actionSniff, sniffers: sniffers, sniffTimeout: action.Sniff.Timeout}, nil
+		return compiledAction{kind: actionSniff, sniffers: sniffers, sniffTimeout: types.ValueOrDefault(action.Sniff.Timeout, 0)}, nil
 	}
 }
 

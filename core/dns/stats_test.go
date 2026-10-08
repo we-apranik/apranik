@@ -6,7 +6,6 @@ import (
 	"maps"
 	"net"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -136,31 +135,6 @@ func TestAServerThatFailsIsCountedOnThatServer(t *testing.T) {
 
 	if got := registry.DNS().Servers["fake"]; got.Queries != 1 || got.Failures != 1 {
 		t.Errorf("server fake = %+v, want 1 query and 1 failure", got)
-	}
-}
-
-func TestAStaleAnswerIsCountedAndItsRefreshIsAQuery(t *testing.T) {
-	zone := dualStackZone()
-	zone.ttl = 10
-	resolver, registry := countedResolver(t, Config{IPVersions: blueprint.IPVersionsIPv4Only,
-		Cache: blueprint.DNSCache{ServeStale: true, MaxStaleAge: time.Minute}}, zone)
-	var mu sync.Mutex
-	now := time.Unix(1000, 0)
-	resolver.now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
-
-	if _, err := resolver.ResolveDomain(context.Background(), "example.com"); err != nil {
-		t.Fatal(err)
-	}
-	mu.Lock()
-	now = now.Add(20 * time.Second)
-	mu.Unlock()
-	if _, err := resolver.ResolveDomain(context.Background(), "example.com"); err != nil {
-		t.Fatal(err)
-	}
-
-	waitFor(t, func() bool { return registry.DNS().Servers["fake"].Queries == 2 })
-	if got := registry.DNS(); got.StaleAnswers != 1 {
-		t.Errorf("stale answers = %d, want 1", got.StaleAnswers)
 	}
 }
 

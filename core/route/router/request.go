@@ -3,7 +3,7 @@ package router
 import (
 	"net/netip"
 
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 	"github.com/The-Apranik/Apranik/spec"
 )
 

@@ -97,8 +97,8 @@ type RouteAction struct {
 type SniffAction struct {
 	Sniffers []spec.SnifferModule
 
-	// Zero means sniff.DefaultTimeout.
-	Timeout time.Duration
+	// Nil means sniff.DefaultTimeout; a value must be positive.
+	Timeout *time.Duration
 }
 
 // Dataset is a named list of values rules look up: domains or IP

@@ -77,7 +77,7 @@ func TestEveryRoutingFieldDecodes(t *testing.T) {
 	}
 
 	sniff := routing.Rules[0].Action.Sniff
-	if sniff == nil || len(sniff.Sniffers) != 2 || sniff.Timeout != 250*time.Millisecond {
+	if sniff == nil || len(sniff.Sniffers) != 2 || sniff.Timeout == nil || *sniff.Timeout != 250*time.Millisecond {
 		t.Errorf("sniff action = %+v", sniff)
 	}
 	if routing.Rules[0].Match.Network != spec.NetworkTCP || routing.Rules[0].Match.Inbounds[0] != "socks-in" {

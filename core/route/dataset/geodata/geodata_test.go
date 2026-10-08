@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
 func testSiteFile() []byte {

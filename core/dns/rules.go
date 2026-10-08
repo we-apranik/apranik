@@ -6,7 +6,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
-	"github.com/The-Apranik/Apranik/core/route/match"
+	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
 // nameCondition is one compiled DNS rule condition over a lookup's name. The
