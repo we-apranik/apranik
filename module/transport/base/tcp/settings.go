@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -11,25 +12,27 @@ import (
 // No listen address here: a listener is handed its bind address, so the field
 // would be meaningless on an outbound.
 type Settings struct {
-	// How long a connection is idle before the first probe. Zero uses Go's
-	// default; negative disables probes.
-	KeepAlive types.Duration `json:"keep_alive"`
+	// How long a connection is idle before the first probe. Absent means 15s
+	// (the constructor's default); negative disables probes; a written zero is
+	// refused.
+	KeepAlive *types.Duration `json:"keep_alive"`
 
 	// Between unanswered probes, and how many before the connection is
 	// dropped, so a dead peer is found after about keep_alive +
-	// keep_alive_interval * keep_alive_count. Zero uses Go's default (15s,
-	// 9). PROVISIONAL: the defaults are Go's, not a choice made here.
-	KeepAliveInterval types.Duration `json:"keep_alive_interval"`
-	KeepAliveCount    int            `json:"keep_alive_count"`
+	// keep_alive_interval * keep_alive_count. Absent uses Go's default (15s,
+	// 9); a written zero is refused. PROVISIONAL: the defaults are Go's, not a
+	// choice made here.
+	KeepAliveInterval *types.Duration `json:"keep_alive_interval"`
+	KeepAliveCount    *int            `json:"keep_alive_count"`
 
-	// How long a dial may take, name resolution included. Zero means
-	// defaultDialTimeout.
-	DialTimeout types.Duration `json:"dial_timeout"`
+	// How long a dial may take, name resolution included. Absent means
+	// defaultDialTimeout; a written zero is refused.
+	DialTimeout *types.Duration `json:"dial_timeout"`
 
 	// When a domain has several addresses, how long one connection attempt
 	// runs before the next starts beside it (RFC 8305's Connection Attempt
-	// Delay). Zero means defaultNextAddressDelay.
-	NextAddressDelay types.Duration `json:"next_address_delay"`
+	// Delay). Absent means defaultNextAddressDelay; a written zero is refused.
+	NextAddressDelay *types.Duration `json:"next_address_delay"`
 
 	// Disables Nagle's algorithm. On by default: a proxy carries interactive
 	// traffic, where coalescing small writes shows up as lag.
@@ -37,20 +40,29 @@ type Settings struct {
 }
 
 func (s *Settings) Validate() error {
-	if s.DialTimeout < 0 {
-		return fmt.Errorf("tcp: dial_timeout %s must not be negative", s.DialTimeout)
+	if err := types.CheckPositive(s.DialTimeout); err != nil {
+		return fmt.Errorf("tcp: dial_timeout %w", err)
 	}
-	if s.NextAddressDelay < 0 {
-		return fmt.Errorf("tcp: next_address_delay %s must not be negative", s.NextAddressDelay)
+	if err := types.CheckPositive(s.NextAddressDelay); err != nil {
+		return fmt.Errorf("tcp: next_address_delay %w", err)
 	}
-	if time.Duration(s.KeepAlive) > 24*time.Hour {
+	if s.KeepAlive != nil && *s.KeepAlive == 0 {
+		return errors.New("tcp: keep_alive must not be zero: leave it out for the default, or write a negative duration to disable probes")
+	}
+	if s.KeepAlive != nil && time.Duration(*s.KeepAlive) > 24*time.Hour {
 		return fmt.Errorf("tcp: keep_alive %s is longer than a day, which is almost certainly a mistake", s.KeepAlive)
 	}
-	if s.KeepAliveInterval < 0 || time.Duration(s.KeepAliveInterval) > 24*time.Hour {
-		return fmt.Errorf("tcp: keep_alive_interval %s must be between zero and a day", s.KeepAliveInterval)
+	if err := types.CheckPositive(s.KeepAliveInterval); err != nil {
+		return fmt.Errorf("tcp: keep_alive_interval %w", err)
 	}
-	if s.KeepAliveCount < 0 || s.KeepAliveCount > 255 {
-		return fmt.Errorf("tcp: keep_alive_count %d must be between 0 and 255", s.KeepAliveCount)
+	if s.KeepAliveInterval != nil && time.Duration(*s.KeepAliveInterval) > 24*time.Hour {
+		return fmt.Errorf("tcp: keep_alive_interval %s must be at most a day", s.KeepAliveInterval)
+	}
+	if err := types.CheckPositive(s.KeepAliveCount); err != nil {
+		return fmt.Errorf("tcp: keep_alive_count %w", err)
+	}
+	if s.KeepAliveCount != nil && *s.KeepAliveCount > 255 {
+		return fmt.Errorf("tcp: keep_alive_count %d must be between 1 and 255", *s.KeepAliveCount)
 	}
 	return nil
 }
@@ -62,28 +74,23 @@ const defaultDialTimeout = 10 * time.Second
 const defaultNextAddressDelay = 250 * time.Millisecond
 
 func (s *Settings) nextAddressDelay() time.Duration {
-	if s.NextAddressDelay == 0 {
-		return defaultNextAddressDelay
-	}
-	return time.Duration(s.NextAddressDelay)
+	return time.Duration(types.ValueOrDefault(s.NextAddressDelay, types.Duration(defaultNextAddressDelay)))
 }
 
 func (s *Settings) dialTimeout() time.Duration {
-	if s.DialTimeout == 0 {
-		return defaultDialTimeout
-	}
-	return time.Duration(s.DialTimeout)
+	return time.Duration(types.ValueOrDefault(s.DialTimeout, types.Duration(defaultDialTimeout)))
 }
 
+// A field left out stays zero, which net.KeepAliveConfig reads as Go's default.
 func (s *Settings) keepAliveConfig() net.KeepAliveConfig {
-	if s.KeepAlive < 0 {
+	if s.KeepAlive != nil && *s.KeepAlive < 0 {
 		return net.KeepAliveConfig{Enable: false}
 	}
 	return net.KeepAliveConfig{
 		Enable:   true,
-		Idle:     time.Duration(s.KeepAlive),
-		Interval: time.Duration(s.KeepAliveInterval),
-		Count:    s.KeepAliveCount,
+		Idle:     time.Duration(types.ValueOrDefault(s.KeepAlive, 0)),
+		Interval: time.Duration(types.ValueOrDefault(s.KeepAliveInterval, 0)),
+		Count:    types.ValueOrDefault(s.KeepAliveCount, 0),
 	}
 }
 

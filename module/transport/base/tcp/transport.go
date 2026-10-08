@@ -27,7 +27,7 @@ func (t *Transport) NewStreamDialer(resolver spec.Resolver) (spec.StreamDialer, 
 		return nil, errNoResolver
 	}
 	return &streamDialer{
-		dialer:           net.Dialer{KeepAlive: time.Duration(t.KeepAlive), KeepAliveConfig: t.keepAliveConfig()},
+		dialer:           net.Dialer{KeepAlive: time.Duration(types.ValueOrDefault(t.KeepAlive, 0)), KeepAliveConfig: t.keepAliveConfig()},
 		resolver:         resolver,
 		noDelay:          t.NoDelay,
 		dialTimeout:      t.dialTimeout(),
@@ -65,7 +65,7 @@ func (t *Transport) NewStreamListener(bind spec.Endpoint) (spec.StreamListener, 
 // will not compile.
 func NewBaseStreamTransportModule() spec.BaseStreamTransportModule {
 	return &Transport{Settings: Settings{
-		KeepAlive: types.Duration(15 * time.Second),
+		KeepAlive: types.Pointer(types.Duration(15 * time.Second)),
 		NoDelay:   true,
 	}}
 }

@@ -232,7 +232,7 @@ func TestDialRejectsMalformedAddresses(t *testing.T) {
 func TestModuleConstructorPopulatesDefaults(t *testing.T) {
 	transport := tcp.NewBaseStreamTransportModule().(*tcp.Transport)
 
-	if time.Duration(transport.KeepAlive) != 15*time.Second {
+	if time.Duration(types.ValueOrDefault(transport.KeepAlive, 0)) != 15*time.Second {
 		t.Errorf("KeepAlive = %v, want 15s", transport.KeepAlive)
 	}
 	if !transport.NoDelay {
@@ -252,7 +252,7 @@ func TestDecodeFillsPromotedFields(t *testing.T) {
 	}
 
 	transport := module.(*tcp.Transport)
-	if time.Duration(transport.KeepAlive) != 30*time.Second {
+	if time.Duration(types.ValueOrDefault(transport.KeepAlive, 0)) != 30*time.Second {
 		t.Errorf("KeepAlive = %v, want 30s", transport.KeepAlive)
 	}
 	// Absent from the config file, so the default survives.
@@ -277,7 +277,7 @@ func TestUnknownFieldIsRefused(t *testing.T) {
 }
 
 func TestValidateRefusesAnAbsurdKeepAlive(t *testing.T) {
-	transport := &tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Duration(48 * time.Hour)}}
+	transport := &tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Pointer(types.Duration(48 * time.Hour))}}
 
 	if err := transport.Validate(); err == nil {
 		t.Error("a 48h keep_alive was accepted, want Validate to refuse it")
@@ -288,7 +288,7 @@ func TestValidateRefusesAnAbsurdKeepAlive(t *testing.T) {
 // constructs twice and compares, so this must not vary with any setting.
 func TestInfoIsConstantAcrossSettings(t *testing.T) {
 	plain := (&tcp.Transport{}).Info()
-	configured := (&tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Duration(time.Minute), NoDelay: false}}).Info()
+	configured := (&tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Pointer(types.Duration(time.Minute)), NoDelay: false}}).Info()
 
 	if plain != configured {
 		t.Errorf("Info varies with settings: %+v then %+v", plain, configured)
@@ -328,10 +328,15 @@ func TestListenerBindsWhereItWasTold(t *testing.T) {
 
 func TestValidateRefusesNegativeKeepAliveIntervalAndCount(t *testing.T) {
 	for name, settings := range map[string]tcp.Settings{
-		"negative interval":     {KeepAliveInterval: types.Duration(-time.Second)},
-		"negative count":        {KeepAliveCount: -1},
-		"absurd count":          {KeepAliveCount: 1000},
-		"negative dial timeout": {DialTimeout: types.Duration(-time.Second)},
+		"negative interval":     {KeepAliveInterval: types.Pointer(types.Duration(-time.Second))},
+		"negative count":        {KeepAliveCount: types.Pointer(-1)},
+		"zero count":            {KeepAliveCount: types.Pointer(0)},
+		"zero interval":         {KeepAliveInterval: types.Pointer(types.Duration(0))},
+		"zero keep alive":       {KeepAlive: types.Pointer(types.Duration(0))},
+		"zero dial timeout":     {DialTimeout: types.Pointer(types.Duration(0))},
+		"zero address delay":    {NextAddressDelay: types.Pointer(types.Duration(0))},
+		"absurd count":          {KeepAliveCount: types.Pointer(1000)},
+		"negative dial timeout": {DialTimeout: types.Pointer(types.Duration(-time.Second))},
 	} {
 		if err := settings.Validate(); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -377,8 +382,8 @@ func TestDialTriesTheNextAddressWhenTheFirstIsSlow(t *testing.T) {
 		netip.MustParseAddr("127.0.0.1"),
 	}}
 	d, _ := (&tcp.Transport{Settings: tcp.Settings{
-		DialTimeout:      types.Duration(5 * time.Second),
-		NextAddressDelay: types.Duration(50 * time.Millisecond),
+		DialTimeout:      types.Pointer(types.Duration(5 * time.Second)),
+		NextAddressDelay: types.Pointer(types.Duration(50 * time.Millisecond)),
 	}}).NewStreamDialer(resolver)
 
 	started := time.Now()
@@ -426,7 +431,7 @@ func TestDialClosesTheConnectionThatLostTheRace(t *testing.T) {
 	defer second.Close()
 
 	resolver := staticResolver{"both.example": {netip.MustParseAddr("127.0.0.1"), netip.MustParseAddr("127.0.0.2")}}
-	d, _ := (&tcp.Transport{Settings: tcp.Settings{NextAddressDelay: types.Duration(time.Nanosecond)}}).NewStreamDialer(resolver)
+	d, _ := (&tcp.Transport{Settings: tcp.Settings{NextAddressDelay: types.Pointer(types.Duration(time.Nanosecond))}}).NewStreamDialer(resolver)
 
 	accepted := make(chan net.Conn, 2)
 	for _, listener := range []net.Listener{first, second} {

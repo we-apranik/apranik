@@ -33,9 +33,9 @@ func keepAliveOptions(t *testing.T, stream spec.Stream) (enabled, idle, interval
 // idle time.
 func TestKeepAliveIntervalAndCountReachBothEnds(t *testing.T) {
 	transport := &tcp.Transport{Settings: tcp.Settings{
-		KeepAlive:         types.Duration(20 * time.Second),
-		KeepAliveInterval: types.Duration(7 * time.Second),
-		KeepAliveCount:    4,
+		KeepAlive:         types.Pointer(types.Duration(20 * time.Second)),
+		KeepAliveInterval: types.Pointer(types.Duration(7 * time.Second)),
+		KeepAliveCount:    types.Pointer(4),
 	}}
 	listener, err := transport.NewStreamListener(endpoint("127.0.0.1", 0))
 	if err != nil {
@@ -70,7 +70,7 @@ func TestKeepAliveIntervalAndCountReachBothEnds(t *testing.T) {
 }
 
 func TestNegativeKeepAliveDisablesProbesOnBothEnds(t *testing.T) {
-	transport := &tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Duration(-1)}}
+	transport := &tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Pointer(types.Duration(-1))}}
 	listener, err := transport.NewStreamListener(endpoint("127.0.0.1", 0))
 	if err != nil {
 		t.Fatal(err)
