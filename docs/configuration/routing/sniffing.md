@@ -50,7 +50,7 @@ warning.
 How long to wait for enough of the connection to recognise it. A client that
 waits for the server to speak first, as SSH and SMTP do, waits this long. Put
 rules that do not need a name, such as `{"port": [22]}`, before the `sniff`
-rule. Must not be negative; over 5 seconds is accepted with a warning.
+rule. Must be greater than zero (a written `0` is refused); over 5 seconds is accepted with a warning.
 
 </div>
 
