@@ -43,7 +43,9 @@ type Handler struct {
 
 	resolver informant.DomainResolver
 	stats    *stats.Registry
-	logger   *logging.Logger
+
+	inboundProtocolName string
+	logger              *logging.Logger
 }
 
 // One per inbound, so each inbound's timeouts apply to its own traffic.
@@ -79,6 +81,10 @@ type Config struct {
 
 	// What a routing resolve action asks. Nil: a resolve finds nothing.
 	Resolver informant.DomainResolver
+
+	// The inbound's protocol as the registry names it, shown with each of its
+	// live conversations.
+	InboundProtocolName string
 
 	// Where traffic is counted. Nil counts nothing.
 	Stats *stats.Registry
@@ -135,6 +141,7 @@ func New(router component.Router, config Config) *Handler {
 		udpSweeper:                          newPeriodicSweeper(sweepInterval),
 		resolver:                            config.Resolver,
 		stats:                               config.Stats,
+		inboundProtocolName:                 config.InboundProtocolName,
 		logger:                              logger,
 	}
 }
@@ -182,13 +189,15 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 		defer closeRequested()
 	}
 	connection := h.stats.TrackConversation(stats.ConversationInfo{
-		Network:      metadata.Network,
-		InboundTag:   metadata.InboundTag,
-		User:         metadata.User,
-		Source:       metadata.Transport.SourceEndpoint,
-		Destination:  metadata.Destination,
-		OutboundTags: carryingOutboundTags,
-		Rule:         decision.Rule,
+		Network:         metadata.Network,
+		InboundTag:      metadata.InboundTag,
+		InboundProtocol: h.inboundProtocolName,
+		User:            metadata.User,
+		Source:          metadata.Transport.SourceEndpoint,
+		Destination:     metadata.Destination,
+		SniffedDomain:   sniffedDomainOf(metadata),
+		OutboundTags:    carryingOutboundTags,
+		Rule:            decision.Rule,
 	}, closeRequested)
 	defer connection.End()
 	for _, counted := range counters {
@@ -247,10 +256,11 @@ func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagr
 	var replyReceived func(from spec.Destination, size int)
 	if h.stats.IsLiveTrackingEnabled() {
 		live := newUDPSessionLiveEntries(h.stats, stats.ConversationInfo{
-			Network:    spec.NetworkUDP,
-			InboundTag: metadata.InboundTag,
-			User:       metadata.User,
-			Source:     metadata.Transport.SourceEndpoint,
+			Network:         spec.NetworkUDP,
+			InboundTag:      metadata.InboundTag,
+			InboundProtocol: h.inboundProtocolName,
+			User:            metadata.User,
+			Source:          metadata.Transport.SourceEndpoint,
 		}, func(routed component.Outbound) []string {
 			if tags := udpSession.CarryingOutboundTags(routed); tags != nil {
 				return tags
@@ -345,4 +355,12 @@ func (h *Handler) countersCarrying(metadata spec.Metadata, carryingOutboundTags 
 		}
 	}
 	return counters
+}
+
+// The sniffed name, empty when no rule asked for a sniff or it found none.
+func sniffedDomainOf(metadata spec.Metadata) string {
+	if metadata.Sniffed == nil {
+		return ""
+	}
+	return metadata.Sniffed.Domain
 }
