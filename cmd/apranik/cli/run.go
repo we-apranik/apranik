@@ -5,20 +5,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/apicoreprovider"
 	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/logging/sink"
 	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/core/route/handler"
 )
 
 const defaultConfigSource = "config.json"
@@ -29,7 +23,10 @@ var cmdRun = &Command{
 	Usage: `Usage: apranik run [-config source] [-fetch-timeout duration]
 
 Load the config file, check it, build the inbounds and outbounds
-it describes, and serve until interrupted.
+it describes, and serve until interrupted. SIGHUP (and an API that offers
+it) loads the config again: a config with errors is reported and the running
+one keeps serving, otherwise everything is closed and started again from the
+new one, with the statistics counting from zero.
 
 Flags:
   -config source          file path or http(s) URL of the config file (default "config.json")
@@ -60,85 +57,9 @@ func runRun(args []string) error {
 		return logFailure(logger, "Config has errors", "source", *source)
 	}
 
-	if err := serve(coreBlueprint); err != nil {
+	if err := serve(*source, *fetchTimeout, coreBlueprint); err != nil {
 		return logFailure(logger, "Could not start", "error", err)
 	}
-	return nil
-}
-
-func serve(coreBlueprint *blueprint.Blueprint) error {
-	stackBuilder, err := builder.New(coreBlueprint.Log)
-	if err != nil {
-		return err
-	}
-	defer stackBuilder.Close()
-	logger := stackBuilder.Logger()
-
-	routing, err := stackBuilder.BuildRouting(coreBlueprint)
-	if err != nil {
-		return err
-	}
-	defer routing.Close()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	routing.StartProbing(ctx)
-
-	var tracking blueprint.StatsTracking
-	if coreBlueprint.Stats != nil {
-		tracking = coreBlueprint.Stats.Tracking
-	}
-	for _, inboundBlueprint := range coreBlueprint.Inbounds {
-		built, err := stackBuilder.BuildInbound(inboundBlueprint)
-		if err != nil {
-			return err
-		}
-		defer built.Close()
-
-		trafficHandler := handler.New(routing.Router, handler.Config{
-			StreamIdleTimeout:                   valueOrZero(inboundBlueprint.TCPIdleTimeout),
-			UDPSessionIdleTimeout:               valueOrZero(inboundBlueprint.UDPSessionIdleTimeout),
-			UDPMaxDatagramSize:                  valueOrZero(inboundBlueprint.UDPMaxDatagramSize),
-			UDPRoutingCacheEntryIdleTimeout:     valueOrZero(inboundBlueprint.UDPRoutingCacheEntryIdleTimeout),
-			UDPRoutingCacheMaxEntriesPerSession: valueOrZero(inboundBlueprint.UDPRoutingCacheMaxEntriesPerSession),
-
-			LiveTrackingUDPEntryIdleTimeout:     valueOrZero(tracking.UDPEntryIdleTimeout),
-			LiveTrackingUDPMaxEntriesPerSession: valueOrZero(tracking.UDPMaxEntriesPerSession),
-			Resolver:                            stackBuilder.Resolver(),
-			Stats:                               stackBuilder.Stats(),
-			InboundProtocolName:                 builder.InboundProtocolName(inboundBlueprint),
-			Logger:                              logger,
-		})
-		if err := built.Activate(ctx, trafficHandler); err != nil {
-			return err
-		}
-		logger.Info("Inbound active", "tag", inboundBlueprint.Tag, "network", inboundBlueprint.Network)
-	}
-
-	if len(coreBlueprint.APIs) > 0 {
-		coreProvider, err := apicoreprovider.New(apicoreprovider.Parts{
-			Version:   blueprint.Version,
-			Stats:     stackBuilder.Stats(),
-			Logs:      stackBuilder.SubscribeToLog,
-			Logger:    logger,
-			Blueprint: coreBlueprint,
-			Outbounds: routing.Outbounds,
-		})
-		if err != nil {
-			return err
-		}
-		// Registered after the inbounds' closes, so it runs first: an API stops
-		// serving before anything it reads goes away.
-		servers, err := startAPIs(ctx, coreBlueprint.APIs, coreProvider, logger)
-		if err != nil {
-			return err
-		}
-		defer closeAPIs(servers, logger)
-	}
-
-	logger.Info("Apranik is running", "version", blueprint.Version, "inbounds", len(coreBlueprint.Inbounds), "apis", len(coreBlueprint.APIs))
-	<-ctx.Done()
-	logger.Info("Shutting down")
 	return nil
 }
 
