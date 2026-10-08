@@ -14,7 +14,8 @@ var cmdModules = &Command{
 	Short: "list the modules this build can be configured with",
 	Usage: `Usage: apranik modules
 
-List every registered transport, proxy protocol, sniffer and DNS server, grouped by the\nkind it fills; a module filling several kinds appears under each.
+List every registered transport, proxy protocol, sniffer, DNS server and API,
+grouped by the kind it fills; a module filling several kinds appears under each.
 A "type" in a config file must name one of these.
 
 Everything printed comes from the module itself, so a module describes itself
@@ -84,6 +85,7 @@ func modulesByKind(modules *registry.Registry) []kindGroup {
 	all = append(all, modules.ProxyProtocols().Modules()...)
 	all = append(all, modules.Sniffers().Modules()...)
 	all = append(all, modules.DNSServers().Modules()...)
+	all = append(all, modules.APIs().Modules()...)
 	slices.SortStableFunc(all, func(first, second registry.Listing) int {
 		return int(first.Kind) - int(second.Kind)
 	})
