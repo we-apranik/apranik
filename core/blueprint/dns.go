@@ -47,20 +47,23 @@ func (v IPVersions) Valid() bool {
 	return false
 }
 
-// DNSCache: zero values mean the defaults the resolver documents.
+// DNSCache: a nil field means the default the resolver documents; a value
+// must be positive.
 type DNSCache struct {
 	Disable bool
 
-	// Zero means the resolver's default.
-	MaxEntries int
+	// Nil means the resolver's default.
+	MaxEntries *int
 
 	// A separate cache, with its own MaxEntries, for each server.
 	PerServer bool
 
 	// Serve an expired answer at once and refresh it in the background, while
 	// it is no older than MaxStaleAge past its expiry (RFC 8767).
-	ServeStale  bool
-	MaxStaleAge time.Duration
+	ServeStale bool
+
+	// Nil means the resolver's default.
+	MaxStaleAge *time.Duration
 }
 
 // DNSServer is one upstream the resolver sends queries to. Exactly one of
@@ -97,8 +100,8 @@ const DefaultDNSOutboundTag = "dns-default-freedom"
 // SystemDNSServer asks the operating system, which takes a name and returns
 // addresses: no wire format, no outbound, and no forwarded client queries.
 type SystemDNSServer struct {
-	// Zero means the resolver's default.
-	Timeout time.Duration
+	// Nil means the resolver's default; a value must be positive.
+	Timeout *time.Duration
 }
 
 // DNSRule's Match uses only the domain fields, Any, All and Not: a lookup has

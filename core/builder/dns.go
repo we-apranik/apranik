@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/dns"
@@ -75,7 +76,7 @@ func (b *Builder) BuildDNS(section *blueprint.DNS, outbounds []component.Outboun
 func (b *Builder) buildDNSServer(section *blueprint.DNS, serverBlueprint blueprint.DNSServer, outboundsByTag map[string]component.Outbound) (dns.Server, error) {
 	server := dns.Server{Tag: serverBlueprint.Tag, IPVersions: serverBlueprint.IPVersions}
 	if serverBlueprint.System != nil {
-		server.System = dns.NewSystemServer(serverBlueprint.System.Timeout)
+		server.System = dns.NewSystemServer(types.ValueOrDefault(serverBlueprint.System.Timeout, 0))
 		return server, nil
 	}
 

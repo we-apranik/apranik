@@ -100,11 +100,11 @@ func ipVersionsList() string {
 
 func checkDNSCache(diagnostics *Diagnostics, cache blueprint.DNSCache) {
 	loc := fieldLocation("dns", "cache")
-	if cache.MaxEntries < 0 {
-		diagnostics.errorf(fieldLocation(loc, "max_entries"), "must not be negative; 0 means the default, %d", dns.DefaultCacheMaxEntries)
+	if cache.MaxEntries != nil && *cache.MaxEntries <= 0 {
+		diagnostics.errorf(fieldLocation(loc, "max_entries"), "must be greater than zero (leave it out for the default, %d)", dns.DefaultCacheMaxEntries)
 	}
-	if cache.MaxStaleAge < 0 {
-		diagnostics.errorf(fieldLocation(loc, "serve_stale", "max_stale_age"), "must not be negative")
+	if cache.MaxStaleAge != nil && *cache.MaxStaleAge <= 0 {
+		diagnostics.errorf(fieldLocation(loc, "serve_stale", "max_stale_age"), "must be greater than zero (leave it out for the default, %s)", dns.DefaultMaxStaleAge)
 	}
 	if cache.ServeStale && cache.Disable {
 		diagnostics.errorf(fieldLocation(loc, "serve_stale"), "serving stale answers needs the cache, and the cache is disabled")
@@ -143,8 +143,8 @@ func checkDNSServer(diagnostics *Diagnostics, server blueprint.DNSServer, outbou
 		if server.DNSServer != "" {
 			diagnostics.errorf(fieldLocation(loc, "dns_server"), "system has no hostname of its own to resolve")
 		}
-		if server.System.Timeout < 0 {
-			diagnostics.errorf(fieldLocation(loc, "settings", "timeout"), "must not be negative")
+		if server.System.Timeout != nil && *server.System.Timeout <= 0 {
+			diagnostics.errorf(fieldLocation(loc, "settings", "timeout"), "must be greater than zero (leave it out for the default, %s)", dns.DefaultSystemTimeout)
 		}
 		return
 	}

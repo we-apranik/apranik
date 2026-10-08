@@ -54,7 +54,7 @@ func TestDNSSectionDecodes(t *testing.T) {
 	if dns.IPVersions != blueprint.IPVersionsPreferIPv6 || dns.DefaultServer != "google" {
 		t.Errorf("dns = %+v", dns)
 	}
-	if !dns.Cache.PerServer || !dns.Cache.ServeStale || dns.Cache.MaxStaleAge != 10*time.Minute || dns.Cache.MaxEntries != 100 {
+	if !dns.Cache.PerServer || !dns.Cache.ServeStale || dns.Cache.MaxStaleAge == nil || *dns.Cache.MaxStaleAge != 10*time.Minute || dns.Cache.MaxEntries == nil || *dns.Cache.MaxEntries != 100 {
 		t.Errorf("cache = %+v", dns.Cache)
 	}
 	google, cf, bootstrap, plain, system := dns.Servers[0], dns.Servers[1], dns.Servers[2], dns.Servers[3], dns.Servers[4]
@@ -70,7 +70,7 @@ func TestDNSSectionDecodes(t *testing.T) {
 	if plain.Stream == nil || plain.TLS != nil {
 		t.Errorf("tcp server = %+v", plain)
 	}
-	if system.System == nil || system.System.Timeout != 3*time.Second {
+	if system.System == nil || system.System.Timeout == nil || *system.System.Timeout != 3*time.Second {
 		t.Errorf("system server = %+v", system)
 	}
 	if len(dns.Rules) != 1 || dns.Rules[0].Server != "bootstrap" || dns.Rules[0].Match.DomainSuffixes[0] != "ir" {
@@ -107,7 +107,10 @@ func TestDNSRefusals(t *testing.T) {
 		{"rule to an unknown server", `{"servers": [{"tag": "a", "type": "system"}], "rules": [{"match": {"domain": ["x"]}, "server": "b"}], "default_server": "a"}`, "", "dns.rules[0].server", `"b"`},
 		{"rule with an unknown dataset", `{"servers": [{"tag": "a", "type": "system"}], "rules": [{"match": {"domain_in_dataset": ["ir"]}, "server": "a"}], "default_server": "a"}`, "", "dns.rules[0].match.domain_in_dataset[0]", `"ir"`},
 		{"serve_stale without a cache", `{"servers": [{"tag": "a", "type": "system"}], "cache": {"disable": true, "serve_stale": {"enabled": true}}, "default_server": "a"}`, "", "dns.cache.serve_stale", "cache is disabled"},
-		{"negative max_entries", `{"servers": [{"tag": "a", "type": "system"}], "cache": {"max_entries": -1}, "default_server": "a"}`, "", "dns.cache.max_entries", "negative"},
+		{"negative max_entries", `{"servers": [{"tag": "a", "type": "system"}], "cache": {"max_entries": -1}, "default_server": "a"}`, "", "dns.cache.max_entries", "greater than zero"},
+		{"zero system timeout", `{"servers": [{"tag": "a", "type": "system", "settings": {"timeout": "0s"}}], "default_server": "a"}`, "", "dns.servers[0].settings.timeout", "greater than zero"},
+		{"zero max_stale_age", `{"servers": [{"tag": "a", "type": "system"}], "cache": {"serve_stale": {"enabled": true, "max_stale_age": "0s"}}, "default_server": "a"}`, "", "dns.cache.serve_stale.max_stale_age", "greater than zero"},
+		{"zero max_entries", `{"servers": [{"tag": "a", "type": "system"}], "cache": {"max_entries": 0}, "default_server": "a"}`, "", "dns.cache.max_entries", "greater than zero"},
 		{"bad global ip_versions", `{"servers": [{"tag": "a", "type": "system"}], "ip_versions": "both", "default_server": "a"}`, "", "dns.ip_versions", "both"},
 		{"resolve with an unknown server", `{"servers": [{"tag": "a", "type": "system"}], "default_server": "a"}`,
 			`{"rules": [{"action": {"type": "resolve", "settings": {"server": "b"}}}, {"match": {"ip": ["10.0.0.0/8"]}, "action": {"type": "block"}}], "default_action": {"type": "block"}}`,

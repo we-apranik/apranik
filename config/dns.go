@@ -3,7 +3,6 @@ package config
 import (
 	"bytes"
 	"encoding/json"
-	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
@@ -22,14 +21,14 @@ type rawDNS struct {
 
 type rawDNSCache struct {
 	Disable    bool           `json:"disable"`
-	MaxEntries int            `json:"max_entries"`
+	MaxEntries *int           `json:"max_entries"`
 	PerServer  bool           `json:"per_server"`
 	ServeStale *rawServeStale `json:"serve_stale"`
 }
 
 type rawServeStale struct {
-	Enabled     bool           `json:"enabled"`
-	MaxStaleAge types.Duration `json:"max_stale_age"`
+	Enabled     bool            `json:"enabled"`
+	MaxStaleAge *types.Duration `json:"max_stale_age"`
 }
 
 // type and settings are the module's; the rest are core's, which is why they
@@ -46,7 +45,7 @@ type rawDNSServer struct {
 
 // The special type system: only a timeout.
 type rawSystemDNSSettings struct {
-	Timeout types.Duration `json:"timeout"`
+	Timeout *types.Duration `json:"timeout"`
 }
 
 type rawDNSRule struct {
@@ -69,7 +68,7 @@ func (b *configBuilder) buildDNS(raw rawDNS, loc string) *blueprint.DNS {
 	}
 	if raw.Cache.ServeStale != nil {
 		dns.Cache.ServeStale = raw.Cache.ServeStale.Enabled
-		dns.Cache.MaxStaleAge = time.Duration(raw.Cache.ServeStale.MaxStaleAge)
+		dns.Cache.MaxStaleAge = durationOrNil(raw.Cache.ServeStale.MaxStaleAge)
 	}
 	for index, server := range raw.Servers {
 		dns.Servers = append(dns.Servers, b.buildDNSServer(server, indexLocation(fieldLocation(loc, "servers"), index)))
@@ -102,7 +101,7 @@ func (b *configBuilder) buildDNSServer(raw rawDNSServer, loc string) blueprint.D
 	case raw.Type == registry.SystemDNSServerName:
 		var settings rawSystemDNSSettings
 		if b.decodeStrict(raw.Settings, &settings, settingsLoc) {
-			server.System = &blueprint.SystemDNSServer{Timeout: time.Duration(settings.Timeout)}
+			server.System = &blueprint.SystemDNSServer{Timeout: durationOrNil(settings.Timeout)}
 		}
 	case len(kinds) == 1 && kinds[0] == registry.KindDatagramDNSServer:
 		newModule, _ := dnsServers.LookupDatagram(raw.Type)

@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
+	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/route/dataset"
@@ -119,16 +120,13 @@ func NewResolver(config Config) *Resolver {
 	}
 	maxStaleAge := time.Duration(0)
 	if config.Cache.ServeStale {
-		maxStaleAge = config.Cache.MaxStaleAge
-		if maxStaleAge <= 0 {
-			maxStaleAge = DefaultMaxStaleAge
-		}
+		maxStaleAge = types.ValueOrDefault(config.Cache.MaxStaleAge, DefaultMaxStaleAge)
 	}
 
 	lifetime, endLifetime := context.WithCancel(context.Background())
 	return &Resolver{
 		ipVersions:  ipVersions,
-		caches:      newCacheSet(config.Cache.Disable, config.Cache.PerServer, config.Cache.MaxEntries, maxStaleAge),
+		caches:      newCacheSet(config.Cache.Disable, config.Cache.PerServer, types.ValueOrDefault(config.Cache.MaxEntries, 0), maxStaleAge),
 		logger:      logger.With("component", "dns"),
 		now:         time.Now,
 		flights:     make(map[cacheKey]*flight),
