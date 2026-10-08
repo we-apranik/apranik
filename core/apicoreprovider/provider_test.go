@@ -475,7 +475,7 @@ func TestRequestReloadSaysWhenNothingCanReload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := provider.RequestReload(); !errors.Is(err, apicoreprovider.ErrReloadUnavailable) {
-		t.Errorf("RequestReload = %v, want ErrReloadUnavailable", err)
+	if err := provider.RequestReload(); !errors.Is(err, spec.ErrAPIReloadUnavailable) {
+		t.Errorf("RequestReload = %v, want ErrAPIReloadUnavailable", err)
 	}
 }

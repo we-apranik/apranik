@@ -11,6 +11,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/component"
+	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/stats"
 	"github.com/The-Apranik/Apranik/spec"
@@ -38,6 +39,9 @@ type Parts struct {
 	// The built outbounds, in the blueprint's order.
 	Outbounds []component.Outbound
 
+	// Answers QueryDNS and FlushDNSCache. Nil when there is none.
+	Resolver *dns.Resolver
+
 	// Checks the configuration source and queues it to replace the running one;
 	// see RequestReload. Nil when reloading is not offered.
 	RequestReload func() error
@@ -51,6 +55,7 @@ type Provider struct {
 	blueprint *blueprint.Blueprint
 
 	requestReload func() error
+	resolver      *dns.Resolver
 
 	outboundTags   []string
 	outboundsByTag map[string]component.Outbound
@@ -77,6 +82,7 @@ func New(parts Parts) (*Provider, error) {
 		logger:         logger.With("component", "api"),
 		blueprint:      parts.Blueprint,
 		requestReload:  parts.RequestReload,
+		resolver:       parts.Resolver,
 		outboundTags:   make([]string, len(parts.Outbounds)),
 		outboundsByTag: make(map[string]component.Outbound, len(parts.Outbounds)),
 		blueprintByTag: make(map[string]blueprint.Outbound, len(parts.Outbounds)),

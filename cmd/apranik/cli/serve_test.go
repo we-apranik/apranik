@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/apicoreprovider"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 func mustDefaultRegistry(t *testing.T) *registry.Registry {
@@ -162,7 +162,7 @@ func TestAReloadOfAConfigWithErrorsChangesNothingAndListsTheProblem(t *testing.T
 
 	serving.rewriteConfig(t, `{"version": 1, "outbounds": [{"tag": "second", "protocol": {"type": "no-such-protocol"}}]}`)
 	err := serving.reloads.Request()
-	if !errors.Is(err, apicoreprovider.ErrReloadConfigInvalid) || !strings.Contains(err.Error(), "no-such-protocol") {
+	if !errors.Is(err, spec.ErrAPIInvalidConfiguration) || !strings.Contains(err.Error(), "no-such-protocol") {
 		t.Fatalf("Request = %v, want ErrReloadConfigInvalid naming the problem", err)
 	}
 	if len(serving.reloads.pending) != 0 {
@@ -177,7 +177,7 @@ func TestAReloadOfAnUnreadableSourceChangesNothing(t *testing.T) {
 	if err := os.Remove(serving.path); err != nil {
 		t.Fatal(err)
 	}
-	if err := serving.reloads.Request(); !errors.Is(err, apicoreprovider.ErrReloadConfigInvalid) {
+	if err := serving.reloads.Request(); !errors.Is(err, spec.ErrAPIInvalidConfiguration) {
 		t.Fatalf("Request = %v, want ErrReloadConfigInvalid", err)
 	}
 	serving.events.waitFor(t, "start first")
@@ -191,7 +191,7 @@ func TestOnlyOneReloadWaitsAtATime(t *testing.T) {
 	if err := reloads.Request(); err != nil {
 		t.Fatalf("first Request = %v", err)
 	}
-	if err := reloads.Request(); !errors.Is(err, apicoreprovider.ErrReloadInProgress) {
+	if err := reloads.Request(); !errors.Is(err, spec.ErrAPIReloadInProgress) {
 		t.Fatalf("second Request = %v, want ErrReloadInProgress", err)
 	}
 }

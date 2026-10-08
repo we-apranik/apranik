@@ -92,6 +92,29 @@ type APICoreProvider interface {
 	// member it replaced. ErrAPINoSuchOutbound, ErrAPIOutboundNotSelectable,
 	// ErrAPINoSuchMember.
 	SelectMember(selectorTag, memberTag string) error
+
+	// One lookup of name through the resolver, by its DNS rules and cache, as
+	// an API client would ask for it. recordType is "A" or "AAAA"; anything else
+	// is ErrAPIInvalidDNSQuery, as is a name that is not a valid domain. A name
+	// without records of that type gives an answer with no records; a lookup
+	// that failed is a plain error.
+	QueryDNS(ctx context.Context, name, recordType string) (APIDNSAnswer, error)
+
+	// FlushDNSCache forgets every cached DNS answer. Nothing to forget is not
+	// an error.
+	FlushDNSCache() error
+
+	// The routing rules in the order they are evaluated, then the default
+	// action as the last entry.
+	RoutingRules() ([]APIRoutingRule, error)
+
+	// RequestReload checks the configuration source again and, when it is valid,
+	// asks for it to replace the running one. It returns once the new
+	// configuration is accepted, not once it is running: this API is closed and
+	// started again with the rest. ErrAPIInvalidConfiguration (the error wrapping
+	// it lists every problem; nothing changes), ErrAPIReloadInProgress,
+	// ErrAPIReloadUnavailable.
+	RequestReload() error
 }
 
 // Bytes counted above the proxy layer. Which networks they cover is the
@@ -128,6 +151,53 @@ type APILiveConversation struct {
 
 	UplinkBytes   uint64
 	DownlinkBytes uint64
+}
+
+// What one DNS lookup found. ServerTag is the DNS server that answered, the
+// resolver's own when the answer came from its cache.
+type APIDNSAnswer struct {
+	ServerTag string
+	Records   []APIDNSRecord
+}
+
+type APIDNSRecord struct {
+	Name string
+	Type string // "A" or "AAAA"
+	TTL  time.Duration
+	Data string // the address
+}
+
+type APIRoutingRuleAction string
+
+const (
+	APIRoutingRuleActionRoute   APIRoutingRuleAction = "route"
+	APIRoutingRuleActionBlock   APIRoutingRuleAction = "block"
+	APIRoutingRuleActionSniff   APIRoutingRuleAction = "sniff"
+	APIRoutingRuleActionResolve APIRoutingRuleAction = "resolve"
+)
+
+// One routing rule, or the default action when Location is "default".
+type APIRoutingRule struct {
+	// Where the rule sits in the configuration: "routing.rules[3]" or "default".
+	Location string
+
+	Action APIRoutingRuleAction
+
+	// The conditions as text, such as "domain_suffix=a.com,b.com port=443":
+	// fields all hold, a field's values are alternatives. Empty for the default.
+	Match string
+
+	// The outbound a route action sends to; empty for the other actions.
+	OutboundTag string
+
+	// The DNS server a resolve action asks; empty when the DNS rules choose,
+	// and for the other actions.
+	DNSServerTag string
+
+	// How many routing decisions this rule made. Only meaningful when
+	// HitsCounted is true, that is when statistics are on.
+	Hits        uint64
+	HitsCounted bool
 }
 
 // What a client reads from a log subscription. Cancel is safe to call twice;

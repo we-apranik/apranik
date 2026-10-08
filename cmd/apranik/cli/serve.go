@@ -14,6 +14,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/builder"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/route/handler"
+	"github.com/The-Apranik/Apranik/spec"
 )
 
 // serve runs the core until interrupted, and starts it again from the config
@@ -99,14 +100,14 @@ func (r *reloader) Request() error {
 	case r.pending <- next:
 		return nil
 	default:
-		return apicoreprovider.ErrReloadInProgress
+		return spec.ErrAPIReloadInProgress
 	}
 }
 
 func (r *reloader) checkedConfiguration() (*blueprint.Blueprint, error) {
 	next, diagnostics, err := load(r.source, r.fetchTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", apicoreprovider.ErrReloadConfigInvalid, err)
+		return nil, fmt.Errorf("%w: %w", spec.ErrAPIInvalidConfiguration, err)
 	}
 	logger := r.logger.Load()
 	if logger == nil {
@@ -114,10 +115,10 @@ func (r *reloader) checkedConfiguration() (*blueprint.Blueprint, error) {
 	}
 	report(logger, diagnostics)
 	if diagnostics.HasErrors() {
-		return nil, fmt.Errorf("%w: %w", apicoreprovider.ErrReloadConfigInvalid, diagnostics.Err())
+		return nil, fmt.Errorf("%w: %w", spec.ErrAPIInvalidConfiguration, diagnostics.Err())
 	}
 	if err := builder.Verify(next, builder.VerifyOptions{}); err != nil {
-		return nil, fmt.Errorf("%w: %w", apicoreprovider.ErrReloadConfigInvalid, err)
+		return nil, fmt.Errorf("%w: %w", spec.ErrAPIInvalidConfiguration, err)
 	}
 	return next, nil
 }
@@ -206,6 +207,7 @@ func startComponents(ctx context.Context, core *runningCore, stackBuilder *build
 			Logger:        logger,
 			Blueprint:     coreBlueprint,
 			Outbounds:     routing.Outbounds,
+			Resolver:      stackBuilder.Resolver(),
 			RequestReload: requestReload,
 		})
 		if err != nil {
