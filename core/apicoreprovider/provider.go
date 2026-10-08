@@ -37,6 +37,10 @@ type Parts struct {
 
 	// The built outbounds, in the blueprint's order.
 	Outbounds []component.Outbound
+
+	// Checks the configuration source and queues it to replace the running one;
+	// see RequestReload. Nil when reloading is not offered.
+	RequestReload func() error
 }
 
 type Provider struct {
@@ -45,6 +49,8 @@ type Provider struct {
 	logs      SubscribeToLog
 	logger    *logging.Logger
 	blueprint *blueprint.Blueprint
+
+	requestReload func() error
 
 	outboundTags   []string
 	outboundsByTag map[string]component.Outbound
@@ -70,6 +76,7 @@ func New(parts Parts) (*Provider, error) {
 		logs:           parts.Logs,
 		logger:         logger.With("component", "api"),
 		blueprint:      parts.Blueprint,
+		requestReload:  parts.RequestReload,
 		outboundTags:   make([]string, len(parts.Outbounds)),
 		outboundsByTag: make(map[string]component.Outbound, len(parts.Outbounds)),
 		blueprintByTag: make(map[string]blueprint.Outbound, len(parts.Outbounds)),
