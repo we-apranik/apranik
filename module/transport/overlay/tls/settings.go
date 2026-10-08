@@ -43,19 +43,16 @@ type Settings struct {
 	// "chrome"; "none" means Go's own.
 	Fingerprint string `json:"fingerprint"`
 
-	// Both: how long the TLS handshake may take. Zero means
-	// defaultHandshakeTimeout.
-	HandshakeTimeout types.Duration `json:"handshake_timeout"`
+	// Both: how long the TLS handshake may take. Absent means
+	// defaultHandshakeTimeout; a written zero is refused.
+	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
 // PROVISIONAL.
 const defaultHandshakeTimeout = 10 * time.Second
 
 func (s *Settings) handshakeTimeout() time.Duration {
-	if s.HandshakeTimeout == 0 {
-		return defaultHandshakeTimeout
-	}
-	return time.Duration(s.HandshakeTimeout)
+	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
 // A PEM certificate, from a file or inline: exactly one of the two.
@@ -83,8 +80,8 @@ var versionsByName = map[string]uint16{
 const maxALPNProtocolLength = 255
 
 func (s *Settings) Validate() error {
-	if s.HandshakeTimeout < 0 {
-		return fmt.Errorf("tls: handshake_timeout %s must not be negative", s.HandshakeTimeout)
+	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
+		return fmt.Errorf("tls: handshake_timeout %w", err)
 	}
 	minVersion, known := versionsByName[s.MinVersion]
 	if !known {

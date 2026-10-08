@@ -487,7 +487,7 @@ func TestInfoIsTheSameForEveryValue(t *testing.T) {
 
 func TestAServerGivesUpOnASilentClientAtItsHandshakeTimeout(t *testing.T) {
 	serverModule := serverFor(t, newTestAuthority(t), []string{"proxy.example"}, nil)
-	serverModule.HandshakeTimeout = types.Duration(100 * time.Millisecond)
+	serverModule.HandshakeTimeout = types.Pointer(types.Duration(100 * time.Millisecond))
 	overlayServer, err := serverModule.NewStreamOverlayServer()
 	if err != nil {
 		t.Fatal(err)
