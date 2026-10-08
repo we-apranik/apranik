@@ -18,6 +18,7 @@ const (
 	KindSniffer
 	KindStreamDNSServer
 	KindDatagramDNSServer
+	KindAPI
 )
 
 func (k Kind) String() string {
@@ -42,6 +43,8 @@ func (k Kind) String() string {
 		return "stream DNS server"
 	case KindDatagramDNSServer:
 		return "datagram DNS server"
+	case KindAPI:
+		return "API"
 	default:
 		return fmt.Sprintf("unknown kind %d", int(k))
 	}

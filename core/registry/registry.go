@@ -11,6 +11,7 @@ type Registry struct {
 	proxyProtocols ProxyProtocolRegistry
 	sniffers       SnifferRegistry
 	dnsServers     DNSServerRegistry
+	apis           APIRegistry
 }
 
 func New() *Registry { return &Registry{} }
@@ -24,3 +25,5 @@ func (r *Registry) ProxyProtocols() *ProxyProtocolRegistry {
 func (r *Registry) Sniffers() *SnifferRegistry { return &r.sniffers }
 
 func (r *Registry) DNSServers() *DNSServerRegistry { return &r.dnsServers }
+
+func (r *Registry) APIs() *APIRegistry { return &r.apis }
