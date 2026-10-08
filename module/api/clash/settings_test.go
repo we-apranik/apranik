@@ -56,6 +56,7 @@ func TestSettingsRefuseWhatTheServerCannotRunWith(t *testing.T) {
 		"a buffer above the maximum":   {`{"listen": "127.0.0.1", "port": 9090, "secret": "x", "log_buffer_records": 100001}`, "log_buffer_records"},
 		"a delay url that is a path":   {`{"listen": "127.0.0.1", "port": 9090, "secret": "x", "delay_test": {"url": "/204"}}`, "delay_test url"},
 		"a delay url that is ftp":      {`{"listen": "127.0.0.1", "port": 9090, "secret": "x", "delay_test": {"url": "ftp://example.com/x"}}`, "delay_test url"},
+		"a relative dashboard folder":  {`{"listen": "127.0.0.1", "port": 9090, "secret": "x", "external_ui": "ui"}`, "external_ui"},
 		"a written zero delay timeout": {`{"listen": "127.0.0.1", "port": 9090, "secret": "x", "delay_test": {"timeout": "0s"}}`, "delay_test timeout"},
 	} {
 		err := settingsFrom(t, test.settings).Validate()

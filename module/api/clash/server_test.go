@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -176,7 +178,7 @@ func TestTheSecretReachesEveryFamilyOfEndpoints(t *testing.T) {
 
 func TestEndpointsNotBuiltAre404Json(t *testing.T) {
 	server := start(t, &testkit.Provider{})
-	for _, path := range []string{"/providers/proxies", "/providers/rules", "/restart", "/ui/", "/script", "/profile"} {
+	for _, path := range []string{"/providers/proxies", "/providers/rules", "/restart", "/script", "/profile"} {
 		status, body, _ := server.request("GET", path, "")
 		if status != http.StatusNotFound || !strings.Contains(body, `"message"`) {
 			t.Errorf("%s = %d %q, want a JSON 404", path, status, body)
@@ -413,5 +415,32 @@ func TestAReloadThatClosesTheServerStillDeliversItsAnswer(t *testing.T) {
 	case <-closed:
 	case <-time.After(10 * time.Second):
 		t.Fatal("the server never finished closing")
+	}
+}
+
+func TestTheDashboardIsServedWithoutTheSecretAndTheAPIStillNeedsIt(t *testing.T) {
+	directory := t.TempDir()
+	os.WriteFile(filepath.Join(directory, "index.html"), []byte("<h1>dashboard</h1>"), 0o644)
+	server := start(t, &testkit.Provider{}, func(s *Settings) { s.ExternalUI = directory })
+
+	if status, body, _ := server.request("GET", "/ui/", "", "Authorization", ""); status != http.StatusOK || !strings.Contains(body, "dashboard") {
+		t.Errorf("/ui/ without the secret = %d %q", status, body)
+	}
+	if status, _, _ := server.request("GET", "/version", "", "Authorization", ""); status != http.StatusUnauthorized {
+		t.Errorf("/version without the secret = %d, want 401", status)
+	}
+}
+
+func TestWithoutExternalUIThereIsNoDashboard(t *testing.T) {
+	server := start(t, &testkit.Provider{})
+	if status, _, _ := server.request("GET", "/ui/", "", "Authorization", ""); status != http.StatusUnauthorized {
+		t.Errorf("/ui/ = %d, want the API's 401 like any other path", status)
+	}
+}
+
+func TestStartFailsForADashboardFolderThatDoesNotExist(t *testing.T) {
+	settings := Settings{Listen: "127.0.0.1", Port: freePort(t), Secret: testSecret, ExternalUI: filepath.Join(t.TempDir(), "nope")}
+	if err := newServer(settings, time.Second).Start(t.Context(), &testkit.Provider{}); err == nil || !strings.Contains(err.Error(), "external_ui") {
+		t.Errorf("Start = %v", err)
 	}
 }
