@@ -69,6 +69,14 @@ type Inbound interface {
 	Close() error
 }
 
+// UserManagingInbound is optional on an Inbound whose protocol may let its users
+// change while it runs. UserManager is nil when the protocol's server does not
+// implement spec.UserManager, and callers must check for it.
+type UserManagingInbound interface {
+	Inbound
+	UserManager() spec.UserManager
+}
+
 // Outbound = proxy client + dialer stack.
 //
 // Networks reports what this outbound can actually carry, so routing can rule
