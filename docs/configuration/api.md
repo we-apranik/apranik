@@ -48,9 +48,10 @@ and warnings only, so **a taken port shows when you run, not when you check.**
 An API never imports core. Core gives it one provider with small, separate questions:
 the totals, the live conversations, closing one, the log, the outbounds and their state,
 a delay test, choosing a selector's member, a DNS lookup and flushing the DNS cache, the
-routing rules, and loading the config again. An API that asks for something that is
+routing rules, loading the config again, and listing, adding and removing the [users](users.md)
+of an inbound. An API that asks for something that is
 switched off gets a plain answer saying so: statistics disabled, live conversations not
 tracked.
 
-An API that can see live conversations and the log can see where users go. Give it a strong
+An API that can change users can also lock them out or let anyone in. An API that can see live conversations and the log can see where users go. Give it a strong
 secret and a loopback address, and read [Stats](stats.md) and [Log](log.md).
