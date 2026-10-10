@@ -145,6 +145,21 @@ type streamInbound struct {
 
 func (i *streamInbound) Tag() string { return i.tag }
 
+var _ component.UserManagingInbound = (*streamInbound)(nil)
+
+// The proxy server's, else the datagram-over-stream server's; nil when neither
+// can change its users. A protocol that serves both with one object (Trojan)
+// answers for both, so a change reaches the stream and the UDP path alike.
+func (i *streamInbound) UserManager() spec.UserManager {
+	if manager, ok := i.proxyServer.(spec.UserManager); ok {
+		return manager
+	}
+	if manager, ok := i.datagramServer.(spec.UserManager); ok {
+		return manager
+	}
+	return nil
+}
+
 func (i *streamInbound) Activate(ctx context.Context, handler component.TrafficHandler) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
