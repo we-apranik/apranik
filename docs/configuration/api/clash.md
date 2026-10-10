@@ -94,6 +94,7 @@ listed answers 404.
 | `GET /logs?level=` | the log as it is written, see [below](#logs) |
 | `GET /logs/file` | the log file, see [below](#the-log-file) |
 | `GET /dns/query?name=&type=` | one lookup through the resolver |
+| `GET /inbounds/{tag}/users`, `GET /inbounds/{tag}/users/{name}` | an inbound's [users](#users): all the names, or whether one exists |
 
 `/traffic`, `/memory`, `/connections` and `/logs` stream when the request is a WebSocket
 upgrade (messages are text frames) and, for `/traffic`, `/memory` and `/logs`, otherwise as
@@ -110,6 +111,8 @@ chunked JSON lines.
 | `GET /group/{name}/delay?url=&timeout=&expected=` | a delay test of every member, `{"<member>": ms}`; a member that failed is left out |
 | `POST /cache/dns/flush` | forgets the cached DNS answers |
 | `POST /reload` | loads the config again, see [below](#reload) |
+| `POST /inbounds/{tag}/users`, `DELETE /inbounds/{tag}/users/{name}` | adds or removes one [user](#users) |
+| `POST /inbounds/{tag}/users:batchCreate`, `POST /inbounds/{tag}/users:batchDelete` | adds or removes many [users](#users) in one request |
 
 `PUT` and `PATCH /configs` answer 405 with a message: the mode and the ports are not settable
 through the API. Nothing is a silent no-op.
@@ -224,6 +227,50 @@ With none of `tail`, `contains` or `follow` it is a normal file download: `Range
 changes nothing, and the answer is 400 with every problem. A good one answers 202 and is applied
 after the answer: everything is closed and started again, this API included, so a dashboard
 reconnects. The statistics count from zero afterwards. A second reload while one waits answers 409.
+
+## Users
+
+These routes change the [users](../users.md) of an inbound while it runs. They are an Apranik
+extension (Mihomo has none) and work on an inbound whose protocol can change its users: Trojan,
+SOCKS5, HTTP and [mixed](../inbound/mixed.md). `{tag}` is the inbound's tag.
+
+| Route | Body | Answer |
+| --- | --- | --- |
+| `GET /inbounds/{tag}/users` | | `200 {"users": ["alice", "bob"]}`, in the order they were added |
+| `GET /inbounds/{tag}/users/{name}` | | `200 {"name": "alice"}`, or `404` |
+| `POST /inbounds/{tag}/users` | one user, a JSON object | `201 {"name": "alice"}` |
+| `DELETE /inbounds/{tag}/users/{name}` | | `204` |
+| `POST /inbounds/{tag}/users:batchCreate` | an array of users | `200 {"results": [...]}` |
+| `POST /inbounds/{tag}/users:batchDelete` | an array of names | `200 {"results": [...]}` |
+
+A user is written as the protocol writes it in its `users`, for example `{"name": "alice",
+"password": "correct horse"}`; unknown keys are refused. A name goes in the path as one
+escaped segment (`a%2Fb`, `%D8%B3%D8%A7%D8%B1%D8%A7`); a name made only of dots has to write them as `%2E`,
+because clients resolve `.` and `..` as directories.
+
+- **Status codes.** `404` for an unknown inbound, an inbound whose protocol cannot change its
+  users, or an unknown user (the message says which); `400` for an invalid user, a body that is
+  not what the route takes or an empty batch; `409` when the name is taken; `413` for a body over
+  16 KiB (one user) or 8 MiB (a batch).
+- **A batch** runs its items in order and answers `200` with one result for each; one that fails
+  does not stop the rest, and nothing is undone: it is not atomic. A result is
+  `{"index": 0, "name": "alice", "ok": true}` or `{"index": 1, "ok": false, "error": "..."}`.
+  Only an unknown inbound fails the whole request.
+- **Removing a user** ends their live conversations on that inbound, and only on it. With
+  [live tracking](../stats.md#live-conversations-and-online-users) off the user is still removed and
+  the open connections stay, which the log says.
+- **Nothing is saved.** A user added here is gone after a restart or a successful
+  [reload](#reload), which read the config file again; see [Users](../users.md#changing-users-while-running).
+  A password change is a removal then an addition.
+- **Every add and removal is logged** at Info with the inbound and the user's name, never the password.
+
+```sh
+curl -X POST -H "Authorization: Bearer $SECRET" -d '{"name":"alice","password":"correct horse"}' \
+  http://127.0.0.1:9090/inbounds/trojan-in/users
+curl -X POST -H "Authorization: Bearer $SECRET" -d '[{"name":"bob","password":"p1"},{"name":"carol","password":"p2"}]' \
+  http://127.0.0.1:9090/inbounds/trojan-in/users:batchCreate
+curl -X DELETE -H "Authorization: Bearer $SECRET" http://127.0.0.1:9090/inbounds/trojan-in/users/alice
+```
 
 ## Examples
 
