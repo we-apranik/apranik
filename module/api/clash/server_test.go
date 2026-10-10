@@ -127,6 +127,8 @@ func TestEveryEndpointNeedsTheSecret(t *testing.T) {
 		{"GET", "/proxies"}, {"GET", "/proxies/a"}, {"PUT", "/proxies/a"}, {"GET", "/proxies/a/delay"},
 		{"GET", "/group/a/delay"}, {"GET", "/logs"}, {"GET", "/logs/file"}, {"GET", "/rules"},
 		{"GET", "/dns/query"}, {"POST", "/cache/dns/flush"}, {"POST", "/reload"}, {"GET", "/nothing"},
+		{"GET", "/inbounds/a/users"}, {"POST", "/inbounds/a/users"}, {"GET", "/inbounds/a/users/b"}, {"DELETE", "/inbounds/a/users/b"},
+		{"POST", "/inbounds/a/users:batchCreate"}, {"POST", "/inbounds/a/users:batchDelete"},
 	} {
 		for name, headers := range map[string][]string{
 			"without the secret":  {"Authorization", ""},
@@ -156,6 +158,7 @@ func TestTheSecretReachesEveryFamilyOfEndpoints(t *testing.T) {
 		MeasureFunc: func(context.Context, string, string, time.Duration, string) (time.Duration, error) {
 			return time.Millisecond, nil
 		},
+		ListUsersFunc: func(string) ([]string, error) { return []string{"alice"}, nil },
 	}
 	server := start(t, provider)
 	for _, endpoint := range []struct {
@@ -166,6 +169,7 @@ func TestTheSecretReachesEveryFamilyOfEndpoints(t *testing.T) {
 		{"GET", "/proxies", 200}, {"GET", "/proxies/direct/delay", 200}, {"GET", "/rules", 200},
 		{"GET", "/dns/query?name=example.com", 200}, {"POST", "/cache/dns/flush", 204}, {"POST", "/reload", 202},
 		{"DELETE", "/connections/1", 204}, {"GET", "/logs/file", 404},
+		{"GET", "/inbounds/socks-in/users", 200}, {"GET", "/inbounds/socks-in/users/alice", 200},
 	} {
 		if status, body, _ := server.request(endpoint.method, endpoint.path, ""); status != endpoint.want {
 			t.Errorf("%s %s = %d %q, want %d", endpoint.method, endpoint.path, status, body, endpoint.want)

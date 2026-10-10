@@ -24,6 +24,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/traffic"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/ui"
+	"github.com/The-Apranik/Apranik/module/api/clash/internal/users"
 	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -129,6 +130,7 @@ func (s *server) handler(provider spec.APICoreProvider) http.Handler {
 	rules.Register(router, provider)
 	dns.Register(router, provider)
 	reload.Register(router, provider)
+	users.Register(router, provider)
 
 	api := web.CORS(s.settings.AllowOrigins, web.Authenticate(s.settings.Secret.Reveal(), router))
 	if s.dashboard == nil {
