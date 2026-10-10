@@ -7,6 +7,7 @@ package builder
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -252,8 +253,54 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	if err != nil {
 		return nil, fmt.Errorf("mixed: proxy %q: %w", inboundBlueprint.Mixed.HTTP.Info().Name, err)
 	}
-	return mixed.NewStreamServer(socks5Server, httpServer, types.ValueOrDefault(inboundBlueprint.Mixed.FirstByteTimeout, 0)), nil
+	if err := checkMixedHalvesHaveNoUsers(socks5Server, httpServer); err != nil {
+		return nil, err
+	}
+	server := mixed.NewStreamServer(socks5Server, httpServer, types.ValueOrDefault(inboundBlueprint.Mixed.FirstByteTimeout, 0))
+	if err := addMixedUsers(server, inboundBlueprint.Mixed.Users); err != nil {
+		return nil, err
+	}
+	return server, nil
 }
+
+// mixed is one inbound with one list of users, which lives at its own level; a
+// user written under socks5 or http would be known to one protocol only.
+func checkMixedHalvesHaveNoUsers(socks5Server, httpServer spec.StreamProxyServer) error {
+	halves := []struct {
+		name   string
+		server spec.StreamProxyServer
+	}{{mixedSOCKS5Name, socks5Server}, {mixedHTTPName, httpServer}}
+	for _, half := range halves {
+		if manager, manages := half.server.(spec.UserManager); manages && len(manager.ListUsers()) > 0 {
+			return fmt.Errorf("mixed: users belong to mixed, not under %s: write them once, in mixed's own users", half.name)
+		}
+	}
+	return nil
+}
+
+// Before the listener exists, so no client is ever accepted without them. Each
+// user goes to both protocols, which apply their own rules; the entry and the
+// protocol that refused it are named.
+func addMixedUsers(server spec.StreamProxyServer, users []json.RawMessage) error {
+	if len(users) == 0 {
+		return nil
+	}
+	manager, manages := server.(spec.UserManager)
+	if !manages {
+		return errors.New("mixed: users need socks5 and http modules that can change their users")
+	}
+	for index, user := range users {
+		if _, err := manager.AddUser(user); err != nil {
+			return fmt.Errorf("mixed: users[%d]: %w", index, err)
+		}
+	}
+	return nil
+}
+
+const (
+	mixedSOCKS5Name = "socks5"
+	mixedHTTPName   = "http"
+)
 
 func InboundProtocolName(inboundBlueprint blueprint.Inbound) string {
 	if inboundBlueprint.Mixed != nil {
