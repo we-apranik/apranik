@@ -46,7 +46,7 @@
 //   - carrier.go: Stream, PeekableStream, Datagram, ResolvedWriter
 //   - module.go: ModuleInfo and Config, which every kind embeds
 //   - transport.go: dialers, listeners and the transport kinds
-//   - proxy.go: proxy servers, clients and the proxy kinds
+//   - proxy.go: proxy servers, clients, the proxy kinds and UserManager
 //   - metadata.go: Metadata and SniffResult
 //   - sniffer.go: the sniffer kind
 //   - dns.go: the DNS server kinds, DNSServer and Resolver

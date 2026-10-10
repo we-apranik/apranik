@@ -1,6 +1,9 @@
 package spec
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // A proxy protocol is handed a carrier. It never dials.
 //
@@ -102,4 +105,26 @@ type StreamDatagramOverStreamAndDatagramProxyModule interface {
 	StreamProxyModule
 	DatagramOverStreamProxyModule
 	DatagramProxyModule
+}
+
+// UserManager is optional on a proxy server whose users can change while it
+// runs. A user is the JSON object of one element of the module's `users` list,
+// so a config file and a running server share one shape and one set of checks.
+// Core finds it by type assertion on the server it built; a server that does
+// not implement it has the users its settings gave it.
+//
+// Safe to call while the server accepts connections. A change applies to the
+// next handshake; connections already accepted are core's to end.
+type UserManager interface {
+	// AddUser adds the user and returns its name. ErrUserExists when the name
+	// is taken in this server, ErrInvalidUser (wrapped, saying what is wrong,
+	// never a credential) when the object is not a user this protocol accepts.
+	AddUser(user json.RawMessage) (name string, err error)
+
+	// RemoveUser removes the user. ErrNoSuchUser when no user has the name.
+	RemoveUser(name string) error
+
+	// ListUsers returns the names, in the order the users were added. Credentials
+	// are never returned.
+	ListUsers() []string
 }

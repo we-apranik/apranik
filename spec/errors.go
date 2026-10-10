@@ -26,11 +26,18 @@ var (
 	// may be returned together with ErrFallbackRequested.
 	ErrAuthenticationFailed = errors.New("spec: credentials were not accepted")
 
+	// The errors a UserManager returns. Core passes them on unchanged, so an
+	// API module can tell its client which one it was.
+	ErrInvalidUser = errors.New("spec: the user is not valid")
+	ErrUserExists  = errors.New("spec: a user with this name already exists")
+	ErrNoSuchUser  = errors.New("spec: no user has this name")
+
 	// The errors an APICoreProvider method returns, each for one thing an API
 	// module can tell its client.
 	ErrAPIStatisticsDisabled        = errors.New("spec: statistics are disabled")
 	ErrAPILiveConversationsDisabled = errors.New("spec: live conversations are not tracked")
 	ErrAPINoSuchOutbound            = errors.New("spec: no outbound has this tag")
+	ErrAPINoSuchInbound             = errors.New("spec: no inbound with this tag manages users")
 	ErrAPIOutboundNotSelectable     = errors.New("spec: this outbound is not a selector")
 	ErrAPINoSuchMember              = errors.New("spec: the selector has no such member")
 	ErrAPINoSuchLiveConversation    = errors.New("spec: no live conversation has this id")
