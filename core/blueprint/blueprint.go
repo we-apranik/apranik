@@ -5,6 +5,7 @@
 package blueprint
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/The-Apranik/Apranik/core/logging"
@@ -153,6 +154,12 @@ type Outbound struct {
 type Mixed struct {
 	SOCKS5 spec.StreamProxyModule
 	HTTP   spec.StreamProxyModule
+
+	// The inbound's users, one list for both protocols, each a JSON object as
+	// SOCKS5 and HTTP would write a user. Core hands them to both servers
+	// without reading them, so a user is valid only if both protocols accept
+	// it. Empty means no authentication.
+	Users []json.RawMessage
 
 	// How long a client may take to send the byte that picks SOCKS5 or HTTP;
 	// each then bounds its own handshake. Nil means
