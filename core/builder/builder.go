@@ -107,7 +107,6 @@ func (b *Builder) BuildStats(coreBlueprint *blueprint.Blueprint) *stats.Registry
 	if section != nil {
 		statsConfig.TrackedInboundTags = section.Inbounds
 		statsConfig.TrackedOutboundTags = section.Outbounds
-		statsConfig.TrackedUsers = section.Users
 		statsConfig.TimeDials = section.DialHealth
 	}
 	statsConfig.TrackLiveConversations = coreBlueprint.IsLiveTrackingEnabled()

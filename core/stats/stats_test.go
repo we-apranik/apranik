@@ -50,7 +50,6 @@ func TestTrackedListsNarrowCounting(t *testing.T) {
 	registry := newTestRegistry(Config{
 		TrackedInboundTags:  []string{"socks-in"},
 		TrackedOutboundTags: []string{"server-a"},
-		TrackedUsers:        []string{"alice"},
 	})
 
 	if registry.Inbound("socks-in") == nil || registry.Inbound("http-in") != nil {
@@ -59,12 +58,9 @@ func TestTrackedListsNarrowCounting(t *testing.T) {
 	if registry.Outbound("server-a") == nil || registry.Outbound("server-b") != nil {
 		t.Error("outbound narrowing is wrong")
 	}
-	if registry.User("alice") == nil || registry.User("bob") != nil {
-		t.Error("user narrowing is wrong")
-	}
 
-	if len(registry.InboundTraffic()) != 1 || len(registry.OutboundTraffic()) != 1 || len(registry.UserTraffic()) != 1 {
-		t.Errorf("a read holds untracked keys: %+v %+v %+v", registry.InboundTraffic(), registry.OutboundTraffic(), registry.UserTraffic())
+	if len(registry.InboundTraffic()) != 1 || len(registry.OutboundTraffic()) != 1 {
+		t.Errorf("a read holds untracked keys: %+v %+v", registry.InboundTraffic(), registry.OutboundTraffic())
 	}
 }
 

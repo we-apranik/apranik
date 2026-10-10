@@ -39,7 +39,6 @@ type Config struct {
 
 	TrackedInboundTags  []string
 	TrackedOutboundTags []string
-	TrackedUsers        []string
 }
 
 // Registry holds every key's Counters. Inbound and outbound counters are made
@@ -66,8 +65,6 @@ type Registry struct {
 	trackLiveConversations bool
 	lastConversationID     atomic.Uint64
 	liveShards             [liveShardCount]liveShard
-
-	trackedUsers []string
 
 	usersLock sync.Mutex
 	users     map[string]*Counters
@@ -100,7 +97,6 @@ func NewRegistry(config Config) *Registry {
 		dns:                    NewDNSCounters(config.DNSServerTags),
 		timeDials:              config.TimeDials,
 		trackLiveConversations: config.TrackLiveConversations,
-		trackedUsers:           slices.Clone(config.TrackedUsers),
 		users:                  make(map[string]*Counters),
 	}
 	for _, location := range config.RuleLocations {
@@ -144,10 +140,10 @@ func (r *Registry) Outbound(tag string) *OutboundCounters {
 	return nil
 }
 
-// Nil when counting is off, the name is empty or the user is not tracked. The
+// Nil when counting is off or the name is empty. The
 // caller asks once per connection and keeps the answer.
 func (r *Registry) User(name string) *Counters {
-	if r == nil || name == "" || !isTracked(r.trackedUsers, name) {
+	if r == nil || name == "" {
 		return nil
 	}
 	r.usersLock.Lock()
