@@ -12,6 +12,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/apicoreprovider"
 	"github.com/The-Apranik/Apranik/core/blueprint"
 	"github.com/The-Apranik/Apranik/core/builder"
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/route/handler"
 	"github.com/The-Apranik/Apranik/spec"
@@ -172,11 +173,13 @@ func startComponents(ctx context.Context, core *runningCore, stackBuilder *build
 	if coreBlueprint.Stats != nil {
 		tracking = coreBlueprint.Stats.Tracking
 	}
+	builtInbounds := make([]component.Inbound, 0, len(coreBlueprint.Inbounds))
 	for _, inboundBlueprint := range coreBlueprint.Inbounds {
 		built, err := stackBuilder.BuildInbound(inboundBlueprint)
 		if err != nil {
 			return err
 		}
+		builtInbounds = append(builtInbounds, built)
 		core.closeLast(func() { built.Close() })
 
 		trafficHandler := handler.New(routing.Router, handler.Config{
@@ -200,12 +203,13 @@ func startComponents(ctx context.Context, core *runningCore, stackBuilder *build
 	}
 
 	if len(coreBlueprint.APIs) > 0 {
-		coreProvider, err := apicoreprovider.New(apicoreprovider.Parts{
+		coreProvider, err := apicoreprovider.New(apicoreprovider.RunningCore{
 			Version:       blueprint.Version,
 			Stats:         stackBuilder.Stats(),
 			Logs:          stackBuilder.SubscribeToLog,
 			Logger:        logger,
 			Blueprint:     coreBlueprint,
+			Inbounds:      builtInbounds,
 			Outbounds:     routing.Outbounds,
 			Resolver:      stackBuilder.Resolver(),
 			RequestReload: requestReload,

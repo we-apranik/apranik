@@ -81,7 +81,10 @@ func TestASwitchThroughTheProviderEndsTheOpenConnectionThroughTheOldMember(t *te
 		"routing": {"default_action": {"type": "route", "settings": {"outbound": "proxy"}}},
 		"stats": {"tracking": {"enabled": true}}
 	}`, proxyPort, deadServerPort))
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Stats: registry, Blueprint: described, Outbounds: outbounds})
+	// The provider is asked about outbounds here, so it is given none of the inbounds.
+	withoutInbounds := *described
+	withoutInbounds.Inbounds = nil
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Stats: registry, Blueprint: &withoutInbounds, Outbounds: outbounds})
 	if err != nil {
 		t.Fatal(err)
 	}

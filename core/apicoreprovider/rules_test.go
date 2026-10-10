@@ -14,7 +14,7 @@ import (
 
 func providerWithRouting(t *testing.T, routing *blueprint.Routing, registry *stats.Registry) *apicoreprovider.Provider {
 	t.Helper()
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{Routing: routing}, Stats: registry})
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: &blueprint.Blueprint{Routing: routing}, Stats: registry})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestRoutingRulesDescribeAnyAllAndNot(t *testing.T) {
 }
 
 func TestRoutingRulesWithoutARoutingSectionHaveOnlyTheDefaultTheFirstOutbound(t *testing.T) {
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{
 		Blueprint: &blueprint.Blueprint{Outbounds: []blueprint.Outbound{{Tag: "first"}}},
 		Outbounds: []component.Outbound{fixedAddressOutbound{tag: "first"}},
 	})

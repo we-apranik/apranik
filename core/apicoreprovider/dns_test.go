@@ -15,7 +15,7 @@ func providerWithResolver(t *testing.T) *apicoreprovider.Provider {
 	t.Helper()
 	resolver := dns.NewSystemResolver(nil)
 	t.Cleanup(func() { resolver.Close() })
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{}, Resolver: resolver})
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: &blueprint.Blueprint{}, Resolver: resolver})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestQueryDNSRefusesATypeOrANameItCannotLookUp(t *testing.T) {
 }
 
 func TestQueryDNSAndFlushNeedAResolver(t *testing.T) {
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{}})
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: &blueprint.Blueprint{}})
 	if err != nil {
 		t.Fatal(err)
 	}

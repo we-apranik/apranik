@@ -102,7 +102,7 @@ func newSetup(t *testing.T, trackConnections bool, countStatistics bool, logOutp
 			Outbounds: []stats.OutboundDescription{{Tag: "proxy"}, {Tag: "direct"}, {Tag: "choose", IsGroup: true}, {Tag: "auto", IsGroup: true}},
 		})
 	}
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{
 		Version: "9.9.9", Stats: registry, Logs: system.SubscribeToLog, Blueprint: described,
 		Outbounds: []component.Outbound{proxy, freedom, selector, auto},
 	})
@@ -113,10 +113,10 @@ func newSetup(t *testing.T, trackConnections bool, countStatistics bool, logOutp
 }
 
 func TestTheProviderNeedsABlueprintAndOneOutboundPerDescription(t *testing.T) {
-	if _, err := apicoreprovider.New(apicoreprovider.Parts{}); err == nil {
+	if _, err := apicoreprovider.New(apicoreprovider.RunningCore{}); err == nil {
 		t.Error("a provider was built with no blueprint")
 	}
-	if _, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{Outbounds: []blueprint.Outbound{{Tag: "a"}}}}); err == nil {
+	if _, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: &blueprint.Blueprint{Outbounds: []blueprint.Outbound{{Tag: "a"}}}}); err == nil {
 		t.Error("a provider was built with fewer outbounds than the blueprint describes")
 	}
 }
@@ -332,7 +332,7 @@ func TestMeasureDelayTimesOneRequestThroughTheOutbound(t *testing.T) {
 func rebuildWith(t *testing.T, s *setup, proxy fixedAddressOutbound) *apicoreprovider.Provider {
 	t.Helper()
 	described := &blueprint.Blueprint{Outbounds: []blueprint.Outbound{{Tag: "proxy", Proxy: fakeProxyModule{}}}}
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: described, Outbounds: []component.Outbound{proxy}})
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: described, Outbounds: []component.Outbound{proxy}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func TestASwitchWithoutLiveConversationsStillSwitches(t *testing.T) {
 func TestRequestReloadAsksTheFunctionItWasGivenAndReportsItsAnswer(t *testing.T) {
 	refused := errors.New("refused")
 	asked := 0
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{
 		Blueprint:     &blueprint.Blueprint{},
 		RequestReload: func() error { asked++; return refused },
 	})
@@ -471,7 +471,7 @@ func TestRequestReloadAsksTheFunctionItWasGivenAndReportsItsAnswer(t *testing.T)
 }
 
 func TestRequestReloadSaysWhenNothingCanReload(t *testing.T) {
-	provider, err := apicoreprovider.New(apicoreprovider.Parts{Blueprint: &blueprint.Blueprint{}})
+	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Blueprint: &blueprint.Blueprint{}})
 	if err != nil {
 		t.Fatal(err)
 	}
