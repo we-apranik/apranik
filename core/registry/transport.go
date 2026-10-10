@@ -4,10 +4,10 @@ import "github.com/The-Apranik/Apranik/spec"
 
 // TransportRegistry is the transport namespace, independent of the proxy one.
 type TransportRegistry struct {
-	baseStream      map[string]func() spec.BaseStreamTransportModule
-	overlayStream   map[string]func() spec.OverlayStreamTransportModule
-	baseDatagram    map[string]func() spec.BaseDatagramTransportModule
-	overlayDatagram map[string]func() spec.OverlayDatagramTransportModule
+	baseStream      table[spec.BaseStreamTransportModule]
+	overlayStream   table[spec.OverlayStreamTransportModule]
+	baseDatagram    table[spec.BaseDatagramTransportModule]
+	overlayDatagram table[spec.OverlayDatagramTransportModule]
 
 	registered index
 }

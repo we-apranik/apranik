@@ -12,47 +12,48 @@ type module interface {
 	Info() spec.ModuleInfo
 }
 
+// table holds one kind's constructors by name. The zero value is usable.
+type table[Module module] struct{ constructors map[string]func() Module }
+
+func (t *table[Module]) add(name string, newModule func() Module) {
+	if t.constructors == nil {
+		t.constructors = make(map[string]func() Module)
+	}
+	t.constructors[name] = newModule
+}
+
+func (t table[Module]) get(name string) (func() Module, bool) {
+	newModule, found := t.constructors[name]
+	return newModule, found
+}
+
 // Stores a constructor, not a module: its return type is the kind, so a module
 // registered under the wrong one fails to compile at the call site.
 func register[Module module](
-	table *map[string]func() Module,
+	kindTable *table[Module],
 	newModule func() Module,
 	kind Kind,
 	claim func(info spec.ModuleInfo, kind Kind) error,
 ) error {
-	if newModule == nil {
-		return fmt.Errorf("registry: %s registered with a nil constructor", kind)
+	info, err := describe(newModule, kind)
+	if err != nil {
+		return err
 	}
-
-	info := newModule().Info()
-	if err := checkName(info.Name); err != nil {
-		return fmt.Errorf("registry: %s: %w", kind, err)
-	}
-
-	// A module deriving its name from a setting would register under one name
-	// and be looked up under another.
-	if again := newModule().Info(); again != info {
-		return &InconsistentInfoError{Kind: kind, First: info, Second: again}
-	}
-
 	if err := claim(info, kind); err != nil {
 		return err
 	}
 
-	if *table == nil {
-		*table = make(map[string]func() Module)
-	}
-	(*table)[info.Name] = newModule
+	kindTable.add(info.Name, newModule)
 	return nil
 }
 
 func lookup[Module module](
-	table map[string]func() Module,
+	kindTable table[Module],
 	name string,
 	kind Kind,
 	registered []Kind,
 ) (func() Module, error) {
-	newModule, found := table[name]
+	newModule, found := kindTable.get(name)
 	if !found {
 		return nil, &UnknownModuleError{Name: name, Want: kind, Registered: registered}
 	}

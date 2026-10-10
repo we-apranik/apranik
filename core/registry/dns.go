@@ -10,10 +10,10 @@ const SystemDNSServerName = "system"
 // one kind only: a config names a server by type alone, so a name filling
 // both kinds would leave the carrier ambiguous.
 type DNSServerRegistry struct {
-	stream   map[string]func() spec.StreamDNSServerModule
-	datagram map[string]func() spec.DatagramDNSServerModule
+	uniqueNames
 
-	registered index
+	stream   table[spec.StreamDNSServerModule]
+	datagram table[spec.DatagramDNSServerModule]
 }
 
 func (r *DNSServerRegistry) RegisterStream(newModule func() spec.StreamDNSServerModule) error {
@@ -40,11 +40,5 @@ func (r *DNSServerRegistry) claim(info spec.ModuleInfo, kind Kind) error {
 	if info.Name == SystemDNSServerName {
 		return &ReservedNameError{Kind: kind, Name: info.Name}
 	}
-	if len(r.registered.kinds(info.Name)) > 0 {
-		return &DuplicateModuleError{Kind: kind, Name: info.Name}
-	}
-	r.registered.record(info, kind)
-	return nil
+	return r.uniqueNames.claim(info, kind)
 }
-
-func (r *DNSServerRegistry) Modules() []Listing { return r.registered.listings() }
