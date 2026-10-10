@@ -86,3 +86,20 @@ type DatagramProxyModule interface {
 	NewDatagramServer() (DatagramProxyServer, error)
 	NewDatagramClient() (DatagramProxyClient, error)
 }
+
+// A protocol that fills several kinds is one value that is all of them, and it is
+// registered once. These compose the kinds above and add no methods; one is named
+// for each combination a protocol has, and another is added when a protocol needs it.
+
+// Trojan, VLESS: TCP proxying, and UDP framed inside the same stream.
+type StreamAndDatagramOverStreamProxyModule interface {
+	StreamProxyModule
+	DatagramOverStreamProxyModule
+}
+
+// Shadowsocks 2022.
+type StreamDatagramOverStreamAndDatagramProxyModule interface {
+	StreamProxyModule
+	DatagramOverStreamProxyModule
+	DatagramProxyModule
+}

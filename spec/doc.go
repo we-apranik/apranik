@@ -8,20 +8,28 @@
 // A module is a transport, a proxy protocol, a sniffer, a DNS server or an
 // API, added without touching core dispatch. In Go it is a package.
 //
-// It contributes one value per kind it fills, and that value both carries the
-// user's settings and builds the working component from them, the way
-// net.Dialer is both a set of options and the thing that dials. The kind
-// interfaces in this package are what such a value implements.
+// It contributes one value, which both carries the user's settings and builds
+// the working components from them, the way net.Dialer is both a set of
+// options and the thing that dials. The kind interfaces in this package are
+// what such a value implements. A module that fills one kind returns that kind;
+// a proxy protocol that fills several returns the combination of them
+// (StreamAndDatagramOverStreamProxyModule, say), so it is registered once and
+// built once.
 //
-// Each module exports one package-level constructor per kind:
+// Each module exports one package-level constructor. For a proxy protocol it is
+// NewProxyModule, and its return type says which kinds it fills:
 //
 //	// transport/tcp
 //	func NewBaseStreamTransportModule() spec.BaseStreamTransportModule
 //
+//	// proxy/socks5
+//	func NewProxyModule() spec.StreamProxyModule
+//
+//	// proxy/trojan -- one module, two kinds
+//	func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule
+//
 //	// proxy/ss2022 -- one module, three kinds
-//	func NewStreamProxyModule() spec.StreamProxyModule
-//	func NewDatagramOverStreamProxyModule() spec.DatagramOverStreamProxyModule
-//	func NewDatagramProxyModule() spec.DatagramProxyModule
+//	func NewProxyModule() spec.StreamDatagramOverStreamAndDatagramProxyModule
 //
 //	// sniffer/tls
 //	func NewSnifferModule() spec.SnifferModule
