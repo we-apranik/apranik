@@ -362,7 +362,7 @@ func TestModuleFillsBothStreamCarriedShapes(t *testing.T) {
 }
 
 func TestDecodeFillsUsers(t *testing.T) {
-	module := trojan.NewStreamProxyModule()
+	module := trojan.NewProxyModule()
 	decoder := json.NewDecoder(strings.NewReader(`{"users":[{"name":"alice","password":"hunter2"}]}`))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(module); err != nil {
@@ -374,9 +374,32 @@ func TestDecodeFillsUsers(t *testing.T) {
 	}
 }
 
-func TestInfoIsConstantAcrossSettingsAndKinds(t *testing.T) {
-	if trojan.NewStreamProxyModule().Info() != trojan.NewDatagramOverStreamProxyModule().Info() ||
-		(&trojan.Proxy{}).Info() != (&trojan.Proxy{Settings: serverSettings}).Info() {
+func TestOneServerServesBothKinds(t *testing.T) {
+	proxy := &trojan.Proxy{Settings: serverSettings}
+	stream, err := proxy.NewStreamServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	datagramOverStream, err := proxy.NewDatagramOverStreamServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if any(stream) != any(datagramOverStream) {
+		t.Error("the stream and datagram-over-stream servers are two objects, so they would hold two lists of users")
+	}
+}
+
+func TestAServerThatCannotBeBuiltFailsForBothKinds(t *testing.T) {
+	proxy := &trojan.Proxy{}
+	_, streamErr := proxy.NewStreamServer()
+	_, datagramErr := proxy.NewDatagramOverStreamServer()
+	if streamErr == nil || datagramErr == nil || streamErr.Error() != datagramErr.Error() {
+		t.Errorf("errors are %v and %v, want the same failure twice", streamErr, datagramErr)
+	}
+}
+
+func TestInfoIsConstantAcrossSettings(t *testing.T) {
+	if trojan.NewProxyModule().Info() != (&trojan.Proxy{Settings: serverSettings}).Info() {
 		t.Error("Info varies")
 	}
 }

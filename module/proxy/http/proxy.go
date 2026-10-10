@@ -18,4 +18,4 @@ func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
 	return &streamClient{username: p.Username, password: p.Password.Reveal(), handshakeTimeout: p.handshakeTimeout()}, nil
 }
 
-func NewStreamProxyModule() spec.StreamProxyModule { return &Proxy{} }
+func NewProxyModule() spec.StreamProxyModule { return &Proxy{} }

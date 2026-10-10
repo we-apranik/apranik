@@ -242,7 +242,7 @@ func TestAMixedInboundServesSOCKS5UDPAndHTTP(t *testing.T) {
 		Bind:            endpoint("127.0.0.1", port),
 		Network:         spec.NetworkTCP,
 		StreamTransport: blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()},
-		Mixed:           &blueprint.Mixed{SOCKS5: socks5.NewStreamProxyModule(), HTTP: proxyhttp.NewStreamProxyModule()},
+		Mixed:           &blueprint.Mixed{SOCKS5: socks5.NewProxyModule(), HTTP: proxyhttp.NewProxyModule()},
 	})
 	if err != nil {
 		t.Fatalf("BuildInbound: %v", err)
@@ -291,7 +291,7 @@ func TestAnIncompleteBlueprintIsAnErrorNotAPanic(t *testing.T) {
 	tcpStack := blueprint.StreamTransportStack{Base: tcp.NewBaseStreamTransportModule()}
 	for name, inboundBlueprint := range map[string]blueprint.Inbound{
 		"no protocol":       {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamTransport: tcpStack},
-		"half of mixed":     {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamTransport: tcpStack, Mixed: &blueprint.Mixed{SOCKS5: socks5.NewStreamProxyModule()}},
+		"half of mixed":     {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamTransport: tcpStack, Mixed: &blueprint.Mixed{SOCKS5: socks5.NewProxyModule()}},
 		"no base transport": {Tag: "in", Bind: endpoint("127.0.0.1", 0), StreamProxy: passthroughProxy{}},
 	} {
 		if _, err := built.BuildInbound(inboundBlueprint); err == nil {

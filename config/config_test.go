@@ -10,6 +10,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/net/udp/nat"
 	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
+	"github.com/The-Apranik/Apranik/module/proxy/trojan"
 	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
 	"github.com/The-Apranik/Apranik/spec"
 )
@@ -800,8 +801,8 @@ func TestANegativeResolveTimeoutIsRefused(t *testing.T) {
 	}
 }
 
-// Trojan registers a stream kind and a datagram-over-stream kind under one
-// name; one protocol block fills both, on either side.
+// Trojan is registered once and fills a stream kind and a datagram-over-stream
+// kind; one protocol block fills both, on either side, with one value.
 func TestTrojanFillsBothKindsAndTakesAFallback(t *testing.T) {
 	registered := modules(t)
 	configuration, diagnostics := config.Parse([]byte(`{
@@ -827,8 +828,50 @@ func TestTrojanFillsBothKindsAndTakesAFallback(t *testing.T) {
 	if out.Proxy == nil || out.DatagramOverStreamProxy == nil {
 		t.Error("the outbound is missing one of trojan's kinds")
 	}
+	if any(in.StreamProxy) != any(in.DatagramOverStreamProxy) || any(out.Proxy) != any(out.DatagramOverStreamProxy) {
+		t.Error("a protocol that fills two kinds was built as two values")
+	}
 	if in.Fallback.String() != "127.0.0.1:8080" {
 		t.Errorf("Fallback = %s", in.Fallback)
+	}
+}
+
+func TestTwoInboundsOfOneProtocolKeepTheirOwnSettings(t *testing.T) {
+	configuration, diagnostics := config.Parse([]byte(`{
+  "version": 1,
+  "inbounds": [
+    {"tag": "a", "listen": "127.0.0.1", "port": 443, "transport": [{"type": "tcp"}],
+     "protocol": {"type": "trojan", "settings": {"users": [{"name": "alice", "password": "p"}]}}},
+    {"tag": "b", "listen": "127.0.0.1", "port": 444, "transport": [{"type": "tcp"}],
+     "protocol": {"type": "trojan", "settings": {"users": [{"name": "bob", "password": "q"}]}}}
+  ],
+  "outbounds": [{"tag": "freedom", "protocol": {"type": "freedom"}}]
+}`), modules(t))
+	requireNoErrors(t, diagnostics)
+
+	first := configuration.Inbounds[0].StreamProxy.(*trojan.Proxy)
+	second := configuration.Inbounds[1].StreamProxy.(*trojan.Proxy)
+	if first == second || first.Users[0].Name != "alice" || second.Users[0].Name != "bob" {
+		t.Errorf("the inbounds share settings: %+v and %+v", first.Users, second.Users)
+	}
+}
+
+func TestASettingsErrorOfAProtocolFillingTwoKindsIsReportedOnce(t *testing.T) {
+	_, diagnostics := config.Parse([]byte(`{
+  "version": 1,
+  "inbounds": [{"tag": "a", "listen": "127.0.0.1", "port": 443, "transport": [{"type": "tcp"}],
+     "protocol": {"type": "trojan", "settings": {"nonsense": true}}}],
+  "outbounds": [{"tag": "freedom", "protocol": {"type": "freedom"}}]
+}`), modules(t))
+
+	reported := 0
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Location == "inbounds[0].protocol.settings" {
+			reported++
+		}
+	}
+	if reported != 1 {
+		t.Errorf("the settings error was reported %d times:\n%v", reported, diagnostics)
 	}
 }
 
@@ -925,7 +968,7 @@ func TestAMixedInboundNeedsBothModulesRegistered(t *testing.T) {
 	withoutHTTP := registry.New()
 	if err := errors.Join(
 		withoutHTTP.Transports().RegisterBaseStream(tcp.NewBaseStreamTransportModule),
-		withoutHTTP.ProxyProtocols().RegisterStream(socks5.NewStreamProxyModule),
+		withoutHTTP.ProxyProtocols().RegisterStream(socks5.NewProxyModule),
 	); err != nil {
 		t.Fatal(err)
 	}

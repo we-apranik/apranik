@@ -1,60 +1,27 @@
 package config
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/The-Apranik/Apranik/core/registry"
 
-// Nil on any failure: an inbound with no usable proxy is caught by Check,
-// which is where "this inbound has no proxy protocol" belongs.
-func (b *configBuilder) buildStreamProxy(proxy rawModule, loc string) spec.StreamProxyModule {
+// A protocol is looked up by name, built and decoded once, whatever kinds it
+// fills. The wanted kind is the one this position needs, so a protocol that
+// lacks it is told apart from an unknown name. The zero value on any failure:
+// an inbound with no usable proxy is caught by Check, which is where "this
+// inbound has no proxy protocol" belongs.
+func (b *configBuilder) buildProxyModules(proxy rawModule, loc string, wanted registry.Kind) registry.ProxyModules {
 	if proxy.Type == "" {
 		b.diagnostics.report(loc, errMissingField("type", "protocol"))
-		return nil
+		return registry.ProxyModules{}
 	}
 
-	newModule, err := b.modules.ProxyProtocols().LookupStream(proxy.Type)
+	newModules, err := b.modules.ProxyProtocols().Lookup(proxy.Type, wanted)
 	if err != nil {
 		b.diagnostics.report(loc, err)
-		return nil
+		return registry.ProxyModules{}
 	}
 
-	built := newModule()
-	if !b.decodeSettings(built, proxy.Settings, fieldLocation(loc, "settings")) {
-		return nil
+	modules := newModules()
+	if !b.decodeSettings(modules.Config, proxy.Settings, fieldLocation(loc, "settings")) {
+		return registry.ProxyModules{}
 	}
-	return built
-}
-
-// Nil when the protocol has no datagram-over-stream kind, which is not an
-// error: that protocol simply carries no UDP inside its streams. Called only
-// after buildStreamProxy accepted the same settings, so decoding them again
-// reports nothing new.
-func (b *configBuilder) buildDatagramOverStreamProxy(proxy rawModule, loc string) spec.DatagramOverStreamProxyModule {
-	newModule, err := b.modules.ProxyProtocols().LookupDatagramOverStream(proxy.Type)
-	if err != nil {
-		return nil
-	}
-
-	built := newModule()
-	if !b.decodeSettings(built, proxy.Settings, fieldLocation(loc, "settings")) {
-		return nil
-	}
-	return built
-}
-
-func (b *configBuilder) buildDatagramProxy(proxy rawModule, loc string) spec.DatagramProxyModule {
-	if proxy.Type == "" {
-		b.diagnostics.report(loc, errMissingField("type", "protocol"))
-		return nil
-	}
-
-	newModule, err := b.modules.ProxyProtocols().LookupDatagram(proxy.Type)
-	if err != nil {
-		b.diagnostics.report(loc, err)
-		return nil
-	}
-
-	built := newModule()
-	if !b.decodeSettings(built, proxy.Settings, fieldLocation(loc, "settings")) {
-		return nil
-	}
-	return built
+	return modules
 }

@@ -356,13 +356,13 @@ func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
 }
 
 func TestConstructorEnablesUDPRelay(t *testing.T) {
-	if proxy := socks5.NewStreamProxyModule().(*socks5.Proxy); !proxy.UDPRelay {
+	if proxy := socks5.NewProxyModule().(*socks5.Proxy); !proxy.UDPRelay {
 		t.Error("UDPRelay is off by default, want on")
 	}
 }
 
 func TestDecodeFillsPromotedFields(t *testing.T) {
-	module := socks5.NewStreamProxyModule()
+	module := socks5.NewProxyModule()
 
 	decoder := json.NewDecoder(strings.NewReader(`{"username":"alice","password":"hunter2"}`))
 	decoder.DisallowUnknownFields()

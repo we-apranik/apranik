@@ -60,6 +60,21 @@ type datagramProxy struct{ settings }
 func (datagramProxy) NewDatagramServer() (spec.DatagramProxyServer, error) { return nil, nil }
 func (datagramProxy) NewDatagramClient() (spec.DatagramProxyClient, error) { return nil, nil }
 
+type streamAndDatagramOverStreamProxy struct{ settings }
+
+func (streamAndDatagramOverStreamProxy) NewStreamServer() (spec.StreamProxyServer, error) {
+	return nil, nil
+}
+func (streamAndDatagramOverStreamProxy) NewStreamClient() (spec.StreamProxyClient, error) {
+	return nil, nil
+}
+func (streamAndDatagramOverStreamProxy) NewDatagramOverStreamServer() (spec.DatagramOverStreamProxyServer, error) {
+	return nil, nil
+}
+func (streamAndDatagramOverStreamProxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClient, error) {
+	return nil, nil
+}
+
 type datagramOverStreamProxy struct{ settings }
 
 func (datagramOverStreamProxy) NewDatagramOverStreamServer() (spec.DatagramOverStreamProxyServer, error) {
@@ -68,6 +83,19 @@ func (datagramOverStreamProxy) NewDatagramOverStreamServer() (spec.DatagramOverS
 func (datagramOverStreamProxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClient, error) {
 	return nil, nil
 }
+
+type proxyWithEveryKind struct{ settings }
+
+func (*proxyWithEveryKind) NewStreamServer() (spec.StreamProxyServer, error) { return nil, nil }
+func (*proxyWithEveryKind) NewStreamClient() (spec.StreamProxyClient, error) { return nil, nil }
+func (*proxyWithEveryKind) NewDatagramOverStreamServer() (spec.DatagramOverStreamProxyServer, error) {
+	return nil, nil
+}
+func (*proxyWithEveryKind) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClient, error) {
+	return nil, nil
+}
+func (*proxyWithEveryKind) NewDatagramServer() (spec.DatagramProxyServer, error) { return nil, nil }
+func (*proxyWithEveryKind) NewDatagramClient() (spec.DatagramProxyClient, error) { return nil, nil }
 
 func newBaseStream(name string) func() spec.BaseStreamTransportModule {
 	return func() spec.BaseStreamTransportModule { return baseStream{settings{name}} }
@@ -211,22 +239,71 @@ func TestOneNameMayNotBeBothBaseAndOverlayOfTheSameShape(t *testing.T) {
 }
 
 // Unlike transports, nothing about position makes a proxy combination
-// ambiguous, so Shadowsocks 2022 fills all three.
-func TestAProxyMayFillEveryKind(t *testing.T) {
+// ambiguous, so Shadowsocks 2022 fills all three. It is registered once, and
+// one value is all three kinds.
+func TestAProxyFillingEveryKindIsRegisteredOnce(t *testing.T) {
 	protocols := &registry.ProxyProtocolRegistry{}
+	newProxy := func() spec.StreamDatagramOverStreamAndDatagramProxyModule {
+		return &proxyWithEveryKind{settings{"ss2022"}}
+	}
 
-	if err := protocols.RegisterStream(newStreamProxy("ss2022")); err != nil {
-		t.Fatalf("stream: %v", err)
+	if err := protocols.RegisterStreamDatagramOverStreamAndDatagram(newProxy); err != nil {
+		t.Fatalf("register: %v", err)
 	}
-	if err := protocols.RegisterDatagramOverStream(func() spec.DatagramOverStreamProxyModule {
-		return datagramOverStreamProxy{settings{"ss2022"}}
-	}); err != nil {
-		t.Errorf("datagram-over-stream: %v", err)
+
+	for _, kind := range []registry.Kind{registry.KindStreamProxy, registry.KindDatagramOverStreamProxy, registry.KindDatagramProxy} {
+		newModules, err := protocols.Lookup("ss2022", kind)
+		if err != nil {
+			t.Fatalf("lookup as %s: %v", kind, err)
+		}
+		modules := newModules()
+		if modules.Stream == nil || modules.DatagramOverStream == nil || modules.Datagram == nil {
+			t.Fatalf("a kind is missing: %+v", modules)
+		}
+		if any(modules.Config) != any(modules.Stream) || any(modules.Config) != any(modules.DatagramOverStream) || any(modules.Config) != any(modules.Datagram) {
+			t.Errorf("the kinds are not one value: %+v", modules)
+		}
 	}
-	if err := protocols.RegisterDatagram(func() spec.DatagramProxyModule {
-		return datagramProxy{settings{"ss2022"}}
+
+	if got := len(protocols.Modules()); got != 3 {
+		t.Errorf("listed %d rows for ss2022, want one per kind", got)
+	}
+}
+
+func TestAProxyNameCannotBeRegisteredAgainUnderAnyKind(t *testing.T) {
+	protocols := &registry.ProxyProtocolRegistry{}
+	if err := protocols.RegisterStreamAndDatagramOverStream(func() spec.StreamAndDatagramOverStreamProxyModule {
+		return &streamAndDatagramOverStreamProxy{settings{"trojan"}}
 	}); err != nil {
-		t.Errorf("datagram: %v", err)
+		t.Fatalf("register: %v", err)
+	}
+
+	again := map[string]error{
+		"stream":               protocols.RegisterStream(newStreamProxy("trojan")),
+		"datagram":             protocols.RegisterDatagram(func() spec.DatagramProxyModule { return datagramProxy{settings{"trojan"}} }),
+		"datagram over stream": protocols.RegisterDatagramOverStream(func() spec.DatagramOverStreamProxyModule { return datagramOverStreamProxy{settings{"trojan"}} }),
+	}
+	for kind, err := range again {
+		var duplicate *registry.DuplicateModuleError
+		if !errors.As(err, &duplicate) {
+			t.Errorf("registering trojan again as %s: got %v, want DuplicateModuleError", kind, err)
+		}
+	}
+}
+
+func TestLookupOfAKindTheProxyDoesNotFillNamesTheKindsItFills(t *testing.T) {
+	protocols := &registry.ProxyProtocolRegistry{}
+	if err := protocols.RegisterStream(newStreamProxy("plain")); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	_, err := protocols.Lookup("plain", registry.KindDatagramProxy)
+	var unknown *registry.UnknownModuleError
+	if !errors.As(err, &unknown) || len(unknown.Registered) != 1 || unknown.Registered[0] != registry.KindStreamProxy {
+		t.Errorf("got %v, want UnknownModuleError naming the stream proxy", err)
+	}
+	if _, err := protocols.Lookup("absent", registry.KindStreamProxy); !errors.As(err, &unknown) || len(unknown.Registered) != 0 {
+		t.Errorf("an unregistered name gave %v", err)
 	}
 }
 
@@ -308,6 +385,25 @@ func TestDefaultRegisters(t *testing.T) {
 		if !found[name] {
 			t.Errorf("%q is not registered by Default", name)
 		}
+	}
+}
+
+func TestTheDefaultRegistryBuildsTrojanOnceForBothKinds(t *testing.T) {
+	modules, err := registry.Default()
+	if err != nil {
+		t.Fatalf("Default: %v", err)
+	}
+
+	newModules, err := modules.ProxyProtocols().Lookup("trojan", registry.KindStreamProxy)
+	if err != nil {
+		t.Fatalf("lookup: %v", err)
+	}
+	trojan := newModules()
+	if trojan.Stream == nil || trojan.DatagramOverStream == nil || trojan.Datagram != nil {
+		t.Fatalf("trojan fills the wrong kinds: %+v", trojan)
+	}
+	if any(trojan.Stream) != any(trojan.DatagramOverStream) {
+		t.Error("trojan's two kinds are two values")
 	}
 }
 
@@ -416,26 +512,11 @@ func constructTransport(t *testing.T, modules *registry.Registry, listing regist
 func constructProxy(t *testing.T, modules *registry.Registry, listing registry.Listing) any {
 	t.Helper()
 
-	switch listing.Kind {
-	case registry.KindStreamProxy:
-		newModule, err := modules.ProxyProtocols().LookupStream(listing.Name)
-		if err != nil {
-			t.Fatalf("lookup %s: %v", listing.Name, err)
-		}
-		return newModule()
-	case registry.KindDatagramOverStreamProxy:
-		newModule, err := modules.ProxyProtocols().LookupDatagramOverStream(listing.Name)
-		if err != nil {
-			t.Fatalf("lookup %s: %v", listing.Name, err)
-		}
-		return newModule()
-	default:
-		newModule, err := modules.ProxyProtocols().LookupDatagram(listing.Name)
-		if err != nil {
-			t.Fatalf("lookup %s: %v", listing.Name, err)
-		}
-		return newModule()
+	newModules, err := modules.ProxyProtocols().Lookup(listing.Name, listing.Kind)
+	if err != nil {
+		t.Fatalf("lookup %s: %v", listing.Name, err)
 	}
+	return newModules().Config
 }
 
 type snifferModule struct{ settings }

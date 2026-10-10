@@ -391,7 +391,7 @@ func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
 }
 
 func TestDecodeFillsPromotedFields(t *testing.T) {
-	module := proxyhttp.NewStreamProxyModule()
+	module := proxyhttp.NewProxyModule()
 
 	decoder := json.NewDecoder(strings.NewReader(`{"username":"alice","password":"hunter2"}`))
 	decoder.DisallowUnknownFields()

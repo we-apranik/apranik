@@ -63,10 +63,9 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"),
 			`block is no longer an outbound; blocking is a routing action: {"match": {...}, "action": {"type": "block"}}`)
 	default:
-		outbound.Proxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
-		if outbound.Proxy != nil {
-			outbound.DatagramOverStreamProxy = b.buildDatagramOverStreamProxy(raw.Protocol, protocolLoc)
-		}
+		modules := b.buildProxyModules(raw.Protocol, protocolLoc, registry.KindStreamProxy)
+		outbound.Proxy = modules.Stream
+		outbound.DatagramOverStreamProxy = modules.DatagramOverStream
 	}
 
 	return outbound

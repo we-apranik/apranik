@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/The-Apranik/Apranik/core/registry"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -39,17 +40,16 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 			b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed serves SOCKS5 and HTTP over streams; a udp inbound cannot use it")
 			break
 		}
-		inbound.DatagramProxy = b.buildDatagramProxy(raw.Protocol, protocolLoc)
+		inbound.DatagramProxy = b.buildProxyModules(raw.Protocol, protocolLoc, registry.KindDatagramProxy).Datagram
 	default:
 		inbound.StreamTransport = b.buildStreamTransportStack(raw.Transport, transportLoc)
 		if raw.Protocol.Type == mixedProtocol {
 			inbound.Mixed = b.buildMixed(raw.Protocol.Settings, fieldLocation(protocolLoc, "settings"))
 			break
 		}
-		inbound.StreamProxy = b.buildStreamProxy(raw.Protocol, protocolLoc)
-		if inbound.StreamProxy != nil {
-			inbound.DatagramOverStreamProxy = b.buildDatagramOverStreamProxy(raw.Protocol, protocolLoc)
-		}
+		modules := b.buildProxyModules(raw.Protocol, protocolLoc, registry.KindStreamProxy)
+		inbound.StreamProxy = modules.Stream
+		inbound.DatagramOverStreamProxy = modules.DatagramOverStream
 	}
 
 	if raw.Fallback != nil {

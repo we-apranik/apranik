@@ -45,14 +45,14 @@ func (b *configBuilder) buildMixed(raw json.RawMessage, loc string) *blueprint.M
 
 // An absent key leaves the module's own defaults, as for freedom's halves.
 func (b *configBuilder) buildMixedHalf(moduleName string, raw json.RawMessage, loc string) spec.StreamProxyModule {
-	newModule, err := b.modules.ProxyProtocols().LookupStream(moduleName)
+	newModules, err := b.modules.ProxyProtocols().Lookup(moduleName, registry.KindStreamProxy)
 	if err != nil {
 		b.diagnostics.report(loc, err)
 		return nil
 	}
-	half := newModule()
-	if !b.decodeSettings(half, raw, loc) {
+	half := newModules()
+	if !b.decodeSettings(half.Config, raw, loc) {
 		return nil
 	}
-	return half
+	return half.Stream
 }

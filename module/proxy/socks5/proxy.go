@@ -30,6 +30,6 @@ func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
 	}, nil
 }
 
-func NewStreamProxyModule() spec.StreamProxyModule {
+func NewProxyModule() spec.StreamProxyModule {
 	return &Proxy{Settings: Settings{UDPRelay: true}}
 }
