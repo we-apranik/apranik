@@ -5,6 +5,7 @@ package testkit
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -33,6 +34,10 @@ type Provider struct {
 	FlushDNSFunc      func() error
 	RoutingRulesFunc  func() ([]spec.APIRoutingRule, error)
 	RequestReloadFunc func() error
+
+	ListUsersFunc  func(inboundTag string) ([]string, error)
+	AddUserFunc    func(inboundTag string, user json.RawMessage) (string, error)
+	RemoveUserFunc func(inboundTag, name string) error
 }
 
 var _ spec.APICoreProvider = (*Provider)(nil)
@@ -126,6 +131,27 @@ func (f *Provider) RequestReload() error {
 		return nil
 	}
 	return f.RequestReloadFunc()
+}
+
+func (f *Provider) ListInboundUsers(inboundTag string) ([]string, error) {
+	if f.ListUsersFunc == nil {
+		return nil, spec.ErrAPINoSuchInbound
+	}
+	return f.ListUsersFunc(inboundTag)
+}
+
+func (f *Provider) AddInboundUser(inboundTag string, user json.RawMessage) (string, error) {
+	if f.AddUserFunc == nil {
+		return "", spec.ErrAPINoSuchInbound
+	}
+	return f.AddUserFunc(inboundTag, user)
+}
+
+func (f *Provider) RemoveInboundUser(inboundTag, name string) error {
+	if f.RemoveUserFunc == nil {
+		return spec.ErrAPINoSuchInbound
+	}
+	return f.RemoveUserFunc(inboundTag, name)
 }
 
 // LogSubscription is a log subscription the test feeds through Feed; Cancelled
