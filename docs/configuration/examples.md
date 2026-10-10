@@ -12,9 +12,9 @@ apranik check -config server.json
 apranik run -config server.json
 ```
 
-On a client, `check` warns that the local SOCKS5 or HTTP port has no username.
-That is expected for a port bound to `127.0.0.1`; set one if other users or
-apps on the machine should not use it.
+On a client, a local SOCKS5 or HTTP port with no users is open to every app on the
+machine. `check` warns about that only for a port bound beyond `127.0.0.1`; add
+`users` if other users or apps on the machine should not use it.
 
 The protocol and transport pages describe every setting:
 [`trojan`](protocol/trojan.md), [`tls`](transport/tls.md),
