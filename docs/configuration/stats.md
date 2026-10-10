@@ -20,7 +20,6 @@ it off, narrows it, or turns on the two things that cost extra.
     "enabled": true,
     "inbounds": ["socks-in"],
     "outbounds": ["server-a", "auto"],
-    "users": ["alice"],
     "dial_health": true,
     "tracking": {
       "enabled": true,
@@ -42,7 +41,6 @@ it off, narrows it, or turns on the two things that cost extra.
 | `enabled` | `true` or `false` | `true` |
 | `inbounds` | inbound tags to count | all |
 | `outbounds` | outbound tags to count | all |
-| `users` | user names to count | all |
 | `dial_health` | `true` or `false`: time each outbound's dials | `false` |
 | `tracking` | the live list, see [below](#tracking) | on when an [API](api.md) is configured, otherwise off |
 
@@ -50,7 +48,7 @@ it off, narrows it, or turns on the two things that cost extra.
 
 A list narrows counting to the names in it; an empty or absent list means everything of
 that kind. `apranik check` refuses an inbound or outbound tag that does not exist.
-A user name is not checked: core learns a user only when a protocol authenticates one.
+Every authenticated user is counted.
 With `"enabled": false` the lists, `tracking` and `dial_health` are ignored and
 `check` warns about them.
 
