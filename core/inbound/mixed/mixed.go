@@ -23,11 +23,21 @@ const DefaultFirstByteTimeout = 10 * time.Second
 // behave as for either protocol alone. firstByteTimeout bounds only the wait
 // for the byte that picks one; each then bounds its own handshake. Zero means
 // DefaultFirstByteTimeout.
+//
+// When both servers can change their users the result can too (spec.UserManager):
+// mixed is one inbound with one list of users, which it keeps equal in both.
 func NewStreamServer(socks5Server, httpServer spec.StreamProxyServer, firstByteTimeout time.Duration) spec.StreamProxyServer {
 	if firstByteTimeout == 0 {
 		firstByteTimeout = DefaultFirstByteTimeout
 	}
-	return &streamServer{socks5Server: socks5Server, httpServer: httpServer, firstByteTimeout: firstByteTimeout}
+	server := &streamServer{socks5Server: socks5Server, httpServer: httpServer, firstByteTimeout: firstByteTimeout}
+
+	socks5Manager, socks5Manages := socks5Server.(spec.UserManager)
+	httpManager, httpManages := httpServer.(spec.UserManager)
+	if socks5Manages && httpManages {
+		return &userManagingStreamServer{streamServer: server, socks5Manager: socks5Manager, httpManager: httpManager}
+	}
+	return server
 }
 
 type streamServer struct {
