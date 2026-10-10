@@ -2,7 +2,8 @@
 
 Trojan: TCP, and UDP framed inside the same stream. A request with the wrong
 password can be handed to the inbound's [`fallback`](../inbound/index.md#fallback),
-so a probe sees an ordinary site.
+so a probe sees an ordinary site. An inbound takes a list of [users](../users.md), which
+can change while it runs.
 
 > [!WARNING]
 > Trojan has no encryption of its own: run it over [`tls`](../transport/tls.md)
@@ -62,11 +63,15 @@ Tested against Xray 26.7 in both directions, over `ws`, `httpupgrade` and
 
 <span class="cfg cfg-type">list of { name, password }</span>
 <span class="cfg cfg-req">Required</span>
-<span class="cfg cfg-note">provisional</span>
 
-Who may connect. Names and passwords must each be unique, so a password always
-identifies one user; the matched name is reported as the user. This list may move
-once user management is designed.
+Who may connect, with at least one user at start. Names and passwords must each be
+unique, so a password always identifies one user; they may be in any language and may
+not contain control characters. The matched name is reported as the user. Users can be
+added and removed [while the inbound runs](../users.md#changing-users-while-running),
+and the same people connect over TCP and UDP. An inbound with no users left refuses
+every client until one is added.
+
+An inbound refuses `password`, which is an outbound's.
 
 ### `handshake_timeout`
 
@@ -84,7 +89,7 @@ ignores this.
 <span class="cfg cfg-type">secret</span>
 <span class="cfg cfg-req">Required</span>
 
-The password sent to the server.
+The password sent to the server. An outbound refuses `users`.
 
 </div>
 
