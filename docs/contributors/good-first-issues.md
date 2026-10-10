@@ -162,3 +162,38 @@ tells the whole story.
 **Acceptance criteria.** Debug-level only; nothing new at Info or above.
 
 **Difficulty.** Easy
+
+---
+
+## 11. A live API reference for the Clash API
+
+**Description.** The Clash API is documented by hand in
+[its page](../configuration/api/clash.md): tables and prose, with no schemas and no way to
+try a request. Add an OpenAPI 3.1 description of it and a UI that can call a running core,
+such as Swagger UI, Scalar or RapiDoc (Redoc's free version cannot send requests).
+
+A workable shape, none of it decided:
+
+- One hand-written YAML file in the repository as the single source: routes, parameters,
+  request and response schemas, status codes, examples, and the bearer secret as the
+  security scheme.
+- The core serves it at `GET /openapi.json`, behind the secret, so an operator can point
+  any tool (Swagger UI, Postman, Insomnia, Bruno) at their own core. Embedding a UI in the
+  binary is not needed.
+- The docs site renders the same file with a server address field that defaults to
+  `http://127.0.0.1:9090`. Trying a request from the docs site needs the docs origin in the
+  API's `allow_origins`; the page should say not to type a production secret into a hosted page.
+- A test that every route the Clash module registers is in the file with the same methods,
+  and the other way round, so the file cannot drift.
+- WebSocket endpoints (`/traffic`, `/memory`, `/connections`, `/logs`) cannot be described
+  in OpenAPI: describe the plain HTTP form where there is one and say the path also takes an
+  upgrade.
+
+**Files.** `module/api/clash/` (the file, the endpoint, the test), `docs/configuration/api/clash.md`,
+`mkdocs.yml`, `requirements-docs.txt`
+
+**Acceptance criteria.** Every documented endpoint is in the file; `mkdocs build --strict`
+passes; the drift test fails when a route is added without an entry; the page can list the
+users of an inbound against a local core.
+
+**Difficulty.** Medium
