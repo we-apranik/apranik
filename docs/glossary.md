@@ -26,6 +26,7 @@
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |
+| **User** | One person who may use an inbound: a name and the credentials its protocol needs. Users belong to an inbound, are written in its protocol's `users`, and can change while it runs. Statistics are kept by name across inbounds. |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor (a proxy protocol exports `NewProxyModule`, once, whatever kinds it fills). The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
