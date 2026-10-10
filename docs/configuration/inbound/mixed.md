@@ -16,6 +16,7 @@ built by core rather than a module.
   "protocol": {
     "type": "mixed",
     "settings": {
+      "users": [{ "name": "alice", "password": "correct horse" }],
       "socks5": { "udp_relay": true },
       "http": {}
     }
@@ -30,6 +31,20 @@ The other fields are those of every [inbound](index.md).
 <div class="cfg-fields" markdown>
 
 ## Fields
+
+### `users`
+
+<span class="cfg cfg-type">list of { name, password }</span>
+
+Who may log in, one list for both protocols: the same name and password work over
+SOCKS5 and over HTTP, and the matched name is reported as the user. A user is
+accepted only if both protocols accept it, so a name with a `:` (which HTTP Basic
+cannot carry) or a name or password over 255 bytes (which SOCKS5 cannot) is refused,
+and `apranik check` says which protocol refused which entry. With no users, both halves
+ask for no login. They can be added and removed
+[while the inbound runs](../users.md#changing-users-while-running).
+
+Users are written here and not under `socks5` or `http`, which refuse them.
 
 ### `socks5`
 
@@ -63,8 +78,8 @@ else to HTTP. SOCKS5 UDP ASSOCIATE works as on a `socks5` inbound.
 
 [![How mixed dispatches a connection: the accept loop hands the stream to mixed, which peeks exactly one byte and passes the stream to the socks5 module on 0x05 or to the http module otherwise; for UDP ASSOCIATE core calls Associate on its own carrier, forwarded by mixed to the socks5 module.](../../assets/diagrams/mixed-dispatch.excalidraw.svg)](../../assets/diagrams/mixed-dispatch.excalidraw.svg)
 
-Each half keeps its own credentials, and a half without a username is warned
-about at its own path (`protocol.settings.socks5` or `protocol.settings.http`).
-`mixed` is refused on a `udp` inbound and on an outbound. SOCKS4 is not supported:
+With no `users`, each half is warned about at its own path
+(`protocol.settings.socks5` or `protocol.settings.http`) when the inbound listens
+beyond this machine. `mixed` is refused on a `udp` inbound and on an outbound. SOCKS4 is not supported:
 its first byte goes to HTTP, which refuses it. See
 a design note.
