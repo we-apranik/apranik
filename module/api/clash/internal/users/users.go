@@ -1,0 +1,120 @@
+// Package users serves the users of an inbound: list them, ask about one, add
+// one, remove one, and add or remove many in one request. It is an Apranik
+// extension; Mihomo has no such endpoints. The batch routes are custom methods
+// on the collection (`users:batchCreate`, `users:batchDelete`, after Google's
+// API design guide) so that no user name can ever be the path of one of them.
+package users
+
+import (
+	"bytes"
+	"errors"
+	"io"
+	"net/http"
+	"slices"
+
+	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/The-Apranik/Apranik/spec"
+)
+
+const (
+	// One user is a few hundred bytes at most.
+	singleUserBodyLimit = 16 << 10
+
+	// Tens of thousands of users.
+	batchBodyLimit = 8 << 20
+)
+
+func Register(router *web.Router, provider spec.APICoreProvider) {
+	handler := handler{provider: provider}
+	router.Handle("/inbounds/{tag}/users", web.Methods{"GET": handler.list, "POST": handler.add})
+	router.Handle("/inbounds/{tag}/users/{name}", web.Methods{"GET": handler.get, "DELETE": handler.remove})
+	router.Handle("/inbounds/{tag}/users:batchCreate", web.Methods{"POST": handler.batchCreate})
+	router.Handle("/inbounds/{tag}/users:batchDelete", web.Methods{"POST": handler.batchDelete})
+}
+
+type handler struct{ provider spec.APICoreProvider }
+
+func (h handler) list(w http.ResponseWriter, r *http.Request) {
+	names, err := h.provider.ListInboundUsers(r.PathValue("tag"))
+	if err != nil {
+		writeUserError(w, err)
+		return
+	}
+	if names == nil {
+		names = []string{}
+	}
+	web.WriteJSON(w, http.StatusOK, map[string][]string{"users": names})
+}
+
+// get answers whether one user exists, from the list: the protocols keep their
+// users in order and hold no index by name, so this is a scan.
+func (h handler) get(w http.ResponseWriter, r *http.Request) {
+	tag, name := r.PathValue("tag"), r.PathValue("name")
+	names, err := h.provider.ListInboundUsers(tag)
+	if err != nil {
+		writeUserError(w, err)
+		return
+	}
+	if !slices.Contains(names, name) {
+		web.WriteError(w, http.StatusNotFound, "inbound %q has no user %q", tag, name)
+		return
+	}
+	web.WriteJSON(w, http.StatusOK, map[string]string{"name": name})
+}
+
+func (h handler) add(w http.ResponseWriter, r *http.Request) {
+	body, ok := readBody(w, r, singleUserBodyLimit)
+	if !ok {
+		return
+	}
+	if trimmed := bytes.TrimSpace(body); len(trimmed) == 0 || trimmed[0] != '{' {
+		web.WriteError(w, http.StatusBadRequest, "the body must be one user, a JSON object")
+		return
+	}
+
+	name, err := h.provider.AddInboundUser(r.PathValue("tag"), body)
+	if err != nil {
+		writeUserError(w, err)
+		return
+	}
+	web.WriteJSON(w, http.StatusCreated, map[string]string{"name": name})
+}
+
+func (h handler) remove(w http.ResponseWriter, r *http.Request) {
+	if err := h.provider.RemoveInboundUser(r.PathValue("tag"), r.PathValue("name")); err != nil {
+		writeUserError(w, err)
+		return
+	}
+	web.WriteNoContent(w)
+}
+
+// readBody reads at most limit bytes; a body over it is answered with 413, and
+// one that cannot be read with 400. False means the answer was written.
+func readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		web.WriteError(w, http.StatusRequestEntityTooLarge, "the body is over %d bytes", limit)
+		return nil, false
+	case err != nil:
+		web.WriteError(w, http.StatusBadRequest, "the body could not be read: %v", err)
+		return nil, false
+	}
+	return body, true
+}
+
+// The module's own errors come through core unchanged, so this knows the
+// contract's vocabulary and nothing about a protocol.
+func writeUserError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, spec.ErrAPINoSuchInbound), errors.Is(err, spec.ErrNoSuchUser):
+		web.WriteError(w, http.StatusNotFound, "%v", err)
+	case errors.Is(err, spec.ErrInvalidUser):
+		web.WriteError(w, http.StatusBadRequest, "%v", err)
+	case errors.Is(err, spec.ErrUserExists):
+		web.WriteError(w, http.StatusConflict, "%v", err)
+	default:
+		web.WriteProviderError(w, err)
+	}
+}
