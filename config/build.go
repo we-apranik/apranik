@@ -96,7 +96,6 @@ func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
 			Disabled:  raw.Stats.Enabled != nil && !*raw.Stats.Enabled,
 			Inbounds:  raw.Stats.Inbounds,
 			Outbounds: raw.Stats.Outbounds,
-			Users:     raw.Stats.Users,
 
 			DialHealth: raw.Stats.DialHealth,
 		}

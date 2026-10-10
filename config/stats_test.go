@@ -22,7 +22,7 @@ func TestWithoutAStatsSectionEverythingIsCounted(t *testing.T) {
 }
 
 func TestAStatsSectionReadsItsSwitchAndLists(t *testing.T) {
-	document := documentWithStats(`{"enabled": true, "inbounds": ["socks-in"], "outbounds": ["freedom"], "users": ["alice"]}`)
+	document := documentWithStats(`{"enabled": true, "inbounds": ["socks-in"], "outbounds": ["freedom"]}`)
 	configuration, _ := config.Parse([]byte(document), modules(t))
 	diagnostics, failed := loadAndCheck(t, document)
 	if failed {
@@ -30,7 +30,7 @@ func TestAStatsSectionReadsItsSwitchAndLists(t *testing.T) {
 	}
 
 	section := configuration.Stats
-	if section == nil || section.Disabled || len(section.Inbounds) != 1 || len(section.Outbounds) != 1 || len(section.Users) != 1 {
+	if section == nil || section.Disabled || len(section.Inbounds) != 1 || len(section.Outbounds) != 1 {
 		t.Errorf("Stats = %+v", section)
 	}
 }
@@ -59,20 +59,6 @@ func TestAStatsListNamingAMissingInboundOrOutboundIsRefused(t *testing.T) {
 	}
 	if !find(diagnostics, "stats.outbounds[1]", `no outbound is tagged "gone"`) {
 		t.Errorf("the missing outbound was not reported:\n%v", diagnostics)
-	}
-}
-
-func TestAnEmptyListedNameIsRefused(t *testing.T) {
-	diagnostics, failed := loadAndCheck(t, documentWithStats(`{"users": ["alice", ""]}`))
-	if !failed || !find(diagnostics, "stats.users[1]", "needs a name") {
-		t.Errorf("an empty user name was not refused:\n%v", diagnostics)
-	}
-}
-
-func TestAUserNameIsNotCheckedAgainstAnything(t *testing.T) {
-	_, failed := loadAndCheck(t, documentWithStats(`{"users": ["nobody-configured-this"]}`))
-	if failed {
-		t.Error("a user name was refused, though core cannot know the users")
 	}
 }
 

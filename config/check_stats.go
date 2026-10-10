@@ -20,9 +20,9 @@ func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 			"is false, so an API cannot list or close live conversations or show online users")
 	}
 
-	namesListed := len(section.Inbounds)+len(section.Outbounds)+len(section.Users) > 0
+	namesListed := len(section.Inbounds)+len(section.Outbounds) > 0
 	if section.Disabled && namesListed {
-		diagnostics.warnf("stats", "counting is disabled, so the lists of inbounds, outbounds and users are ignored")
+		diagnostics.warnf("stats", "counting is disabled, so the lists of inbounds and outbounds are ignored")
 		return
 	}
 	if section.Disabled && (section.Tracking != (blueprint.StatsTracking{}) || section.DialHealth) {
@@ -41,7 +41,6 @@ func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 
 	checkStatsNames(diagnostics, section.Inbounds, inboundTags, "inbound", fieldLocation("stats", "inbounds"))
 	checkStatsNames(diagnostics, section.Outbounds, outboundTags, "outbound", fieldLocation("stats", "outbounds"))
-	checkStatsNames(diagnostics, section.Users, nil, "user", fieldLocation("stats", "users"))
 	checkTracking(diagnostics, coreBlueprint)
 }
 

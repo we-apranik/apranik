@@ -38,12 +38,11 @@ type rawConfig struct {
 }
 
 // Counting is on unless enabled is false. A list narrows counting to the
-// names in it; absent or empty means all.
+// tags in it; absent or empty means all.
 type rawStats struct {
 	Enabled   *bool    `json:"enabled"`
 	Inbounds  []string `json:"inbounds"`
 	Outbounds []string `json:"outbounds"`
-	Users     []string `json:"users"`
 
 	Tracking *rawStatsTracking `json:"tracking"`
 

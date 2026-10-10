@@ -7,12 +7,10 @@ import "time"
 type Stats struct {
 	Disabled bool
 
-	// A list narrows counting to the names in it; an empty list means all of
-	// that kind. Users cannot be checked against anything: core learns them
-	// only when a protocol authenticates one.
+	// A list narrows counting to the tags in it; an empty list means all of
+	// that kind.
 	Inbounds  []string
 	Outbounds []string
-	Users     []string
 
 	Tracking StatsTracking
 
