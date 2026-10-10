@@ -177,7 +177,7 @@ overrides only what it names; everything else keeps the module's default.
 
 Some findings do not stop Apranik but deserve attention, for example:
 
-- an inbound with no username: anyone who can reach it may use it;
+- a SOCKS5 or HTTP inbound with no users: anyone who can reach it may use it;
 - `endpoint-independent` NAT filtering: an off-path sender can inject packets;
 - a sniff timeout over 5 seconds, or a sniff no later rule reads;
 - TLS with `insecure` on, or a `min_version` below 1.2;
