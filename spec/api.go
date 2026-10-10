@@ -2,6 +2,7 @@ package spec
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 )
@@ -115,6 +116,23 @@ type APICoreProvider interface {
 	// it lists every problem; nothing changes), ErrAPIReloadInProgress,
 	// ErrAPIReloadUnavailable.
 	RequestReload() error
+
+	// The names of an inbound's users, in the order they were added, for an
+	// inbound whose protocol can change its users. ErrAPINoSuchInbound: the tag
+	// is unknown, or the protocol cannot change its users (the error says which).
+	ListInboundUsers(inboundTag string) ([]string, error)
+
+	// AddInboundUser adds a user, a JSON object as the protocol writes one in its
+	// config, and returns its name. It applies from the next handshake. The
+	// protocol's own errors come through as they are: ErrInvalidUser,
+	// ErrUserExists. ErrAPINoSuchInbound.
+	AddInboundUser(inboundTag string, user json.RawMessage) (name string, err error)
+
+	// RemoveInboundUser removes the user and ends their live conversations on
+	// that inbound; the same name on another inbound keeps working. When live
+	// conversations are not tracked, the open ones stay and the user is still
+	// removed. ErrNoSuchUser, ErrAPINoSuchInbound.
+	RemoveInboundUser(inboundTag, name string) error
 }
 
 // Bytes counted above the proxy layer. Which networks they cover is the
