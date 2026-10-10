@@ -1,7 +1,6 @@
 package trojan
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
@@ -39,22 +38,21 @@ func (p *Proxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClien
 
 func (p *Proxy) newSharedServer() (*server, error) {
 	p.buildServerOnce.Do(func() {
-		if len(p.Users) == 0 {
-			p.buildServerErr = errors.New("trojan: an inbound needs users")
+		if p.buildServerErr = p.checkAsServer(); p.buildServerErr != nil {
 			return
 		}
 		users := make([]user, len(p.Users))
 		for index, configured := range p.Users {
-			users[index] = user{name: configured.Name, passwordHash: wire.HashPassword(configured.Password.Reveal())}
+			users[index] = newUser(configured)
 		}
-		p.builtServer = &server{users: users, handshakeTimeout: p.handshakeTimeout()}
+		p.builtServer = newServer(users, p.handshakeTimeout())
 	})
 	return p.builtServer, p.buildServerErr
 }
 
 func (p *Proxy) newClient() (*client, error) {
-	if p.Password == "" {
-		return nil, errors.New("trojan: an outbound needs a password")
+	if err := p.checkAsClient(); err != nil {
+		return nil, err
 	}
 	return &client{passwordHash: wire.HashPassword(p.Password.Reveal())}, nil
 }

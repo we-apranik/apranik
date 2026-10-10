@@ -8,6 +8,8 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
@@ -20,9 +22,23 @@ type user struct {
 	passwordHash wire.PasswordHash
 }
 
+func newUser(configured User) user {
+	return user{name: configured.Name, passwordHash: wire.HashPassword(configured.Password.Reveal())}
+}
+
+// The users are an immutable snapshot, replaced whole by AddUser and
+// RemoveUser (users.go), so a handshake reads them with one atomic load and no
+// lock, and never sees a list half changed.
 type server struct {
-	users            []user
+	users            atomic.Pointer[[]user]
+	changeUsers      sync.Mutex
 	handshakeTimeout time.Duration
+}
+
+func newServer(users []user, handshakeTimeout time.Duration) *server {
+	s := &server{handshakeTimeout: handshakeTimeout}
+	s.users.Store(&users)
+	return s
 }
 
 // The command byte sits at a fixed offset, so the kind of request is known
@@ -101,8 +117,9 @@ func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wante
 // Every user is compared, match or not, so the time taken says nothing about
 // which one matched or how many there are before it.
 func (s *server) lookUp(hash wire.PasswordHash) (string, bool) {
+	users := *s.users.Load()
 	matchedIndex, found := 0, 0
-	for index, candidate := range s.users {
+	for index, candidate := range users {
 		match := subtle.ConstantTimeCompare(hash[:], candidate.passwordHash[:])
 		matchedIndex = subtle.ConstantTimeSelect(match, index, matchedIndex)
 		found |= match
@@ -110,7 +127,7 @@ func (s *server) lookUp(hash wire.PasswordHash) (string, bool) {
 	if found == 0 {
 		return "", false
 	}
-	return s.users[matchedIndex].name, true
+	return users[matchedIndex].name, true
 }
 
 // Only bytes that are not a Trojan request go to the fallback. A closed,

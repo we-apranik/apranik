@@ -7,6 +7,7 @@ import (
 
 	"github.com/The-Apranik/Apranik/config/types"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
+	"github.com/The-Apranik/Apranik/shared/controlcharacter"
 )
 
 // No server address here: a proxy protocol never dials, so that belongs to the
@@ -14,11 +15,12 @@ import (
 // transport below it, the password hash and all payload cross the wire in
 // the clear.
 type Settings struct {
-	// What an outbound sends. An inbound ignores it.
+	// What an outbound sends. An inbound refuses it: it takes users.
 	Password types.Secret `json:"password"`
 
-	// Who an inbound accepts. The matched user's name lands in Metadata.User.
-	// PROVISIONAL: user management is not designed yet, and this list may move.
+	// Who an inbound accepts; an outbound refuses it. The matched user's name
+	// lands in Metadata.User. Users can be added and removed while the inbound
+	// runs (UserManager), and a name is unique within the inbound.
 	Users []User `json:"users"`
 
 	// Server: how long a client may take to send its request. A client sends
@@ -39,6 +41,8 @@ type User struct {
 	Password types.Secret `json:"password"`
 }
 
+// Validate holds what is wrong for either role; checkAsServer and checkAsClient
+// hold what is wrong for one, and run where the role is known.
 func (s *Settings) Validate() error {
 	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
 		return fmt.Errorf("trojan: handshake_timeout %w", err)
@@ -50,11 +54,8 @@ func (s *Settings) Validate() error {
 	names := make(map[string]int, len(s.Users))
 	hashes := make(map[wire.PasswordHash]int, len(s.Users))
 	for index, user := range s.Users {
-		if user.Name == "" {
-			return fmt.Errorf("trojan: users[%d] has no name", index)
-		}
-		if user.Password == "" {
-			return fmt.Errorf("trojan: user %q has no password", user.Name)
+		if err := checkUser(user); err != nil {
+			return fmt.Errorf("trojan: users[%d] %w", index, err)
 		}
 		if first, seen := names[user.Name]; seen {
 			return fmt.Errorf("trojan: users[%d] and users[%d] are both named %q", first, index, user.Name)
@@ -67,6 +68,42 @@ func (s *Settings) Validate() error {
 			return fmt.Errorf("trojan: users[%d] and users[%d] have the same password", first, index)
 		}
 		hashes[hash] = index
+	}
+	return nil
+}
+
+// checkUser says what is wrong with one user on its own, without saying where
+// the user is and without ever naming a password.
+func checkUser(user User) error {
+	switch {
+	case user.Name == "":
+		return errors.New("has no name")
+	case user.Password == "":
+		return fmt.Errorf("%q has no password", user.Name)
+	case controlcharacter.Contains(user.Name):
+		return fmt.Errorf("%q has a control character in its name", user.Name)
+	case controlcharacter.Contains(user.Password.Reveal()):
+		return fmt.Errorf("%q has a control character in its password", user.Name)
+	}
+	return nil
+}
+
+func (s *Settings) checkAsServer() error {
+	if s.Password != "" {
+		return errors.New(`trojan: an inbound takes users, not password: "users": [{"name": "...", "password": "..."}]`)
+	}
+	if len(s.Users) == 0 {
+		return errors.New("trojan: an inbound needs users")
+	}
+	return nil
+}
+
+func (s *Settings) checkAsClient() error {
+	if len(s.Users) > 0 {
+		return errors.New("trojan: an outbound takes a password, not users")
+	}
+	if s.Password == "" {
+		return errors.New("trojan: an outbound needs a password")
 	}
 	return nil
 }
