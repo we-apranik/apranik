@@ -186,6 +186,17 @@ Rules:
   travel together with `ErrFallbackRequested`). Core counts these apart from
   garbage, so an operator sees a guessing run. Without it, a failed login is counted as
   a handshake that failed.
+- **Users that change while running.** A protocol whose clients log in implements
+  `spec.UserManager` on its server (`AddUser`, `RemoveUser`, `ListUsers`), so core can change
+  them without a reload. A user is the JSON object of one element of your `users` list, so the
+  config file and a running server share one shape and one set of checks: decode it with
+  unknown keys refused, refuse what your protocol cannot carry with `spec.ErrInvalidUser`, a
+  taken name with `spec.ErrUserExists`, an unknown one with `spec.ErrNoSuchUser`, and put no
+  credential in any error. Keep the users in an immutable snapshot behind an `atomic.Pointer`
+  that a change replaces whole, so a handshake takes no lock, and compare every user in constant
+  time (`module/proxy/trojan`, `socks5` and `http` are the examples). Refuse the other role's
+  settings where the role is known (`NewStreamServer` and `NewStreamClient`), so a stray key
+  cannot leave an inbound open. See [Users](configuration/users.md).
 - **Never dial.** The stream is handed to you. If your protocol truly needs a
   second socket, look at how SOCKS5 UDP ASSOCIATE receives a
   `spec.UDPAssociateSocketFunc`, and raise the design question first.
@@ -272,8 +283,8 @@ Flag these for careful review:
 - **Authentication:** credential comparison uses `crypto/subtle`; keep it
   constant-time. Secrets are `types.Secret` and must never appear in errors,
   warnings or logs.
-- **Exposure:** listeners refuse a missing bind address; inbounds without a
-  username produce a warning. Keep both.
+- **Exposure:** listeners refuse a missing bind address; inbounds whose users are
+  none (SOCKS5, HTTP) produce a warning. Keep both.
 - **UDP filtering:** loosening `core/net/udp/nat` filtering lets off-path senders
   inject packets.
 - **Logs:** a log naming what a user reached is evidence on a seized device.
