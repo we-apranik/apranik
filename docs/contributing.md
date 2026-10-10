@@ -163,11 +163,11 @@ proxy touches:
 | File | Change |
 | --- | --- |
 | `module/proxy/<name>/settings.go` (new) | settings, `Validate`, `Warnings` |
-| `module/proxy/<name>/proxy.go` (new) | `Proxy` type, `Info`, `NewStreamServer`, `NewStreamClient`, `NewStreamProxyModule` |
+| `module/proxy/<name>/proxy.go` (new) | `Proxy` type, `Info`, `NewStreamServer`, `NewStreamClient`, `NewProxyModule` |
 | `module/proxy/<name>/server.go`, `client.go` (new) | the two roles |
 | `module/proxy/<name>/wire/` (new, optional) | the byte format, kept separate so it can be tested and fuzzed alone |
 | `module/proxy/<name>/<name>_test.go` (new) | tests over `net.Pipe`, no core |
-| `core/registry/default.go` | one line: `RegisterStream(<name>.NewStreamProxyModule)` |
+| `core/registry/default.go` | one line: `RegisterStream(<name>.NewProxyModule)` |
 
 Rules:
 
@@ -190,10 +190,14 @@ Rules:
   second socket, look at how SOCKS5 UDP ASSOCIATE receives a
   `spec.UDPAssociateSocketFunc`, and raise the design question first.
 - **Other shapes.** A protocol with UDP also fills `spec.DatagramOverStreamProxyModule` or
-  `spec.DatagramProxyModule`, each with its own constructor and registration line.
-  A datagram-over-stream server also implements `IsDatagramOverStream`, which
+  `spec.DatagramProxyModule`. It is still one module with one `NewProxyModule`, which returns
+  the combination (`spec.StreamAndDatagramOverStreamProxyModule` for stream plus UDP framed in
+  the stream) and is registered once with the matching function
+  (`RegisterStreamAndDatagramOverStream(<name>.NewProxyModule)`). Build the server once, so the
+  stream and datagram-over-stream servers are one object; `module/proxy/trojan` does it with a
+  `sync.Once`. A datagram-over-stream server also implements `IsDatagramOverStream`, which
   only peeks, so core can choose between `AcceptStream` and
-  `AcceptDatagramOverStream`; `module/proxy/trojan` is the example.
+  `AcceptDatagramOverStream`. A name can be registered only once, under any kind.
 
 ## Adding a new sniffer
 

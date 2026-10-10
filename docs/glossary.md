@@ -28,7 +28,7 @@
 | **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
-| **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor per kind. The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
+| **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor (a proxy protocol exports `NewProxyModule`, once, whatever kinds it fills). The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
 | **Module kind** | One of the `spec` interfaces a module fills, each named `...Module`: `BaseStreamTransportModule`, `OverlayStreamTransportModule`, `StreamProxyModule`, `SnifferModule` and so on. |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
 | **Outbound** | How traffic leaves: a proxy client plus a dialer stack, freedom, or a group that picks among other outbounds (`component.Outbound`). |

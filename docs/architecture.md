@@ -99,20 +99,22 @@ config file's `settings` straight into it, so `spec` never names a config field.
 
 ## Modules
 
-A module is a package under `module/` that exports one constructor per kind it
-fills:
+A module is a package under `module/` that exports a constructor whose return
+type is the kind it fills (a proxy protocol that fills several returns their
+combination, and is registered once):
 
 ```go
 func NewBaseStreamTransportModule() spec.BaseStreamTransportModule       // module/transport/base/tcp
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule // module/transport/overlay/tls
-func NewStreamProxyModule() spec.StreamProxyModule                       // module/proxy/socks5
+func NewProxyModule() spec.StreamProxyModule                             // module/proxy/socks5
+func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule        // module/proxy/trojan
 func NewSnifferModule() spec.SnifferModule                               // module/sniffer/tls
 ```
 
 The module value is the settings; its `New...` methods build the running parts
 once, per role (a TLS server loads its certificates there).
 
-`core/registry` stores these constructors by name and kind. `registry.Default()`
+`core/registry` stores these constructors by name, and for a proxy protocol one entry per name that shows the one built value under each kind it fills. `registry.Default()`
 in `core/registry/default.go` is the only place in the project that names a
 module. There is no `init()` and no global registry, so a Go program using Apranik can build a
 registry containing modules Apranik has never heard of.
@@ -161,7 +163,7 @@ real modules need it:
 | Package | Responsibility |
 | --- | --- |
 | `core/component` | the roles core's own parts play for each other: `Inbound`, `Outbound`, `Router` (with its `RouterTrafficInformant` and `Decision`), `TrafficHandler`; modules never use them |
-| `core/registry` | name → module constructor, per kind, with clear errors for a name used in the wrong position |
+| `core/registry` | name → module constructor, per kind (a proxy protocol is one entry under all the kinds it fills), with clear errors for a name used in the wrong position |
 | `core/blueprint` | a validated description of every inbound, outbound and routing rule; nothing is opened |
 | `core/builder` | blueprint → `component.Inbound` / `component.Outbound` / `component.Router`; builds each module's components, joins an outbound's dialer and overlay clients; grants the UDP associate socket; loads datasets for the router |
 | `core/inbound` | accept loop, per-connection overlay handshakes, handshake timeout, identifying which payload a request asks for, fallback, handing a UDP association to the handler |
