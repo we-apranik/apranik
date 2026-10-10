@@ -215,7 +215,7 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 
 	t.Run("accepted, and the name reaches Metadata", func(t *testing.T) {
 		clientSide, serverSide := pipe(t)
-		results := serverOn(t, &socks5.Settings{UDPRelay: true, Username: user, Password: pass}, serverSide)
+		results := serverOn(t, &socks5.Settings{UDPRelay: true, Users: []socks5.User{{Name: user, Password: pass}}}, serverSide)
 
 		cl, err := (&socks5.Proxy{Settings: socks5.Settings{UDPRelay: true, Username: user, Password: pass}}).NewStreamClient()
 		if err != nil {
@@ -240,7 +240,7 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 
 	t.Run("rejected", func(t *testing.T) {
 		clientSide, serverSide := pipe(t)
-		results := serverOn(t, &socks5.Settings{UDPRelay: true, Username: user, Password: pass}, serverSide)
+		results := serverOn(t, &socks5.Settings{UDPRelay: true, Users: []socks5.User{{Name: user, Password: pass}}}, serverSide)
 
 		cl, err := (&socks5.Proxy{Settings: socks5.Settings{UDPRelay: true, Username: user, Password: "wrong"}}).NewStreamClient()
 		if err != nil {
@@ -264,7 +264,7 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 
 	t.Run("client offering only no-auth is turned away", func(t *testing.T) {
 		clientSide, serverSide := pipe(t)
-		results := serverOn(t, &socks5.Settings{UDPRelay: true, Username: user, Password: pass}, serverSide)
+		results := serverOn(t, &socks5.Settings{UDPRelay: true, Users: []socks5.User{{Name: user, Password: pass}}}, serverSide)
 
 		go clientSide.Write([]byte{0x05, 0x01, 0x00})
 
@@ -347,7 +347,7 @@ func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
 			t.Errorf("no auth on %s: warnings %v, want a warning: %v", address, got, want)
 		}
 	}
-	if got := (&socks5.Settings{Username: "u", Password: "p"}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
+	if got := (&socks5.Settings{Users: []socks5.User{{Name: "u", Password: "p"}}}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
 		t.Errorf("an authenticated proxy warned anyway: %v", got)
 	}
 	if got := open.Warnings(); len(got) != 0 {

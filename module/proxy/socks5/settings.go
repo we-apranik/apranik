@@ -6,16 +6,23 @@ import (
 	"time"
 
 	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/The-Apranik/Apranik/shared/controlcharacter"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 // No server address here: a proxy protocol never dials, so that belongs to the
 // outbound stack.
 type Settings struct {
-	// RFC 1929 authentication. Both empty means no-auth and nothing else; on
-	// the server the accepted name lands in Metadata.User.
+	// What a client sends (RFC 1929), set together or not at all; an inbound
+	// refuses them, it takes users.
 	Username string       `json:"username"`
 	Password types.Secret `json:"password"`
+
+	// Who an inbound accepts, by RFC 1929 username and password; the matched
+	// name lands in Metadata.User. An inbound with none accepts everyone, with
+	// no authentication. An outbound refuses them. Users can be added and
+	// removed while the inbound runs (UserManager).
+	Users []User `json:"users"`
 
 	// On by default, but still depends on core having granted a socket func:
 	// without one the command is refused with X'07' whatever this says.
@@ -68,16 +75,65 @@ func (s *Settings) Validate() error {
 	if len(s.Username) > 255 || len(s.Password) > 255 {
 		return errors.New("socks5: username and password are limited to 255 bytes each")
 	}
+
+	names := make(map[string]int, len(s.Users))
+	for index, user := range s.Users {
+		if err := checkUser(user); err != nil {
+			return fmt.Errorf("socks5: users[%d] %w", index, err)
+		}
+		if first, seen := names[user.Name]; seen {
+			return fmt.Errorf("socks5: users[%d] and users[%d] are both named %q", first, index, user.Name)
+		}
+		names[user.Name] = index
+	}
+	return nil
+}
+
+type User struct {
+	Name     string       `json:"name"`
+	Password types.Secret `json:"password"`
+}
+
+// checkUser says what is wrong with one user on its own, without saying where
+// the user is and without ever naming a password. The name is the RFC 1929
+// username, so both are limited to what a length byte can hold.
+func checkUser(user User) error {
+	switch {
+	case user.Name == "":
+		return errors.New("has no name")
+	case user.Password == "":
+		return fmt.Errorf("%q has no password", user.Name)
+	case len(user.Name) > 255 || len(user.Password) > 255:
+		return fmt.Errorf("%q is over 255 bytes, which RFC 1929 limits a username and a password to", user.Name)
+	case controlcharacter.Contains(user.Name):
+		return fmt.Errorf("%q has a control character in its name", user.Name)
+	case controlcharacter.Contains(user.Password.Reveal()):
+		return fmt.Errorf("%q has a control character in its password", user.Name)
+	}
+	return nil
+}
+
+func (s *Settings) checkAsServer() error {
+	if s.Username != "" || s.Password != "" {
+		return errors.New(`socks5: an inbound takes users, not username and password: "users": [{"name": "...", "password": "..."}]`)
+	}
+	return nil
+}
+
+func (s *Settings) checkAsClient() error {
+	if len(s.Users) > 0 {
+		return errors.New("socks5: an outbound takes username and password, not users")
+	}
 	return nil
 }
 
 func (s *Settings) Warnings() []string { return nil }
 
-// An inbound with no username is open to whoever can reach its port: only a
+// An inbound with no users is open to whoever can reach its port: only a
 // listen address on this machine makes that safe.
 func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
-	if s.Username == "" && !listen.Addr().IsLoopback() {
-		return []string{"socks5: no username set, so any client that can reach this inbound may use it"}
+	if len(s.Users) == 0 && !listen.Addr().IsLoopback() {
+		return []string{"socks5: no users, so any client that can reach this inbound may use it"}
 	}
 	return nil
 }

@@ -12,6 +12,8 @@ import (
 	"io"
 	"net"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
@@ -20,9 +22,23 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
+type user struct {
+	name          string
+	nameBytes     []byte
+	passwordBytes []byte
+}
+
+func newUser(configured User) user {
+	return user{name: configured.Name, nameBytes: []byte(configured.Name), passwordBytes: []byte(configured.Password.Reveal())}
+}
+
 type streamServer struct {
-	username string
-	password string
+	// An immutable snapshot, replaced whole by AddUser and RemoveUser
+	// (users.go), so a handshake reads it with one atomic load and never sees a
+	// list half changed. No users means no authentication.
+	users       atomic.Pointer[[]user]
+	changeUsers sync.Mutex
+
 	udpRelay bool
 
 	handshakeTimeout time.Duration
@@ -49,7 +65,8 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	defer cancel()
 	defer streamdeadline.BindToContext(ctx, underlyingStream)()
 
-	if err := s.authenticate(underlyingStream); err != nil {
+	authenticatedUser, err := s.authenticate(underlyingStream)
+	if err != nil {
 		return nil, spec.Metadata{}, err
 	}
 
@@ -62,7 +79,7 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	}
 	command := request[1]
 
-	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: s.username}
+	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: authenticatedUser}
 
 	switch {
 	case command == wire.CommandConnect:
@@ -143,75 +160,84 @@ func reachableAddress(bound, control net.Addr) (spec.Endpoint, error) {
 	return spec.NewEndpoint(controlEndpoint.Addr(), boundEndpoint.Port())
 }
 
-func (s *streamServer) authenticate(underlyingStream spec.Stream) error {
+// authenticate returns the name of the user who logged in, empty when the
+// server has no users and so asks for no login.
+func (s *streamServer) authenticate(underlyingStream spec.Stream) (string, error) {
+	users := *s.users.Load()
+
 	var greeting [2]byte
 	if _, err := io.ReadFull(underlyingStream, greeting[:]); err != nil {
-		return fmt.Errorf("socks5: reading greeting: %w", err)
+		return "", fmt.Errorf("socks5: reading greeting: %w", err)
 	}
 	if greeting[0] != wire.Version5 {
-		return fmt.Errorf("socks5: greeting version X'%02X', want X'05'", greeting[0])
+		return "", fmt.Errorf("socks5: greeting version X'%02X', want X'05'", greeting[0])
 	}
 	if greeting[1] == 0 {
-		return errors.New("socks5: client offered no authentication methods")
+		return "", errors.New("socks5: client offered no authentication methods")
 	}
 
 	offered := make([]byte, greeting[1])
 	if _, err := io.ReadFull(underlyingStream, offered); err != nil {
-		return fmt.Errorf("socks5: reading authentication methods: %w", err)
+		return "", fmt.Errorf("socks5: reading authentication methods: %w", err)
 	}
 
 	required := byte(wire.MethodNoAuth)
-	if s.username != "" {
+	if len(users) > 0 {
 		required = wire.MethodUserPass
 	}
 	if !slices.Contains(offered, required) {
 		underlyingStream.Write([]byte{wire.Version5, wire.MethodNone})
-		return fmt.Errorf("socks5: client does not offer authentication method X'%02X'", required)
+		return "", fmt.Errorf("socks5: client does not offer authentication method X'%02X'", required)
 	}
 	if _, err := underlyingStream.Write([]byte{wire.Version5, required}); err != nil {
-		return fmt.Errorf("socks5: selecting authentication method: %w", err)
+		return "", fmt.Errorf("socks5: selecting authentication method: %w", err)
 	}
 	if required == wire.MethodNoAuth {
-		return nil
+		return "", nil
 	}
-	return s.checkCredentials(underlyingStream)
+	return s.checkCredentials(underlyingStream, users)
 }
 
-func (s *streamServer) checkCredentials(underlyingStream spec.Stream) error {
+func (s *streamServer) checkCredentials(underlyingStream spec.Stream, users []user) (string, error) {
 	var versionAndUsernameLength [2]byte
 	if _, err := io.ReadFull(underlyingStream, versionAndUsernameLength[:]); err != nil {
-		return fmt.Errorf("socks5: reading credentials: %w", err)
+		return "", fmt.Errorf("socks5: reading credentials: %w", err)
 	}
 	if versionAndUsernameLength[0] != wire.AuthVersion {
-		return fmt.Errorf("socks5: credential version X'%02X', want X'01'", versionAndUsernameLength[0])
+		return "", fmt.Errorf("socks5: credential version X'%02X', want X'01'", versionAndUsernameLength[0])
 	}
 
 	username, err := readLengthPrefixed(underlyingStream, versionAndUsernameLength[1], "username")
 	if err != nil {
-		return err
+		return "", err
 	}
 	var passwordLength [1]byte
 	if _, err := io.ReadFull(underlyingStream, passwordLength[:]); err != nil {
-		return fmt.Errorf("socks5: reading password length: %w", err)
+		return "", fmt.Errorf("socks5: reading password length: %w", err)
 	}
 	password, err := readLengthPrefixed(underlyingStream, passwordLength[0], "password")
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// Both compared before deciding, so a wrong username and a wrong password
-	// take the same time.
-	usernameMatches := subtle.ConstantTimeCompare(username, []byte(s.username)) == 1
-	passwordMatches := subtle.ConstantTimeCompare(password, []byte(s.password)) == 1
-	if !usernameMatches || !passwordMatches {
+	// Every user is compared, with both fields, before deciding, so the time
+	// taken says nothing about which user matched, how many there are before
+	// it, or whether the username or the password was the wrong part.
+	matchedIndex, found := 0, 0
+	for index, candidate := range users {
+		match := subtle.ConstantTimeCompare(username, candidate.nameBytes) & subtle.ConstantTimeCompare(password, candidate.passwordBytes)
+		matchedIndex = subtle.ConstantTimeSelect(match, index, matchedIndex)
+		found |= match
+	}
+	if found == 0 {
 		underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthFailed})
-		return fmt.Errorf("%w: socks5: bad username or password", spec.ErrAuthenticationFailed)
+		return "", fmt.Errorf("%w: socks5: bad username or password", spec.ErrAuthenticationFailed)
 	}
 
 	if _, err := underlyingStream.Write([]byte{wire.AuthVersion, wire.AuthSucceeded}); err != nil {
-		return fmt.Errorf("socks5: accepting credentials: %w", err)
+		return "", fmt.Errorf("socks5: accepting credentials: %w", err)
 	}
-	return nil
+	return users[matchedIndex].name, nil
 }
 
 func readLengthPrefixed(underlyingStream spec.Stream, length byte, fieldName string) ([]byte, error) {

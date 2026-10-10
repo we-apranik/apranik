@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"encoding/base64"
 	"io"
 	"net"
 	"net/netip"
@@ -124,23 +125,30 @@ func TestParseHostPortRefusesBadAddresses(t *testing.T) {
 	}
 }
 
-func TestBasicCredentialsMatch(t *testing.T) {
+func TestBasicCredentials(t *testing.T) {
 	value := BasicAuthorizationValue("alice", "secret")
 	lowercaseScheme := "basic" + strings.TrimPrefix(value, "Basic")
 
 	for _, tc := range []struct {
 		name               string
 		authorizationValue string
-		want               bool
+		wantUsername       string
+		wantPassword       string
+		wantOK             bool
 	}{
-		{"exact", value, true},
-		{"scheme in lower case", lowercaseScheme, true},
-		{"wrong password", BasicAuthorizationValue("alice", "wrong"), false},
-		{"other scheme", "Bearer token", false},
-		{"empty", "", false},
+		{"exact", value, "alice", "secret", true},
+		{"scheme in lower case", lowercaseScheme, "alice", "secret", true},
+		{"a colon in the password", BasicAuthorizationValue("alice", "se:cret"), "alice", "se:cret", true},
+		{"an empty password", BasicAuthorizationValue("alice", ""), "alice", "", true},
+		{"non-English", BasicAuthorizationValue("سارا", "گذرواژه"), "سارا", "گذرواژه", true},
+		{"other scheme", "Bearer token", "", "", false},
+		{"not base64", "Basic !!!", "", "", false},
+		{"no colon", "Basic " + base64.StdEncoding.EncodeToString([]byte("alice")), "", "", false},
+		{"empty", "", "", "", false},
 	} {
-		if got := BasicCredentialsMatch(tc.authorizationValue, "alice", "secret"); got != tc.want {
-			t.Errorf("%s: BasicCredentialsMatch = %v, want %v", tc.name, got, tc.want)
+		username, password, ok := BasicCredentials(tc.authorizationValue)
+		if ok != tc.wantOK || string(username) != tc.wantUsername || string(password) != tc.wantPassword {
+			t.Errorf("%s: BasicCredentials = %q, %q, %v; want %q, %q, %v", tc.name, username, password, ok, tc.wantUsername, tc.wantPassword, tc.wantOK)
 		}
 	}
 }

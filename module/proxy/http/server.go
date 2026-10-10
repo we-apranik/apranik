@@ -6,8 +6,11 @@ package http
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
@@ -21,9 +24,23 @@ const (
 	statusProxyAuthenticationRequired = "407 Proxy Authentication Required"
 )
 
+type user struct {
+	name          string
+	nameBytes     []byte
+	passwordBytes []byte
+}
+
+func newUser(configured User) user {
+	return user{name: configured.Name, nameBytes: []byte(configured.Name), passwordBytes: []byte(configured.Password.Reveal())}
+}
+
 type streamServer struct {
-	username         string
-	password         string
+	// An immutable snapshot, replaced whole by AddUser and RemoveUser
+	// (users.go), so a request reads it with one atomic load and never sees a
+	// list half changed. No users means no authentication.
+	users       atomic.Pointer[[]user]
+	changeUsers sync.Mutex
+
 	handshakeTimeout time.Duration
 }
 
@@ -45,11 +62,12 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 		return nil, spec.Metadata{}, err
 	}
 
-	if err := s.requireProxyCredentials(underlyingStream, httpVersion, head); err != nil {
+	authenticatedUser, err := s.requireProxyCredentials(underlyingStream, httpVersion, head)
+	if err != nil {
 		return nil, spec.Metadata{}, err
 	}
 
-	metadata := spec.Metadata{Network: spec.NetworkTCP, Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: s.username}
+	metadata := spec.Metadata{Network: spec.NetworkTCP, Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: authenticatedUser}
 
 	if strings.EqualFold(requestMethod, "CONNECT") {
 		return acceptConnectTunnel(streamAfterHead, metadata, httpVersion, requestTarget)
@@ -57,15 +75,31 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	return acceptAbsoluteFormRequest(streamAfterHead, metadata, httpVersion, requestMethod, requestTarget, head.HeaderLines)
 }
 
-func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, httpVersion string, head wire.Head) error {
-	if s.username == "" {
-		return nil
+// requireProxyCredentials returns the name of the user who logged in, empty
+// when the server has no users and so asks for no login.
+func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, httpVersion string, head wire.Head) (string, error) {
+	users := *s.users.Load()
+	if len(users) == 0 {
+		return "", nil
 	}
-	if wire.BasicCredentialsMatch(head.HeaderValue("Proxy-Authorization"), s.username, s.password) {
-		return nil
+
+	username, password, ok := wire.BasicCredentials(head.HeaderValue("Proxy-Authorization"))
+
+	// Every user is compared, with both fields, before deciding, so the time
+	// taken says nothing about which user matched, how many there are before
+	// it, or whether the username or the password was the wrong part.
+	matchedIndex, found := 0, 0
+	for index, candidate := range users {
+		match := subtle.ConstantTimeCompare(username, candidate.nameBytes) & subtle.ConstantTimeCompare(password, candidate.passwordBytes)
+		matchedIndex = subtle.ConstantTimeSelect(match, index, matchedIndex)
+		found |= match
 	}
+	if ok && found == 1 {
+		return users[matchedIndex].name, nil
+	}
+
 	writeStatusResponse(underlyingStream, httpVersion, statusProxyAuthenticationRequired, `Proxy-Authenticate: Basic realm="apranik"`)
-	return fmt.Errorf("%w: http: missing or bad proxy credentials", spec.ErrAuthenticationFailed)
+	return "", fmt.Errorf("%w: http: missing or bad proxy credentials", spec.ErrAuthenticationFailed)
 }
 
 func parseRequestLine(requestLine string) (requestMethod, requestTarget, httpVersion string, err error) {

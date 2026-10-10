@@ -24,7 +24,7 @@ func tlsInboundConfig(port int, certificateFile string) string {
   "inbounds": [{
     "tag": "in", "listen": "127.0.0.1", "port": %d, "network": "tcp",
     "transport": [{"type": "tcp"}, {"type": "tls", "settings": {"certificates": [{"certificate_file": %q, "key_file": %q}]}}],
-    "protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}
+    "protocol": {"type": "socks5", "settings": {"users": [{"name": "u", "password": "p"}]}}
   }],
   "outbounds": [{"tag": "direct", "protocol": {"type": "freedom"}}]
 }`, port, certificateFile, certificateFile)
@@ -52,7 +52,7 @@ func TestCheckDoesNotBindThePortsItChecks(t *testing.T) {
   "inbounds": [{
     "tag": "in", "listen": "127.0.0.1", "port": %d, "network": "tcp",
     "transport": [{"type": "tcp"}],
-    "protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}
+    "protocol": {"type": "socks5", "settings": {"users": [{"name": "u", "password": "p"}]}}
   }],
   "outbounds": [{"tag": "direct", "protocol": {"type": "freedom"}}]
 }`, port))
@@ -118,7 +118,7 @@ func plainInboundsConfig(ports ...int) string {
 		inbounds += fmt.Sprintf(`{
     "tag": "in-%d", "listen": "127.0.0.1", "port": %d, "network": "tcp",
     "transport": [{"type": "tcp"}],
-    "protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}
+    "protocol": {"type": "socks5", "settings": {"users": [{"name": "u", "password": "p"}]}}
   }`, index, port)
 	}
 	return `{"version": 1, "inbounds": [` + inbounds + `],

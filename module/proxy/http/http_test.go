@@ -192,7 +192,7 @@ func TestProxyAuthentication(t *testing.T) {
 
 	t.Run("accepted", func(t *testing.T) {
 		clientSide, serverSide := pipe(t)
-		results := serverOn(t, &proxyhttp.Settings{Username: user, Password: pass}, serverSide)
+		results := serverOn(t, &proxyhttp.Settings{Users: []proxyhttp.User{{Name: user, Password: pass}}}, serverSide)
 
 		cl, err := (&proxyhttp.Proxy{Settings: proxyhttp.Settings{Username: user, Password: pass}}).NewStreamClient()
 		if err != nil {
@@ -216,7 +216,7 @@ func TestProxyAuthentication(t *testing.T) {
 
 	t.Run("rejected with 407", func(t *testing.T) {
 		clientSide, serverSide := pipe(t)
-		results := serverOn(t, &proxyhttp.Settings{Username: user, Password: pass}, serverSide)
+		results := serverOn(t, &proxyhttp.Settings{Users: []proxyhttp.User{{Name: user, Password: pass}}}, serverSide)
 
 		go clientSide.Write([]byte("CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n"))
 
@@ -382,7 +382,7 @@ func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
 			t.Errorf("no auth on %s: warnings %v, want a warning: %v", address, got, want)
 		}
 	}
-	if got := (&proxyhttp.Settings{Username: "u", Password: "p"}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
+	if got := (&proxyhttp.Settings{Users: []proxyhttp.User{{Name: "u", Password: "p"}}}).WarningsForListenAddress(listenAt("0.0.0.0")); len(got) != 0 {
 		t.Errorf("an authenticated proxy warned about being open: %v", got)
 	}
 	if got := open.Warnings(); len(got) != 0 {

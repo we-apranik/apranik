@@ -35,7 +35,7 @@ const goodDocument = `{
     "listen": "127.0.0.1",
     "port": 1080,
     "transport": [{"type": "tcp"}],
-    "protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}
+    "protocol": {"type": "socks5", "settings": {"users": [{"name": "u", "password": "p"}]}}
   }],
   "outbounds": [{
     "tag": "freedom",
@@ -97,7 +97,7 @@ func TestGoodDocumentLoads(t *testing.T) {
 	if !ok {
 		t.Fatalf("proxy is %T, want *socks5.Proxy", inbound.StreamProxy)
 	}
-	if proxy.Username != "u" || proxy.Password.Reveal() != "p" {
+	if len(proxy.Users) != 1 || proxy.Users[0].Name != "u" || proxy.Users[0].Password.Reveal() != "p" {
 		t.Error("proxy settings did not decode into the promoted fields")
 	}
 	if !proxy.UDPRelay {
@@ -161,7 +161,7 @@ func TestSatisfiedMinCorePasses(t *testing.T) {
 // who writes "fingerprnt" believes they configured a fingerprint.
 func TestUnknownSettingIsRefusedByDefault(t *testing.T) {
 	document := strings.Replace(goodDocument,
-		`"settings": {"username": "u", "password": "p"}`,
+		`"settings": {"users": [{"name": "u", "password": "p"}]}`,
 		`"settings": {"usernam": "u"}`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
@@ -176,8 +176,8 @@ func TestUnknownSettingIsRefusedByDefault(t *testing.T) {
 func TestStrictFalseAcceptsUnknownSettings(t *testing.T) {
 	document := strings.Replace(goodDocument, `"version": 1,`, `"version": 1, "strict": false,`, 1)
 	document = strings.Replace(document,
-		`"settings": {"username": "u", "password": "p"}`,
-		`"settings": {"username": "u", "password": "p", "usernam": "typo"}`, 1)
+		`"settings": {"users": [{"name": "u", "password": "p"}]}`,
+		`"settings": {"users": [{"name": "u", "password": "p"}], "usernam": "typo"}`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
 	if failed {
@@ -516,14 +516,14 @@ func TestUnknownNetworkIsRefused(t *testing.T) {
 // Each component's advisory findings, prefixed with where it sits.
 func TestComponentWarningsCarryTheirPath(t *testing.T) {
 	document := strings.Replace(strings.Replace(goodDocument,
-		`"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1),
+		`"settings": {"users": [{"name": "u", "password": "p"}]}`, `"settings": {}`, 1),
 		`"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
 	if failed {
 		t.Fatalf("an unauthenticated proxy is legal: %v", diagnostics.Err())
 	}
-	if !find(diagnostics, "inbounds[0].protocol.settings", "no username") {
+	if !find(diagnostics, "inbounds[0].protocol.settings", "no users") {
 		t.Errorf("the module's warning did not reach the diagnostics with a path: %v", diagnostics)
 	}
 }
@@ -893,11 +893,11 @@ func TestAFallbackNeedsAPort(t *testing.T) {
 
 // ---------- the special inbound protocol mixed ----------
 
-const mixedProtocol = `"protocol": {"type": "mixed", "settings": {"socks5": {"username": "u", "password": "p"}, "http": {"username": "u", "password": "p"}}}`
+const mixedProtocol = `"protocol": {"type": "mixed", "settings": {"users": [{"name": "u", "password": "p"}], "socks5": {"handshake_timeout": "5s"}, "http": {"handshake_timeout": "5s"}}}`
 
 func mixedDocument(protocol string) string {
 	return strings.Replace(goodDocument,
-		`"protocol": {"type": "socks5", "settings": {"username": "u", "password": "p"}}`, protocol, 1)
+		`"protocol": {"type": "socks5", "settings": {"users": [{"name": "u", "password": "p"}]}}`, protocol, 1)
 }
 
 func TestAMixedInboundDecodesBothHalves(t *testing.T) {
@@ -912,8 +912,30 @@ func TestAMixedInboundDecodesBothHalves(t *testing.T) {
 	if inbound.Mixed.SOCKS5.Info().Name != "socks5" || inbound.Mixed.HTTP.Info().Name != "http" {
 		t.Errorf("halves = %q and %q", inbound.Mixed.SOCKS5.Info().Name, inbound.Mixed.HTTP.Info().Name)
 	}
-	if socks5Half := inbound.Mixed.SOCKS5.(*socks5.Proxy); socks5Half.Username != "u" || !socks5Half.UDPRelay {
+	if socks5Half := inbound.Mixed.SOCKS5.(*socks5.Proxy); socks5Half.HandshakeTimeout == nil || !socks5Half.UDPRelay {
 		t.Errorf("socks5 half = %+v, want its settings over the module's defaults", socks5Half.Settings)
+	}
+	if len(inbound.Mixed.Users) != 1 {
+		t.Errorf("Mixed.Users = %s, want the one user written at mixed's level", inbound.Mixed.Users)
+	}
+}
+
+// mixed is one inbound with one list of users, so the halves are not warned
+// about having none, and the password that crosses the wire is.
+func TestMixedUsersReplaceTheHalvesOpenProxyWarnings(t *testing.T) {
+	document := strings.Replace(mixedDocument(mixedProtocol), `"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
+	configuration, diagnostics := config.Parse([]byte(document), modules(t))
+	requireNoErrors(t, diagnostics)
+	checked := config.Check(configuration)
+	requireNoErrors(t, checked)
+
+	for _, path := range []string{"inbounds[0].protocol.settings.socks5", "inbounds[0].protocol.settings.http"} {
+		if find(checked, path, "no users") {
+			t.Errorf("a half was warned about having no users, though mixed has some: %v", checked)
+		}
+	}
+	if !find(checked, "inbounds[0].protocol.settings.users", "recoverable form") {
+		t.Errorf("no warning about the password crossing the wire: %v", checked)
 	}
 }
 
@@ -925,7 +947,7 @@ func TestAMixedInboundWithoutSettingsUsesTheModulesDefaults(t *testing.T) {
 	requireNoErrors(t, checked)
 
 	for _, path := range []string{"inbounds[0].protocol.settings.socks5", "inbounds[0].protocol.settings.http"} {
-		if !find(checked, path, "no username set") {
+		if !find(checked, path, "no users, so any client") {
 			t.Errorf("no warning about the open half at %s: %v", path, checked)
 		}
 	}
@@ -1129,13 +1151,13 @@ func TestAnInboundTLSServerIsCheckedToo(t *testing.T) {
 
 // What depends on where an inbound listens is only said where others can reach it.
 func TestAnOpenInboundOnLoopbackIsNotWarnedAbout(t *testing.T) {
-	document := strings.Replace(goodDocument, `"settings": {"username": "u", "password": "p"}`, `"settings": {}`, 1)
+	document := strings.Replace(goodDocument, `"settings": {"users": [{"name": "u", "password": "p"}]}`, `"settings": {}`, 1)
 
 	diagnostics, failed := loadAndCheck(t, document)
 	if failed {
 		t.Fatalf("an unauthenticated proxy is legal: %v", diagnostics.Err())
 	}
-	if find(diagnostics, "inbounds[0].protocol.settings", "no username") {
+	if find(diagnostics, "inbounds[0].protocol.settings", "no users") {
 		t.Errorf("a loopback inbound was warned about: %v", diagnostics)
 	}
 }
@@ -1163,7 +1185,7 @@ func TestWebSocketReadingAHeaderWithoutVerificationIsWarnedAboutOnAnOpenAddress(
 func TestTheUDPDatagramSizeSettingsDecodeAndAreChecked(t *testing.T) {
 	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "udp_max_datagram_size": 4096,`, 1)
 	document = strings.Replace(document, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"nat": {"max_datagram_size": 2048}}}`, 1)
-	document = strings.Replace(document, `"settings": {"username": "u", "password": "p"}`, `"settings": {"username": "u", "password": "p", "udp_max_datagram_size": 4096}`, 1)
+	document = strings.Replace(document, `"settings": {"users": [{"name": "u", "password": "p"}]}`, `"settings": {"users": [{"name": "u", "password": "p"}], "udp_max_datagram_size": 4096}`, 1)
 	configuration, diagnostics := config.Parse([]byte(document), modules(t))
 	requireNoErrors(t, diagnostics)
 	requireNoErrors(t, config.Check(configuration))
@@ -1195,7 +1217,7 @@ func TestADatagramSizeOutOfRangeIsRefusedWithItsPath(t *testing.T) {
 		}
 	}
 
-	document := strings.Replace(goodDocument, `"settings": {"username": "u", "password": "p"}`, `"settings": {"username": "u", "password": "p", "udp_max_datagram_size": 70000}`, 1)
+	document := strings.Replace(goodDocument, `"settings": {"users": [{"name": "u", "password": "p"}]}`, `"settings": {"users": [{"name": "u", "password": "p"}], "udp_max_datagram_size": 70000}`, 1)
 	if _, failed := loadAndCheck(t, document); !failed {
 		t.Error("a socks5 udp_max_datagram_size over the largest datagram was accepted")
 	}

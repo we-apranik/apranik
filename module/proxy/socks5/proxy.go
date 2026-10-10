@@ -13,16 +13,26 @@ func (*Proxy) Info() spec.ModuleInfo {
 }
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {
-	return &streamServer{
-		username:         p.Username,
-		password:         p.Password.Reveal(),
+	if err := p.checkAsServer(); err != nil {
+		return nil, err
+	}
+	users := make([]user, len(p.Users))
+	for index, configured := range p.Users {
+		users[index] = newUser(configured)
+	}
+	server := &streamServer{
 		udpRelay:         p.UDPRelay,
 		handshakeTimeout: p.handshakeTimeout(),
 		maxDatagramSize:  p.maxDatagramSize(),
-	}, nil
+	}
+	server.users.Store(&users)
+	return server, nil
 }
 
 func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
+	if err := p.checkAsClient(); err != nil {
+		return nil, err
+	}
 	return &streamClient{
 		username:         p.Username,
 		password:         p.Password.Reveal(),

@@ -3,6 +3,7 @@ package mixed_test
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/netip"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/dns"
 	"github.com/The-Apranik/Apranik/core/inbound"
 	"github.com/The-Apranik/Apranik/core/inbound/mixed"
@@ -50,11 +52,20 @@ type mixedInboundOptions struct {
 	socks5Settings   socks5.Settings
 	httpSettings     proxyhttp.Settings
 	firstByteTimeout time.Duration
+
+	// Added to both protocols before the inbound listens, as the builder does.
+	users []json.RawMessage
 }
 
 // startMixedInbound runs a real inbound on loopback TCP with the real socks5
 // and http modules behind the mixed server, as the builder does.
 func startMixedInbound(t *testing.T, options mixedInboundOptions) (net.Addr, recordingHandler) {
+	t.Helper()
+	address, handler, _ := startMixedInboundReturningIt(t, options)
+	return address, handler
+}
+
+func startMixedInboundReturningIt(t *testing.T, options mixedInboundOptions) (net.Addr, recordingHandler, component.Inbound) {
 	t.Helper()
 	listener, err := tcp.NewBaseStreamTransportModule().NewStreamListener(loopback(t))
 	if err != nil {
@@ -77,18 +88,25 @@ func startMixedInbound(t *testing.T, options mixedInboundOptions) (net.Addr, rec
 		return datagramListener.ListenDatagram(ctx)
 	}
 
+	mixedServer := mixed.NewStreamServer(socks5Server, httpServer, options.firstByteTimeout)
+	for _, user := range options.users {
+		if _, err := mixedServer.(spec.UserManager).AddUser(user); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	in := inbound.NewStream(inbound.StreamConfig{
 		Tag:             "mixed-in",
 		Listener:        listener,
-		ProxyServer:     mixed.NewStreamServer(socks5Server, httpServer, options.firstByteTimeout),
+		ProxyServer:     mixedServer,
 		AssociateSocket: associateSocket,
 	})
-	handler := recordingHandler{calls: make(chan handled, 1)}
+	handler := recordingHandler{calls: make(chan handled, 16)}
 	if err := in.Activate(context.Background(), handler); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { in.Close() })
-	return listener.LocalAddr(), handler
+	return listener.LocalAddr(), handler, in
 }
 
 func dialMixed(t *testing.T, address net.Addr) net.Conn {
@@ -199,11 +217,9 @@ func TestMixedServesSOCKS5UDPAssociate(t *testing.T) {
 	}
 }
 
-func TestMixedKeepsEachHalfsAuthentication(t *testing.T) {
-	address, _ := startMixedInbound(t, mixedInboundOptions{
-		socks5Settings: socks5.Settings{Username: "alice", Password: "secret"},
-		httpSettings:   proxyhttp.Settings{Username: "alice", Password: "secret"},
-	})
+// mixed has one list of users, and both protocols ask for a login when it has any.
+func TestMixedUsersApplyToBothProtocols(t *testing.T) {
+	address, handler := startMixedInbound(t, mixedInboundOptions{users: []json.RawMessage{json.RawMessage(`{"name": "alice", "password": "secret"}`)}})
 
 	socks5Connection := dialMixed(t, address)
 	socks5Connection.Write([]byte{0x05, 0x01, 0x00})
@@ -216,6 +232,12 @@ func TestMixedKeepsEachHalfsAuthentication(t *testing.T) {
 	status, err := bufio.NewReader(httpConnection).ReadString('\n')
 	if err != nil || !strings.Contains(status, " 407 ") {
 		t.Errorf("http without credentials: status line = %q, %v; want 407", status, err)
+	}
+
+	select {
+	case got := <-handler.calls:
+		t.Errorf("a client without credentials was dispatched: %+v", got)
+	default:
 	}
 }
 

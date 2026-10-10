@@ -11,10 +11,22 @@ func (*Proxy) Info() spec.ModuleInfo {
 }
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) {
-	return &streamServer{username: p.Username, password: p.Password.Reveal(), handshakeTimeout: p.handshakeTimeout()}, nil
+	if err := p.checkAsServer(); err != nil {
+		return nil, err
+	}
+	users := make([]user, len(p.Users))
+	for index, configured := range p.Users {
+		users[index] = newUser(configured)
+	}
+	server := &streamServer{handshakeTimeout: p.handshakeTimeout()}
+	server.users.Store(&users)
+	return server, nil
 }
 
 func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) {
+	if err := p.checkAsClient(); err != nil {
+		return nil, err
+	}
 	return &streamClient{username: p.Username, password: p.Password.Reveal(), handshakeTimeout: p.handshakeTimeout()}, nil
 }
 

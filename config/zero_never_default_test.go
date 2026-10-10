@@ -8,14 +8,14 @@ import (
 // A setting left out has its default. A written zero is refused wherever the
 // default is not what zero means, and never stands for the default.
 func TestAWrittenZeroIsRefusedNotTakenAsTheDefault(t *testing.T) {
-	const socks5Settings = `"settings": {"username": "u", "password": "p"}`
+	const socks5Settings = `"settings": {"users": [{"name": "u", "password": "p"}]}`
 	for _, tc := range []struct {
 		name, from, to, location, message string
 	}{
 		{"inbound tcp idle timeout", `"port": 1080,`, `"port": 1080, "tcp_idle_timeout": "0s",`, "inbounds[0].tcp_idle_timeout", "must not be zero"},
 		{"inbound udp session idle timeout", `"port": 1080,`, `"port": 1080, "udp_session_idle_timeout": "0s",`, "inbounds[0].udp_session_idle_timeout", "greater than zero"},
-		{"socks5 handshake timeout", socks5Settings, `"settings": {"username": "u", "password": "p", "handshake_timeout": "0s"}`, "inbounds[0].protocol.settings", "handshake_timeout"},
-		{"socks5 datagram size", socks5Settings, `"settings": {"username": "u", "password": "p", "udp_max_datagram_size": 0}`, "inbounds[0].protocol.settings", "udp_max_datagram_size"},
+		{"socks5 handshake timeout", socks5Settings, `"settings": {"users": [{"name": "u", "password": "p"}], "handshake_timeout": "0s"}`, "inbounds[0].protocol.settings", "handshake_timeout"},
+		{"socks5 datagram size", socks5Settings, `"settings": {"users": [{"name": "u", "password": "p"}], "udp_max_datagram_size": 0}`, "inbounds[0].protocol.settings", "udp_max_datagram_size"},
 		{"tcp dial timeout", `"transport": [{"type": "tcp"}]`, `"transport": [{"type": "tcp", "settings": {"dial_timeout": "0s"}}]`, "inbounds[0].transport[0].settings", "dial_timeout"},
 		{"tcp keep alive count", `"transport": [{"type": "tcp"}]`, `"transport": [{"type": "tcp", "settings": {"keep_alive_count": 0}}]`, "inbounds[0].transport[0].settings", "keep_alive_count"},
 		{"freedom nat idle timeout", `"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"nat": {"idle_timeout": "0s"}}}`, "outbounds[0].protocol.settings.nat.idle_timeout", "greater than zero"},
