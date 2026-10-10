@@ -21,33 +21,31 @@ const (
 	KindAPI
 )
 
+// Everything about a Kind in one place, so adding a kind is one row.
+var kindDescriptions = [...]struct {
+	name    string
+	carrier carrier
+}{
+	KindBaseStream:              {"base stream transport", carrierStream},
+	KindOverlayStream:           {"overlay stream transport", carrierStream},
+	KindBaseDatagram:            {"base datagram transport", carrierDatagram},
+	KindOverlayDatagram:         {"overlay datagram transport", carrierDatagram},
+	KindStreamProxy:             {"stream proxy", carrierStream},
+	KindDatagramOverStreamProxy: {"datagram over stream proxy", carrierStream},
+	KindDatagramProxy:           {"datagram proxy", carrierDatagram},
+	KindSniffer:                 {"sniffer", carrierStream},
+	KindStreamDNSServer:         {"stream DNS server", carrierStream},
+	KindDatagramDNSServer:       {"datagram DNS server", carrierDatagram},
+	KindAPI:                     {"API", carrierStream},
+}
+
+func (k Kind) isKnown() bool { return k >= 0 && int(k) < len(kindDescriptions) }
+
 func (k Kind) String() string {
-	switch k {
-	case KindBaseStream:
-		return "base stream transport"
-	case KindOverlayStream:
-		return "overlay stream transport"
-	case KindBaseDatagram:
-		return "base datagram transport"
-	case KindOverlayDatagram:
-		return "overlay datagram transport"
-	case KindStreamProxy:
-		return "stream proxy"
-	case KindDatagramOverStreamProxy:
-		return "datagram over stream proxy"
-	case KindDatagramProxy:
-		return "datagram proxy"
-	case KindSniffer:
-		return "sniffer"
-	case KindStreamDNSServer:
-		return "stream DNS server"
-	case KindDatagramDNSServer:
-		return "datagram DNS server"
-	case KindAPI:
-		return "API"
-	default:
+	if !k.isKnown() {
 		return fmt.Sprintf("unknown kind %d", int(k))
 	}
+	return kindDescriptions[k].name
 }
 
 // Two transport kinds may share a name only when their carriers differ. Both
@@ -61,10 +59,8 @@ const (
 )
 
 func (k Kind) carrier() carrier {
-	switch k {
-	case KindBaseDatagram, KindOverlayDatagram, KindDatagramProxy, KindDatagramDNSServer:
-		return carrierDatagram
-	default:
+	if !k.isKnown() {
 		return carrierStream
 	}
+	return kindDescriptions[k].carrier
 }
