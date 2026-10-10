@@ -145,6 +145,7 @@ nav:
           - configuration/routing/datasets.md
           - configuration/routing/sniffing.md
       - DNS: configuration/dns/index.md
+      - Users: configuration/users.md
       - Stats: configuration/stats.md
       - APIs:
           - configuration/api.md
