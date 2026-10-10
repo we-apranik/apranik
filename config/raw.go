@@ -158,6 +158,9 @@ type rawMixedSettings struct {
 	SOCKS5 json.RawMessage `json:"socks5"`
 	HTTP   json.RawMessage `json:"http"`
 
+	// One list of users for both protocols.
+	Users []json.RawMessage `json:"users"`
+
 	FirstByteTimeout *types.Duration `json:"first_byte_timeout"`
 }
 

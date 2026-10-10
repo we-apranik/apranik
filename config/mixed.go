@@ -40,7 +40,7 @@ func (b *configBuilder) buildMixed(raw json.RawMessage, loc string) *blueprint.M
 	if err := types.CheckPositive(settings.FirstByteTimeout); err != nil {
 		b.diagnostics.errorf(fieldLocation(loc, "first_byte_timeout"), "first_byte_timeout %v", err)
 	}
-	return &blueprint.Mixed{SOCKS5: socks5, HTTP: http, FirstByteTimeout: durationOrNil(settings.FirstByteTimeout)}
+	return &blueprint.Mixed{SOCKS5: socks5, HTTP: http, Users: settings.Users, FirstByteTimeout: durationOrNil(settings.FirstByteTimeout)}
 }
 
 // An absent key leaves the module's own defaults, as for freedom's halves.

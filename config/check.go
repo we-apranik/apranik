@@ -151,6 +151,10 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 	if inbound.Mixed != nil {
 		collectWarnings(diagnostics, inbound.Mixed.SOCKS5, fieldLocation(loc, "protocol", "settings", mixedSOCKS5Module))
 		collectWarnings(diagnostics, inbound.Mixed.HTTP, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
+		if len(inbound.Mixed.Users) > 0 {
+			diagnostics.warnf(fieldLocation(loc, "protocol", "settings", "users"),
+				"users log in with a password that SOCKS5 and HTTP Basic send in a recoverable form unless the carrier below is encrypted")
+		}
 	}
 
 	if inbound.Bind.IsValid() {
@@ -159,7 +163,9 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		}
 		collectListenAddressWarnings(diagnostics, inbound.StreamProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
 		collectListenAddressWarnings(diagnostics, inbound.DatagramProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
-		if inbound.Mixed != nil {
+		// With users the halves have none of their own, and warning that they
+		// have no users would be wrong.
+		if inbound.Mixed != nil && len(inbound.Mixed.Users) == 0 {
 			collectListenAddressWarnings(diagnostics, inbound.Mixed.SOCKS5, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedSOCKS5Module))
 			collectListenAddressWarnings(diagnostics, inbound.Mixed.HTTP, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
 		}
