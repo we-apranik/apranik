@@ -483,6 +483,40 @@ func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
 	}
 }
 
+func TestConnectWaitsNoLongerThanMaxFirstPayloadDelayForThePayload(t *testing.T) {
+	underlyingStream := newWriteRecordingStream()
+	proxy := &trojan.Proxy{Settings: trojan.Settings{Password: "p", MaxFirstPayloadDelay: types.Pointer(types.Duration(30 * time.Millisecond))}}
+	streamClient, err := proxy.NewStreamClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream, err := streamClient.RequestStream(context.Background(), underlyingStream, spec.Metadata{
+		Network: spec.NetworkTCP, Destination: domainDestination("ssh.example", 22),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+
+	select {
+	case first := <-underlyingStream.writes:
+		if length, err := wire.RequestLength(first); err != nil || length != len(first) {
+			t.Errorf("write = %q, want exactly one request", first)
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Fatal("the request waited past the configured max_first_payload_delay")
+	}
+}
+
+func TestAnInboundRefusesMaxFirstPayloadDelay(t *testing.T) {
+	settings := serverSettings
+	settings.MaxFirstPayloadDelay = types.Pointer(types.Duration(time.Second))
+	_, err := (&trojan.Proxy{Settings: settings}).NewStreamServer()
+	if err == nil || !strings.Contains(err.Error(), "max_first_payload_delay") {
+		t.Errorf("error = %v, want one naming max_first_payload_delay", err)
+	}
+}
+
 func TestUDPSendsTheRequestWithTheFirstDatagram(t *testing.T) {
 	underlyingStream := newWriteRecordingStream()
 	datagram, err := newClient(t, "p").RequestDatagramOverStream(context.Background(), underlyingStream, spec.Metadata{Network: spec.NetworkUDP})
