@@ -3,6 +3,7 @@ package session_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"slices"
 	"sync"
@@ -183,6 +184,33 @@ func TestAFailedOpenCountsADialFailureAndADropOnTheOutbound(t *testing.T) {
 	}
 	if got.UDP.Sessions != 0 {
 		t.Errorf("an outbound that never opened counted %d sessions", got.UDP.Sessions)
+	}
+}
+
+// A datagram that opens the way to each destination on its first write
+// (a protocol naming the destination in its stream request) fails to open in a
+// write, and that counts as the outbound failing to open, not a failed send.
+func TestAWriteThatFailsToOpenTheWayToADestinationCountsADialFailure(t *testing.T) {
+	registry := newStatsRegistry()
+	out := newFakeOutbound("out")
+	config := statsSessionConfig(registry)
+	config.DialFailureReasonFor = func(error) stats.DialFailureReason { return stats.DialRefused }
+	udpSession := newSession(t, config)
+
+	if err := udpSession.Send([]byte("x"), destinationOf(t, "192.0.2.1", 53), out); err != nil {
+		t.Fatal(err)
+	}
+	cause := errors.New("proxy server refused")
+	out.datagramAt(t, 0).failWrites(fmt.Errorf("%w: %w", component.ErrOpeningDatagramForDestination, cause))
+
+	err := udpSession.Send([]byte("y"), destinationOf(t, "192.0.2.2", 53), out)
+	if !errors.Is(err, session.ErrOpeningOutbound) || !errors.Is(err, cause) {
+		t.Fatalf("Send error = %v, want ErrOpeningOutbound wrapping the cause", err)
+	}
+
+	got := registry.OutboundTraffic()["out"]
+	if got.DialFailuresByReason["refused"] != 1 || got.DatagramDropsByReason["outbound_open_failed"] != 1 || got.DatagramDropsByReason["send_failed"] != 0 {
+		t.Errorf("dial failures %v, drops %v, want one refused and one outbound_open_failed, no send_failed", got.DialFailuresByReason, got.DatagramDropsByReason)
 	}
 }
 
