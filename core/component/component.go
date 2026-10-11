@@ -127,6 +127,14 @@ type SelectableOutbound interface {
 }
 
 var (
+	// A datagram that serves several destinations through one outbound opens
+	// the way to a new destination on its first write (a stream to the proxy
+	// server, for a protocol that names the destination in the stream request).
+	// A write that fails because that did not open wraps this, so the session
+	// counts it as the outbound failing to open, as it counts CreateDatagram
+	// failing, not as a send that failed.
+	ErrOpeningDatagramForDestination = errors.New("component: opening the way to a destination")
+
 	ErrNoSuchMember  = errors.New("component: the group has no member with this tag")
 	ErrNotSelectable = errors.New("component: this outbound is not a group a person drives")
 )
