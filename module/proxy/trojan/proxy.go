@@ -54,7 +54,7 @@ func (p *Proxy) newClient() (*client, error) {
 	if err := p.checkAsClient(); err != nil {
 		return nil, err
 	}
-	return &client{passwordHash: wire.HashPassword(p.Password.Reveal())}, nil
+	return &client{passwordHash: wire.HashPassword(p.Password.Reveal()), maxFirstPayloadDelay: p.maxFirstPayloadDelay()}, nil
 }
 
 func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule { return &Proxy{} }

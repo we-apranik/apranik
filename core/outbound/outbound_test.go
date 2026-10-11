@@ -141,6 +141,10 @@ type fakeDatagramOverStreamClient struct {
 	err       error
 }
 
+func (fakeDatagramOverStreamClient) DatagramDestinationIsWritten() spec.DatagramDestinationPlacement {
+	return spec.DatagramDestinationInEveryDatagram
+}
+
 func (c fakeDatagramOverStreamClient) RequestDatagramOverStream(ctx context.Context, underlyingStream spec.Stream, _ spec.Metadata) (spec.Datagram, error) {
 	c.requested <- underlyingStream
 	if c.err != nil {

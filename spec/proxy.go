@@ -46,8 +46,27 @@ type DatagramOverStreamProxyServer interface {
 	AcceptDatagramOverStream(ctx context.Context, underlyingStream Stream) (Datagram, Metadata, error)
 }
 
+// DatagramDestinationPlacement says where a datagram-over-stream protocol
+// writes the destination of the datagrams it carries.
+type DatagramDestinationPlacement int
+
+const (
+	// Every datagram names its own destination, so one stream carries a UDP
+	// session's datagrams to any number of destinations (Trojan).
+	DatagramDestinationInEveryDatagram DatagramDestinationPlacement = iota + 1
+
+	// The destination is named once, in the request that opens the stream, so
+	// each destination needs its own stream (plain VLESS, plain VMess).
+	DatagramDestinationInStreamRequest
+)
+
 type DatagramOverStreamProxyClient interface {
 	RequestDatagramOverStream(ctx context.Context, underlyingStream Stream, metadata Metadata) (Datagram, error)
+
+	// Required of every client, with no zero value, so one that does not say
+	// does not compile. Core opens one stream per destination for
+	// DatagramDestinationInStreamRequest.
+	DatagramDestinationIsWritten() DatagramDestinationPlacement
 }
 
 type DatagramProxyServer interface {
