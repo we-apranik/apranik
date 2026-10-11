@@ -12,6 +12,7 @@ credentials differ by protocol, so each protocol checks its own.
 | Inbound protocol | `users` | With none |
 | --- | --- | --- |
 | [Trojan](protocol/trojan.md#users) | `{ name, password }`, at least one | refused at start |
+| [VLESS](protocol/vless.md#users) | `{ name, uuid }`, at least one | refused at start |
 | [SOCKS5](protocol/socks5.md#users) | `{ name, password }`: the RFC 1929 username and password | no login: everyone is accepted |
 | [HTTP](protocol/http.md#users) | `{ name, password }`: Basic authentication | no login: everyone is accepted |
 | [Mixed](inbound/mixed.md#users) | `{ name, password }`, one list for SOCKS5 and HTTP | no login: everyone is accepted |
@@ -34,7 +35,7 @@ both.
 
 ## Changing users while running
 
-A protocol whose users can change implements Go's `spec.UserManager`, and Trojan, SOCKS5, HTTP
+A protocol whose users can change implements Go's `spec.UserManager`, and Trojan, VLESS, SOCKS5, HTTP
 and mixed do. A program that embeds Apranik, and an API module such as the
 [Clash API](api/clash.md#users), can add a user, remove one and list the names without a reload. The
 change applies from the next handshake; connections already accepted keep going until they end,
@@ -46,7 +47,7 @@ or until core ends them when the user is removed.
   which read the config file again. A reload that fails starts the previous configuration again
   as it was, users added while running included. A panel that manages users sends them again after
   a reload.
-- **The last user.** Trojan refuses every client until one is added. SOCKS5, HTTP and mixed then
+- **The last user.** Trojan and VLESS refuse every client until one is added. SOCKS5, HTTP and mixed then
   have no users, which means no login: they accept everyone. Removing the last user removes
   authentication, and adding a user to an inbound with none makes it ask for a login.
 - **Statistics.** A user is counted from their first connection, and the counters of a removed
