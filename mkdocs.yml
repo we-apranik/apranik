@@ -130,6 +130,7 @@ nav:
           - configuration/protocol/socks5.md
           - configuration/protocol/http.md
           - configuration/protocol/trojan.md
+          - configuration/protocol/vless.md
       - Transport:
           - configuration/transport/index.md
           - configuration/transport/tcp.md
