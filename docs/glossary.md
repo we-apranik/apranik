@@ -27,10 +27,12 @@
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |
 | **User** | One person who may use an inbound: a name and the credentials its protocol needs. Users belong to an inbound, are written in its protocol's `users`, and can change while it runs. Statistics are kept by name across inbounds. |
+| **Main connection** | In Mux.Cool, the one established stream that carries many sub-connections. It is closed when idle (`IdleTimeout`) or on a protocol violation, and ends every sub-connection with it. |
 | **Metadata** | `spec.Metadata`: network, destination, source, inbound tag, user and sniff result. Crosses the proxy layer, and only there. |
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor (a proxy protocol exports `NewProxyModule`, once, whatever kinds it fills). The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
 | **Module kind** | One of the `spec` interfaces a module fills, each named `...Module`: `BaseStreamTransportModule`, `OverlayStreamTransportModule`, `StreamProxyModule`, `SnifferModule` and so on. |
+| **Mux.Cool** | V2Ray's and Xray's multiplexing format: sub-connections with an ID, a state and options, in frames both ends send and read alike. `shared/muxcool`; VLESS enters it with command 3. |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
 | **Outbound** | How traffic leaves: a proxy client plus a dialer stack, freedom, or a group that picks among other outbounds (`component.Outbound`). |
 | **Overlay transport** | A transport that wraps a layer below it, one connection at a time (`WrapClientStream`, `WrapServerStream`), such as TLS or WebSocket. `tls`, `ws` and `httpupgrade` are built. |
@@ -52,6 +54,7 @@
 | **SNI** | Server Name Indication: the host name a TLS client sends in the clear. The `tls` sniffer reads it; the `tls` transport sends it. |
 | **Sniffer** | A module that recognises a protocol in the start of a payload and reports its domain, such as the TLS SNI or the HTTP `Host`. `SnifferModule` holds its settings and builds the `Sniffer`. |
 | **Stack** | A list of transports, base first and overlays outward from the wire, composed as a fold. |
+| **Sub-connection** | In Mux.Cool, one conversation on a main connection: an ID, a network (TCP or UDP) and a destination. It is a `spec.Stream` or a `spec.Datagram` and has no buffer of its own; a sub-connection nobody reads holds up the others. |
 | **Transport info** | `spec.TransportInfo`: facts about a configured transport that only the config check reads, today the application protocols it offers or can speak. |
 | **UDP session** | One client's UDP flow, such as one SOCKS5 association: `core/net/udp/session`. |
 | **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream, transport)` or `AcceptStream(ctx, underlyingStream)`. |
