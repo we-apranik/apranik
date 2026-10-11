@@ -407,6 +407,25 @@ func TestTheDefaultRegistryBuildsTrojanOnceForBothKinds(t *testing.T) {
 	}
 }
 
+func TestTheDefaultRegistryBuildsVLESSOnceForBothKinds(t *testing.T) {
+	modules, err := registry.Default()
+	if err != nil {
+		t.Fatalf("Default: %v", err)
+	}
+
+	newModules, err := modules.ProxyProtocols().Lookup("vless", registry.KindStreamProxy)
+	if err != nil {
+		t.Fatalf("lookup: %v", err)
+	}
+	vless := newModules()
+	if vless.Stream == nil || vless.DatagramOverStream == nil || vless.Datagram != nil {
+		t.Fatalf("vless fills the wrong kinds: %+v", vless)
+	}
+	if any(vless.Stream) != any(vless.DatagramOverStream) {
+		t.Error("vless's two kinds are two values")
+	}
+}
+
 func TestListingsAreSorted(t *testing.T) {
 	modules, err := registry.Default()
 	if err != nil {
