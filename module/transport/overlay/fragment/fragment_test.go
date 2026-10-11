@@ -188,7 +188,14 @@ func TestNoPieceHoldsTheWholeServerName(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, write := range below.recorded() {
-				if bytes.Contains(write, []byte(blockedName)) {
+				// A piece given a record header of its own starts with five bytes
+				// that are not part of the hello: its length can end in the
+				// name's first letter ('b' is 98 bytes), so only the body is searched.
+				pieceBytes := write
+				if recordsOn {
+					pieceBytes = parseRecords(t, write)[0]
+				}
+				if bytes.Contains(pieceBytes, []byte(blockedName)) {
 					t.Fatalf("records=%v: a piece holds %q whole", recordsOn, blockedName)
 				}
 			}
