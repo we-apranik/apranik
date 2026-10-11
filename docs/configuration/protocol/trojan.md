@@ -91,10 +91,20 @@ ignores this.
 
 The password sent to the server. An outbound refuses `users`.
 
+### `max_first_payload_delay`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>400ms</code></span>
+
+The longest the request waits for the application's first bytes, so the two travel in one
+packet. A server-first protocol such as SSH or SMTP sends nothing until the server has
+spoken, so once this passes the request goes alone. A written zero is refused. An inbound
+refuses this key.
+
 </div>
 
 The client sends its request together with the first payload, waiting up to
-100ms for it before sending the request alone.
+`max_first_payload_delay` (400ms) for it before sending the request alone.
 
 A Trojan outbound also carries UDP: each UDP session opens one stream to the
 server, and every destination's datagrams are framed inside it. On an inbound,
