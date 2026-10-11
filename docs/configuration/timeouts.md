@@ -17,6 +17,7 @@ stack's handshakes can together take the sum of their timeouts.
 | SOCKS5 handshake | [`socks5`](protocol/socks5.md#handshake_timeout) settings `handshake_timeout` | `10s` |
 | HTTP proxy request | [`http`](protocol/http.md#handshake_timeout) settings `handshake_timeout` | `10s` |
 | Trojan request (inbound) | [`trojan`](protocol/trojan.md#handshake_timeout) settings `handshake_timeout` | `10s` |
+| VLESS request (inbound) | [`vless`](protocol/vless.md#handshake_timeout) settings `handshake_timeout` | `10s` |
 | PROXY protocol header | [`proxy_protocol`](transport/proxy_protocol.md#timeout) settings `timeout` | `1s` |
 | Mixed's first byte | [`mixed`](inbound/mixed.md#first_byte_timeout) settings `first_byte_timeout` | `10s` |
 | Sniffing wait | a `sniff` rule's [`settings.timeout`](routing/sniffing.md#timeout) | `300ms` |
@@ -24,7 +25,8 @@ stack's handshakes can together take the sum of their timeouts.
 | UDP session idle | [`inbounds[].udp_session_idle_timeout`](inbound/index.md#udp_session_idle_timeout) | `5m` |
 | UDP route cache idle (a destination's routing decision kept) | [`inbounds[].udp_routing_cache_entry_idle_timeout`](inbound/index.md#udp_routing_cache_entry_idle_timeout) | `1m` |
 | UDP live entry idle (a destination listed as live, silence in either direction) | [`stats.tracking.udp_entry_idle_timeout`](stats.md#tracking) | `1m` |
-| Trojan request wait for the first payload | internal | `100ms` |
+| Trojan request wait for the first payload (outbound) | [`trojan`](protocol/trojan.md#max_first_payload_delay) settings `max_first_payload_delay` | `400ms` |
+| VLESS request wait for the first payload (outbound) | [`vless`](protocol/vless.md#max_first_payload_delay) settings `max_first_payload_delay` | `400ms` |
 | Fallback dial | internal | `10s` |
 | `ws` Close frame on close | internal | `1s` |
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
