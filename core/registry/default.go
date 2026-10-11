@@ -12,6 +12,7 @@ import (
 	"github.com/The-Apranik/Apranik/module/proxy/http"
 	"github.com/The-Apranik/Apranik/module/proxy/socks5"
 	"github.com/The-Apranik/Apranik/module/proxy/trojan"
+	"github.com/The-Apranik/Apranik/module/proxy/vless"
 	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
 	tlssniffer "github.com/The-Apranik/Apranik/module/sniffer/tls"
 	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
@@ -39,6 +40,7 @@ func Default() (*Registry, error) {
 		moduleRegistry.ProxyProtocols().RegisterStream(socks5.NewProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStream(http.NewProxyModule),
 		moduleRegistry.ProxyProtocols().RegisterStreamAndDatagramOverStream(trojan.NewProxyModule),
+		moduleRegistry.ProxyProtocols().RegisterStreamAndDatagramOverStream(vless.NewProxyModule),
 		moduleRegistry.Sniffers().Register(tlssniffer.NewSnifferModule),
 		moduleRegistry.Sniffers().Register(httpsniffer.NewSnifferModule),
 		moduleRegistry.DNSServers().RegisterDatagram(dnsudp.NewDatagramDNSServerModule),
