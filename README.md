@@ -58,9 +58,9 @@ Early and working. Two dependencies: uTLS, and `golang.org/x/net` for its DNS me
 | Area | Available |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram), `tls` (Chrome's ClientHello by default, via uTLS), `ws` and `httpupgrade` (stream overlays) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`), `vless` (CONNECT and plain UDP, named users, fallback; tested against Xray and sing-box over plain `tcp`; no XUDP, Vision or Mux yet) |
 | Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
-| Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan), `freedom` (straight to the destination) and `block` (refuses everything) |
+| Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan and VLESS), `freedom` (straight to the destination) and `block` (refuses everything) |
 | Sniffers | `tls` (SNI from a ClientHello), `http` (Host header), per inbound, off by default |
 | UDP | per-destination routing, one NAT per UDP session, RFC 4787 mapping and filtering |
 | DNS | servers `udp`, `tcp`, `dot`, `doh` and the operating system's, each through any outbound; DNS rules, a TTL cache, IPv4/IPv6 preference, and a routing `resolve` action ([docs](docs/configuration/dns/index.md)) |
@@ -269,7 +269,8 @@ anyone who can reach the socket inject packets into a session.
 | `fragment` | outbound only: `tls_records`, `tcp_packets` (both default `true`), `piece_sizes` (default `["3-5", "10-20"]`), `piece_delays` (default `["10-20ms"]`, only with `tcp_packets`), `max_pieces` (default `"4-8"`, `0` no limit), `split_sni` (default `true`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`), `handshake_timeout` (default `10s`) |
 | `http` | `username`, `password`, `handshake_timeout` (default `10s`) |
-| `trojan` | server: `users` (`[{ name, password }]`), `handshake_timeout` (default `10s`); client: `password` |
+| `trojan` | server: `users` (`[{ name, password }]`), `handshake_timeout` (default `10s`); client: `password`, `max_first_payload_delay` (default `400ms`) |
+| `vless` | server: `users` (`[{ name, uuid }]`), `handshake_timeout` (default `10s`); client: `uuid`, `max_first_payload_delay` (default `400ms`) |
 
 An inbound with no username is accepted with a warning: anyone who can reach it
 may use it.
