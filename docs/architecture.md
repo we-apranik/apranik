@@ -156,6 +156,8 @@ real modules need it:
 | Package | Concept | Used by |
 | --- | --- | --- |
 | `shared/socksaddr` | the RFC 1928 address codec: ATYP, address, port | `socks5`, `trojan` |
+| `shared/vmessaddr` | the V2Ray family's address codec: port, type (1 IPv4, 2 domain, 3 IPv6), address | `vless` (`muxcool` below) |
+| `shared/muxcool` | Mux.Cool: sub-connections (TCP and UDP) over one established stream, both ends, with limits and idle close | none yet (`vless` will, for XUDP) |
 | `shared/delayedrequest` | a stream that sends a proxy client's request together with the first payload, or alone after a maximum delay | `trojan`, `vless` |
 | `shared/websocket/handshake` | the HTTP/1.1 WebSocket upgrade handshake: size limit, context bound, web-server refusals, Host handling | `ws`, `httpupgrade` |
 
