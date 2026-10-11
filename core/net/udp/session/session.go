@@ -240,6 +240,10 @@ func (s *Session) Send(payload []byte, to spec.Destination, via component.Outbou
 		if s.hasEnded() {
 			return ErrClosed
 		}
+		if errors.Is(err, component.ErrOpeningDatagramForDestination) {
+			s.countOpeningFailure(via.Tag(), err)
+			return fmt.Errorf("%w %q: %w", ErrOpeningOutbound, via.Tag(), err)
+		}
 		outboundDatagram.routedOutbound.DatagramDroppedFor(stats.OutboundDropSendFailed)
 		return fmt.Errorf("%w %s through %q: %w", ErrSendingToOutbound, to, via.Tag(), err)
 	}
@@ -313,13 +317,7 @@ func (s *Session) openOrReuseOutboundDatagram(via component.Outbound) (*outbound
 	// for a different one.
 	datagram, err := via.CreateDatagram(s.ctx, s.metadata)
 	if err != nil {
-		routedOutbound := s.stats.Outbound(tag)
-		reason := stats.DialOther
-		if s.dialFailureReasonFor != nil {
-			reason = s.dialFailureReasonFor(err)
-		}
-		routedOutbound.DialFailedFor(reason)
-		routedOutbound.DatagramDroppedFor(stats.OutboundDropOpenFailed)
+		s.countOpeningFailure(tag, err)
 		return nil, fmt.Errorf("%w %q: %w", ErrOpeningOutbound, tag, err)
 	}
 
@@ -353,6 +351,18 @@ func (s *Session) openOrReuseOutboundDatagram(via component.Outbound) (*outbound
 
 	go s.forwardRepliesFrom(outboundDatagram)
 	return outboundDatagram, nil
+}
+
+// An outbound that could not open a datagram, or the way to a destination for
+// one, counts as a dial failure of that outbound and a drop that says so.
+func (s *Session) countOpeningFailure(outboundTag string, err error) {
+	routedOutbound := s.stats.Outbound(outboundTag)
+	reason := stats.DialOther
+	if s.dialFailureReasonFor != nil {
+		reason = s.dialFailureReasonFor(err)
+	}
+	routedOutbound.DialFailedFor(reason)
+	routedOutbound.DatagramDroppedFor(stats.OutboundDropOpenFailed)
 }
 
 func (s *Session) countersOfOutbounds(tags []string) []*stats.Counters {
