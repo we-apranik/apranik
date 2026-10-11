@@ -1,6 +1,16 @@
 // Package socksaddr is the type-prefixed address from RFC 1928 section 5:
 // ATYP, then the address, then a big-endian port. SOCKS5 and Trojan both put
 // destinations on the wire this way.
+//
+//	ATYP(1)  ADDRESS  PORT(2)
+//
+//	ATYP 0x01  ADDRESS = 4 bytes, IPv4
+//	ATYP 0x03  ADDRESS = LENGTH(1) + LENGTH bytes of domain name
+//	ATYP 0x04  ADDRESS = 16 bytes, IPv6
+//
+// The V2Ray family (VMess, VLESS, Mux.Cool) writes the port first and numbers
+// the types 1 IPv4, 2 domain, 3 IPv6; that is shared/vmessaddr, and the two
+// layouts must not be mixed up.
 package socksaddr
 
 import (
