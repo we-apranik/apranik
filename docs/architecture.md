@@ -63,7 +63,7 @@ returns above (its payload) are independent, so there are three shapes:
 | Kind | Below (underlying) | Above (payload) | Example |
 | --- | --- | --- | --- |
 | `StreamProxyModule` | `Stream` | `Stream` | SOCKS5, HTTP and Trojan CONNECT (implemented) |
-| `DatagramOverStreamProxyModule` | `Stream` | `Datagram` | Trojan UDP (implemented); VLESS planned |
+| `DatagramOverStreamProxyModule` | `Stream` | `Datagram` | Trojan and VLESS UDP (implemented) |
 | `DatagramProxyModule` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
 
 [![The three proxy shapes: StreamProxyModule takes an underlying Stream and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxyModule takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxyModule takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
@@ -107,7 +107,7 @@ combination, and is registered once):
 func NewBaseStreamTransportModule() spec.BaseStreamTransportModule       // module/transport/base/tcp
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule // module/transport/overlay/tls
 func NewProxyModule() spec.StreamProxyModule                             // module/proxy/socks5
-func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule        // module/proxy/trojan
+func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule        // module/proxy/trojan, vless
 func NewSnifferModule() spec.SnifferModule                               // module/sniffer/tls
 ```
 
@@ -156,6 +156,7 @@ real modules need it:
 | Package | Concept | Used by |
 | --- | --- | --- |
 | `shared/socksaddr` | the RFC 1928 address codec: ATYP, address, port | `socks5`, `trojan` |
+| `shared/delayedrequest` | a stream that sends a proxy client's request together with the first payload, or alone after a maximum delay | `trojan`, `vless` |
 | `shared/websocket/handshake` | the HTTP/1.1 WebSocket upgrade handshake: size limit, context bound, web-server refusals, Host handling | `ws`, `httpupgrade` |
 
 ## Core packages
@@ -200,9 +201,14 @@ possibly through a different outbound. Three pieces share the work:
   each destination and which senders may reply, using RFC 4787 mapping and
   filtering. Replies to a domain are reported back under the domain the client used.
 - **A proxy outbound frames UDP in a stream.** When its protocol has a
-  datagram-over-stream kind (Trojan), `CreateDatagram` dials the server through
-  the stack, overlays included, and returns a `Datagram` whose messages are framed
-  inside that one stream. One stream per UDP session per outbound.
+  datagram-over-stream kind (Trojan, VLESS), `CreateDatagram` dials the server
+  through the stack, overlays included, and returns a `Datagram` whose messages
+  are framed inside a stream. Where the protocol writes the destination decides how
+  many streams: Trojan names it in every datagram, so one stream carries a UDP
+  session's datagrams to every destination; VLESS names it once, in the stream
+  request, so the outbound opens one stream per destination
+  (`datagramOverStreamPerDestination`) and the session still sees one datagram.
+  The client says which with `DatagramDestinationIsWritten`.
 
 Because each UDP session has its own NAT, two clients never receive each other's
 replies. Timeouts are PROVISIONAL and configured beside what they bound: a silent
