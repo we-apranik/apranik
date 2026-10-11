@@ -1,0 +1,65 @@
+package muxcool
+
+import (
+	"sync"
+	"time"
+)
+
+// deadline is a read or write deadline that a blocked caller can select on:
+// wait returns a channel that is closed once the deadline has passed. The
+// shape is net.Pipe's.
+type deadline struct {
+	mutex  sync.Mutex
+	timer  *time.Timer
+	cancel chan struct{}
+}
+
+func newDeadline() deadline {
+	return deadline{cancel: make(chan struct{})}
+}
+
+func (d *deadline) set(at time.Time) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	if d.timer != nil && !d.timer.Stop() {
+		<-d.cancel // the timer already fired; wait for it to finish closing
+	}
+	d.timer = nil
+
+	passed := isClosed(d.cancel)
+	if at.IsZero() {
+		if passed {
+			d.cancel = make(chan struct{})
+		}
+		return
+	}
+
+	if remaining := time.Until(at); remaining > 0 {
+		if passed {
+			d.cancel = make(chan struct{})
+		}
+		cancel := d.cancel
+		d.timer = time.AfterFunc(remaining, func() { close(cancel) })
+		return
+	}
+
+	if !passed {
+		close(d.cancel)
+	}
+}
+
+func (d *deadline) wait() <-chan struct{} {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	return d.cancel
+}
+
+func isClosed(channel <-chan struct{}) bool {
+	select {
+	case <-channel:
+		return true
+	default:
+		return false
+	}
+}
