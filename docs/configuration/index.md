@@ -130,7 +130,7 @@ overrides only what it names; everything else keeps the module's default.
     ---
 
     [`socks5`](protocol/socks5.md) · [`http`](protocol/http.md) ·
-    [`trojan`](protocol/trojan.md), plus the special protocols
+    [`trojan`](protocol/trojan.md) · [`vless`](protocol/vless.md), plus the special protocols
     [`mixed`](inbound/mixed.md) and [`freedom`](outbound/freedom.md).
 
 -   :material-lan-connect:{ .lg .middle } **Transports**
