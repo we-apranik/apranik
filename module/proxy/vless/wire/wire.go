@@ -8,8 +8,8 @@
 //	UDP frame: LENGTH PAYLOAD
 //
 // PORT comes before the address, and ATYP is 1 IPv4, 2 domain, 3 IPv6, unlike
-// SOCKS5, so the address cannot be shared with it. A Mux or Reverse command
-// carries no port and no address. The destination of a UDP command is named
+// SOCKS5; that layout is shared/vmessaddr, which this package uses. A Mux or
+// Reverse command carries no port and no address. The destination of a UDP command is named
 // once, in the request; the frames after it name nothing.
 //
 // Checked against the VLESS page of the Xray docs, Xray-core
@@ -25,8 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/netip"
 
+	"github.com/The-Apranik/Apranik/shared/vmessaddr"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -39,19 +39,13 @@ const (
 	CommandReverse = 0x04
 )
 
-const (
-	addressTypeIPv4   = 0x01
-	addressTypeDomain = 0x02
-	addressTypeIPv6   = 0x03
-)
-
 const UUIDLength = 16
 
 // RequestPrefixLength is version, UUID and the addons length: the bytes that
 // come before the addons, whose length they give.
 const RequestPrefixLength = 1 + UUIDLength + 1
 
-const MaxDomainLength = 255
+const MaxDomainLength = vmessaddr.MaxDomainLength
 
 // MaxUDPPayload is what the two-byte length field can express.
 const MaxUDPPayload = 0xFFFF
@@ -66,9 +60,9 @@ var (
 	ErrUnknownVersion         = errors.New("vless: unknown version")
 	ErrUnknownCommand         = errors.New("vless: unknown command")
 	ErrMalformedAddons        = errors.New("vless: malformed addons")
-	ErrUnsupportedAddressType = errors.New("vless: address type not supported")
-	ErrEmptyDomain            = errors.New("vless: empty domain name")
-	ErrDomainTooLong          = errors.New("vless: domain longer than 255 bytes")
+	ErrUnsupportedAddressType = vmessaddr.ErrUnsupportedAddressType
+	ErrEmptyDomain            = vmessaddr.ErrEmptyDomain
+	ErrDomainTooLong          = vmessaddr.ErrDomainTooLong
 	ErrInvalidUUID            = errors.New("vless: invalid UUID")
 )
 
@@ -169,7 +163,7 @@ func AppendRequest(destination []byte, request Request) ([]byte, error) {
 	destination = append(destination, byte(len(addons)))
 	destination = append(destination, addons...)
 	destination = append(destination, request.Command)
-	return appendPortAndAddress(destination, request.Destination)
+	return vmessaddr.AppendAddress(destination, request.Destination)
 }
 
 // ReadRequest reads exactly one header and nothing after it, so the payload
@@ -204,9 +198,9 @@ func ReadRequest(reader io.Reader) (Request, error) {
 
 	switch request.Command {
 	case CommandTCP, CommandUDP:
-		request.Destination, err = readPortAndAddress(reader)
+		request.Destination, err = vmessaddr.ReadAddress(reader)
 		if err != nil {
-			return Request{}, err
+			return Request{}, fmt.Errorf("vless: reading destination: %w", unexpectedIfEnded(err))
 		}
 	case CommandMux, CommandReverse:
 	default:
@@ -328,64 +322,4 @@ func appendAddons(destination []byte, flow string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: %d bytes do not fit the one-byte length", ErrMalformedAddons, len(destination))
 	}
 	return destination, nil
-}
-
-func appendPortAndAddress(destination []byte, target spec.Destination) ([]byte, error) {
-	destination = binary.BigEndian.AppendUint16(destination, target.Port())
-	if ip, isIP := target.IP(); isIP {
-		if ip.Is4() {
-			destination = append(destination, addressTypeIPv4)
-		} else {
-			destination = append(destination, addressTypeIPv6)
-		}
-		return append(destination, ip.AsSlice()...), nil
-	}
-
-	domain, isDomain := target.Domain()
-	if !isDomain {
-		return nil, errors.New("vless: destination has no address")
-	}
-	if len(domain) > MaxDomainLength {
-		return nil, fmt.Errorf("%w: %d bytes", ErrDomainTooLong, len(domain))
-	}
-	destination = append(destination, addressTypeDomain, byte(len(domain)))
-	return append(destination, domain...), nil
-}
-
-func readPortAndAddress(reader io.Reader) (spec.Destination, error) {
-	var portAndType [3]byte
-	if _, err := io.ReadFull(reader, portAndType[:]); err != nil {
-		return spec.Destination{}, fmt.Errorf("vless: reading destination: %w", err)
-	}
-	port := binary.BigEndian.Uint16(portAndType[:2])
-
-	switch portAndType[2] {
-	case addressTypeIPv4, addressTypeIPv6:
-		raw := make([]byte, 4)
-		if portAndType[2] == addressTypeIPv6 {
-			raw = make([]byte, 16)
-		}
-		if _, err := io.ReadFull(reader, raw); err != nil {
-			return spec.Destination{}, fmt.Errorf("vless: reading address: %w", err)
-		}
-		ip, _ := netip.AddrFromSlice(raw)
-		return spec.NewDestinationFromIP(ip, port)
-
-	case addressTypeDomain:
-		var length [1]byte
-		if _, err := io.ReadFull(reader, length[:]); err != nil {
-			return spec.Destination{}, fmt.Errorf("vless: reading domain length: %w", err)
-		}
-		if length[0] == 0 {
-			return spec.Destination{}, ErrEmptyDomain
-		}
-		domain := make([]byte, length[0])
-		if _, err := io.ReadFull(reader, domain); err != nil {
-			return spec.Destination{}, fmt.Errorf("vless: reading domain: %w", err)
-		}
-		return spec.NewDestinationFromDomain(string(domain), port)
-
-	default:
-		return spec.Destination{}, fmt.Errorf("%w: X'%02X'", ErrUnsupportedAddressType, portAndType[2])
-	}
 }
