@@ -14,7 +14,7 @@ import (
 )
 
 func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	datagramDestination := ipDestination(t, "8.8.8.8", 53)
 	datagram, serverDatagram := openDatagramAndAccept(t, client, server, datagramDestination, []byte("q"))
@@ -50,9 +50,9 @@ func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.
 }
 
 func TestAcceptReturnsWhenTheMainConnectionCloses(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{IdleTimeout: -1}, muxcool.ServerOptions{IdleTimeout: -1})
+	client, server := pair(t, muxcool.ServerOptions{IdleTimeout: -1})
 	accepting := make(chan error, 1)
-	go func() { _, err := server.Accept(); accepting <- err }()
+	go func() { _, err := server.AcceptSubConnection(); accepting <- err }()
 	time.Sleep(50 * time.Millisecond)
 
 	client.Close()
@@ -88,7 +88,7 @@ func TestAPeerThatVanishesInTheMiddleOfAFrameClosesTheMainConnection(t *testing.
 }
 
 func TestClosingTheMainConnectionWhileTheReaderWaitsForAConsumerReturns(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, _ := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	opened.Write([]byte("nobody reads"))
 	time.Sleep(50 * time.Millisecond) // the server's reader is now waiting for a consumer
@@ -110,7 +110,7 @@ func goroutineCount() int {
 func TestNoGoroutineIsLeftAfterClose(t *testing.T) {
 	before := goroutineCount()
 	for range 20 {
-		client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+		client, server := pair(t, muxcool.ServerOptions{})
 		opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 		opened.Write([]byte("hello"))
 		io.ReadFull(accepted, make([]byte, 5))
@@ -126,11 +126,11 @@ func TestNoGoroutineIsLeftAfterClose(t *testing.T) {
 // them in the middle of a transfer. Everything that is not cut short must
 // arrive exactly, and nothing may deadlock. Run under -race.
 func TestConcurrentOpensTransfersAndClosesStayCorrect(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 
 	go func() {
 		for {
-			accepted, err := server.Accept()
+			accepted, err := server.AcceptSubConnection()
 			if err != nil {
 				return
 			}
@@ -178,7 +178,7 @@ func TestConcurrentOpensTransfersAndClosesStayCorrect(t *testing.T) {
 }
 
 func TestAcceptReturnsSubConnectionsInTheOrderTheyWereOpened(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	for _, name := range []string{"one.example", "two.example", "three.example"} {
 		if _, err := client.OpenStream(domainDestination(t, name, 80)); err != nil {
 			t.Fatal(err)
@@ -192,7 +192,7 @@ func TestAcceptReturnsSubConnectionsInTheOrderTheyWereOpened(t *testing.T) {
 }
 
 func TestSubConnectionsNobodyAcceptedEndWhenTheServerCloses(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, err := client.OpenStream(domainDestination(t, "example.com", 80))
 	if err != nil {
 		t.Fatal(err)
@@ -204,7 +204,7 @@ func TestSubConnectionsNobodyAcceptedEndWhenTheServerCloses(t *testing.T) {
 	if _, err := opened.Read(make([]byte, 1)); !errors.Is(err, muxcool.ErrClosed) {
 		t.Errorf("client Read after the server closed = %v, want ErrClosed", err)
 	}
-	if _, err := server.Accept(); !errors.Is(err, muxcool.ErrClosed) {
+	if _, err := server.AcceptSubConnection(); !errors.Is(err, muxcool.ErrClosed) {
 		t.Errorf("Accept = %v, want ErrClosed", err)
 	}
 }
