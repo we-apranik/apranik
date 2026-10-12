@@ -124,4 +124,43 @@ keys of what is not built are refused when set, with a message that says so.
 
 A written zero is refused. An inbound has no `muxcool`: it accepts whatever the client sends.
 
+### `proxy_request_timing`
+
+<span class="cfg cfg-type">object</span>
+<span class="cfg cfg-note">proxy protocols whose client holds its request (`trojan`, `vless`)</span>
+
+When the client sends the request it owes its proxy server. It holds the request until the
+application's first bytes, so the two travel in one write and a connection never opens with a
+small packet of a fixed length on its own, which a DPI could recognise. After `max_delay` it
+sends the request alone. Core reads this key, and a protocol that does not hold its request
+refuses it at `apranik check`.
+
+```json
+"proxy_request_timing": {
+  "max_delay": "400ms",
+  "skip": { "enabled": false, "ports": [21, 25, 110, 143, 587, 3306] }
+}
+```
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `max_delay` | The longest the request waits for the application's first bytes. A longer wait delays the first byte of server-first protocols; a shorter one sends the request alone more often. | `400ms` |
+| `skip.enabled` | Send the request at once, without waiting, for the ports in `skip.ports`. | `false` |
+| `skip.ports` | The destination ports that send at once. Writing it replaces the built-in list; an empty list, a number outside 1 to 65535 and a duplicate are refused. Written while `skip.enabled` is not `true`, it only gets a warning. | `[21, 25, 110, 143, 587, 3306]` |
+
+**What `skip` is for.** FTP, SMTP, POP3, IMAP and MySQL are server-first: the application sends
+nothing until the server has spoken, and the server speaks only after it has the request. Without
+`skip` these connections start `max_delay` late. With it, a connection to a listed port sends the
+request at once.
+
+**What it costs.** A request sent alone is a small packet of a fixed length at the start of every
+such connection, the pattern the wait exists to avoid. So `skip` is off by default; turn it on only
+for ports where that trade is acceptable. The built-in ports are server-first and none starts with
+TLS; SSH (22) is left out because its client sends first, and so are 465, 993 and 995, which start
+with a TLS handshake.
+
+`skip` does not apply to UDP: a UDP session sends its request with its first datagram. A written
+zero or negative `max_delay` is refused. An inbound has no `proxy_request_timing`: it has no request
+to send.
+
 </div>
