@@ -28,7 +28,7 @@ func FuzzServerReadsArbitraryBytes(f *testing.F) {
 
 		go func() {
 			for {
-				accepted, err := server.Accept()
+				accepted, err := server.AcceptSubConnection()
 				if err != nil {
 					return
 				}
