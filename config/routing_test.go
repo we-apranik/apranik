@@ -222,12 +222,11 @@ func TestRoutingWarnings(t *testing.T) {
 	}
 }
 
-func TestDatasetsInRoutingPointToTheTopLevel(t *testing.T) {
+func TestDatasetsInRoutingAreAnUnknownKeyNow(t *testing.T) {
 	document := strings.TrimSuffix(strings.TrimSpace(goodDocument), "}") +
 		`, "routing": {"datasets": [], "default_action": {"type": "route", "settings": {"outbound": "freedom"}}}}`
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "routing.datasets", "moved to the top level") {
-		t.Errorf("routing.datasets was not refused with a pointer: %v", diagnostics)
+	if _, failed := loadAndCheck(t, document); !failed {
+		t.Error("routing.datasets was accepted")
 	}
 }
 
