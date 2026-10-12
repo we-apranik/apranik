@@ -66,7 +66,7 @@ returns above (its payload) are independent, so there are three shapes:
 | `DatagramOverStreamProxyModule` | `Stream` | `Datagram` | Trojan and VLESS UDP (implemented) |
 | `DatagramProxyModule` | `Datagram` | `Datagram` | Shadowsocks UDP (none implemented) |
 
-[![The three proxy shapes: StreamProxyModule takes an underlying Stream and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxyModule takes a Stream and returns a Datagram (Trojan UDP; VLESS planned); DatagramProxyModule takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
+[![The three proxy shapes: StreamProxyModule takes an underlying Stream and returns a Stream payload (SOCKS5, HTTP, Trojan); DatagramOverStreamProxyModule takes a Stream and returns a Datagram (Trojan UDP; VLESS); DatagramProxyModule takes a Datagram and returns a Datagram (Shadowsocks UDP, none yet).](assets/diagrams/proxy-shapes.excalidraw.svg)](assets/diagrams/proxy-shapes.excalidraw.svg)
 
 A proxy protocol never opens a connection. It is handed an underlying stream or
 datagram and returns a payload ("wrapper, not pump"); core runs the copy loop.
@@ -157,7 +157,7 @@ real modules need it:
 | --- | --- | --- |
 | `shared/socksaddr` | the RFC 1928 address codec: ATYP, address, port | `socks5`, `trojan` |
 | `shared/vmessaddr` | the V2Ray family's address codec: port, type (1 IPv4, 2 domain, 3 IPv6), address | `vless` (`muxcool` below) |
-| `shared/muxcool` | Mux.Cool: sub-connections (TCP, UDP and XUDP) over one established stream, both ends, with limits and idle close | none yet (`vless` will, for XUDP) |
+| `shared/muxcool` | Mux.Cool: sub-connections (TCP, UDP and XUDP) over one established stream, both ends, with limits and idle close | `vless` (XUDP) |
 | `shared/delayedrequest` | a stream that sends a proxy client's request together with the first payload, or alone after a maximum delay | `trojan`, `vless` |
 | `shared/websocket/handshake` | the HTTP/1.1 WebSocket upgrade handshake: size limit, context bound, web-server refusals, Host handling | `ws`, `httpupgrade` |
 
