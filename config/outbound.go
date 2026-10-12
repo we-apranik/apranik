@@ -13,7 +13,6 @@ import (
 
 const (
 	freedomProtocol = registry.FreedomProtocolName
-	blockProtocol   = registry.BlockProtocolName
 
 	urlTestProtocol  = registry.URLTestProtocolName
 	fallbackProtocol = registry.FallbackProtocolName
@@ -24,16 +23,8 @@ const (
 )
 
 func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Outbound {
-	outbound := blueprint.Outbound{Tag: raw.Tag, DNSServer: raw.DNSServer, MuxCool: buildMuxCool(raw.MuxCool)}
-
-	if raw.MovedDialTimeout != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "dial_timeout"),
-			`dial_timeout moved to tcp's settings: "transport": [{"type": "tcp", "settings": {"dial_timeout": "10s"}}, ...]`)
-	}
-	if raw.MovedHandshakeTimeout != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "handshake_timeout"),
-			`handshake_timeout moved into each layer's own settings: "protocol": {"type": "trojan", "settings": {"handshake_timeout": "10s"}}, and likewise for every transport`)
-	}
+	outbound := blueprint.Outbound{Tag: raw.Tag, DNSServer: raw.DNSServer, MuxCool: buildMuxCool(raw.MuxCool),
+		ProxyRequestTiming: buildProxyRequestTiming(raw.ProxyRequestTiming)}
 
 	if raw.Server != "" {
 		server, err := parseServerAddr(raw.Server, raw.ServerPort)
@@ -59,9 +50,6 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 		outbound.Group = b.buildGroup(raw.Protocol, fieldLocation(protocolLoc, "settings"))
 	case mixedProtocol:
 		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"), "mixed is an inbound protocol; an outbound needs a proxy protocol or freedom")
-	case blockProtocol:
-		b.diagnostics.errorf(fieldLocation(protocolLoc, "type"),
-			`block is no longer an outbound; blocking is a routing action: {"match": {...}, "action": {"type": "block"}}`)
 	default:
 		modules := b.buildProxyModules(raw.Protocol, protocolLoc, registry.KindStreamProxy)
 		outbound.Proxy = modules.Stream
@@ -120,6 +108,17 @@ func buildMuxCool(raw *rawMuxCool) *blueprint.MuxCool {
 	return muxCool
 }
 
+func buildProxyRequestTiming(raw *rawProxyRequestTiming) *blueprint.ProxyRequestTiming {
+	if raw == nil {
+		return nil
+	}
+	timing := &blueprint.ProxyRequestTiming{MaxDelay: durationOrNil(raw.MaxDelay)}
+	if raw.Skip != nil {
+		timing.Skip = &blueprint.ProxyRequestTimingSkip{Enabled: raw.Skip.Enabled, Ports: raw.Skip.Ports}
+	}
+	return timing
+}
+
 func hasSettings(raw json.RawMessage) bool {
 	trimmed := bytes.TrimSpace(raw)
 	return len(trimmed) > 0 && !bytes.Equal(trimmed, []byte("{}")) && !bytes.Equal(trimmed, []byte("null"))
@@ -136,10 +135,6 @@ func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string, transport 
 			b.diagnostics.report(loc, err)
 			return nil
 		}
-	}
-	if settings.MovedTCP != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "tcp"),
-			`freedom no longer takes tcp here. Put tcp's settings in its transport: [{"type": "tcp", "settings": {...}}]`)
 	}
 
 	freedom := &blueprint.Freedom{StreamTransport: b.buildFreedomStreamTransport(transport, transportLoc)}
