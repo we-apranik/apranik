@@ -3,9 +3,11 @@ package builder_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -305,5 +307,66 @@ func TestVLESSServerHandsAWrongUUIDToTheFallback(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the fallback received nothing")
+	}
+}
+
+// A server that speaks first, as SMTP does: it sends nothing until the proxy
+// request has reached it, and the client writes nothing until it has read.
+func startServerFirstBanner(t *testing.T) uint16 {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+	go func() {
+		for {
+			connection, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer connection.Close()
+				connection.Write([]byte("220 hello\r\n"))
+				io.Copy(io.Discard, connection)
+			}()
+		}
+	}()
+	return uint16(listener.Addr().(*net.TCPAddr).Port)
+}
+
+func readBannerThroughVLESS(t *testing.T, extra string, within time.Duration) error {
+	t.Helper()
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServer(t, stack)
+	bannerPort := startServerFirstBanner(t)
+	outbound := buildVLESSClientWith(t, stack, serverPort, vlessAliceUUID, fmt.Sprintf(extra, bannerPort))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := outbound.DialStream(ctx, spec.Metadata{Network: spec.NetworkTCP, Destination: loopbackDestination(t, int(bannerPort))})
+	if err != nil {
+		t.Fatalf("DialStream: %v", err)
+	}
+	defer stream.Close()
+	stream.SetReadDeadline(time.Now().Add(within))
+	banner := make([]byte, len("220 hello\r\n"))
+	_, err = io.ReadFull(stream, banner)
+	return err
+}
+
+func TestVLESSSendsTheRequestAtOnceToASkippedPortSoAServerFirstBannerArrives(t *testing.T) {
+	err := readBannerThroughVLESS(t, `, "proxy_request_timing": {"max_delay": "1h", "skip": {"enabled": true, "ports": [%d]}}`, 3*time.Second)
+	if err != nil {
+		t.Fatalf("reading the banner: %v, want it to arrive without waiting for the delay", err)
+	}
+}
+
+func TestVLESSHoldsTheRequestForAServerFirstPortThatIsNotSkipped(t *testing.T) {
+	err := readBannerThroughVLESS(t, `, "proxy_request_timing": {"max_delay": "1h", "skip": {"enabled": false, "ports": [%d]}}`, 400*time.Millisecond)
+	// The server gives up on a connection with no request after its 300 ms
+	// handshake timeout, which the client reads as the end of the stream.
+	if !errors.Is(err, os.ErrDeadlineExceeded) && !errors.Is(err, io.EOF) {
+		t.Fatalf("reading the banner: %v, want no banner because the request is still held", err)
 	}
 }
