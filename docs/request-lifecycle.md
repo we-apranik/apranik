@@ -119,7 +119,7 @@ On the client side, a Trojan-over-TLS outbound replaces step 5:
    in `core/builder/builder.go` dials TCP, then calls the TLS client's
    `WrapClientStream`, which handshakes with the server's domain as SNI.
 2. The Trojan client's `RequestStream` returns at once; it sends the request
-   together with the first payload, or alone after `max_first_payload_delay`
+   together with the first payload, or alone after the outbound's `proxy_request_timing.max_delay`
    (400ms by default).
 3. On the server, the TLS inbound's `WrapServerStream` handshakes in that
    connection's goroutine; Trojan's `IsDatagramOverStream` peeks at the command
