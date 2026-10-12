@@ -53,9 +53,8 @@ receive ws framing instead of the client's traffic. Transports that work with
 freedom: tcp, fragment.
 ```
 
-`tcp`'s settings, which older versions took as `settings.tcp`, now go in the
-stack: `[{ "type": "tcp", "settings": { "keep_alive": "15s" } }]`. A config
-still using `settings.tcp` is refused with that advice.
+`tcp`'s settings go in the stack, not in freedom's settings:
+`[{ "type": "tcp", "settings": { "keep_alive": "15s" } }]`. Freedom takes no `settings.tcp`.
 
 Freedom's UDP is not part of the stack; it is set in [`udp`](#udp).
 
