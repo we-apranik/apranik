@@ -43,10 +43,10 @@ func connected(t testing.TB) (clientSide, serverSide net.Conn) {
 
 // pair is a Client and a Server on the two ends of a loopback TCP connection,
 // closed when the test ends.
-func pair(t testing.TB, clientOptions muxcool.ClientOptions, serverOptions muxcool.ServerOptions) (*muxcool.Client, *muxcool.Server) {
+func pair(t testing.TB, serverOptions muxcool.ServerOptions) (*muxcool.Client, *muxcool.Server) {
 	t.Helper()
 	clientSide, serverSide := connected(t)
-	client := muxcool.NewClient(clientSide, clientOptions)
+	client := muxcool.NewClient(clientSide)
 	server := muxcool.NewServer(serverSide, serverOptions)
 	t.Cleanup(func() {
 		client.Close()
@@ -64,7 +64,7 @@ func acceptWithin(t testing.TB, server *muxcool.Server, within time.Duration) mu
 	}
 	results := make(chan result, 1)
 	go func() {
-		accepted, err := server.Accept()
+		accepted, err := server.AcceptSubConnection()
 		results <- result{accepted, err}
 	}()
 	select {
@@ -122,10 +122,10 @@ func rawClientOf(t testing.TB, options muxcool.ServerOptions) (*muxcool.Server, 
 }
 
 // rawServerOf is a Client whose peer is a raw peer.
-func rawServerOf(t testing.TB, options muxcool.ClientOptions) (*muxcool.Client, *rawPeer) {
+func rawServerOf(t testing.TB) (*muxcool.Client, *rawPeer) {
 	t.Helper()
 	clientSide, rawSide := connected(t)
-	client := muxcool.NewClient(clientSide, options)
+	client := muxcool.NewClient(clientSide)
 	t.Cleanup(func() { client.Close() })
 	return client, newRawPeer(t, rawSide)
 }
