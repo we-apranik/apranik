@@ -147,3 +147,19 @@ type UserManager interface {
 	// are never returned.
 	ListUsers() []string
 }
+
+// MuxCoolOptions is what core read from an outbound's muxcool key and hands to
+// its protocol: how the protocol sends UDP.
+type MuxCoolOptions struct {
+	// XUDP sends a UDP session as XUDP: one stream to the server carries every
+	// destination of the session. False sends plain protocol UDP.
+	XUDP bool
+}
+
+// MuxCoolConfigurable is optional on a proxy module that can carry Mux.Cool.
+// Core finds it by assertion on the module, so a muxcool key on a protocol
+// without it is refused before anything is built, and calls it once with the
+// resolved options before it builds the module's clients.
+type MuxCoolConfigurable interface {
+	ConfigureMuxCool(options MuxCoolOptions) error
+}
