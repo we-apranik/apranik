@@ -3,6 +3,7 @@ package spec
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 // A proxy protocol is handed a carrier. It never dials.
@@ -162,4 +163,29 @@ type MuxCoolOptions struct {
 // resolved options before it builds the module's clients.
 type MuxCoolConfigurable interface {
 	ConfigureMuxCool(options MuxCoolOptions) error
+}
+
+// ProxyRequestTimingOptions is what core read from an outbound's
+// proxy_request_timing key and hands to its protocol: when the client sends the
+// request it owes its server.
+type ProxyRequestTimingOptions struct {
+	// MaxDelay is the longest the client holds its request, waiting for the
+	// application's first bytes to travel with it. After that the request goes
+	// alone.
+	MaxDelay time.Duration
+
+	// SkipPorts are destination ports whose connections send the request at
+	// once, without waiting (server-first protocols, which send nothing until
+	// the server has answered the request). Empty means every connection waits
+	// up to MaxDelay.
+	SkipPorts []uint16
+}
+
+// ProxyRequestTimingConfigurable is optional on a proxy module whose client
+// holds its request until the first payload. Core finds it by assertion on the
+// module, so a proxy_request_timing key on a protocol without it is refused
+// before anything is built, and calls it once with the resolved options before
+// it builds the module's clients.
+type ProxyRequestTimingConfigurable interface {
+	ConfigureProxyRequestTiming(options ProxyRequestTimingOptions) error
 }
