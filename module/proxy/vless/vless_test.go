@@ -209,7 +209,7 @@ func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
 
 	upstream.Write([]byte("hello"))
 	first := <-underlyingStream.writes
-	request, err := wire.ReadRequest(bytes.NewReader(first))
+	request, err := wire.ReadRequestHeader(bytes.NewReader(first))
 	if err != nil {
 		t.Fatalf("first write is not a request: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestConnectSendsTheRequestAloneOnceMaxFirstPayloadDelayHasPassed(t *testing
 
 	select {
 	case first := <-underlyingStream.writes:
-		request, err := wire.ReadRequest(bytes.NewReader(first))
+		request, err := wire.ReadRequestHeader(bytes.NewReader(first))
 		if err != nil || request.Destination != domainDestination("ssh.example", 22) {
 			t.Errorf("write = %q, %v, want exactly one request", first, err)
 		}
@@ -263,7 +263,7 @@ func TestTheClientSaysItWritesTheDatagramDestinationInTheStreamRequest(t *testin
 func TestTheServerAsksForTheFallbackOnWhatIsNotAKnownUsersRequest(t *testing.T) {
 	validFor := func(uuid string) []byte {
 		parsed, _ := wire.ParseUUID(uuid)
-		request, _ := wire.AppendRequest(nil, wire.Request{UUID: parsed, Command: wire.CommandTCP, Destination: domainDestination("example.com", 443)})
+		request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: parsed, Command: wire.CommandTCP, Destination: domainDestination("example.com", 443)})
 		return request
 	}
 	wrongVersion := validFor(aliceUUID)
@@ -311,11 +311,12 @@ func TestACutShortOrSilentClientIsNotHandedToTheFallback(t *testing.T) {
 	}
 }
 
-func TestAServerRefusesAKnownUsersFlowAndMuxWithoutAskingForTheFallback(t *testing.T) {
+func TestAServerRefusesAKnownUsersFlowAndReverseWithoutAskingForTheFallback(t *testing.T) {
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	withFlow, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Flow: "xtls-rprx-vision", Command: wire.CommandTCP, Destination: domainDestination("example.com", 443)})
-	mux := append([]byte{0x00}, uuid[:]...)
-	mux = append(mux, 0x00, wire.CommandMux)
+	withFlow, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Flow: "xtls-rprx-vision", Command: wire.CommandTCP, Destination: domainDestination("example.com", 443)})
+	flowWithMux, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Flow: "xtls-rprx-vision", Command: wire.CommandMux})
+	reverse := append([]byte{0x00}, uuid[:]...)
+	reverse = append(reverse, 0x00, wire.CommandReverse)
 
 	tests := []struct {
 		name  string
@@ -323,7 +324,8 @@ func TestAServerRefusesAKnownUsersFlowAndMuxWithoutAskingForTheFallback(t *testi
 		want  error
 	}{
 		{"flow", withFlow, vless.ErrUnsupportedFlow},
-		{"mux", mux, vless.ErrUnsupportedCommand},
+		{"flow with mux", flowWithMux, vless.ErrUnsupportedFlow},
+		{"reverse", reverse, vless.ErrUnsupportedCommand},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -371,10 +373,15 @@ func TestIdentifyingTellsUDPFromTCPEvenWithAddonsBeforeTheCommand(t *testing.T) 
 	}{
 		{wire.CommandUDP, "", true},
 		{wire.CommandTCP, "", false},
+		{wire.CommandMux, "", true},
 		{wire.CommandUDP, "some-flow", true},
 		{wire.CommandTCP, "some-flow", false},
 	} {
-		request, err := wire.AppendRequest(nil, wire.Request{UUID: uuid, Flow: test.flow, Command: test.command, Destination: ipDestination("192.0.2.1", 53)})
+		destination := ipDestination("192.0.2.1", 53)
+		if test.command == wire.CommandMux {
+			destination = spec.Destination{}
+		}
+		request, err := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Flow: test.flow, Command: test.command, Destination: destination})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,7 +397,7 @@ func TestIdentifyingTellsUDPFromTCPEvenWithAddonsBeforeTheCommand(t *testing.T) 
 
 func TestIdentifyingNeverConsumesTheRequest(t *testing.T) {
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	request, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
+	request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
 	clientSide, serverSide := pipe(t)
 	go clientSide.Write(request)
 
@@ -407,7 +414,7 @@ func TestIdentifyingNeverConsumesTheRequest(t *testing.T) {
 func TestAnAcceptedStreamHalfClosedBeforeWritingStillSendsTheAnswerHeader(t *testing.T) {
 	underlying := &halfCloseRecordingStream{writes: make(chan []byte, 4)}
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	request, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
+	request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
 	underlying.input = bytes.NewReader(request)
 
 	stream, _, err := newServer(t).AcceptStream(context.Background(), underlying)
@@ -428,7 +435,7 @@ func TestAnAcceptedStreamHalfClosedBeforeWritingStillSendsTheAnswerHeader(t *tes
 func TestAnAcceptedStreamClosedBeforeWritingSendsNothing(t *testing.T) {
 	underlying := &halfCloseRecordingStream{writes: make(chan []byte, 4)}
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	request, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
+	request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Command: wire.CommandTCP, Destination: ipDestination("192.0.2.1", 80)})
 	underlying.input = bytes.NewReader(request)
 
 	stream, _, err := newServer(t).AcceptStream(context.Background(), underlying)
