@@ -3,16 +3,14 @@ package trojan
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
 	"github.com/The-Apranik/Apranik/shared/delayedrequest"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 type client struct {
-	passwordHash         wire.PasswordHash
-	maxFirstPayloadDelay time.Duration
+	passwordHash  wire.PasswordHash
+	requestTiming delayedrequest.Policy
 }
 
 // Nothing goes on the wire here. The request travels with the first payload,
@@ -28,7 +26,7 @@ func (c *client) RequestStream(ctx context.Context, underlyingStream spec.Stream
 	if err != nil {
 		return nil, err
 	}
-	return delayedrequest.NewStream(underlyingStream, request, c.maxFirstPayloadDelay), nil
+	return delayedrequest.NewStream(underlyingStream, request, c.requestTiming.DelayForDestinationPort(metadata.Destination.Port())), nil
 }
 
 // Nothing goes on the wire here either: the request rides with the first
