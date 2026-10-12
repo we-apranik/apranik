@@ -222,6 +222,8 @@ func checkOutbound(diagnostics *Diagnostics, outbound blueprint.Outbound, loc st
 		return
 	}
 
+	checkMuxCool(diagnostics, outbound, loc)
+
 	if outbound.Group != nil {
 		checkGroupOutboundFields(diagnostics, outbound, loc)
 		return
