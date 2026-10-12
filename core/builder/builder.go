@@ -465,6 +465,16 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (comp
 		return nil, fmt.Errorf("outbound %q: %w", outboundBlueprint.Tag, err)
 	}
 
+	// Before any client is built, so each one is built knowing how UDP goes out.
+	// Check has refused a muxcool key on a protocol that cannot carry it; with no
+	// key, a protocol that can is told the defaults.
+	if configurable, ok := outboundBlueprint.Proxy.(spec.MuxCoolConfigurable); ok {
+		if err := configurable.ConfigureMuxCool(outboundBlueprint.MuxCool.Options()); err != nil {
+			dialer.Close()
+			return nil, fmt.Errorf("outbound %q: proxy %q: %w", outboundBlueprint.Tag, outboundBlueprint.Proxy.Info().Name, err)
+		}
+	}
+
 	proxyClient, err := outboundBlueprint.Proxy.NewStreamClient()
 	if err != nil {
 		dialer.Close()
