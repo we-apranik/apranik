@@ -165,3 +165,17 @@ func TestTheRequestIsSentOnceWhenTheTimerAndTheFirstWriteRace(t *testing.T) {
 		}
 	}
 }
+
+func TestAMaximumDelayOfZeroSendsTheRequestAtOnceWithNoWriteAtAll(t *testing.T) {
+	underlying := newRecordingStream()
+	stream := delayedrequest.NewStream(underlying, []byte("REQUEST"), 0)
+	defer stream.Close()
+
+	if first := expectWrite(t, underlying, 2*time.Second); string(first) != "REQUEST" {
+		t.Errorf("first write = %q, want the request alone", first)
+	}
+	stream.Write([]byte("payload"))
+	if next := expectWrite(t, underlying, time.Second); string(next) != "payload" {
+		t.Errorf("after the request = %q, want the payload alone", next)
+	}
+}
