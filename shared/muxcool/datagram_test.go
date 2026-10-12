@@ -36,7 +36,7 @@ func readDatagram(t testing.TB, datagram spec.Datagram, size int) ([]byte, spec.
 }
 
 func TestDatagramsKeepTheirBoundariesAndSayWhereTheyAreFrom(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := ipDestination(t, "8.8.8.8", 53)
 	opened, accepted := openDatagramAndAccept(t, client, server, destination, []byte("one"))
 
@@ -64,7 +64,7 @@ func TestDatagramsKeepTheirBoundariesAndSayWhereTheyAreFrom(t *testing.T) {
 }
 
 func TestTheFirstDatagramIsCarriedByTheNewFrame(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	destination := ipDestination(t, "1.1.1.1", 53)
 
 	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{})
@@ -90,7 +90,7 @@ func TestTheFirstDatagramIsCarriedByTheNewFrame(t *testing.T) {
 }
 
 func TestADatagramClosedBeforeItWroteAnythingSendsNothing(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	opened, err := client.OpenDatagram(ipDestination(t, "1.1.1.1", 53), muxcool.DatagramOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestADatagramClosedBeforeItWroteAnythingSendsNothing(t *testing.T) {
 }
 
 func TestADatagramEndedAfterItWroteTellsThePeer(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	destination := ipDestination(t, "1.1.1.1", 53)
 	opened, _ := client.OpenDatagram(destination, muxcool.DatagramOptions{})
 	opened.WriteTo([]byte("q"), destination)
@@ -119,7 +119,7 @@ func TestADatagramEndedAfterItWroteTellsThePeer(t *testing.T) {
 }
 
 func TestAClientDatagramWritesToItsBoundDestinationOnly(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := ipDestination(t, "8.8.8.8", 53)
 	opened, _ := openDatagramAndAccept(t, client, server, destination, []byte("first"))
 	if _, err := opened.WriteTo([]byte("x"), ipDestination(t, "9.9.9.9", 53)); !errors.Is(err, muxcool.ErrDestinationNotBound) {
@@ -131,7 +131,7 @@ func TestAClientDatagramWritesToItsBoundDestinationOnly(t *testing.T) {
 }
 
 func TestADatagramLargerThanTheBufferIsDroppedAndTheNextOneIsRead(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := ipDestination(t, "8.8.8.8", 53)
 	opened, accepted := openDatagramAndAccept(t, client, server, destination, bytes.Repeat([]byte{'x'}, 100))
 	opened.WriteTo([]byte("small"), destination)
@@ -146,7 +146,7 @@ func TestADatagramLargerThanTheBufferIsDroppedAndTheNextOneIsRead(t *testing.T) 
 }
 
 func TestTheLargestFrameCarriesADatagramOf65535Bytes(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := ipDestination(t, "8.8.8.8", 53)
 	opened, accepted := openDatagramAndAccept(t, client, server, destination, []byte("first"))
 	readDatagram(t, accepted, 10)
@@ -165,7 +165,7 @@ func TestTheLargestFrameCarriesADatagramOf65535Bytes(t *testing.T) {
 }
 
 func TestAnEmptyDatagramIsSkipped(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := ipDestination(t, "8.8.8.8", 53)
 	opened, accepted := openDatagramAndAccept(t, client, server, destination, []byte("first"))
 	readDatagram(t, accepted, 10)
