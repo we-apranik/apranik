@@ -125,6 +125,26 @@ type rawOutbound struct {
 
 	// The DNS server that resolves server when it is a domain.
 	DNSServer string `json:"dns_server"`
+
+	// How a proxy outbound uses Mux.Cool.
+	MuxCool *rawMuxCool `json:"muxcool"`
+}
+
+type rawMuxCool struct {
+	TCP *rawMuxCoolTCP `json:"tcp"`
+	UDP *rawMuxCoolUDP `json:"udp"`
+}
+
+type rawMuxCoolTCP struct {
+	Enabled     *bool `json:"enabled"`
+	Concurrency *int  `json:"concurrency"`
+	MaxTotal    *int  `json:"max_total"`
+}
+
+type rawMuxCoolUDP struct {
+	Enabled     *bool `json:"enabled"`
+	XUDP        *bool `json:"xudp"`
+	Concurrency *int  `json:"concurrency"`
 }
 
 // A group's members and the probe that tests them. Tolerance is the urltest
