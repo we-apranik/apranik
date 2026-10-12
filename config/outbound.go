@@ -24,7 +24,7 @@ const (
 )
 
 func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Outbound {
-	outbound := blueprint.Outbound{Tag: raw.Tag, DNSServer: raw.DNSServer}
+	outbound := blueprint.Outbound{Tag: raw.Tag, DNSServer: raw.DNSServer, MuxCool: buildMuxCool(raw.MuxCool)}
 
 	if raw.MovedDialTimeout != nil {
 		b.diagnostics.errorf(fieldLocation(loc, "dial_timeout"),
@@ -104,6 +104,20 @@ func (b *configBuilder) buildGroup(protocol rawModule, loc string) *blueprint.Gr
 		}
 	}
 	return group
+}
+
+func buildMuxCool(raw *rawMuxCool) *blueprint.MuxCool {
+	if raw == nil {
+		return nil
+	}
+	muxCool := &blueprint.MuxCool{}
+	if raw.TCP != nil {
+		muxCool.TCP = &blueprint.MuxCoolTCP{Enabled: raw.TCP.Enabled, Concurrency: raw.TCP.Concurrency, MaxTotal: raw.TCP.MaxTotal}
+	}
+	if raw.UDP != nil {
+		muxCool.UDP = &blueprint.MuxCoolUDP{Enabled: raw.UDP.Enabled, XUDP: raw.UDP.XUDP, Concurrency: raw.UDP.Concurrency}
+	}
+	return muxCool
 }
 
 func hasSettings(raw json.RawMessage) bool {
