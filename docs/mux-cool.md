@@ -37,5 +37,5 @@ A domain ADDRESS is a length byte and then the name. The port-first layout is VM
 | UDP | New (network, destination) + first datagram; Keep + datagram | Keep + datagram, no address |
 | XUDP | New (UDP, first destination) + datagram; Keep (UDP, destination) + datagram | Keep (UDP, source) + datagram, once the client has named an address |
 
-A server never sends New. A refused New is answered with an End carrying the error bit, and the main connection stays. A New for
+VLESS enters Mux.Cool with command 3, and Apranik uses it for XUDP only. A server never sends New. A refused New is answered with an End carrying the error bit, and the main connection stays. A New for
 an ID that is open closes the main connection.
