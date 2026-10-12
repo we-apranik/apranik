@@ -27,7 +27,7 @@ const (
 // A setting left out has its default; a written zero or negative duration is
 // refused, never taken as the default.
 func TestAWrittenZeroOrNegativeDurationIsRefused(t *testing.T) {
-	for _, key := range []string{"handshake_timeout", "max_first_payload_delay"} {
+	for _, key := range []string{"handshake_timeout"} {
 		for _, written := range []string{"0s", "-1s"} {
 			settings := decode(t, `{"uuid": "`+someUUID+`", "`+key+`": "`+written+`"}`)
 			err := settings.Validate()
@@ -40,9 +40,6 @@ func TestAWrittenZeroOrNegativeDurationIsRefused(t *testing.T) {
 
 func TestDefaultsAreTheDocumentedOnes(t *testing.T) {
 	var settings Settings
-	if got := settings.maxFirstPayloadDelay(); got != 400*time.Millisecond {
-		t.Errorf("max_first_payload_delay default = %v, want 400ms", got)
-	}
 	if got := settings.handshakeTimeout(); got != 10*time.Second {
 		t.Errorf("handshake_timeout default = %v, want 10s", got)
 	}
@@ -101,10 +98,6 @@ func TestEachRoleRefusesTheOthersKeys(t *testing.T) {
 	inboundWithUUID := decode(t, `{"uuid": "`+someUUID+`", "users": [{"name": "a", "uuid": "`+anotherUUID+`"}]}`)
 	if err := inboundWithUUID.checkAsServer(); err == nil || !strings.Contains(err.Error(), "takes users, not uuid") {
 		t.Errorf("inbound with a uuid: error = %v", err)
-	}
-	inboundWithDelay := decode(t, `{"users": [{"name": "a", "uuid": "`+someUUID+`"}], "max_first_payload_delay": "1s"}`)
-	if err := inboundWithDelay.checkAsServer(); err == nil || !strings.Contains(err.Error(), "max_first_payload_delay") {
-		t.Errorf("inbound with max_first_payload_delay: error = %v", err)
 	}
 	inboundWithoutUsers := decode(t, `{"uuid": "`+someUUID+`"}`)
 	inboundWithoutUsers.UUID = ""
