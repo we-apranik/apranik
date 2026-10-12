@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,14 +78,20 @@ func startVLESSServer(t *testing.T, transport string) (port uint16, fallbackRece
 
 func buildVLESSClient(t *testing.T, transport string, serverPort uint16, uuid string) component.Outbound {
 	t.Helper()
+	return buildVLESSClientWith(t, transport, serverPort, uuid, "")
+}
+
+// extra is more members of the outbound, such as `, "muxcool": {...}`.
+func buildVLESSClientWith(t *testing.T, transport string, serverPort uint16, uuid, extra string) component.Outbound {
+	t.Helper()
 	clientBlueprint := parseConfig(t, fmt.Sprintf(`{
 		"version": 1,
 		"outbounds": [{
 			"tag": "vless-out", "server": "127.0.0.1", "server_port": %d,
 			"transport": %s,
-			"protocol": { "type": "vless", "settings": { "uuid": %q } }
+			"protocol": { "type": "vless", "settings": { "uuid": %q } }%s
 		}]
-	}`, serverPort, transport, uuid))
+	}`, serverPort, transport, uuid, extra))
 
 	built, err := builder.New(blueprint.Log{})
 	if err != nil {
@@ -147,14 +155,74 @@ func TestVLESSAcceptsAUserWrittenAsShortText(t *testing.T) {
 	checkTCPThrough(t, buildVLESSClient(t, stack, port, "my-secret-id"))
 }
 
-// One UDP session talking to two destinations: plain VLESS names one
-// destination per stream, so core opens a stream for each, and both answers
-// come back through the one datagram from the right destination.
+// One UDP session talking to two destinations; both answers come back through
+// the one datagram from the right destination. With no muxcool key the client
+// sends XUDP, the other cores' default.
 func TestVLESSCarriesOneUDPSessionToTwoDestinations(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServer(t, stack)
-	outbound := buildVLESSClient(t, stack, serverPort, vlessAliceUUID)
+	checkOneUDPSessionToTwoDestinations(t, buildVLESSClient(t, stack, serverPort, vlessAliceUUID))
+}
 
+// countingForwarder passes every connection to targetPort and counts them, so a
+// test can tell how many connections a client made to the server.
+func countingForwarder(t *testing.T, targetPort uint16) (port uint16, connections *atomic.Int32) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+	connections = new(atomic.Int32)
+	go func() {
+		for {
+			accepted, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			connections.Add(1)
+			go func() {
+				defer accepted.Close()
+				target, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", targetPort))
+				if err != nil {
+					return
+				}
+				defer target.Close()
+				go io.Copy(target, accepted)
+				io.Copy(accepted, target)
+			}()
+		}
+	}()
+	return uint16(listener.Addr().(*net.TCPAddr).Port), connections
+}
+
+// XUDP carries a whole UDP session on one connection to the server, whatever
+// the number of destinations.
+func TestVLESSXUDPUsesOneConnectionForAUDPSessionToTwoDestinations(t *testing.T) {
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServer(t, stack)
+	forwarderPort, connections := countingForwarder(t, serverPort)
+	checkOneUDPSessionToTwoDestinations(t, buildVLESSClient(t, stack, forwarderPort, vlessAliceUUID))
+	if got := connections.Load(); got != 1 {
+		t.Errorf("the client made %d connections to the server, want 1", got)
+	}
+}
+
+// With the UDP part switched off the protocol's own UDP is used: plain VLESS
+// names one destination per stream, so a stream is opened for each.
+func TestVLESSPlainUDPUsesAConnectionPerDestination(t *testing.T) {
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServer(t, stack)
+	forwarderPort, connections := countingForwarder(t, serverPort)
+	outbound := buildVLESSClientWith(t, stack, forwarderPort, vlessAliceUUID, `, "muxcool": { "udp": { "enabled": false } }`)
+	checkOneUDPSessionToTwoDestinations(t, outbound)
+	if got := connections.Load(); got != 2 {
+		t.Errorf("the client made %d connections to the server, want 2", got)
+	}
+}
+
+func checkOneUDPSessionToTwoDestinations(t *testing.T, outbound component.Outbound) {
+	t.Helper()
 	startEcho := func(prefix string) spec.Destination {
 		echo, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 		if err != nil {
