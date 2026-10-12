@@ -185,8 +185,7 @@ zero is refused, and leaving the key out gives the default.
 
 How many TCP connections are held at once. One more is closed as soon as it is
 accepted, before any handshake; refusals are logged at most once per 10 seconds.
-Must be greater than zero; leave it out for no limit. Called `max_connections` before UDP sessions had their own limit;
-the old name is refused with a pointer here.
+Must be greater than zero; leave it out for no limit.
 
 ### `max_udp_sessions`
 
