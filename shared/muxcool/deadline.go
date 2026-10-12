@@ -5,9 +5,7 @@ import (
 	"time"
 )
 
-// deadline is a read or write deadline that a blocked caller can select on:
-// wait returns a channel that is closed once the deadline has passed. The
-// shape is net.Pipe's.
+// deadline is net.Pipe's shape: wait returns a channel closed once it has passed.
 type deadline struct {
 	mutex  sync.Mutex
 	timer  *time.Timer

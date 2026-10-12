@@ -171,7 +171,7 @@ func TestClosingEndsTheSubConnectionAtBothEnds(t *testing.T) {
 	if err := accepted.Close(); err != nil {
 		t.Errorf("Close after the peer's End = %v, want nil", err)
 	}
-	waitFor(t, "the sub-connection to leave both tables", func() bool { return client.Active() == 0 && server.Active() == 0 })
+	waitFor(t, "the sub-connection to leave both tables", func() bool { return client.ActiveSubConnectionsCount() == 0 && server.ActiveSubConnectionsCount() == 0 })
 }
 
 func TestAServerCanEndASubConnectionToo(t *testing.T) {

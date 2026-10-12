@@ -7,7 +7,7 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// stream is a TCP sub-connection. It is safe for one reader and many writers.
+// stream is safe for one reader and many writers.
 type stream struct {
 	*subConnection
 }
@@ -18,12 +18,12 @@ func (s *stream) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	remaining, _, err := s.awaitDelivery(s.readDeadline.wait())
+	remaining, _, err := s.claimDelivery(s.readDeadline.wait())
 	if err != nil {
 		return 0, err
 	}
 	read, readErr := s.conn.reader.Read(p[:min(len(p), remaining)])
-	s.finishRead(read, readErr)
+	s.finishDelivery(read, readErr)
 	if readErr != nil && read == 0 {
 		return 0, closedError(readErr)
 	}

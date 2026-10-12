@@ -17,22 +17,22 @@ func TestAClientRefusesToOpenPastTheConcurrentLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53)); err != nil {
+	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53), muxcool.DatagramOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if !client.Full() {
-		t.Error("Full = false with the limit reached")
+	if client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = true with the limit reached")
 	}
-	if _, err := client.OpenStream(destination); !errors.Is(err, muxcool.ErrFull) {
-		t.Errorf("OpenStream past the limit = %v, want ErrFull", err)
+	if _, err := client.OpenStream(destination); !errors.Is(err, muxcool.ErrSubConnectionLimit) {
+		t.Errorf("OpenStream past the limit = %v, want ErrSubConnectionLimit", err)
 	}
-	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53)); !errors.Is(err, muxcool.ErrFull) {
-		t.Errorf("OpenDatagram past the limit = %v, want ErrFull", err)
+	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53), muxcool.DatagramOptions{}); !errors.Is(err, muxcool.ErrSubConnectionLimit) {
+		t.Errorf("OpenDatagram past the limit = %v, want ErrSubConnectionLimit", err)
 	}
 
 	first.Close()
-	if client.Full() {
-		t.Error("Full = true after a sub-connection ended")
+	if !client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = false after a sub-connection ended")
 	}
 	if _, err := client.OpenStream(destination); err != nil {
 		t.Errorf("OpenStream after one ended: %v", err)
@@ -40,7 +40,7 @@ func TestAClientRefusesToOpenPastTheConcurrentLimit(t *testing.T) {
 }
 
 func TestAClientRefusesToOpenPastTheTotalLimitEvenOneAfterAnother(t *testing.T) {
-	client, _ := pair(t, muxcool.ClientOptions{MaxSubConnectionsEver: 3}, muxcool.ServerOptions{})
+	client, _ := pair(t, muxcool.ClientOptions{MaxTotalSubConnections: 3}, muxcool.ServerOptions{})
 	destination := domainDestination(t, "example.com", 80)
 	for range 3 {
 		opened, err := client.OpenStream(destination)
@@ -49,11 +49,11 @@ func TestAClientRefusesToOpenPastTheTotalLimitEvenOneAfterAnother(t *testing.T) 
 		}
 		opened.Close()
 	}
-	if !client.Full() {
-		t.Error("Full = false after the third sub-connection of three")
+	if client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = true after the third sub-connection of three")
 	}
-	if _, err := client.OpenStream(destination); !errors.Is(err, muxcool.ErrFull) {
-		t.Errorf("OpenStream past the total = %v, want ErrFull", err)
+	if _, err := client.OpenStream(destination); !errors.Is(err, muxcool.ErrSubConnectionLimit) {
+		t.Errorf("OpenStream past the total = %v, want ErrSubConnectionLimit", err)
 	}
 }
 
@@ -64,24 +64,24 @@ func TestNoLimitsMeansNoLimits(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if client.Full() {
-		t.Error("Full with no limit set")
+	if !client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = false with no limit set")
 	}
-	if client.Active() != 300 {
-		t.Errorf("Active = %d, want 300", client.Active())
+	if client.ActiveSubConnectionsCount() != 300 {
+		t.Errorf("Active = %d, want 300", client.ActiveSubConnectionsCount())
 	}
 }
 
 func TestOpeningOnAClosedMainConnectionFails(t *testing.T) {
 	client, _ := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
 	client.Close()
-	if !client.Full() {
-		t.Error("a closed main connection is not Full")
+	if client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = true on a closed main connection")
 	}
 	if _, err := client.OpenStream(domainDestination(t, "example.com", 80)); !errors.Is(err, muxcool.ErrClosed) {
 		t.Errorf("OpenStream = %v, want ErrClosed", err)
 	}
-	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53)); !errors.Is(err, muxcool.ErrClosed) {
+	if _, err := client.OpenDatagram(ipDestination(t, "8.8.8.8", 53), muxcool.DatagramOptions{}); !errors.Is(err, muxcool.ErrClosed) {
 		t.Errorf("OpenDatagram = %v, want ErrClosed", err)
 	}
 }
@@ -109,7 +109,7 @@ func TestAServerRefusalReachesTheClientAsAResetAndTheMainConnectionStays(t *test
 func TestAUDPSubConnectionRefusedByTheServerReadsAsAReset(t *testing.T) {
 	client, _ := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{AcceptedNetworks: muxcool.NetworksTCP})
 	destination := ipDestination(t, "8.8.8.8", 53)
-	opened, _ := client.OpenDatagram(destination)
+	opened, _ := client.OpenDatagram(destination, muxcool.DatagramOptions{})
 	opened.WriteTo([]byte("q"), destination)
 	buffer := make([]byte, 10)
 	if _, _, err := opened.ReadFrom(buffer); !errors.Is(err, muxcool.ErrRemoteReset) {

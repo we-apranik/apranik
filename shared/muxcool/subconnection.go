@@ -20,17 +20,17 @@ const (
 	stateAborted
 )
 
-// subConnection is one conversation on a main connection. It holds no buffer:
-// the reader of the main connection waits for this side to read, then the
-// payload goes from the carrier into the caller's slice (a "delivery"). So a
-// sub-connection that nobody reads holds up its whole main connection, which is
-// the cost of a format without flow control, and it costs no memory.
+// subConnection holds no buffer: the main connection's reader waits for a Read, then
+// copies the payload into the caller's slice. A sub-connection nobody reads holds up the others.
 type subConnection struct {
 	conn        *mainConnection
 	id          uint16
 	network     Network
 	destination spec.Destination
 	accepted    bool // this end is the server end: it never sends New
+
+	// addressInEveryDatagram is XUDP: set at open (client) or when the peer first names an address (server).
+	addressInEveryDatagram atomic.Bool
 
 	readDeadline  deadline
 	writeDeadline deadline
@@ -39,9 +39,7 @@ type subConnection struct {
 	ready        chan struct{} // a delivery is waiting for a reader; a hint, may be stale
 	deliveryDone chan struct{} // the reader finished a delivery, or the sub-connection ended while one was claimed
 
-	// Whether the peer has heard of this sub-connection, so a Close knows if an
-	// End is owed. Set before the New frame is written, so it can only be too
-	// generous, and an End for an ID the peer never opened is ignored.
+	// Whether the peer has heard of it, so Close knows if an End is owed.
 	peerKnows atomic.Bool
 
 	// Guarded by conn.writeLock.
@@ -77,12 +75,10 @@ func newSubConnection(conn *mainConnection, id uint16, network Network, destinat
 	return s
 }
 
-// ---- the reader of the main connection hands data over
-
-// deliver blocks until length bytes of data, which are next in the carrier,
+// passDataToReader blocks until length bytes of data, which are next in the carrier,
 // have been read by this sub-connection's reader, or dropped because it ended.
 // The returned error is only for the carrier failing.
-func (s *subConnection) deliver(length int, header Header) error {
+func (s *subConnection) passDataToReader(length int, header Header) error {
 	var source spec.Destination
 	if header.Network == NetworkUDP {
 		source = header.Destination
@@ -132,9 +128,7 @@ func (s *subConnection) deliver(length int, header Header) error {
 	}
 }
 
-// awaitDelivery waits until a delivery is ready for this reader and claims it,
-// or the sub-connection ended, or the deadline passed.
-func (s *subConnection) awaitDelivery(deadline <-chan struct{}) (remaining int, source spec.Destination, err error) {
+func (s *subConnection) claimDelivery(deadline <-chan struct{}) (remaining int, source spec.Destination, err error) {
 	for {
 		s.mutex.Lock()
 		switch s.state {
@@ -174,9 +168,7 @@ func (s *subConnection) awaitDelivery(deadline <-chan struct{}) (remaining int, 
 	}
 }
 
-// finishRead gives the claimed delivery back after consuming bytes of it. A
-// failure of the carrier ends the main connection.
-func (s *subConnection) finishRead(consumed int, readErr error) {
+func (s *subConnection) finishDelivery(consumed int, readErr error) {
 	s.mutex.Lock()
 	s.deliveryRemaining -= consumed
 	s.deliveryClaimed = false
@@ -190,7 +182,7 @@ func (s *subConnection) finishRead(consumed int, readErr error) {
 	s.mutex.Unlock()
 
 	if readErr != nil {
-		s.conn.closeWith(fmt.Errorf("muxcool: reading frame data: %w", unexpectedIfEnded(readErr)))
+		s.conn.closeBecause(fmt.Errorf("muxcool: reading frame data: %w", unexpectedIfEnded(readErr)))
 		signal = true
 	}
 	if signal {
@@ -200,8 +192,6 @@ func (s *subConnection) finishRead(consumed int, readErr error) {
 		}
 	}
 }
-
-// ---- how a sub-connection ends
 
 func (s *subConnection) close() error {
 	s.mutex.Lock()
@@ -213,14 +203,14 @@ func (s *subConnection) close() error {
 	close(s.closedCh)
 	s.mutex.Unlock()
 
-	s.conn.remove(s)
+	s.conn.forgetSubConnection(s)
 	if s.peerKnows.Load() {
-		s.conn.queueEnd(s.id, 0)
+		s.conn.queueEndFrame(s.id, 0)
 	}
 	return nil
 }
 
-func (s *subConnection) remoteEnded(reset bool) {
+func (s *subConnection) markEndedByPeer(reset bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if s.state != stateOpen {
@@ -231,7 +221,7 @@ func (s *subConnection) remoteEnded(reset bool) {
 	close(s.closedCh)
 }
 
-func (s *subConnection) abort(cause error) {
+func (s *subConnection) abortBecause(cause error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if s.state != stateOpen {
@@ -242,8 +232,6 @@ func (s *subConnection) abort(cause error) {
 	close(s.closedCh)
 }
 
-// writeError says what a write that could not happen returns, by how the
-// sub-connection stands.
 func (s *subConnection) writeError(err error) error {
 	s.mutex.Lock()
 	state, cause := s.state, s.abortCause
@@ -263,10 +251,8 @@ func (s *subConnection) writable() error {
 	return s.writeError(nil)
 }
 
-// ---- writing
-
 func (s *subConnection) writeKeep(data []byte) error {
-	err := s.conn.writeFrame(Header{SessionID: s.id, Status: StatusKeep, Options: OptionData}, data, s.closedCh, s.writeDeadline.wait())
+	err := s.conn.writeFrame(Header{SubConnectionID: s.id, Status: StatusKeep, Options: OptionDataFollows}, data, s.closedCh, s.writeDeadline.wait())
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return err
@@ -276,23 +262,29 @@ func (s *subConnection) writeKeep(data []byte) error {
 	return nil
 }
 
-// writeDatagram writes one datagram of a UDP sub-connection. The first one a
-// client writes is carried by the New frame that opens the sub-connection.
-func (s *subConnection) writeDatagram(data []byte) error {
+// writeDatagram: the first datagram a client writes is carried by the New frame.
+func (s *subConnection) writeDatagram(data []byte, to spec.Destination) error {
 	cancel, deadline := s.closedCh, s.writeDeadline.wait()
-	if err := s.conn.lockWrite(cancel, deadline); err != nil {
+	if err := s.conn.acquireWriteSlot(cancel, deadline); err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return err
 		}
 		return s.writeError(err)
 	}
-	defer s.conn.unlockWrite()
+	defer s.conn.releaseWriteSlot()
 
-	header := Header{SessionID: s.id, Status: StatusKeep, Options: OptionData}
+	namesAddress := s.addressInEveryDatagram.Load()
+	header := Header{SubConnectionID: s.id, Status: StatusKeep, Options: OptionDataFollows}
+	if namesAddress {
+		header.Network = NetworkUDP
+		header.Destination = to
+	}
 	if !s.newSent {
 		header.Status = StatusNew
 		header.Network = NetworkUDP
-		header.Destination = s.destination
+		if !namesAddress {
+			header.Destination = s.destination
+		}
 		s.peerKnows.Store(true)
 	}
 	if isClosed(s.conn.done) {

@@ -44,8 +44,8 @@ func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.
 	if err := client.Close(); err != nil {
 		t.Errorf("second Close = %v, want nil", err)
 	}
-	if client.Active() != 0 {
-		t.Errorf("Active = %d after Close", client.Active())
+	if client.ActiveSubConnectionsCount() != 0 {
+		t.Errorf("ActiveSubConnectionsCount = %d after Close", client.ActiveSubConnectionsCount())
 	}
 }
 
@@ -174,7 +174,7 @@ func TestConcurrentOpensTransfersAndClosesStayCorrect(t *testing.T) {
 		}()
 	}
 	group.Wait()
-	waitFor(t, "every sub-connection to leave both tables", func() bool { return client.Active() == 0 && server.Active() == 0 })
+	waitFor(t, "every sub-connection to leave both tables", func() bool { return client.ActiveSubConnectionsCount() == 0 && server.ActiveSubConnectionsCount() == 0 })
 }
 
 func TestAcceptReturnsSubConnectionsInTheOrderTheyWereOpened(t *testing.T) {
@@ -197,7 +197,7 @@ func TestSubConnectionsNobodyAcceptedEndWhenTheServerCloses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, "the New frame to be registered", func() bool { return server.Active() == 1 })
+	waitFor(t, "the New frame to be registered", func() bool { return server.ActiveSubConnectionsCount() == 1 })
 
 	server.Close()
 	opened.SetReadDeadline(time.Now().Add(2 * time.Second))

@@ -12,7 +12,7 @@ import (
 
 func openDatagramAndAccept(t testing.TB, client *muxcool.Client, server *muxcool.Server, destination spec.Destination, first []byte) (spec.Datagram, spec.Datagram) {
 	t.Helper()
-	opened, err := client.OpenDatagram(destination)
+	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestTheFirstDatagramIsCarriedByTheNewFrame(t *testing.T) {
 	client, peer := rawServerOf(t, muxcool.ClientOptions{})
 	destination := ipDestination(t, "1.1.1.1", 53)
 
-	opened, err := client.OpenDatagram(destination)
+	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,43 +77,43 @@ func TestTheFirstDatagramIsCarriedByTheNewFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	header, data := peer.receive(2 * time.Second)
-	want := muxcool.Header{SessionID: 1, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: destination}
+	want := muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: destination}
 	if header != want || string(data) != "query" {
 		t.Errorf("first frame = %+v %q, want %+v \"query\"", header, data, want)
 	}
 
 	opened.WriteTo([]byte("again"), destination)
 	header, data = peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusKeep || header.SessionID != 1 || header.Network != 0 || string(data) != "again" {
+	if header.Status != muxcool.StatusKeep || header.SubConnectionID != 1 || header.Network != 0 || string(data) != "again" {
 		t.Errorf("second frame = %+v %q, want a plain Keep with the data", header, data)
 	}
 }
 
 func TestADatagramClosedBeforeItWroteAnythingSendsNothing(t *testing.T) {
 	client, peer := rawServerOf(t, muxcool.ClientOptions{})
-	opened, err := client.OpenDatagram(ipDestination(t, "1.1.1.1", 53))
+	opened, err := client.OpenDatagram(ipDestination(t, "1.1.1.1", 53), muxcool.DatagramOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.Active() != 1 {
-		t.Errorf("Active = %d, want the opened sub-connection counted", client.Active())
+	if client.ActiveSubConnectionsCount() != 1 {
+		t.Errorf("Active = %d, want the opened sub-connection counted", client.ActiveSubConnectionsCount())
 	}
 	opened.Close()
 	peer.expectNothing(150 * time.Millisecond)
-	if client.Active() != 0 {
-		t.Errorf("Active = %d after Close", client.Active())
+	if client.ActiveSubConnectionsCount() != 0 {
+		t.Errorf("Active = %d after Close", client.ActiveSubConnectionsCount())
 	}
 }
 
 func TestADatagramEndedAfterItWroteTellsThePeer(t *testing.T) {
 	client, peer := rawServerOf(t, muxcool.ClientOptions{})
 	destination := ipDestination(t, "1.1.1.1", 53)
-	opened, _ := client.OpenDatagram(destination)
+	opened, _ := client.OpenDatagram(destination, muxcool.DatagramOptions{})
 	opened.WriteTo([]byte("q"), destination)
 	peer.receive(2 * time.Second)
 	opened.Close()
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 1 || header.Options != 0 {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 1 || header.Options != 0 {
 		t.Errorf("after Close the peer got %+v, want a plain End", header)
 	}
 }
@@ -182,18 +182,18 @@ func TestAKeepFrameThatNamesAnAddressSaysWhereTheDatagramIsFrom(t *testing.T) {
 	bound := ipDestination(t, "8.8.8.8", 53)
 	other := domainDestination(t, "dns.example", 5353)
 
-	peer.send(muxcool.Header{SessionID: 4, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: bound}, []byte("one"))
+	peer.send(muxcool.Header{SubConnectionID: 4, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: bound}, []byte("one"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	if got, from, err := readDatagram(t, accepted.Datagram, 10); err != nil || string(got) != "one" || from != bound {
 		t.Fatalf("first: %q from %s, %v", got, from, err)
 	}
 
-	peer.send(muxcool.Header{SessionID: 4, Status: muxcool.StatusKeep, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: other}, []byte("two"))
+	peer.send(muxcool.Header{SubConnectionID: 4, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: other}, []byte("two"))
 	if got, from, err := readDatagram(t, accepted.Datagram, 10); err != nil || string(got) != "two" || from != other {
 		t.Errorf("second: %q from %s, %v; want it from %s", got, from, err, other)
 	}
 
-	peer.send(muxcool.Header{SessionID: 4, Status: muxcool.StatusKeep, Options: muxcool.OptionData}, []byte("three"))
+	peer.send(muxcool.Header{SubConnectionID: 4, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows}, []byte("three"))
 	if got, from, err := readDatagram(t, accepted.Datagram, 10); err != nil || string(got) != "three" || from != bound {
 		t.Errorf("third: %q from %s, %v; want it from the bound destination again", got, from, err)
 	}

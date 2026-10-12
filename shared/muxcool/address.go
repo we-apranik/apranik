@@ -5,8 +5,6 @@ import (
 	"strconv"
 )
 
-// address names a sub-connection for LocalAddr and RemoteAddr: the local end by
-// its ID on the main connection, the remote end by the destination it carries.
 type address struct {
 	network string
 	text    string

@@ -9,40 +9,34 @@ import (
 )
 
 type ClientOptions struct {
-	// MaxConcurrentSubConnections is how many sub-connections may be open at once
-	// on this main connection; zero means no limit. Xray's client uses 8.
+	// Zero means no limit. Xray's client uses 8.
 	MaxConcurrentSubConnections int
 
-	// MaxSubConnectionsEver is how many may be opened over the life of this main
-	// connection, even one after another; zero means no limit. Xray's client uses 128.
-	MaxSubConnectionsEver int
+	// Over the life of the main connection. Zero means no limit. Xray's client uses 128.
+	MaxTotalSubConnections int
 
-	// IdleTimeout closes a main connection that has had no open sub-connection
-	// for this long. Zero is 15 seconds; a negative value never closes it.
+	// Zero is 15 seconds; a negative value never closes.
 	IdleTimeout time.Duration
 }
 
-// Client is the end of a main connection that opens sub-connections. It is safe
-// for concurrent use.
+// Client is safe for concurrent use.
 type Client struct {
 	connection *mainConnection
 }
 
-// NewClient starts reading carrier at once. The Client owns the carrier from
-// here on and closes it with Close.
+// NewClient takes ownership of carrier, which Close closes.
 func NewClient(carrier io.ReadWriteCloser, options ClientOptions) *Client {
-	return &Client{connection: newMainConnection(carrier, false, options.MaxConcurrentSubConnections, options.MaxSubConnectionsEver, options.IdleTimeout, 0)}
+	return &Client{connection: newMainConnection(carrier, false, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, 0)}
 }
 
-// OpenStream opens a TCP sub-connection to destination: the New frame goes out
-// at once, with no data.
+// OpenStream sends the New frame at once, with no data.
 func (c *Client) OpenStream(destination spec.Destination) (spec.Stream, error) {
 	sub, err := c.connection.open(NetworkTCP, destination)
 	if err != nil {
 		return nil, err
 	}
 	sub.peerKnows.Store(true)
-	header := Header{SessionID: sub.id, Status: StatusNew, Network: NetworkTCP, Destination: destination}
+	header := Header{SubConnectionID: sub.id, Status: StatusNew, Network: NetworkTCP, Destination: destination}
 	if err := c.connection.writeFrame(header, nil, sub.closedCh, nil); err != nil {
 		sub.close()
 		return nil, err
@@ -50,33 +44,31 @@ func (c *Client) OpenStream(destination spec.Destination) (spec.Stream, error) {
 	return &stream{sub}, nil
 }
 
-// OpenDatagram opens a UDP sub-connection bound to destination. Nothing is sent
-// yet: the New frame leaves with the first WriteTo and carries that datagram.
-func (c *Client) OpenDatagram(destination spec.Destination) (spec.Datagram, error) {
+type DatagramOptions struct {
+	// XUDP names an address in every datagram, so one sub-connection reaches many destinations.
+	XUDP bool
+}
+
+// OpenDatagram sends nothing: the New frame leaves with the first WriteTo.
+func (c *Client) OpenDatagram(destination spec.Destination, options DatagramOptions) (spec.Datagram, error) {
 	sub, err := c.connection.open(NetworkUDP, destination)
 	if err != nil {
 		return nil, err
 	}
+	sub.addressInEveryDatagram.Store(options.XUDP)
 	return &datagram{sub}, nil
 }
 
-// Full says that no sub-connection can be opened here any more: a limit was
-// reached, the 65535 IDs are used, or the main connection is closed. The caller
-// uses another main connection.
-func (c *Client) Full() bool { return c.connection.full() }
+// CanOpenSubConnection is a hint: OpenStream and OpenDatagram can still return ErrSubConnectionLimit.
+func (c *Client) CanOpenSubConnection() bool { return !c.connection.cannotOpenMore() }
 
-// Active is how many sub-connections are open now, for a caller with an idle
-// policy of its own.
-func (c *Client) Active() int { return c.connection.active() }
+func (c *Client) ActiveSubConnectionsCount() int { return c.connection.activeSubConnectionsCount() }
 
-// SendKeepAlive sends a KeepAlive frame, which keeps the peer from closing the
-// main connection as idle.
 func (c *Client) SendKeepAlive() error { return c.connection.sendKeepAlive() }
 
-// Done is closed once the main connection has ended, for whatever reason.
+// Done is closed once the main connection has ended.
 func (c *Client) Done() <-chan struct{} { return c.connection.done }
 
-// Close ends every sub-connection and closes the carrier.
 func (c *Client) Close() error { return c.connection.close() }
 
 func (c *mainConnection) open(network Network, destination spec.Destination) (*subConnection, error) {
@@ -88,8 +80,8 @@ func (c *mainConnection) open(network Network, destination spec.Destination) (*s
 	if c.closed {
 		return nil, closedError(c.closeCause)
 	}
-	if c.fullLocked() {
-		return nil, ErrFull
+	if c.cannotOpenMoreLocked() {
+		return nil, ErrSubConnectionLimit
 	}
 	sub := newSubConnection(c, uint16(c.nextID), network, destination, false)
 	c.nextID++

@@ -14,37 +14,31 @@ const (
 	defaultClientIdleTimeout = 15 * time.Second
 	defaultServerIdleTimeout = 60 * time.Second
 
-	// The reader holds a whole header (514 bytes at most) and spares a read of
-	// the carrier for each small frame. One per main connection, none per
-	// sub-connection. PROVISIONAL.
+	// Holds a whole header, so a small frame costs no read of the carrier. PROVISIONAL.
 	readerBufferSize = 4096
 
 	// A stream's Write is cut into frames of this size, Xray's.
 	maxStreamFrameData = 8 << 10
 
-	// A write buffer that grew past this for one big datagram is dropped, not
-	// kept for the life of the main connection.
+	// A write buffer grown for one big datagram is dropped, not kept.
 	maxRetainedWriteBuffer = 16 << 10
 
 	idCount = 1 << 16
 )
 
-// mainConnection is one established reliable stream carrying sub-connections,
-// the engine both Client and Server are built on. One goroutine reads the
-// carrier and hands each frame's data straight to the sub-connection that reads
-// it; writes are made by the callers, one whole frame at a time.
+// mainConnection is the engine of Client and Server. One goroutine reads the
+// carrier and hands each frame's data to the sub-connection that reads it.
 type mainConnection struct {
 	carrier  io.ReadWriteCloser
 	reader   *bufio.Reader
 	isServer bool
 
 	maxConcurrent    int
-	maxEver          int
+	maxTotal         int
 	idleTimeout      time.Duration
 	acceptedNetworks Networks
 
-	// A one-slot channel instead of a mutex, so a waiter can give up on a write
-	// deadline or when its sub-connection closes.
+	// A channel, not a mutex, so a waiter can give up on a deadline or close.
 	writeLock   chan struct{}
 	writeBuffer []byte // guarded by writeLock
 
@@ -56,7 +50,7 @@ type mainConnection struct {
 	closeCause     error
 	idleTimer      *time.Timer
 	idleGeneration uint64
-	pendingEnds    map[uint16]Options
+	pendingEnds    map[uint16]FrameOptions
 	drainingEnds   bool
 	acceptQueue    []*subConnection
 	acceptSignal   chan struct{}
@@ -65,7 +59,7 @@ type mainConnection struct {
 	loopDone chan struct{}
 }
 
-func newMainConnection(carrier io.ReadWriteCloser, isServer bool, maxConcurrent, maxEver int, idleTimeout time.Duration, accepted Networks) *mainConnection {
+func newMainConnection(carrier io.ReadWriteCloser, isServer bool, maxConcurrent, maxTotal int, idleTimeout time.Duration, accepted Networks) *mainConnection {
 	if idleTimeout == 0 {
 		idleTimeout = defaultClientIdleTimeout
 		if isServer {
@@ -77,13 +71,13 @@ func newMainConnection(carrier io.ReadWriteCloser, isServer bool, maxConcurrent,
 		reader:           bufio.NewReaderSize(carrier, readerBufferSize),
 		isServer:         isServer,
 		maxConcurrent:    maxConcurrent,
-		maxEver:          maxEver,
+		maxTotal:         maxTotal,
 		idleTimeout:      idleTimeout,
 		acceptedNetworks: accepted,
 		writeLock:        make(chan struct{}, 1),
 		subs:             make(map[uint16]*subConnection),
 		nextID:           1,
-		pendingEnds:      make(map[uint16]Options),
+		pendingEnds:      make(map[uint16]FrameOptions),
 		acceptSignal:     make(chan struct{}, 1),
 		done:             make(chan struct{}),
 		loopDone:         make(chan struct{}),
@@ -91,12 +85,10 @@ func newMainConnection(carrier io.ReadWriteCloser, isServer bool, maxConcurrent,
 	c.mutex.Lock()
 	c.startIdleTimerLocked()
 	c.mutex.Unlock()
-	go c.readLoop()
+	go c.readFramesUntilClosed()
 	return c
 }
 
-// closedError is what an operation on a closed connection returns: ErrClosed,
-// and the reason when there is one.
 func closedError(cause error) error {
 	if cause == nil || errors.Is(cause, ErrClosed) {
 		return ErrClosed
@@ -104,14 +96,14 @@ func closedError(cause error) error {
 	return fmt.Errorf("%w: %w", ErrClosed, cause)
 }
 
-func (c *mainConnection) closeWith(cause error) {
+func (c *mainConnection) closeBecause(cause error) {
 	c.mutex.Lock()
 	c.closeAndUnlock(cause)
 }
 
-// closeAndUnlock closes the main connection. The caller holds c.mutex, which is
-// released here, so a decision made under the lock (the idle clock found no
-// sub-connection) and the closing cannot be separated by an open.
+// closeAndUnlock: the caller holds c.mutex, released here, so a decision under
+//
+//	the lock cannot be separated from the closing by an open.
 func (c *mainConnection) closeAndUnlock(cause error) {
 	if c.closed {
 		c.mutex.Unlock()
@@ -134,41 +126,37 @@ func (c *mainConnection) closeAndUnlock(cause error) {
 	close(c.done)
 	_ = c.carrier.Close()
 	for _, sub := range subs {
-		sub.abort(cause)
+		sub.abortBecause(cause)
 	}
 }
 
-// close ends the main connection and waits for its reader to stop.
 func (c *mainConnection) close() error {
-	c.closeWith(ErrClosed)
+	c.closeBecause(ErrClosed)
 	<-c.loopDone
 	return nil
 }
 
-func (c *mainConnection) active() int {
+func (c *mainConnection) activeSubConnectionsCount() int {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return len(c.subs)
 }
 
-// full says whether another sub-connection can be opened here. The caller
-// holds c.mutex.
-func (c *mainConnection) fullLocked() bool {
+// cannotOpenMoreLocked: the caller holds c.mutex.
+func (c *mainConnection) cannotOpenMoreLocked() bool {
 	return c.closed ||
 		c.nextID >= idCount ||
 		(c.maxConcurrent > 0 && len(c.subs) >= c.maxConcurrent) ||
-		(c.maxEver > 0 && c.everOpened >= c.maxEver)
+		(c.maxTotal > 0 && c.everOpened >= c.maxTotal)
 }
 
-func (c *mainConnection) full() bool {
+func (c *mainConnection) cannotOpenMore() bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	return c.fullLocked()
+	return c.cannotOpenMoreLocked()
 }
 
-// The idle clock runs while no sub-connection is open. A timer firing late for
-// a clock that was stopped or restarted since finds another generation and does
-// nothing.
+// The idle clock runs while no sub-connection is open; a stale timer finds another generation.
 func (c *mainConnection) startIdleTimerLocked() {
 	if c.idleTimeout < 0 || c.closed {
 		return
@@ -197,8 +185,6 @@ func (c *mainConnection) idleFired(generation uint64) {
 	c.closeAndUnlock(fmt.Errorf("%w: no sub-connection for %s", ErrClosed, c.idleTimeout))
 }
 
-// A KeepAlive frame keeps the main connection from being closed as idle, which
-// is its whole purpose in the specification.
 func (c *mainConnection) keepAliveReceived() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -207,15 +193,14 @@ func (c *mainConnection) keepAliveReceived() {
 	}
 }
 
-func (c *mainConnection) lookup(id uint16) *subConnection {
+func (c *mainConnection) subConnectionByID(id uint16) *subConnection {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return c.subs[id]
 }
 
-// remove takes a sub-connection out of the table, if it is still the one there,
-// and starts the idle clock when it was the last.
-func (c *mainConnection) remove(sub *subConnection) {
+// forgetSubConnection starts the idle clock when it removes the last one.
+func (c *mainConnection) forgetSubConnection(sub *subConnection) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.subs[sub.id] != sub {
@@ -227,41 +212,39 @@ func (c *mainConnection) remove(sub *subConnection) {
 	}
 }
 
-// ---- reading
-
-func (c *mainConnection) readLoop() {
+func (c *mainConnection) readFramesUntilClosed() {
 	defer close(c.loopDone)
 	for {
 		header, err := ReadHeader(c.reader)
 		if err != nil {
-			c.closeWith(err)
+			c.closeBecause(err)
 			return
 		}
 		dataLength := 0
-		if header.Options.Has(OptionData) {
+		if header.Options.Has(OptionDataFollows) {
 			if dataLength, err = ReadDataLength(c.reader); err != nil {
-				c.closeWith(err)
+				c.closeBecause(err)
 				return
 			}
 		}
-		if err := c.handleFrame(header, dataLength); err != nil {
-			c.closeWith(err)
+		if err := c.dispatchFrame(header, dataLength); err != nil {
+			c.closeBecause(err)
 			return
 		}
 	}
 }
 
-func (c *mainConnection) handleFrame(header Header, dataLength int) error {
+func (c *mainConnection) dispatchFrame(header Header, dataLength int) error {
 	switch header.Status {
 	case StatusKeepAlive:
 		c.keepAliveReceived()
 		return c.discard(dataLength)
 	case StatusNew:
-		return c.handleNew(header, dataLength)
+		return c.acceptNewSubConnection(header, dataLength)
 	case StatusKeep:
-		return c.handleKeep(header, dataLength)
+		return c.routeKeepFrame(header, dataLength)
 	case StatusEnd:
-		return c.handleEnd(header, dataLength)
+		return c.endSubConnectionFromPeer(header, dataLength)
 	default:
 		return fmt.Errorf("%w: frame status %s", ErrProtocol, header.Status)
 	}
@@ -277,10 +260,8 @@ func (c *mainConnection) discard(length int) error {
 	return nil
 }
 
-// A server end registers the sub-connection the peer asks for. A client end
-// ignores a New, whose data it discards: only a server end is never sent one by
-// a correct peer, and Xray's client ignores it as well.
-func (c *mainConnection) handleNew(header Header, dataLength int) error {
+// A client end ignores a New, as Xray's does.
+func (c *mainConnection) acceptNewSubConnection(header Header, dataLength int) error {
 	if !c.isServer {
 		return c.discard(dataLength)
 	}
@@ -290,19 +271,19 @@ func (c *mainConnection) handleNew(header Header, dataLength int) error {
 		c.mutex.Unlock()
 		return c.discard(dataLength)
 	}
-	if _, open := c.subs[header.SessionID]; open {
+	if _, open := c.subs[header.SubConnectionID]; open {
 		c.mutex.Unlock()
-		return fmt.Errorf("%w: New for sub-connection %d, which is already open", ErrProtocol, header.SessionID)
+		return fmt.Errorf("%w: New for sub-connection %d, which is already open", ErrProtocol, header.SubConnectionID)
 	}
 	refused := !c.acceptedNetworks.accepts(header.Network) ||
 		(c.maxConcurrent > 0 && len(c.subs) >= c.maxConcurrent) ||
-		(c.maxEver > 0 && c.everOpened >= c.maxEver)
+		(c.maxTotal > 0 && c.everOpened >= c.maxTotal)
 	if refused {
 		c.mutex.Unlock()
-		c.queueEnd(header.SessionID, OptionError)
+		c.queueEndFrame(header.SubConnectionID, OptionError)
 		return c.discard(dataLength)
 	}
-	sub := newSubConnection(c, header.SessionID, header.Network, header.Destination, true)
+	sub := newSubConnection(c, header.SubConnectionID, header.Network, header.Destination, true)
 	c.subs[sub.id] = sub
 	c.everOpened++
 	c.stopIdleTimerLocked()
@@ -316,48 +297,45 @@ func (c *mainConnection) handleNew(header Header, dataLength int) error {
 	if dataLength == 0 {
 		return nil
 	}
-	return sub.deliver(dataLength, header)
+	return sub.passDataToReader(dataLength, header)
 }
 
-func (c *mainConnection) handleKeep(header Header, dataLength int) error {
-	sub := c.lookup(header.SessionID)
+func (c *mainConnection) routeKeepFrame(header Header, dataLength int) error {
+	sub := c.subConnectionByID(header.SubConnectionID)
 	if sub == nil {
 		// The peer is sending to a sub-connection that is not open (it ended
 		// here a moment ago, or never was): tell it to stop.
-		if header.Options.Has(OptionData) {
-			c.queueEnd(header.SessionID, 0)
+		if header.Options.Has(OptionDataFollows) {
+			c.queueEndFrame(header.SubConnectionID, 0)
 		}
 		return c.discard(dataLength)
+	}
+	if sub.accepted && header.Destination.IsValid() {
+		sub.addressInEveryDatagram.Store(true)
 	}
 	if dataLength == 0 {
 		return nil
 	}
-	return sub.deliver(dataLength, header)
+	return sub.passDataToReader(dataLength, header)
 }
 
-// An End may carry data (the specification says it must be delivered), so that
-// is delivered first, then the sub-connection ends.
-func (c *mainConnection) handleEnd(header Header, dataLength int) error {
-	sub := c.lookup(header.SessionID)
+// An End may carry data, which is delivered first.
+func (c *mainConnection) endSubConnectionFromPeer(header Header, dataLength int) error {
+	sub := c.subConnectionByID(header.SubConnectionID)
 	if sub == nil {
 		return c.discard(dataLength)
 	}
 	if dataLength > 0 {
-		if err := sub.deliver(dataLength, header); err != nil {
+		if err := sub.passDataToReader(dataLength, header); err != nil {
 			return err
 		}
 	}
-	c.remove(sub)
-	sub.remoteEnded(header.Options.Has(OptionError))
+	c.forgetSubConnection(sub)
+	sub.markEndedByPeer(header.Options.Has(OptionError))
 	return nil
 }
 
-// ---- writing
-
-// lockWrite waits for the right to write one frame. It gives up when the main
-// connection closes, when cancel is closed (the sub-connection ended) or when
-// deadline passes.
-func (c *mainConnection) lockWrite(cancel, deadline <-chan struct{}) error {
+func (c *mainConnection) acquireWriteSlot(cancel, deadline <-chan struct{}) error {
 	select {
 	case c.writeLock <- struct{}{}:
 		return nil
@@ -381,16 +359,14 @@ func (c *mainConnection) cause() error {
 	return c.closeCause
 }
 
-func (c *mainConnection) unlockWrite() { <-c.writeLock }
+func (c *mainConnection) releaseWriteSlot() { <-c.writeLock }
 
-// writeFrame writes one whole frame, header and data together, with one Write
-// of the carrier. A failed write closes the main connection: the carrier may
-// hold half a frame.
+// writeFrame: one Write of the carrier; a failure closes the main connection (half a frame).
 func (c *mainConnection) writeFrame(header Header, data []byte, cancel, deadline <-chan struct{}) error {
-	if err := c.lockWrite(cancel, deadline); err != nil {
+	if err := c.acquireWriteSlot(cancel, deadline); err != nil {
 		return err
 	}
-	defer c.unlockWrite()
+	defer c.releaseWriteSlot()
 	if isClosed(c.done) {
 		return closedError(c.cause())
 	}
@@ -402,7 +378,7 @@ func (c *mainConnection) writeFrame(header Header, data []byte, cancel, deadline
 
 func (c *mainConnection) writeFrameLocked(header Header, data []byte) error {
 	buffer, err := AppendHeader(c.writeBuffer[:0], header)
-	if err == nil && header.Options.Has(OptionData) {
+	if err == nil && header.Options.Has(OptionDataFollows) {
 		if buffer, err = AppendDataLength(buffer, len(data)); err == nil {
 			buffer = append(buffer, data...)
 		}
@@ -416,17 +392,14 @@ func (c *mainConnection) writeFrameLocked(header Header, data []byte) error {
 		c.writeBuffer = buffer
 	}
 	if _, err := c.carrier.Write(buffer); err != nil {
-		c.closeWith(err)
+		c.closeBecause(err)
 		return closedError(err)
 	}
 	return nil
 }
 
-// queueEnd asks for an End frame without waiting for the carrier, so that a
-// close, or the reader answering a frame, never blocks on a peer that is not
-// reading. One goroutine at a time sends what is queued; a second End for an ID
-// already waiting replaces the first.
-func (c *mainConnection) queueEnd(id uint16, options Options) {
+// queueEndFrame never blocks on the carrier; a second End for an ID replaces the first.
+func (c *mainConnection) queueEndFrame(id uint16, options FrameOptions) {
 	c.mutex.Lock()
 	if c.closed {
 		c.mutex.Unlock()
@@ -437,11 +410,11 @@ func (c *mainConnection) queueEnd(id uint16, options Options) {
 	c.drainingEnds = true
 	c.mutex.Unlock()
 	if start {
-		go c.drainEnds()
+		go c.sendQueuedEndFrames()
 	}
 }
 
-func (c *mainConnection) drainEnds() {
+func (c *mainConnection) sendQueuedEndFrames() {
 	for {
 		c.mutex.Lock()
 		if c.closed || len(c.pendingEnds) == 0 {
@@ -450,14 +423,14 @@ func (c *mainConnection) drainEnds() {
 			return
 		}
 		var id uint16
-		var options Options
+		var options FrameOptions
 		for id, options = range c.pendingEnds {
 			break
 		}
 		delete(c.pendingEnds, id)
 		c.mutex.Unlock()
 
-		if err := c.writeFrame(Header{SessionID: id, Status: StatusEnd, Options: options}, nil, nil, nil); err != nil {
+		if err := c.writeFrame(Header{SubConnectionID: id, Status: StatusEnd, Options: options}, nil, nil, nil); err != nil {
 			c.mutex.Lock()
 			c.drainingEnds = false
 			c.mutex.Unlock()

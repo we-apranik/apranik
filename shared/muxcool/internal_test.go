@@ -40,17 +40,17 @@ func TestTheIDSpaceOfAMainConnectionRunsOut(t *testing.T) {
 	if ids[0] != idCount-3 || ids[1] != idCount-2 {
 		t.Fatalf("IDs = %v", ids)
 	}
-	if client.Full() {
-		t.Error("Full with one ID left")
+	if !client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = false with one ID left")
 	}
 	last, err := client.connection.open(NetworkTCP, destination)
 	if err != nil || last.id != 65535 {
 		t.Fatalf("the last ID = %v, %v; want 65535", last, err)
 	}
-	if !client.Full() {
-		t.Error("Full = false with every ID used")
+	if client.CanOpenSubConnection() {
+		t.Error("CanOpenSubConnection = true with every ID used")
 	}
-	if _, err := client.connection.open(NetworkTCP, destination); !errors.Is(err, ErrFull) {
-		t.Errorf("open past the last ID = %v, want ErrFull", err)
+	if _, err := client.connection.open(NetworkTCP, destination); !errors.Is(err, ErrSubConnectionLimit) {
+		t.Errorf("open past the last ID = %v, want ErrSubConnectionLimit", err)
 	}
 }

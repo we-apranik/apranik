@@ -12,13 +12,13 @@ import (
 // The frames below are sent by hand, one by one, to the engine: what the format
 // says to do with each, and what the two cores do, is what is checked.
 
-func newTCP(id uint16, options muxcool.Options, destination string) muxcool.Header {
-	return muxcool.Header{SessionID: id, Status: muxcool.StatusNew, Options: options, Network: muxcool.NetworkTCP, Destination: domainDestinationNoT(destination, 80)}
+func newTCP(id uint16, options muxcool.FrameOptions, destination string) muxcool.Header {
+	return muxcool.Header{SubConnectionID: id, Status: muxcool.StatusNew, Options: options, Network: muxcool.NetworkTCP, Destination: domainDestinationNoT(destination, 80)}
 }
 
 func TestANewFrameWithDataOpensASubConnectionAndDeliversTheData(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
-	peer.send(newTCP(7, muxcool.OptionData, "example.com"), []byte("GET /"))
+	peer.send(newTCP(7, muxcool.OptionDataFollows, "example.com"), []byte("GET /"))
 
 	accepted := acceptWithin(t, server, 2*time.Second)
 	buffer := make([]byte, 5)
@@ -35,7 +35,7 @@ func TestAnEndFrameThatCarriesDataDeliversItThenEnds(t *testing.T) {
 	peer.send(newTCP(7, 0, "example.com"), nil)
 	accepted := acceptWithin(t, server, 2*time.Second)
 
-	peer.send(muxcool.Header{SessionID: 7, Status: muxcool.StatusEnd, Options: muxcool.OptionData}, []byte("goodbye"))
+	peer.send(muxcool.Header{SubConnectionID: 7, Status: muxcool.StatusEnd, Options: muxcool.OptionDataFollows}, []byte("goodbye"))
 	data, err := io.ReadAll(accepted.Stream)
 	if err != nil || string(data) != "goodbye" {
 		t.Errorf("ReadAll = %q, %v; want the data of the End frame, then the end", data, err)
@@ -47,7 +47,7 @@ func TestAnEndFrameWithTheErrorBitMakesReadsFail(t *testing.T) {
 	peer.send(newTCP(7, 0, "example.com"), nil)
 	accepted := acceptWithin(t, server, 2*time.Second)
 
-	peer.send(muxcool.Header{SessionID: 7, Status: muxcool.StatusEnd, Options: muxcool.OptionError}, nil)
+	peer.send(muxcool.Header{SubConnectionID: 7, Status: muxcool.StatusEnd, Options: muxcool.OptionError}, nil)
 	if _, err := accepted.Stream.Read(make([]byte, 1)); !errors.Is(err, muxcool.ErrRemoteReset) {
 		t.Errorf("Read = %v, want ErrRemoteReset", err)
 	}
@@ -57,7 +57,7 @@ func TestTheErrorBitOnAnyOtherFrameIsIgnored(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
 	peer.send(newTCP(7, muxcool.OptionError, "example.com"), nil)
 	accepted := acceptWithin(t, server, 2*time.Second)
-	peer.send(muxcool.Header{SessionID: 7, Status: muxcool.StatusKeep, Options: muxcool.OptionData | muxcool.OptionError}, []byte("data"))
+	peer.send(muxcool.Header{SubConnectionID: 7, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows | muxcool.OptionError}, []byte("data"))
 	buffer := make([]byte, 4)
 	if _, err := io.ReadFull(accepted.Stream, buffer); err != nil || string(buffer) != "data" {
 		t.Errorf("read %q, %v; the error bit is honoured on End only, as Xray does", buffer, err)
@@ -66,15 +66,15 @@ func TestTheErrorBitOnAnyOtherFrameIsIgnored(t *testing.T) {
 
 func TestAKeepWithDataForAnUnknownIDIsAnsweredWithAnEndAndTheDataDropped(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
-	peer.send(muxcool.Header{SessionID: 9, Status: muxcool.StatusKeep, Options: muxcool.OptionData}, []byte("to nobody"))
+	peer.send(muxcool.Header{SubConnectionID: 9, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows}, []byte("to nobody"))
 
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 9 || header.Options.Has(muxcool.OptionError) {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 9 || header.Options.Has(muxcool.OptionError) {
 		t.Errorf("answer = %+v, want a plain End for ID 9", header)
 	}
 
 	// The data was consumed from the carrier, so the next frame is read right.
-	peer.send(newTCP(1, muxcool.OptionData, "example.com"), []byte("after"))
+	peer.send(newTCP(1, muxcool.OptionDataFollows, "example.com"), []byte("after"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	buffer := make([]byte, 5)
 	if _, err := io.ReadFull(accepted.Stream, buffer); err != nil || string(buffer) != "after" {
@@ -84,9 +84,9 @@ func TestAKeepWithDataForAnUnknownIDIsAnsweredWithAnEndAndTheDataDropped(t *test
 
 func TestAKeepWithoutDataAndAnEndForAnUnknownIDAreIgnored(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
-	peer.send(muxcool.Header{SessionID: 9, Status: muxcool.StatusKeep}, nil)
-	peer.send(muxcool.Header{SessionID: 9, Status: muxcool.StatusEnd}, nil)
-	peer.send(muxcool.Header{SessionID: 9, Status: muxcool.StatusEnd, Options: muxcool.OptionData}, []byte("dropped"))
+	peer.send(muxcool.Header{SubConnectionID: 9, Status: muxcool.StatusKeep}, nil)
+	peer.send(muxcool.Header{SubConnectionID: 9, Status: muxcool.StatusEnd}, nil)
+	peer.send(muxcool.Header{SubConnectionID: 9, Status: muxcool.StatusEnd, Options: muxcool.OptionDataFollows}, []byte("dropped"))
 	peer.expectNothing(150 * time.Millisecond)
 	if isDone(server.Done()) {
 		t.Error("the main connection closed")
@@ -95,8 +95,8 @@ func TestAKeepWithoutDataAndAnEndForAnUnknownIDAreIgnored(t *testing.T) {
 
 func TestKeepAliveDataIsDiscardedAndNothingIsAnswered(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
-	peer.send(muxcool.Header{SessionID: 0x1234, Status: muxcool.StatusKeepAlive}, nil)
-	peer.send(muxcool.Header{SessionID: 0x4321, Status: muxcool.StatusKeepAlive, Options: muxcool.OptionData}, []byte("discard me"))
+	peer.send(muxcool.Header{SubConnectionID: 0x1234, Status: muxcool.StatusKeepAlive}, nil)
+	peer.send(muxcool.Header{SubConnectionID: 0x4321, Status: muxcool.StatusKeepAlive, Options: muxcool.OptionDataFollows}, []byte("discard me"))
 	peer.expectNothing(150 * time.Millisecond)
 
 	peer.send(newTCP(1, 0, "example.com"), nil)
@@ -135,12 +135,12 @@ func TestAnEndedIDMayBeOpenedAgain(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
 	peer.send(newTCP(5, 0, "one.example"), nil)
 	first := acceptWithin(t, server, 2*time.Second)
-	peer.send(muxcool.Header{SessionID: 5, Status: muxcool.StatusEnd}, nil)
+	peer.send(muxcool.Header{SubConnectionID: 5, Status: muxcool.StatusEnd}, nil)
 	if _, err := first.Stream.Read(make([]byte, 1)); err != io.EOF {
 		t.Fatal(err)
 	}
 
-	peer.send(newTCP(5, muxcool.OptionData, "two.example"), []byte("again"))
+	peer.send(newTCP(5, muxcool.OptionDataFollows, "two.example"), []byte("again"))
 	second := acceptWithin(t, server, 2*time.Second)
 	buffer := make([]byte, 5)
 	if _, err := io.ReadFull(second.Stream, buffer); err != nil || string(buffer) != "again" {
@@ -175,27 +175,27 @@ func TestAServerRefusesANewOverTheLimitWithAnErrorEndAndKeepsTheMainConnection(t
 	peer.send(newTCP(1, 0, "one.example"), nil)
 	first := acceptWithin(t, server, 2*time.Second)
 
-	peer.send(newTCP(2, muxcool.OptionData, "two.example"), []byte("refused data"))
+	peer.send(newTCP(2, muxcool.OptionDataFollows, "two.example"), []byte("refused data"))
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 2 || !header.Options.Has(muxcool.OptionError) {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 2 || !header.Options.Has(muxcool.OptionError) {
 		t.Errorf("answer = %+v, want an End with the error bit for ID 2", header)
 	}
 
-	peer.send(muxcool.Header{SessionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionData}, []byte("still fine"))
+	peer.send(muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows}, []byte("still fine"))
 	buffer := make([]byte, 10)
 	if _, err := io.ReadFull(first.Stream, buffer); err != nil || string(buffer) != "still fine" {
 		t.Errorf("the first sub-connection read %q, %v", buffer, err)
 	}
 
 	first.Stream.Close()
-	waitFor(t, "the slot to free", func() bool { return server.Active() == 0 })
+	waitFor(t, "the slot to free", func() bool { return server.ActiveSubConnectionsCount() == 0 })
 	peer.receive(2 * time.Second) // the End for ID 1
 	peer.send(newTCP(3, 0, "three.example"), nil)
 	acceptWithin(t, server, 2*time.Second)
 }
 
 func TestAServerRefusesANewOverTheTotalLimit(t *testing.T) {
-	server, peer := rawClientOf(t, muxcool.ServerOptions{MaxSubConnectionsEver: 2})
+	server, peer := rawClientOf(t, muxcool.ServerOptions{MaxTotalSubConnections: 2})
 	for id := uint16(1); id <= 2; id++ {
 		peer.send(newTCP(id, 0, "example.com"), nil)
 		accepted := acceptWithin(t, server, 2*time.Second)
@@ -204,7 +204,7 @@ func TestAServerRefusesANewOverTheTotalLimit(t *testing.T) {
 	}
 	peer.send(newTCP(3, 0, "example.com"), nil)
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 3 || !header.Options.Has(muxcool.OptionError) {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 3 || !header.Options.Has(muxcool.OptionError) {
 		t.Errorf("answer = %+v, want an End with the error bit for ID 3", header)
 	}
 	if isDone(server.Done()) {
@@ -214,13 +214,13 @@ func TestAServerRefusesANewOverTheTotalLimit(t *testing.T) {
 
 func TestAServerRefusesANetworkItDoesNotAccept(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{AcceptedNetworks: muxcool.NetworksUDP})
-	peer.send(newTCP(1, muxcool.OptionData, "example.com"), []byte("tcp data"))
+	peer.send(newTCP(1, muxcool.OptionDataFollows, "example.com"), []byte("tcp data"))
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 1 || !header.Options.Has(muxcool.OptionError) {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 1 || !header.Options.Has(muxcool.OptionError) {
 		t.Fatalf("answer = %+v, want an End with the error bit", header)
 	}
 
-	peer.send(muxcool.Header{SessionID: 2, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)}, []byte("q"))
+	peer.send(muxcool.Header{SubConnectionID: 2, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)}, []byte("q"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	if accepted.Datagram == nil {
 		t.Error("the UDP sub-connection was not accepted")
@@ -229,17 +229,17 @@ func TestAServerRefusesANetworkItDoesNotAccept(t *testing.T) {
 
 func TestAClientIgnoresANewFrameAndItsData(t *testing.T) {
 	client, peer := rawServerOf(t, muxcool.ClientOptions{})
-	peer.send(newTCP(8, muxcool.OptionData, "example.com"), []byte("server-initiated"))
+	peer.send(newTCP(8, muxcool.OptionDataFollows, "example.com"), []byte("server-initiated"))
 
 	opened, err := client.OpenStream(domainDestinationNoT("example.com", 80))
 	if err != nil {
 		t.Fatal(err)
 	}
 	header, _ := peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusNew || header.SessionID != 1 {
+	if header.Status != muxcool.StatusNew || header.SubConnectionID != 1 {
 		t.Fatalf("client sent %+v", header)
 	}
-	peer.send(muxcool.Header{SessionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionData}, []byte("reply"))
+	peer.send(muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows}, []byte("reply"))
 	buffer := make([]byte, 5)
 	opened.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if _, err := io.ReadFull(opened, buffer); err != nil || string(buffer) != "reply" {
@@ -257,13 +257,13 @@ func TestAClientTellsTheServerAboutTheStreamsItOpensAndEnds(t *testing.T) {
 
 	opened.Write([]byte("payload"))
 	header, data = peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusKeep || header.SessionID != 1 || header.Options != muxcool.OptionData || string(data) != "payload" {
+	if header.Status != muxcool.StatusKeep || header.SubConnectionID != 1 || header.Options != muxcool.OptionDataFollows || string(data) != "payload" {
 		t.Errorf("Keep = %+v %q", header, data)
 	}
 
 	opened.Close()
 	header, _ = peer.receive(2 * time.Second)
-	if header.Status != muxcool.StatusEnd || header.SessionID != 1 || header.Options != 0 {
+	if header.Status != muxcool.StatusEnd || header.SubConnectionID != 1 || header.Options != 0 {
 		t.Errorf("End = %+v", header)
 	}
 }
@@ -277,7 +277,7 @@ func TestAClientNumbersItsSubConnectionsFromOneAndNeverReusesAnID(t *testing.T) 
 			t.Fatal(err)
 		}
 		header, _ := peer.receive(2 * time.Second)
-		ids = append(ids, header.SessionID)
+		ids = append(ids, header.SubConnectionID)
 		opened.Close()
 		peer.receive(2 * time.Second) // its End
 	}

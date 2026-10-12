@@ -33,7 +33,7 @@ func FuzzReadHeader(f *testing.F) {
 			return
 		}
 
-		header.Options &= muxcool.OptionData | muxcool.OptionError // unknown bits are tolerated on read, never written
+		header.Options &= muxcool.OptionDataFollows | muxcool.OptionError // unknown bits are tolerated on read, never written
 		written, err := muxcool.AppendHeader(nil, header)
 		if err != nil {
 			t.Fatalf("a header ReadHeader accepted, %+v, cannot be written: %v", header, err)

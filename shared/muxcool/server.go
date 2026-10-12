@@ -8,21 +8,16 @@ import (
 )
 
 type ServerOptions struct {
-	// MaxConcurrentSubConnections is how many sub-connections the peer may have
-	// open at once; a New past it is refused with an End carrying the error
-	// bit. Zero means no limit.
+	// A New past it is refused with an End carrying the error bit. Zero means no limit.
 	MaxConcurrentSubConnections int
 
-	// MaxSubConnectionsEver is how many the peer may open over the life of this
-	// main connection. Zero means no limit.
-	MaxSubConnectionsEver int
+	// Over the life of the main connection. Zero means no limit.
+	MaxTotalSubConnections int
 
-	// IdleTimeout closes a main connection that has had no open sub-connection
-	// for this long. Zero is 60 seconds; a negative value never closes it.
+	// Zero is 60 seconds; a negative value never closes.
 	IdleTimeout time.Duration
 
-	// AcceptedNetworks refuses a New for any other network, as the limits do.
-	// Zero accepts TCP and UDP.
+	// A New for another network is refused like a limit. Zero accepts TCP and UDP.
 	AcceptedNetworks Networks
 }
 
@@ -33,24 +28,19 @@ type Accepted struct {
 	Datagram    spec.Datagram
 }
 
-// Server is the end of a main connection that accepts the sub-connections the
-// peer opens. It is safe for concurrent use.
+// Server is safe for concurrent use.
 type Server struct {
 	connection *mainConnection
 }
 
-// NewServer starts reading carrier at once. The Server owns the carrier from
-// here on and closes it with Close.
+// NewServer takes ownership of carrier, which Close closes.
 //
-// The reader waits for the first data of a sub-connection to be read, so Accept
-// and a Read of what it returns must follow promptly for every sub-connection
-// that comes with data in its New frame.
+// The reader waits for a sub-connection's first data to be read, so Accept and a
+// Read must follow promptly.
 func NewServer(carrier io.ReadWriteCloser, options ServerOptions) *Server {
-	return &Server{connection: newMainConnection(carrier, true, options.MaxConcurrentSubConnections, options.MaxSubConnectionsEver, options.IdleTimeout, options.AcceptedNetworks)}
+	return &Server{connection: newMainConnection(carrier, true, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, options.AcceptedNetworks)}
 }
 
-// Accept blocks for the next sub-connection the peer opens. It returns ErrClosed
-// once the main connection has ended.
 func (s *Server) Accept() (Accepted, error) {
 	c := s.connection
 	for {
@@ -86,7 +76,7 @@ func acceptedFrom(sub *subConnection) Accepted {
 	return accepted
 }
 
-func (s *Server) Active() int { return s.connection.active() }
+func (s *Server) ActiveSubConnectionsCount() int { return s.connection.activeSubConnectionsCount() }
 
 func (s *Server) SendKeepAlive() error { return s.connection.sendKeepAlive() }
 

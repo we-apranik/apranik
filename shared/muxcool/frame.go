@@ -53,18 +53,16 @@ func (n Network) String() string {
 	}
 }
 
-type Options byte
+type FrameOptions byte
 
 const (
-	// OptionData: a data length and that many bytes follow the metadata.
-	OptionData Options = 1
-	// OptionError: set on End, the sub-connection ended because of an error.
-	OptionError Options = 2
+	OptionDataFollows FrameOptions = 1
+	OptionError       FrameOptions = 2
 
-	knownOptions = OptionData | OptionError
+	knownOptions = OptionDataFollows | OptionError
 )
 
-func (o Options) Has(option Options) bool { return o&option == option }
+func (o FrameOptions) Has(option FrameOptions) bool { return o&option == option }
 
 const (
 	// MaxMetadataLength is Xray's limit; the longest metadata this package
@@ -77,21 +75,15 @@ const (
 	minMetadataLength = 4 // ID, status, options
 )
 
-// Header is the metadata of one frame, without the data that may follow it.
-//
-// Network and Destination are set where the format carries them: always on New,
-// and on a Keep of a UDP sub-connection that names the address of a datagram.
-// Every other frame has neither.
+// Network and Destination are set on New, and on a Keep that names an address.
 type Header struct {
-	SessionID   uint16
-	Status      Status
-	Options     Options
-	Network     Network
-	Destination spec.Destination
+	SubConnectionID uint16
+	Status          Status
+	Options         FrameOptions
+	Network         Network
+	Destination     spec.Destination
 }
 
-// AppendHeader appends the frame's length and metadata to buffer. The data, if
-// Options says there is some, follows it: AppendDataLength and the bytes.
 func AppendHeader(buffer []byte, header Header) ([]byte, error) {
 	if header.Options&^knownOptions != 0 {
 		return nil, fmt.Errorf("muxcool: options %#x include bits this format does not define", byte(header.Options))
@@ -99,7 +91,7 @@ func AppendHeader(buffer []byte, header Header) ([]byte, error) {
 
 	start := len(buffer)
 	buffer = append(buffer, 0, 0) // the length, filled in below
-	buffer = binary.BigEndian.AppendUint16(buffer, header.SessionID)
+	buffer = binary.BigEndian.AppendUint16(buffer, header.SubConnectionID)
 	buffer = append(buffer, byte(header.Status), byte(header.Options))
 
 	switch header.Status {
@@ -208,9 +200,9 @@ func checkMetadataLength(length []byte) (int, error) {
 
 func parseMetadata(metadata []byte) (Header, error) {
 	header := Header{
-		SessionID: binary.BigEndian.Uint16(metadata),
-		Status:    Status(metadata[2]),
-		Options:   Options(metadata[3]),
+		SubConnectionID: binary.BigEndian.Uint16(metadata),
+		Status:          Status(metadata[2]),
+		Options:         FrameOptions(metadata[3]),
 	}
 	extra := metadata[minMetadataLength:]
 
@@ -244,7 +236,6 @@ func parseMetadata(metadata []byte) (Header, error) {
 	return header, nil
 }
 
-// AppendDataLength appends the two-byte length that precedes a frame's data.
 func AppendDataLength(buffer []byte, length int) ([]byte, error) {
 	if length < 0 || length > MaxDataLength {
 		return nil, fmt.Errorf("muxcool: data of %d bytes does not fit a frame (at most %d)", length, MaxDataLength)
@@ -252,9 +243,6 @@ func AppendDataLength(buffer []byte, length int) ([]byte, error) {
 	return binary.BigEndian.AppendUint16(buffer, uint16(length)), nil
 }
 
-// ReadDataLength reads the two-byte length that precedes a frame's data. The
-// frame's metadata has just been read, so a reader that ends here ends inside
-// a frame.
 func ReadDataLength(reader io.Reader) (int, error) {
 	var length [2]byte
 	if _, err := io.ReadFull(reader, length[:]); err != nil {

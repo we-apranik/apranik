@@ -1,6 +1,7 @@
 package muxcool
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -8,33 +9,28 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// datagram is a UDP sub-connection. One frame is one datagram. It is safe for
-// one reader and many writers.
+// datagram is safe for one reader and many writers.
 type datagram struct {
 	*subConnection
 }
 
 var _ spec.Datagram = (*datagram)(nil)
 
-// ReadFrom reads the next datagram and says where it is from: the address its
-// Keep frame names, or else the destination this sub-connection is bound to. A
-// datagram larger than p is dropped and reported as ErrDatagramTooLarge; the
-// next ReadFrom reads the one after it. A datagram of no bytes is skipped, as
-// Xray and sing-box skip it.
+// ReadFrom drops a datagram larger than p as ErrDatagramTooLarge and skips an empty one.
 func (d *datagram) ReadFrom(p []byte) (int, spec.Destination, error) {
-	remaining, source, err := d.awaitDelivery(d.readDeadline.wait())
+	remaining, source, err := d.claimDelivery(d.readDeadline.wait())
 	if err != nil {
 		return 0, spec.Destination{}, err
 	}
 
 	if remaining > len(p) {
 		discarded, discardErr := d.conn.reader.Discard(remaining)
-		d.finishRead(discarded, discardErr)
+		d.finishDelivery(discarded, discardErr)
 		return 0, spec.Destination{}, fmt.Errorf("%w: %d bytes, the buffer holds %d", ErrDatagramTooLarge, remaining, len(p))
 	}
 
 	read, readErr := io.ReadFull(d.conn.reader, p[:remaining])
-	d.finishRead(read, readErr)
+	d.finishDelivery(read, readErr)
 	if readErr != nil {
 		return 0, spec.Destination{}, closedError(readErr)
 	}
@@ -44,11 +40,13 @@ func (d *datagram) ReadFrom(p []byte) (int, spec.Destination, error) {
 	return remaining, source, nil
 }
 
-// WriteTo sends one datagram. At the client end the destination must be the one
-// this sub-connection was opened for; at the server end it is the source the
-// reply comes from, which plain Mux.Cool does not carry, so it is not used.
+// WriteTo: to is the destination (client end; the bound one unless XUDP) or the reply's source (server end).
 func (d *datagram) WriteTo(p []byte, to spec.Destination) (int, error) {
-	if !d.accepted && to != d.destination {
+	if d.addressInEveryDatagram.Load() {
+		if !to.IsValid() {
+			return 0, errors.New("muxcool: WriteTo needs a destination because every datagram names its address")
+		}
+	} else if !d.accepted && to != d.destination {
 		return 0, fmt.Errorf("%w: %s, not %s", ErrDestinationNotBound, to, d.destination)
 	}
 	if len(p) > MaxDataLength {
@@ -57,7 +55,7 @@ func (d *datagram) WriteTo(p []byte, to spec.Destination) (int, error) {
 	if err := d.writable(); err != nil {
 		return 0, err
 	}
-	if err := d.writeDatagram(p); err != nil {
+	if err := d.writeDatagram(p, to); err != nil {
 		return 0, err
 	}
 	return len(p), nil

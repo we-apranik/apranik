@@ -136,7 +136,7 @@ func (p *rawPeer) send(header muxcool.Header, data []byte) {
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	if header.Options.Has(muxcool.OptionData) {
+	if header.Options.Has(muxcool.OptionDataFollows) {
 		if frame, err = muxcool.AppendDataLength(frame, len(data)); err != nil {
 			p.t.Fatal(err)
 		}
@@ -162,7 +162,7 @@ func (p *rawPeer) receive(within time.Duration) (muxcool.Header, []byte) {
 		p.t.Fatalf("raw peer: no frame within %s: %v", within, err)
 	}
 	var data []byte
-	if header.Options.Has(muxcool.OptionData) {
+	if header.Options.Has(muxcool.OptionDataFollows) {
 		length, err := muxcool.ReadDataLength(p.reader)
 		if err != nil {
 			p.t.Fatalf("raw peer: data length: %v", err)

@@ -64,42 +64,42 @@ func headerCases(t *testing.T) []struct {
 	}{
 		{
 			"New TCP to a domain, no data",
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(t, "example.com", 80)},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(t, "example.com", 80)},
 			bytesOf(0x00, 0x14, 0x00, 0x01, 0x01, 0x00, 0x01, 0x00, 0x50, 0x02, 0x0B, "example.com"),
 		},
 		{
 			"New UDP to an IPv4 address, with data",
-			muxcool.Header{SessionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
+			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
 			bytesOf(0x00, 0x0C, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8),
 		},
 		{
 			"New TCP to an IPv6 address",
-			muxcool.Header{SessionID: 0x0102, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkTCP, Destination: ipDestination(t, "2001:db8::1", 443)},
+			muxcool.Header{SubConnectionID: 0x0102, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkTCP, Destination: ipDestination(t, "2001:db8::1", 443)},
 			bytesOf(0x00, 0x18, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01, 0xBB, 0x03, 0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
 		},
 		{
 			"Keep of a TCP sub-connection, with data",
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionData},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows},
 			bytesOf(0x00, 0x04, 0x00, 0x01, 0x02, 0x01),
 		},
 		{
 			"Keep of a UDP sub-connection naming an address (XUDP)",
-			muxcool.Header{SessionID: 0, Status: muxcool.StatusKeep, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "1.1.1.1", 53)},
+			muxcool.Header{SubConnectionID: 0, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "1.1.1.1", 53)},
 			bytesOf(0x00, 0x0C, 0x00, 0x00, 0x02, 0x01, 0x02, 0x00, 0x35, 0x01, 1, 1, 1, 1),
 		},
 		{
 			"End with the error bit",
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusEnd, Options: muxcool.OptionError},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusEnd, Options: muxcool.OptionError},
 			bytesOf(0x00, 0x04, 0x00, 0x01, 0x03, 0x02),
 		},
 		{
 			"End, nothing more",
-			muxcool.Header{SessionID: 65535, Status: muxcool.StatusEnd},
+			muxcool.Header{SubConnectionID: 65535, Status: muxcool.StatusEnd},
 			bytesOf(0x00, 0x04, 0xFF, 0xFF, 0x03, 0x00),
 		},
 		{
 			"KeepAlive with an arbitrary ID",
-			muxcool.Header{SessionID: 0xBEEF, Status: muxcool.StatusKeepAlive},
+			muxcool.Header{SubConnectionID: 0xBEEF, Status: muxcool.StatusKeepAlive},
 			bytesOf(0x00, 0x04, 0xBE, 0xEF, 0x04, 0x00),
 		},
 	}
@@ -138,7 +138,7 @@ func TestReadHeaderReadsThemBackAndLeavesTheDataInTheReader(t *testing.T) {
 }
 
 func TestAppendHeaderKeepsWhatIsAlreadyInTheBuffer(t *testing.T) {
-	got, err := muxcool.AppendHeader([]byte{0xAA, 0xBB}, muxcool.Header{SessionID: 1, Status: muxcool.StatusEnd})
+	got, err := muxcool.AppendHeader([]byte{0xAA, 0xBB}, muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusEnd})
 	if err != nil || !bytes.Equal(got, bytesOf(0xAA, 0xBB, 0x00, 0x04, 0x00, 0x01, 0x03, 0x00)) {
 		t.Errorf("AppendHeader = % x, %v", got, err)
 	}
@@ -157,27 +157,27 @@ func TestReadHeaderSkipsBytesAfterTheDefinedFields(t *testing.T) {
 		{
 			"Global ID after a New address",
 			bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, globalID),
-			muxcool.Header{SessionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
+			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
 		},
 		{
 			"padding after End",
 			bytesOf(0x00, 0x08, 0x00, 0x01, 0x03, 0x00, 0, 0, 0, 0),
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusEnd},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusEnd},
 		},
 		{
 			"padding after a TCP Keep",
 			bytesOf(0x00, 0x06, 0x00, 0x01, 0x02, 0x01, 0x00, 0x00),
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionData},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows},
 		},
 		{
 			"padding after the address of a UDP Keep",
 			bytesOf(0x00, 0x0E, 0x00, 0x00, 0x02, 0x01, 0x02, 0x00, 0x35, 0x01, 1, 1, 1, 1, 0, 0),
-			muxcool.Header{SessionID: 0, Status: muxcool.StatusKeep, Options: muxcool.OptionData, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "1.1.1.1", 53)},
+			muxcool.Header{SubConnectionID: 0, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "1.1.1.1", 53)},
 		},
 		{
 			"option bits this format does not define are kept as read",
 			bytesOf(0x00, 0x04, 0x00, 0x01, 0x03, 0xFC),
-			muxcool.Header{SessionID: 1, Status: muxcool.StatusEnd, Options: 0xFC},
+			muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusEnd, Options: 0xFC},
 		},
 	} {
 		for readerName, reader := range readers(append(bytes.Clone(tc.wire), "data"...)) {
@@ -194,7 +194,7 @@ func TestReadHeaderSkipsBytesAfterTheDefinedFields(t *testing.T) {
 
 func TestReadHeaderAcceptsMetadataUpToTheLimitAndRefusesBeyondIt(t *testing.T) {
 	domain := domainDestination(t, strings.Repeat("a", vmessaddr.MaxDomainLength), 80)
-	base, err := muxcool.AppendHeader(nil, muxcool.Header{SessionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domain})
+	base, err := muxcool.AppendHeader(nil, muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domain})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestADataLengthIsTwoBytesBigEndian(t *testing.T) {
 }
 
 func TestAWholeFrameIsReadHeaderThenDataLengthThenData(t *testing.T) {
-	header := muxcool.Header{SessionID: 7, Status: muxcool.StatusNew, Options: muxcool.OptionData, Network: muxcool.NetworkTCP, Destination: domainDestination(t, "example.com", 80)}
+	header := muxcool.Header{SubConnectionID: 7, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkTCP, Destination: domainDestination(t, "example.com", 80)}
 	frame, err := muxcool.AppendHeader(nil, header)
 	if err != nil {
 		t.Fatal(err)
@@ -351,7 +351,7 @@ func TestStatusAndNetworkNamesReadInLogs(t *testing.T) {
 }
 
 func BenchmarkAppendHeaderNewDomain(b *testing.B) {
-	header := muxcool.Header{SessionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(b, "www.example.com", 80)}
+	header := muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(b, "www.example.com", 80)}
 	buffer := make([]byte, 0, 64)
 	b.ReportAllocs()
 	for b.Loop() {
@@ -385,13 +385,13 @@ func benchmarkReadHeader(b *testing.B, header muxcool.Header, buffered bool) {
 }
 
 func BenchmarkReadHeaderKeep(b *testing.B) {
-	keep := muxcool.Header{SessionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionData}
+	keep := muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows}
 	b.Run("plain reader", func(b *testing.B) { benchmarkReadHeader(b, keep, false) })
 	b.Run("buffered reader", func(b *testing.B) { benchmarkReadHeader(b, keep, true) })
 }
 
 func BenchmarkReadHeaderNewDomain(b *testing.B) {
-	newDomain := muxcool.Header{SessionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(b, "www.example.com", 80)}
+	newDomain := muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(b, "www.example.com", 80)}
 	b.Run("plain reader", func(b *testing.B) { benchmarkReadHeader(b, newDomain, false) })
 	b.Run("buffered reader", func(b *testing.B) { benchmarkReadHeader(b, newDomain, true) })
 }
