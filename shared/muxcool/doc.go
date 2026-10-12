@@ -47,8 +47,8 @@
 //     reads the carrier. While it waits for a sub-connection to read its data it
 //     reads nothing, so a peer that vanished then is noticed when that
 //     sub-connection reads or closes.
-//   - A main connection with no sub-connection for IdleTimeout (60 s for a
-//     server end, 15 s for a client end) is closed.
+//   - A server end closes a main connection with no sub-connection after
+//     IdleTimeout (60 s); a client end never does, its caller closes it.
 //   - Mux is for handshake latency, not throughput: one lost packet stalls all
 //     sub-connections, which is why Xray's documentation advises against it for
 //     downloads.
