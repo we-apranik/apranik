@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,7 +20,7 @@ var (
 	ErrUnsupportedFlow = errors.New("vless: flow not supported")
 
 	// A request from a known user for a command this module does not implement
-	// (Mux, which carries XUDP, or Reverse).
+	// (Reverse).
 	ErrUnsupportedCommand = errors.New("vless: command not supported")
 )
 
@@ -73,7 +74,8 @@ func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec
 	if err != nil {
 		return false, fmt.Errorf("vless: reading request: %w", err)
 	}
-	return withCommand[commandOffset] == wire.CommandUDP, nil
+	command := withCommand[commandOffset]
+	return command == wire.CommandUDP || command == wire.CommandMux, nil
 }
 
 // Nothing is written during the handshake, so every refusal may ask for the
@@ -87,14 +89,21 @@ func (s *server) AcceptStream(ctx context.Context, underlyingStream spec.Stream)
 }
 
 func (s *server) AcceptDatagramOverStream(ctx context.Context, underlyingStream spec.Stream) (spec.Datagram, spec.Metadata, error) {
-	request, metadata, err := s.acceptRequest(ctx, underlyingStream, wire.CommandUDP)
+	request, metadata, err := s.acceptRequest(ctx, underlyingStream, wire.CommandUDP, wire.CommandMux)
 	if err != nil {
 		return nil, spec.Metadata{}, err
+	}
+	if request.Command == wire.CommandMux {
+		datagram, err := s.acceptXUDP(underlyingStream)
+		if err != nil {
+			return nil, spec.Metadata{}, err
+		}
+		return datagram, metadata, nil
 	}
 	return newServerDatagram(underlyingStream, request.Destination), metadata, nil
 }
 
-func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream, wantedCommand byte) (wire.Request, spec.Metadata, error) {
+func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream, wantedCommands ...byte) (wire.Request, spec.Metadata, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
 	if deadline, ok := ctx.Deadline(); ok {
@@ -102,7 +111,7 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 		defer underlyingStream.SetReadDeadline(time.Time{})
 	}
 
-	request, err := wire.ReadRequest(underlyingStream)
+	request, err := wire.ReadRequestHeader(underlyingStream)
 	if err != nil {
 		if isMalformedRequest(err) {
 			return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: %w", spec.ErrFallbackRequested, err)
@@ -118,9 +127,9 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 	switch {
 	case request.Flow != "":
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: %q", ErrUnsupportedFlow, request.Flow)
-	case request.Command == wire.CommandMux || request.Command == wire.CommandReverse:
+	case request.Command == wire.CommandReverse:
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: X'%02X'", ErrUnsupportedCommand, request.Command)
-	case request.Command != wantedCommand:
+	case !slices.Contains(wantedCommands, request.Command):
 		// Core dispatched on IsDatagramOverStream, so this is a mismatch
 		// between the two calls, not a client error.
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("vless: command X'%02X' reached the wrong accept: %w", request.Command, spec.ErrUnsupportedNetwork)
@@ -131,6 +140,7 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 		metadata.Network = spec.NetworkTCP
 		metadata.Destination = request.Destination
 	} else {
+		// UDP and XUDP name their destinations per datagram, or in the request.
 		metadata.Network = spec.NetworkUDP
 	}
 	return request, metadata, nil
