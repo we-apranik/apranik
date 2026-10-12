@@ -26,7 +26,7 @@ func (c *client) requestXUDP(underlyingStream spec.Stream) (spec.Datagram, error
 	if err != nil {
 		return nil, err
 	}
-	delayed := delayedrequest.NewStream(underlyingStream, request, c.maxFirstPayloadDelay)
+	delayed := delayedrequest.NewStream(underlyingStream, request, c.requestTiming.MaxDelay)
 	carrier := &responseHeaderSkippingStream{Stream: delayed}
 	return &xudpClientDatagram{
 		mux:      muxcool.NewClient(carrier),
