@@ -12,7 +12,7 @@ import (
 )
 
 func TestOneXUDPSubConnectionCarriesManyDestinationsBothWays(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	first := ipDestination(t, "1.2.3.4", 3478)
 	second := ipDestination(t, "5.6.7.8", 9000)
 	third := domainDestination(t, "peer.example", 4000)
@@ -62,7 +62,7 @@ func TestOneXUDPSubConnectionCarriesManyDestinationsBothWays(t *testing.T) {
 }
 
 func TestAnXUDPClientNamesAnAddressInTheNewFrameAndInEveryKeep(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	bound := ipDestination(t, "1.1.1.1", 53)
 	other := domainDestination(t, "game.example", 27015)
 
@@ -90,7 +90,7 @@ func TestAnXUDPClientNamesAnAddressInTheNewFrameAndInEveryKeep(t *testing.T) {
 }
 
 func TestAPlainClientStaysBoundToItsDestinationAndAnXUDPClientNeedsOne(t *testing.T) {
-	client, _ := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, _ := pair(t, muxcool.ServerOptions{})
 	bound := ipDestination(t, "1.1.1.1", 53)
 
 	plain, err := client.OpenDatagram(bound, muxcool.DatagramOptions{})
