@@ -76,7 +76,7 @@ func (d *clientDatagram) WriteTo(payload []byte, destination spec.Destination) (
 
 	message := d.frameBuffer[:0]
 	if !d.requestSent {
-		request, err := wire.AppendRequest(message, wire.Request{UUID: d.uuid, Command: wire.CommandUDP, Destination: destination})
+		request, err := wire.AppendRequestHeader(message, wire.Request{UUID: d.uuid, Command: wire.CommandUDP, Destination: destination})
 		if err != nil {
 			return 0, err
 		}
