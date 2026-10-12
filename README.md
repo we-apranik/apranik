@@ -269,8 +269,8 @@ anyone who can reach the socket inject packets into a session.
 | `fragment` | outbound only: `tls_records`, `tcp_packets` (both default `true`), `piece_sizes` (default `["3-5", "10-20"]`), `piece_delays` (default `["10-20ms"]`, only with `tcp_packets`), `max_pieces` (default `"4-8"`, `0` no limit), `split_sni` (default `true`) |
 | `socks5` | `username`, `password`, `udp_relay` (default `true`), `handshake_timeout` (default `10s`) |
 | `http` | `username`, `password`, `handshake_timeout` (default `10s`) |
-| `trojan` | server: `users` (`[{ name, password }]`), `handshake_timeout` (default `10s`); client: `password`, `max_first_payload_delay` (default `400ms`) |
-| `vless` | server: `users` (`[{ name, uuid }]`), `handshake_timeout` (default `10s`); client: `uuid`, `max_first_payload_delay` (default `400ms`) |
+| `trojan` | server: `users` (`[{ name, password }]`), `handshake_timeout` (default `10s`); client: `password` |
+| `vless` | server: `users` (`[{ name, uuid }]`), `handshake_timeout` (default `10s`); client: `uuid` |
 
 An inbound with no username is accepted with a warning: anyone who can reach it
 may use it.
