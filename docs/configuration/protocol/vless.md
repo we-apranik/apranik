@@ -82,7 +82,7 @@ any text of 1 to 30 bytes, which becomes a UUID version 5 in the nil namespace. 
 server given the same text agree on it. Text of 31 bytes, or a UUID-looking text that is not
 one, is refused.
 
-An inbound refuses `uuid` and `max_first_payload_delay`, which are an outbound's.
+An inbound refuses `uuid`, which is an outbound's.
 
 ### `handshake_timeout`
 
@@ -101,16 +101,8 @@ first payload and waits for no answer, so it has nothing to bound and ignores th
 
 The user's UUID, written as above. An outbound refuses `users`.
 
-### `max_first_payload_delay`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>400ms</code></span>
-
-The longest the request waits for the application's first bytes, so the two travel in one
-packet and a connection never opens with a small packet of a fixed length on its own. A
-server-first protocol such as SSH or SMTP sends nothing until the server has spoken, so once
-this passes the request goes alone. A longer wait delays the first byte of those protocols; a
-shorter one sends the request alone more often. A written zero is refused.
+The request waits for the application's first bytes, up to 400ms by default; the outbound's
+[`proxy_request_timing`](../outbound/index.md#proxy_request_timing) sets that and the ports that skip the wait.
 
 </div>
 
