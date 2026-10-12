@@ -146,6 +146,10 @@ type Outbound struct {
 	// Only with Proxy: how the outbound uses Mux.Cool. Nil means the defaults.
 	MuxCool *MuxCool
 
+	// Only with Proxy: when its client sends the request it owes the server. Nil
+	// means the defaults.
+	ProxyRequestTiming *ProxyRequestTiming
+
 	// Only with Proxy: the DNS server that resolves Server when it is a
 	// domain, so the proxy's own name never loops through a DNS server that
 	// uses the proxy. Empty means the dns section's default server.
