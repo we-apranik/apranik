@@ -44,7 +44,7 @@ func TestRequestMatchesHandWrittenBytes(t *testing.T) {
 	want = append(want, 0x00, 0x01, 0x01, 0xBB, 0x02, 11)
 	want = append(want, "example.com"...)
 
-	got, err := wire.AppendRequest(nil, wire.Request{
+	got, err := wire.AppendRequestHeader(nil, wire.Request{
 		UUID:        sequentialUUID,
 		Command:     wire.CommandTCP,
 		Destination: domainDestination(t, "example.com", 443),
@@ -54,6 +54,39 @@ func TestRequestMatchesHandWrittenBytes(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Errorf("request = % X, want % X", got, want)
+	}
+}
+
+// The Mux command carries no port and no address: the header ends at the command.
+func TestMuxRequestMatchesHandWrittenBytes(t *testing.T) {
+	want := []byte{0x00}
+	want = append(want, sequentialUUID[:]...)
+	want = append(want, 0x00, 0x03)
+
+	got, err := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandMux})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("request = % X, want % X", got, want)
+	}
+}
+
+func TestMuxRequestRoundTripsAndLeavesWhatFollowsUnread(t *testing.T) {
+	encoded, err := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandMux})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(append(encoded, "frames"...))
+	request, err := wire.ReadRequestHeader(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Command != wire.CommandMux || request.UUID != sequentialUUID || request.Destination.IsValid() {
+		t.Errorf("request = %+v, want the Mux command with the UUID and no destination", request)
+	}
+	if rest, _ := io.ReadAll(reader); string(rest) != "frames" {
+		t.Errorf("left %q, want the bytes after the command", rest)
 	}
 }
 
@@ -67,11 +100,11 @@ func TestRequestRoundTripsEveryAddressTypeAndBothCommands(t *testing.T) {
 		for _, command := range []byte{wire.CommandTCP, wire.CommandUDP} {
 			t.Run(fmt.Sprintf("%s/command %d", name, command), func(t *testing.T) {
 				request := wire.Request{UUID: sequentialUUID, Command: command, Destination: destination}
-				encoded, err := wire.AppendRequest(nil, request)
+				encoded, err := wire.AppendRequestHeader(nil, request)
 				if err != nil {
 					t.Fatal(err)
 				}
-				decoded, err := wire.ReadRequest(bytes.NewReader(encoded))
+				decoded, err := wire.ReadRequestHeader(bytes.NewReader(encoded))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -83,13 +116,13 @@ func TestRequestRoundTripsEveryAddressTypeAndBothCommands(t *testing.T) {
 	}
 }
 
-func TestReadRequestStopsAtTheEndOfTheHeader(t *testing.T) {
-	encoded, err := wire.AppendRequest(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandTCP, Destination: ipDestination(t, "192.0.2.1", 80)})
+func TestReadRequestHeaderStopsAtTheEndOfTheHeader(t *testing.T) {
+	encoded, err := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandTCP, Destination: ipDestination(t, "192.0.2.1", 80)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(append(encoded, "payload"...))
-	if _, err := wire.ReadRequest(reader); err != nil {
+	if _, err := wire.ReadRequestHeader(reader); err != nil {
 		t.Fatal(err)
 	}
 	rest, _ := io.ReadAll(reader)
@@ -107,7 +140,7 @@ func TestMuxAndReverseCarryNoDestination(t *testing.T) {
 		input = append(input, 0x00, command, 'X')
 		reader := bytes.NewReader(input)
 
-		request, err := wire.ReadRequest(reader)
+		request, err := wire.ReadRequestHeader(reader)
 		if err != nil {
 			t.Fatalf("command %d: %v", command, err)
 		}
@@ -125,7 +158,7 @@ func TestFlowRoundTripsThroughTheAddons(t *testing.T) {
 		UUID: sequentialUUID, Flow: "xtls-rprx-vision", Command: wire.CommandTCP,
 		Destination: ipDestination(t, "192.0.2.1", 80),
 	}
-	encoded, err := wire.AppendRequest(nil, request)
+	encoded, err := wire.AppendRequestHeader(nil, request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +166,7 @@ func TestFlowRoundTripsThroughTheAddons(t *testing.T) {
 	if want := append([]byte{18, 0x0A, 16}, "xtls-rprx-vision"...); !bytes.Contains(encoded, want) {
 		t.Errorf("request = % X, want it to hold the addons % X", encoded, want)
 	}
-	decoded, err := wire.ReadRequest(bytes.NewReader(encoded))
+	decoded, err := wire.ReadRequestHeader(bytes.NewReader(encoded))
 	if err != nil || decoded != request {
 		t.Errorf("decoded %+v, %v, want %+v", decoded, err, request)
 	}
@@ -146,7 +179,7 @@ func TestSeedInTheAddonsIsAcceptedAndIgnored(t *testing.T) {
 	input = append(input, 8, 0x12, 3, 1, 2, 3, 0x0A, 1, 'v')
 	input = append(input, wire.CommandTCP, 0x00, 0x50, 0x01, 192, 0, 2, 1)
 
-	request, err := wire.ReadRequest(bytes.NewReader(input))
+	request, err := wire.ReadRequestHeader(bytes.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +188,7 @@ func TestSeedInTheAddonsIsAcceptedAndIgnored(t *testing.T) {
 	}
 }
 
-func TestReadRequestRefusesWhatItCannotRead(t *testing.T) {
+func TestReadRequestHeaderRefusesWhatItCannotRead(t *testing.T) {
 	prefix := append([]byte{0x00}, sequentialUUID[:]...)
 	with := func(rest ...byte) []byte { return append(append([]byte{}, prefix...), rest...) }
 
@@ -179,7 +212,7 @@ func TestReadRequestRefusesWhatItCannotRead(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := wire.ReadRequest(bytes.NewReader(test.input))
+			_, err := wire.ReadRequestHeader(bytes.NewReader(test.input))
 			if !errors.Is(err, test.want) {
 				t.Errorf("error = %v, want one wrapping %v", err, test.want)
 			}
@@ -187,43 +220,44 @@ func TestReadRequestRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-func TestReadRequestWorksOneByteAtATime(t *testing.T) {
-	encoded, err := wire.AppendRequest(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandUDP, Destination: domainDestination(t, "dns.example", 53)})
+func TestReadRequestHeaderWorksOneByteAtATime(t *testing.T) {
+	encoded, err := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandUDP, Destination: domainDestination(t, "dns.example", 53)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, err := wire.ReadRequest(iotest.OneByteReader(bytes.NewReader(encoded)))
+	request, err := wire.ReadRequestHeader(iotest.OneByteReader(bytes.NewReader(encoded)))
 	if err != nil || request.Command != wire.CommandUDP {
-		t.Errorf("ReadRequest = %+v, %v", request, err)
+		t.Errorf("ReadRequestHeader = %+v, %v", request, err)
 	}
 }
 
-func TestAppendRequestRefusesWhatTheFormatCannotCarry(t *testing.T) {
+func TestAppendRequestHeaderRefusesWhatTheFormatCannotCarry(t *testing.T) {
 	longDomain := strings.Repeat("a", wire.MaxDomainLength+1)
 	tests := []struct {
 		name    string
 		request wire.Request
 		want    error
 	}{
-		{"mux", wire.Request{Command: wire.CommandMux, Destination: ipDestination(t, "192.0.2.1", 1)}, wire.ErrUnknownCommand},
+		{"mux with a destination", wire.Request{Command: wire.CommandMux, Destination: ipDestination(t, "192.0.2.1", 1)}, wire.ErrMuxNamesNoDestination},
+		{"reverse", wire.Request{Command: wire.CommandReverse}, wire.ErrUnknownCommand},
 		{"unknown command", wire.Request{Command: 9, Destination: ipDestination(t, "192.0.2.1", 1)}, wire.ErrUnknownCommand},
 		{"domain too long", wire.Request{Command: wire.CommandTCP, Destination: domainDestination(t, longDomain, 1)}, wire.ErrDomainTooLong},
 		{"flow too long for the length byte", wire.Request{Command: wire.CommandTCP, Flow: strings.Repeat("f", 300), Destination: ipDestination(t, "192.0.2.1", 1)}, wire.ErrMalformedAddons},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if _, err := wire.AppendRequest(nil, test.request); !errors.Is(err, test.want) {
+			if _, err := wire.AppendRequestHeader(nil, test.request); !errors.Is(err, test.want) {
 				t.Errorf("error = %v, want one wrapping %v", err, test.want)
 			}
 		})
 	}
-	if _, err := wire.AppendRequest(nil, wire.Request{Command: wire.CommandTCP}); err == nil {
+	if _, err := wire.AppendRequestHeader(nil, wire.Request{Command: wire.CommandTCP}); err == nil {
 		t.Error("a request with no destination was encoded")
 	}
 }
 
 func TestCommandOffsetSkipsTheAddons(t *testing.T) {
-	encoded, err := wire.AppendRequest(nil, wire.Request{
+	encoded, err := wire.AppendRequestHeader(nil, wire.Request{
 		UUID: sequentialUUID, Flow: "f", Command: wire.CommandUDP, Destination: ipDestination(t, "192.0.2.1", 80),
 	})
 	if err != nil {
