@@ -25,8 +25,7 @@ stack's handshakes can together take the sum of their timeouts.
 | UDP session idle | [`inbounds[].udp_session_idle_timeout`](inbound/index.md#udp_session_idle_timeout) | `5m` |
 | UDP route cache idle (a destination's routing decision kept) | [`inbounds[].udp_routing_cache_entry_idle_timeout`](inbound/index.md#udp_routing_cache_entry_idle_timeout) | `1m` |
 | UDP live entry idle (a destination listed as live, silence in either direction) | [`stats.tracking.udp_entry_idle_timeout`](stats.md#tracking) | `1m` |
-| Trojan request wait for the first payload (outbound) | [`trojan`](protocol/trojan.md#max_first_payload_delay) settings `max_first_payload_delay` | `400ms` |
-| VLESS request wait for the first payload (outbound) | [`vless`](protocol/vless.md#max_first_payload_delay) settings `max_first_payload_delay` | `400ms` |
+| Request wait for the first payload (`trojan`, `vless` outbounds) | the outbound's [`proxy_request_timing.max_delay`](outbound/index.md#proxy_request_timing) | `400ms` |
 | Fallback dial | internal | `10s` |
 | `ws` Close frame on close | internal | `1s` |
 | NAT socket idle | freedom `settings.nat.idle_timeout` | `5m` |
