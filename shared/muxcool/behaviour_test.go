@@ -114,7 +114,7 @@ func TestAnUnknownStatusClosesTheMainConnection(t *testing.T) {
 	if _, err := accepted.Stream.Read(make([]byte, 1)); !errors.Is(err, muxcool.ErrClosed) || !errors.Is(err, muxcool.ErrProtocol) {
 		t.Errorf("Read on a live sub-connection = %v, want ErrClosed caused by ErrProtocol", err)
 	}
-	if _, err := server.Accept(); !errors.Is(err, muxcool.ErrClosed) {
+	if _, err := server.AcceptSubConnection(); !errors.Is(err, muxcool.ErrClosed) {
 		t.Errorf("Accept = %v, want ErrClosed", err)
 	}
 }
@@ -228,7 +228,7 @@ func TestAServerRefusesANetworkItDoesNotAccept(t *testing.T) {
 }
 
 func TestAClientIgnoresANewFrameAndItsData(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	peer.send(newTCP(8, muxcool.OptionDataFollows, "example.com"), []byte("server-initiated"))
 
 	opened, err := client.OpenStream(domainDestinationNoT("example.com", 80))
@@ -248,7 +248,7 @@ func TestAClientIgnoresANewFrameAndItsData(t *testing.T) {
 }
 
 func TestAClientTellsTheServerAboutTheStreamsItOpensAndEnds(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	opened, _ := client.OpenStream(domainDestinationNoT("example.com", 80))
 	header, data := peer.receive(2 * time.Second)
 	if want := newTCP(1, 0, "example.com"); header != want || data != nil {
@@ -269,7 +269,7 @@ func TestAClientTellsTheServerAboutTheStreamsItOpensAndEnds(t *testing.T) {
 }
 
 func TestAClientNumbersItsSubConnectionsFromOneAndNeverReusesAnID(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	var ids []uint16
 	for range 4 {
 		opened, err := client.OpenStream(domainDestinationNoT("example.com", 80))
@@ -290,7 +290,7 @@ func TestAClientNumbersItsSubConnectionsFromOneAndNeverReusesAnID(t *testing.T) 
 }
 
 func TestKeepAliveIsSentWhenAsked(t *testing.T) {
-	client, peer := rawServerOf(t, muxcool.ClientOptions{})
+	client, peer := rawServerOf(t)
 	if err := client.SendKeepAlive(); err != nil {
 		t.Fatal(err)
 	}
