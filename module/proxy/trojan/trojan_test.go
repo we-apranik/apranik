@@ -483,20 +483,34 @@ func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
 	}
 }
 
-func TestConnectWaitsNoLongerThanMaxFirstPayloadDelayForThePayload(t *testing.T) {
-	underlyingStream := newWriteRecordingStream()
-	proxy := &trojan.Proxy{Settings: trojan.Settings{Password: "p", MaxFirstPayloadDelay: types.Pointer(types.Duration(30 * time.Millisecond))}}
+func newClientWithTiming(t *testing.T, options spec.ProxyRequestTimingOptions) spec.StreamProxyClient {
+	t.Helper()
+	proxy := &trojan.Proxy{Settings: trojan.Settings{Password: "p"}}
+	if err := proxy.ConfigureProxyRequestTiming(options); err != nil {
+		t.Fatal(err)
+	}
 	streamClient, err := proxy.NewStreamClient()
 	if err != nil {
 		t.Fatal(err)
 	}
+	return streamClient
+}
+
+func requestStreamTo(t *testing.T, streamClient spec.StreamProxyClient, underlyingStream writeRecordingStream, host string, port uint16) spec.Stream {
+	t.Helper()
 	upstream, err := streamClient.RequestStream(context.Background(), underlyingStream, spec.Metadata{
-		Network: spec.NetworkTCP, Destination: domainDestination("ssh.example", 22),
+		Network: spec.NetworkTCP, Destination: domainDestination(host, port),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer upstream.Close()
+	t.Cleanup(func() { upstream.Close() })
+	return upstream
+}
+
+func TestConnectWaitsNoLongerThanTheMaximumDelayForThePayload(t *testing.T) {
+	underlyingStream := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, spec.ProxyRequestTimingOptions{MaxDelay: 30 * time.Millisecond}), underlyingStream, "ssh.example", 22)
 
 	select {
 	case first := <-underlyingStream.writes:
@@ -504,16 +518,39 @@ func TestConnectWaitsNoLongerThanMaxFirstPayloadDelayForThePayload(t *testing.T)
 			t.Errorf("write = %q, want exactly one request", first)
 		}
 	case <-time.After(300 * time.Millisecond):
-		t.Fatal("the request waited past the configured max_first_payload_delay")
+		t.Fatal("the request waited past the configured maximum delay")
 	}
 }
 
-func TestAnInboundRefusesMaxFirstPayloadDelay(t *testing.T) {
-	settings := serverSettings
-	settings.MaxFirstPayloadDelay = types.Pointer(types.Duration(time.Second))
-	_, err := (&trojan.Proxy{Settings: settings}).NewStreamServer()
-	if err == nil || !strings.Contains(err.Error(), "max_first_payload_delay") {
-		t.Errorf("error = %v, want one naming max_first_payload_delay", err)
+func TestConnectSendsTheRequestAtOnceToASkippedPortAndWaitsForAnyOther(t *testing.T) {
+	options := spec.ProxyRequestTimingOptions{MaxDelay: time.Hour, SkipPorts: []uint16{25}}
+
+	skipped := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, options), skipped, "mail.example", 25)
+	select {
+	case first := <-skipped.writes:
+		if length, err := wire.RequestLength(first); err != nil || length != len(first) {
+			t.Errorf("write = %q, want exactly one request", first)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the request to a skipped port was not sent at once")
+	}
+
+	waiting := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, options), waiting, "web.example", 80)
+	expectNoWrite(t, waiting, 150*time.Millisecond)
+}
+
+func TestWithoutConfigureProxyRequestTimingEveryPortWaitsForThePayload(t *testing.T) {
+	underlyingStream := newWriteRecordingStream()
+	requestStreamTo(t, newClient(t, "p"), underlyingStream, "mail.example", 25)
+	expectNoWrite(t, underlyingStream, 150*time.Millisecond)
+}
+
+func TestConfigureProxyRequestTimingRefusesAMaximumDelayThatIsNotPositive(t *testing.T) {
+	proxy := &trojan.Proxy{Settings: trojan.Settings{Password: "p"}}
+	if err := proxy.ConfigureProxyRequestTiming(spec.ProxyRequestTimingOptions{}); err == nil {
+		t.Error("a zero maximum delay was accepted")
 	}
 }
 
