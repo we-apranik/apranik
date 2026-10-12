@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	defaultClientIdleTimeout = 15 * time.Second
 	defaultServerIdleTimeout = 60 * time.Second
 
 	// Holds a whole header, so a small frame costs no read of the carrier. PROVISIONAL.
@@ -61,10 +60,7 @@ type mainConnection struct {
 
 func newMainConnection(carrier io.ReadWriteCloser, isServer bool, maxConcurrent, maxTotal int, idleTimeout time.Duration, accepted Networks) *mainConnection {
 	if idleTimeout == 0 {
-		idleTimeout = defaultClientIdleTimeout
-		if isServer {
-			idleTimeout = defaultServerIdleTimeout
-		}
+		idleTimeout = defaultServerIdleTimeout
 	}
 	c := &mainConnection{
 		carrier:          carrier,
@@ -140,20 +136,6 @@ func (c *mainConnection) activeSubConnectionsCount() int {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	return len(c.subs)
-}
-
-// cannotOpenMoreLocked: the caller holds c.mutex.
-func (c *mainConnection) cannotOpenMoreLocked() bool {
-	return c.closed ||
-		c.nextID >= idCount ||
-		(c.maxConcurrent > 0 && len(c.subs) >= c.maxConcurrent) ||
-		(c.maxTotal > 0 && c.everOpened >= c.maxTotal)
-}
-
-func (c *mainConnection) cannotOpenMore() bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	return c.cannotOpenMoreLocked()
 }
 
 // The idle clock runs while no sub-connection is open; a stale timer finds another generation.

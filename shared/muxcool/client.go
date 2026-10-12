@@ -3,30 +3,19 @@ package muxcool
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/The-Apranik/Apranik/spec"
 )
-
-type ClientOptions struct {
-	// Zero means no limit. Xray's client uses 8.
-	MaxConcurrentSubConnections int
-
-	// Over the life of the main connection. Zero means no limit. Xray's client uses 128.
-	MaxTotalSubConnections int
-
-	// Zero is 15 seconds; a negative value never closes.
-	IdleTimeout time.Duration
-}
 
 // Client is safe for concurrent use.
 type Client struct {
 	connection *mainConnection
 }
 
-// NewClient takes ownership of carrier, which Close closes.
-func NewClient(carrier io.ReadWriteCloser, options ClientOptions) *Client {
-	return &Client{connection: newMainConnection(carrier, false, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, 0)}
+// NewClient takes ownership of carrier, which Close closes. The client end has no
+// limits and no idle timer: the caller counts sub-connections and closes the Client.
+func NewClient(carrier io.ReadWriteCloser) *Client {
+	return &Client{connection: newMainConnection(carrier, false, 0, 0, -1, 0)}
 }
 
 // OpenStream sends the New frame at once, with no data.
@@ -59,9 +48,6 @@ func (c *Client) OpenDatagram(destination spec.Destination, options DatagramOpti
 	return &datagram{sub}, nil
 }
 
-// CanOpenSubConnection is a hint: OpenStream and OpenDatagram can still return ErrSubConnectionLimit.
-func (c *Client) CanOpenSubConnection() bool { return !c.connection.cannotOpenMore() }
-
 func (c *Client) ActiveSubConnectionsCount() int { return c.connection.activeSubConnectionsCount() }
 
 func (c *Client) SendKeepAlive() error { return c.connection.sendKeepAlive() }
@@ -80,8 +66,8 @@ func (c *mainConnection) open(network Network, destination spec.Destination) (*s
 	if c.closed {
 		return nil, closedError(c.closeCause)
 	}
-	if c.cannotOpenMoreLocked() {
-		return nil, ErrSubConnectionLimit
+	if c.nextID >= idCount {
+		return nil, errIDsUsedUp
 	}
 	sub := newSubConnection(c, uint16(c.nextID), network, destination, false)
 	c.nextID++

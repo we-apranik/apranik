@@ -11,11 +11,6 @@ var (
 	// is closed, or a main connection closed for being idle.
 	ErrClosed = errors.New("muxcool: closed")
 
-	// ErrSubConnectionLimit is an attempt to open a sub-connection past MaxConcurrentSubConnections,
-	// MaxTotalSubConnections, or the 65535 IDs one main connection has.
-	// The caller uses another main connection.
-	ErrSubConnectionLimit = errors.New("muxcool: no room for another sub-connection on this main connection")
-
 	// ErrRemoteReset is a sub-connection the peer ended with the error bit set.
 	ErrRemoteReset = errors.New("muxcool: sub-connection ended by the peer with an error")
 
@@ -28,3 +23,5 @@ var (
 	// UDP sub-connection was opened for.
 	ErrDestinationNotBound = errors.New("muxcool: destination is not the one this sub-connection is bound to")
 )
+
+var errIDsUsedUp = errors.New("muxcool: all 65535 sub-connection IDs of this main connection are used")
