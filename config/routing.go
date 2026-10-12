@@ -17,14 +17,10 @@ import (
 	"github.com/The-Apranik/Apranik/core/route/router/match"
 )
 
-// The routing section. Its datasets moved to the top
-// level, where DNS rules reach them too.
+// The routing section. Datasets are top-level.
 type rawRouting struct {
 	Rules         []rawRule  `json:"rules"`
 	DefaultAction *rawModule `json:"default_action"`
-
-	// Read only to say where datasets moved.
-	MovedDatasets json.RawMessage `json:"datasets"`
 }
 
 type rawDataset struct {
@@ -113,10 +109,6 @@ const (
 func (b *configBuilder) buildRouting(raw rawRouting, loc string) *blueprint.Routing {
 	routing := &blueprint.Routing{}
 
-	if raw.MovedDatasets != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "datasets"),
-			`datasets moved to the top level of the config, beside routing, so dns rules can use them too: "datasets": [...]`)
-	}
 	for index, rule := range raw.Rules {
 		ruleLoc := indexLocation(fieldLocation(loc, "rules"), index)
 		built := blueprint.Rule{Match: b.buildMatch(rule.Match, fieldLocation(ruleLoc, "match"))}
