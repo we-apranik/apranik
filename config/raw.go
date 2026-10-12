@@ -83,18 +83,8 @@ type rawInbound struct {
 	MaxTCPConnections *int `json:"max_tcp_connections"`
 	MaxUDPSessions    *int `json:"max_udp_sessions"`
 
-	// Renamed max_tcp_connections; read only to say so.
-	MovedMaxConnections json.RawMessage `json:"max_connections"`
-
 	Transport []rawModule `json:"transport"`
 	Protocol  rawModule   `json:"protocol"`
-
-	// Moved to a routing rule's sniff action; read only to say so.
-	MovedSniffing json.RawMessage `json:"sniffing"`
-
-	// Moved into each transport's and protocol's own settings; read only to
-	// say so.
-	MovedHandshakeTimeout json.RawMessage `json:"handshake_timeout"`
 
 	// Absent means a request the proxy refuses is closed.
 	Fallback *rawFallback `json:"fallback"`
@@ -113,10 +103,6 @@ type rawOutbound struct {
 	Server     string `json:"server"`
 	ServerPort uint16 `json:"server_port"`
 
-	// Moved to tcp's and the protocol's own settings; read only to say so.
-	MovedDialTimeout      json.RawMessage `json:"dial_timeout"`
-	MovedHandshakeTimeout json.RawMessage `json:"handshake_timeout"`
-
 	// A proxy protocol's way to its server, or freedom's to each destination.
 	Transport []rawModule `json:"transport"`
 
@@ -128,6 +114,19 @@ type rawOutbound struct {
 
 	// How a proxy outbound uses Mux.Cool.
 	MuxCool *rawMuxCool `json:"muxcool"`
+
+	// When a proxy outbound's client sends its request.
+	ProxyRequestTiming *rawProxyRequestTiming `json:"proxy_request_timing"`
+}
+
+type rawProxyRequestTiming struct {
+	MaxDelay *types.Duration            `json:"max_delay"`
+	Skip     *rawProxyRequestTimingSkip `json:"skip"`
+}
+
+type rawProxyRequestTimingSkip struct {
+	Enabled *bool `json:"enabled"`
+	Ports   []int `json:"ports"`
 }
 
 type rawMuxCool struct {
@@ -167,9 +166,6 @@ type rawProbe struct {
 type rawFreedomSettings struct {
 	NAT *rawNAT         `json:"nat"`
 	UDP json.RawMessage `json:"udp"`
-
-	// Moved to the transport stack; read only to say so.
-	MovedTCP json.RawMessage `json:"tcp"`
 }
 
 // Mixed's halves are always the socks5 and http modules, so only their
