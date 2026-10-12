@@ -56,10 +56,10 @@ func pair(t testing.TB, serverOptions muxcool.ServerOptions) (*muxcool.Client, *
 }
 
 // acceptWithin fails the test rather than hang when no sub-connection comes.
-func acceptWithin(t testing.TB, server *muxcool.Server, within time.Duration) muxcool.Accepted {
+func acceptWithin(t testing.TB, server *muxcool.Server, within time.Duration) muxcool.AcceptedSubConnection {
 	t.Helper()
 	type result struct {
-		accepted muxcool.Accepted
+		accepted muxcool.AcceptedSubConnection
 		err      error
 	}
 	results := make(chan result, 1)
@@ -75,7 +75,7 @@ func acceptWithin(t testing.TB, server *muxcool.Server, within time.Duration) mu
 		return got.accepted
 	case <-time.After(within):
 		t.Fatal("Accept did not return")
-		return muxcool.Accepted{}
+		return muxcool.AcceptedSubConnection{}
 	}
 }
 

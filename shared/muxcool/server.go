@@ -21,8 +21,8 @@ type ServerOptions struct {
 	AcceptedNetworks Networks
 }
 
-// Accepted is a sub-connection the peer opened: Stream for TCP, Datagram for UDP.
-type Accepted struct {
+// AcceptedSubConnection is a sub-connection the peer opened: Stream for TCP, Datagram for UDP.
+type AcceptedSubConnection struct {
 	Destination spec.Destination
 	Stream      spec.Stream
 	Datagram    spec.Datagram
@@ -41,14 +41,14 @@ func NewServer(carrier io.ReadWriteCloser, options ServerOptions) *Server {
 	return &Server{connection: newMainConnection(carrier, true, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, options.AcceptedNetworks)}
 }
 
-func (s *Server) AcceptSubConnection() (Accepted, error) {
+func (s *Server) AcceptSubConnection() (AcceptedSubConnection, error) {
 	c := s.connection
 	for {
 		c.mutex.Lock()
 		if c.closed {
 			cause := c.closeCause
 			c.mutex.Unlock()
-			return Accepted{}, closedError(cause)
+			return AcceptedSubConnection{}, closedError(cause)
 		}
 		if len(c.acceptQueue) > 0 {
 			sub := c.acceptQueue[0]
@@ -66,8 +66,8 @@ func (s *Server) AcceptSubConnection() (Accepted, error) {
 	}
 }
 
-func acceptedFrom(sub *subConnection) Accepted {
-	accepted := Accepted{Destination: sub.destination}
+func acceptedFrom(sub *subConnection) AcceptedSubConnection {
+	accepted := AcceptedSubConnection{Destination: sub.destination}
 	if sub.network == NetworkTCP {
 		accepted.Stream = &stream{sub}
 	} else {
