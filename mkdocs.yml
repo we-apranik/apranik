@@ -90,6 +90,7 @@ plugins:
         How it works:
           - architecture.md
           - request-lifecycle.md
+          - mux-cool.md
         Design:
           - design/open-questions.md
           - design/threat-model.md
@@ -156,6 +157,7 @@ nav:
   - How it works:
       - Architecture: architecture.md
       - Request lifecycle: request-lifecycle.md
+      - Mux.Cool on the wire: mux-cool.md
   - Contribute:
       - Contributing guide: contributing.md
       - Practices: contributors/practices.md
