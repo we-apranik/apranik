@@ -1,6 +1,7 @@
 // Package vless is the VLESS proxy module: a UUID, a command and a destination
 // in a header, then raw payload. CONNECT gives a stream; UDP gives datagrams
-// framed inside the stream, plain (no XUDP): one stream carries one destination.
+// framed inside the stream, either plain (one stream carries one destination) or
+// as XUDP over Mux.Cool (one stream carries every destination of a UDP session).
 package vless
 
 import (
@@ -18,13 +19,16 @@ import (
 type Proxy struct {
 	Settings
 
+	// Set by ConfigureMuxCool before any client is built.
+	xudp bool
+
 	buildServerOnce sync.Once
 	builtServer     *server
 	buildServerErr  error
 }
 
 func (*Proxy) Info() spec.ModuleInfo {
-	return spec.ModuleInfo{Name: "vless", Description: "VLESS proxy, CONNECT and plain UDP framed in the stream"}
+	return spec.ModuleInfo{Name: "vless", Description: "VLESS proxy, CONNECT and UDP framed in the stream, plain or XUDP"}
 }
 
 func (p *Proxy) NewStreamServer() (spec.StreamProxyServer, error) { return p.newSharedServer() }
@@ -37,6 +41,14 @@ func (p *Proxy) NewStreamClient() (spec.StreamProxyClient, error) { return p.new
 
 func (p *Proxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClient, error) {
 	return p.newClient()
+}
+
+// ConfigureMuxCool is called by core with what the outbound's muxcool key says:
+// whether UDP goes out as XUDP. A server needs nothing, since it takes either
+// form by the command of the request.
+func (p *Proxy) ConfigureMuxCool(options spec.MuxCoolOptions) error {
+	p.xudp = options.XUDP
+	return nil
 }
 
 func (p *Proxy) newSharedServer() (*server, error) {
@@ -64,7 +76,7 @@ func (p *Proxy) newClient() (*client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{uuid: uuid, maxFirstPayloadDelay: p.maxFirstPayloadDelay()}, nil
+	return &client{uuid: uuid, maxFirstPayloadDelay: p.maxFirstPayloadDelay(), xudp: p.xudp}, nil
 }
 
 func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule { return &Proxy{} }
