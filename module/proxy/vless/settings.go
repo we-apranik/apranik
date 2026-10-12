@@ -28,27 +28,13 @@ type Settings struct {
 	// its request with the first payload and waits for no answer, so it has
 	// nothing to bound. Absent means defaultHandshakeTimeout; a written zero is refused.
 	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
-
-	// Client: the longest the request waits for the application's first bytes
-	// to travel with it (a server-first protocol such as SSH sends nothing, so
-	// after this the request goes alone). An inbound refuses it. Absent means
-	// defaultMaxFirstPayloadDelay; a written zero is refused.
-	MaxFirstPayloadDelay *types.Duration `json:"max_first_payload_delay"`
 }
 
 // PROVISIONAL.
 const defaultHandshakeTimeout = 10 * time.Second
 
-// PROVISIONAL: 400 ms. Xray waits 500 ms in its VLESS client and 100 ms in its
-// Trojan, VMess and Shadowsocks clients, sing-box 300 ms; none of them says why.
-const defaultMaxFirstPayloadDelay = 400 * time.Millisecond
-
 func (s *Settings) handshakeTimeout() time.Duration {
 	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
-}
-
-func (s *Settings) maxFirstPayloadDelay() time.Duration {
-	return time.Duration(types.ValueOrDefault(s.MaxFirstPayloadDelay, types.Duration(defaultMaxFirstPayloadDelay)))
 }
 
 type User struct {
@@ -61,9 +47,6 @@ type User struct {
 func (s *Settings) Validate() error {
 	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
 		return fmt.Errorf("vless: handshake_timeout %w", err)
-	}
-	if err := types.CheckPositive(s.MaxFirstPayloadDelay); err != nil {
-		return fmt.Errorf("vless: max_first_payload_delay %w", err)
 	}
 	if s.UUID == "" && len(s.Users) == 0 {
 		return errors.New("vless: set uuid for an outbound, or users for an inbound")
@@ -118,9 +101,6 @@ func (s *Settings) checkAsServer() error {
 	}
 	if len(s.Users) == 0 {
 		return errors.New("vless: an inbound needs users")
-	}
-	if s.MaxFirstPayloadDelay != nil {
-		return errors.New("vless: max_first_payload_delay is for an outbound; an inbound has no request to send")
 	}
 	return nil
 }
