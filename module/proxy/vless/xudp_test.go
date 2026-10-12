@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -448,5 +449,30 @@ func TestAClientEndingItsSubConnectionWithTheErrorBitIsTheEndOfTheSession(t *tes
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("ReadFrom did not return after the End")
+	}
+}
+
+func TestSkippedPortsDoNotChangeXUDPWhichStillWaitsForTheFirstFrame(t *testing.T) {
+	proxy := &vless.Proxy{Settings: vless.Settings{UUID: aliceUUID}}
+	if err := proxy.ConfigureMuxCool(spec.MuxCoolOptions{XUDP: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := proxy.ConfigureProxyRequestTiming(spec.ProxyRequestTimingOptions{MaxDelay: time.Hour, SkipPorts: []uint16{53}}); err != nil {
+		t.Fatal(err)
+	}
+	datagramClient, err := proxy.NewDatagramOverStreamClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientSide, serverSide := pipe(t)
+	datagram, err := datagramClient.(client).RequestDatagramOverStream(context.Background(), clientSide, spec.Metadata{Network: spec.NetworkUDP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer datagram.Close()
+
+	serverSide.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
+	if n, err := serverSide.Read(make([]byte, 100)); n != 0 || !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Errorf("Read = %d, %v, want nothing on the wire before the first datagram", n, err)
 	}
 }
