@@ -219,23 +219,78 @@ func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
 	upstream.Close()
 }
 
-func TestConnectSendsTheRequestAloneOnceMaxFirstPayloadDelayHasPassed(t *testing.T) {
-	underlyingStream := newWriteRecordingStream()
-	upstream, err := newClientWith(t, vless.Settings{UUID: aliceUUID, MaxFirstPayloadDelay: types.Pointer(types.Duration(30 * time.Millisecond))}).
-		RequestStream(context.Background(), underlyingStream, spec.Metadata{Network: spec.NetworkTCP, Destination: domainDestination("ssh.example", 22)})
+func newClientWithTiming(t *testing.T, options spec.ProxyRequestTimingOptions) client {
+	t.Helper()
+	proxy := &vless.Proxy{Settings: vless.Settings{UUID: aliceUUID}}
+	if err := proxy.ConfigureProxyRequestTiming(options); err != nil {
+		t.Fatal(err)
+	}
+	streamClient, err := proxy.NewStreamClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer upstream.Close()
+	return streamClient.(client)
+}
 
+func requestStreamTo(t *testing.T, vlessClient client, underlyingStream writeRecordingStream, host string, port uint16) {
+	t.Helper()
+	upstream, err := vlessClient.RequestStream(context.Background(), underlyingStream, spec.Metadata{Network: spec.NetworkTCP, Destination: domainDestination(host, port)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { upstream.Close() })
+}
+
+func expectOneRequestAlone(t *testing.T, underlyingStream writeRecordingStream, destination spec.Destination) {
+	t.Helper()
 	select {
 	case first := <-underlyingStream.writes:
 		request, err := wire.ReadRequestHeader(bytes.NewReader(first))
-		if err != nil || request.Destination != domainDestination("ssh.example", 22) {
+		if err != nil || request.Destination != destination {
 			t.Errorf("write = %q, %v, want exactly one request", first, err)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("the request was never sent")
+	}
+}
+
+func expectNoWrite(t *testing.T, underlyingStream writeRecordingStream, within time.Duration) {
+	t.Helper()
+	select {
+	case written := <-underlyingStream.writes:
+		t.Fatalf("wrote %q, want nothing yet", written)
+	case <-time.After(within):
+	}
+}
+
+func TestConnectSendsTheRequestAloneOnceTheMaximumDelayHasPassed(t *testing.T) {
+	underlyingStream := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, spec.ProxyRequestTimingOptions{MaxDelay: 30 * time.Millisecond}), underlyingStream, "ssh.example", 22)
+	expectOneRequestAlone(t, underlyingStream, domainDestination("ssh.example", 22))
+}
+
+func TestConnectSendsTheRequestAtOnceToASkippedPortAndWaitsForAnyOther(t *testing.T) {
+	options := spec.ProxyRequestTimingOptions{MaxDelay: time.Hour, SkipPorts: []uint16{25}}
+
+	skipped := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, options), skipped, "mail.example", 25)
+	expectOneRequestAlone(t, skipped, domainDestination("mail.example", 25))
+
+	waiting := newWriteRecordingStream()
+	requestStreamTo(t, newClientWithTiming(t, options), waiting, "web.example", 80)
+	expectNoWrite(t, waiting, 150*time.Millisecond)
+}
+
+func TestWithoutConfigureProxyRequestTimingEveryPortWaitsForThePayload(t *testing.T) {
+	underlyingStream := newWriteRecordingStream()
+	requestStreamTo(t, newClient(t, aliceUUID), underlyingStream, "mail.example", 25)
+	expectNoWrite(t, underlyingStream, 150*time.Millisecond)
+}
+
+func TestConfigureProxyRequestTimingRefusesAMaximumDelayThatIsNotPositive(t *testing.T) {
+	proxy := &vless.Proxy{Settings: vless.Settings{UUID: aliceUUID}}
+	if err := proxy.ConfigureProxyRequestTiming(spec.ProxyRequestTimingOptions{}); err == nil {
+		t.Error("a zero maximum delay was accepted")
 	}
 }
 
