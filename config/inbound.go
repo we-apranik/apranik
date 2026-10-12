@@ -61,21 +61,6 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 		}
 	}
 
-	if raw.MovedSniffing != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "sniffing"),
-			`sniffing moved to a routing rule: {"match": {"inbound": [%q]}, "action": {"type": "sniff", "settings": {"sniffers": [...]}}}`, raw.Tag)
-	}
-
-	if raw.MovedMaxConnections != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "max_connections"),
-			"max_connections was renamed max_tcp_connections; UDP sessions have their own limit, max_udp_sessions")
-	}
-
-	if raw.MovedHandshakeTimeout != nil {
-		b.diagnostics.errorf(fieldLocation(loc, "handshake_timeout"),
-			`handshake_timeout moved into each layer's own settings: {"type": "tls", "settings": {"handshake_timeout": "10s"}}, and likewise for every transport and protocol`)
-	}
-
 	return inbound
 }
 
