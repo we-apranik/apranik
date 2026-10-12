@@ -3,17 +3,15 @@ package vless
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
 	"github.com/The-Apranik/Apranik/shared/delayedrequest"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
 type client struct {
-	uuid                 wire.UUID
-	maxFirstPayloadDelay time.Duration
-	xudp                 bool
+	uuid          wire.UUID
+	requestTiming delayedrequest.Policy
+	xudp          bool
 }
 
 // Nothing goes on the wire here. The request travels with the first payload,
@@ -28,7 +26,7 @@ func (c *client) RequestStream(ctx context.Context, underlyingStream spec.Stream
 	if err != nil {
 		return nil, err
 	}
-	delayed := delayedrequest.NewStream(underlyingStream, request, c.maxFirstPayloadDelay)
+	delayed := delayedrequest.NewStream(underlyingStream, request, c.requestTiming.DelayForDestinationPort(metadata.Destination.Port()))
 	return &responseHeaderSkippingStream{Stream: delayed}, nil
 }
 
