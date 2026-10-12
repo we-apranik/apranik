@@ -475,6 +475,15 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (comp
 		}
 	}
 
+	// Likewise: Check has refused a proxy_request_timing key on a protocol that
+	// cannot carry it, and one without a key is told the defaults.
+	if configurable, ok := outboundBlueprint.Proxy.(spec.ProxyRequestTimingConfigurable); ok {
+		if err := configurable.ConfigureProxyRequestTiming(outboundBlueprint.ProxyRequestTiming.Options()); err != nil {
+			dialer.Close()
+			return nil, fmt.Errorf("outbound %q: proxy %q: %w", outboundBlueprint.Tag, outboundBlueprint.Proxy.Info().Name, err)
+		}
+	}
+
 	proxyClient, err := outboundBlueprint.Proxy.NewStreamClient()
 	if err != nil {
 		dialer.Close()
