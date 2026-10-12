@@ -58,7 +58,7 @@ Early and working. Two dependencies: uTLS, and `golang.org/x/net` for its DNS me
 | Area | Available |
 | --- | --- |
 | Transports | `tcp` (base stream), `udp` (base datagram), `tls` (Chrome's ClientHello by default, via uTLS), `ws` and `httpupgrade` (stream overlays) |
-| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`), `vless` (CONNECT and plain UDP, named users, fallback; tested against Xray and sing-box over plain `tcp`; no XUDP, Vision or Mux yet) |
+| Proxy protocols | `socks5` (CONNECT, UDP ASSOCIATE, RFC 1929 auth), `http` (CONNECT, absolute-form, Basic auth), `trojan` (CONNECT and UDP, named users, fallback; tested against Xray over `tls`, `ws` and `httpupgrade`), `vless` (CONNECT, plain UDP and XUDP, named users, fallback; tested against Xray and sing-box over plain `tcp`; no Vision or TCP over Mux yet) |
 | Inbounds | any proxy protocol over any stream transport, and `mixed` (SOCKS5 and HTTP on one port) |
 | Outbounds | proxy outbounds over any stream transport stack (UDP too, for Trojan and VLESS), `freedom` (straight to the destination) and `block` (refuses everything) |
 | Sniffers | `tls` (SNI from a ClientHello), `http` (Host header), per inbound, off by default |
