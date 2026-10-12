@@ -388,16 +388,6 @@ func TestFreedomsTransportMustStartWithTCP(t *testing.T) {
 	}
 }
 
-func TestFreedomsOldTCPSettingsAreRefused(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"protocol": {"type": "freedom"}`,
-		`"protocol": {"type": "freedom", "settings": {"tcp": {"keep_alive": "15s"}}}`, 1)
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.tcp", "freedom no longer takes tcp here") {
-		t.Errorf("settings.tcp was not refused clearly: %v", diagnostics)
-	}
-}
-
 func TestATransportWithNoServerSideIsRefusedOnAnInbound(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"transport": [{"type": "tcp"}],
@@ -637,21 +627,25 @@ func TestFileOutputNeedsAPath(t *testing.T) {
 
 // ---------- removed fields ----------
 
-func TestInboundSniffingPointsToTheSniffAction(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"protocol": {"type": "socks5",`,
-		`"sniffing": {"sniffers": [{"type": "tls"}]}, "protocol": {"type": "socks5",`, 1)
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "inbounds[0].sniffing", `"type": "sniff"`) {
-		t.Errorf("inbound sniffing was not refused with a pointer to the sniff action: %v", diagnostics)
-	}
-}
-
-func TestBlockOutboundPointsToTheBlockAction(t *testing.T) {
-	document := strings.Replace(goodDocument, `"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`, 1)
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].protocol.type", "routing action") {
-		t.Errorf("a block outbound was not refused with a pointer to the block action: %v", diagnostics)
+// Keys that once lived elsewhere have no pointer: the project has no users, so
+// each is an unknown key like any other, refused in strict mode.
+func TestKeysThatOnceLivedElsewhereAreUnknownNow(t *testing.T) {
+	for name, replacement := range map[string][2]string{
+		"inbound sniffing":           {`"protocol": {"type": "socks5",`, `"sniffing": {"sniffers": [{"type": "tls"}]}, "protocol": {"type": "socks5",`},
+		"inbound max_connections":    {`"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "max_connections": 10,`},
+		"inbound handshake_timeout":  {`"listen": "127.0.0.1",`, `"listen": "127.0.0.1", "handshake_timeout": "5s",`},
+		"outbound dial_timeout":      {`"tag": "freedom",`, `"tag": "freedom", "dial_timeout": "5s",`},
+		"outbound handshake_timeout": {`"tag": "freedom",`, `"tag": "freedom", "handshake_timeout": "5s",`},
+		"freedom settings.tcp":       {`"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"tcp": {"keep_alive": "15s"}}}`},
+		"udp resolve_timeout":        {`"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s"}}}`},
+		"udp resolve_cache_ttl":      {`"protocol": {"type": "freedom"}`, `"protocol": {"type": "freedom", "settings": {"udp": {"resolve_cache_ttl": "1m"}}}`},
+		"block as an outbound":       {`"protocol": {"type": "freedom"}`, `"protocol": {"type": "block"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, failed := loadAndCheck(t, strings.Replace(goodDocument, replacement[0], replacement[1], 1)); !failed {
+				t.Errorf("%s was accepted, want it refused", name)
+			}
+		})
 	}
 }
 
@@ -670,16 +664,6 @@ func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 	if inbound.TCPIdleTimeout == nil || *inbound.TCPIdleTimeout != 2*time.Minute ||
 		inbound.UDPSessionIdleTimeout == nil || *inbound.UDPSessionIdleTimeout != 90*time.Second {
 		t.Errorf("inbound timeouts = %v, %v; want 2m, 90s", inbound.TCPIdleTimeout, inbound.UDPSessionIdleTimeout)
-	}
-}
-
-func TestUDPResolveSettingsPointToTheDNSSection(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"protocol": {"type": "freedom"}`,
-		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "3s", "resolve_cache_ttl": "1m"}}}`, 1)
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.udp", "moved to the dns section") {
-		t.Errorf("udp's resolve settings were not refused with a pointer to dns: %v", diagnostics)
 	}
 }
 
@@ -759,27 +743,6 @@ func TestTheOldUDPLiveConnectionsKeysAreUnknownNow(t *testing.T) {
 	}
 }
 
-// The old keys beside the components are refused with where they moved.
-func TestTheMovedTimeoutKeysPointToTheirNewPlace(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"listen": "127.0.0.1",`,
-		`"listen": "127.0.0.1", "handshake_timeout": "5s",`, 1)
-	document = strings.Replace(document,
-		`"tag": "freedom",`,
-		`"tag": "freedom", "dial_timeout": "5s", "handshake_timeout": "5s",`, 1)
-
-	diagnostics, failed := loadAndCheck(t, document)
-	for _, want := range []struct{ location, text string }{
-		{"inbounds[0].handshake_timeout", "each layer's own settings"},
-		{"outbounds[0].dial_timeout", "tcp's settings"},
-		{"outbounds[0].handshake_timeout", "each layer's own settings"},
-	} {
-		if !failed || !find(diagnostics, want.location, want.text) {
-			t.Errorf("%s was not refused with where it moved: %v", want.location, diagnostics)
-		}
-	}
-}
-
 func TestATimeoutInsideALayersSettingsIsAccepted(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"protocol": {"type": "freedom"}`,
@@ -787,17 +750,6 @@ func TestATimeoutInsideALayersSettingsIsAccepted(t *testing.T) {
 
 	if diagnostics, failed := loadAndCheck(t, document); failed {
 		t.Errorf("tcp's dial_timeout was refused: %v", diagnostics)
-	}
-}
-
-func TestANegativeResolveTimeoutIsRefused(t *testing.T) {
-	document := strings.Replace(goodDocument,
-		`"protocol": {"type": "freedom"}`,
-		`"protocol": {"type": "freedom", "settings": {"udp": {"resolve_timeout": "-1s"}}}`, 1)
-
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "outbounds[0].protocol.settings.udp", "resolve_timeout") {
-		t.Errorf("a negative resolve timeout was not refused with its path: %v", diagnostics)
 	}
 }
 
@@ -1061,15 +1013,6 @@ func TestNoLimitIsSetUnlessTheConfigAsksForOne(t *testing.T) {
 	requireNoErrors(t, diagnostics)
 	if inbound := configuration.Inbounds[0]; inbound.MaxTCPConnections != nil || inbound.MaxUDPSessions != nil {
 		t.Errorf("limits = %v TCP connections, %v UDP sessions, want both absent (no limit)", inbound.MaxTCPConnections, inbound.MaxUDPSessions)
-	}
-}
-
-func TestTheOldMaxConnectionsKeyIsRefusedWithItsNewName(t *testing.T) {
-	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_connections": 500,`, 1)
-
-	diagnostics, failed := loadAndCheck(t, document)
-	if !failed || !find(diagnostics, "inbounds[0].max_connections", "max_tcp_connections") {
-		t.Errorf("max_connections was not refused with its new name: %v", diagnostics)
 	}
 }
 
