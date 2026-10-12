@@ -5,11 +5,9 @@ The base datagram transport. Today it is configured only inside
 its own.
 
 A datagram addressed to a domain is resolved through the
-[resolver](../dns/index.md), like every other lookup. The settings
-`resolve_timeout` and `resolve_cache_ttl` it once had moved there: each DNS
-server bounds its own queries with its `timeout`, and answers are cached for
-their TTL under [`dns.cache`](../dns/index.md#cache). A config that still sets
-them is refused with a pointer.
+[resolver](../dns/index.md), like every other lookup: each DNS server bounds
+its own queries with its `timeout`, and answers are cached for their TTL under
+[`dns.cache`](../dns/index.md#cache). `udp` has no settings for either.
 
 ## Structure
 
