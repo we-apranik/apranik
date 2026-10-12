@@ -85,7 +85,7 @@ func TestTheFirstDatagramCarriesTheRequestAndLaterOnesDoNot(t *testing.T) {
 	datagram.WriteTo([]byte("one"), dns)
 	first := <-underlying.writes
 	reader := bytes.NewReader(first)
-	request, err := wire.ReadRequest(reader)
+	request, err := wire.ReadRequestHeader(reader)
 	if err != nil || request.Command != wire.CommandUDP || request.Destination != dns {
 		t.Fatalf("first write: request = %+v, %v, want UDP to %s", request, err, dns)
 	}
@@ -102,7 +102,7 @@ func TestTheFirstDatagramCarriesTheRequestAndLaterOnesDoNot(t *testing.T) {
 func TestAServerDatagramPutsTheAnswerHeaderInFrontOfTheFirstReplyOnly(t *testing.T) {
 	underlying := &halfCloseRecordingStream{writes: make(chan []byte, 4)}
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	request, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Command: wire.CommandUDP, Destination: ipDestination("1.1.1.1", 53)})
+	request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Command: wire.CommandUDP, Destination: ipDestination("1.1.1.1", 53)})
 	underlying.input = bytes.NewReader(request)
 
 	datagram, _, err := newServer(t).AcceptDatagramOverStream(context.Background(), underlying)
@@ -134,7 +134,7 @@ func TestADatagramTooLargeForTheLengthFieldIsRefusedByBothEnds(t *testing.T) {
 func TestAReplyLargerThanTheBufferIsReportedAndTheNextOneStillReads(t *testing.T) {
 	underlying := &halfCloseRecordingStream{writes: make(chan []byte, 4)}
 	uuid, _ := wire.ParseUUID(aliceUUID)
-	request, _ := wire.AppendRequest(nil, wire.Request{UUID: uuid, Command: wire.CommandUDP, Destination: ipDestination("1.1.1.1", 53)})
+	request, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: uuid, Command: wire.CommandUDP, Destination: ipDestination("1.1.1.1", 53)})
 	frames, _ := wire.AppendUDPFrame(nil, []byte(strings.Repeat("x", 100)))
 	frames, _ = wire.AppendUDPFrame(frames, []byte("next"))
 	underlying.input = bytes.NewReader(append(request, frames...))
