@@ -35,13 +35,13 @@ type Server struct {
 
 // NewServer takes ownership of carrier, which Close closes.
 //
-// The reader waits for a sub-connection's first data to be read, so Accept and a
+// The reader waits for a sub-connection's first data to be read, so AcceptSubConnection and a
 // Read must follow promptly.
 func NewServer(carrier io.ReadWriteCloser, options ServerOptions) *Server {
 	return &Server{connection: newMainConnection(carrier, true, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, options.AcceptedNetworks)}
 }
 
-func (s *Server) Accept() (Accepted, error) {
+func (s *Server) AcceptSubConnection() (Accepted, error) {
 	c := s.connection
 	for {
 		c.mutex.Lock()
