@@ -64,6 +64,7 @@ var (
 	ErrEmptyDomain            = vmessaddr.ErrEmptyDomain
 	ErrDomainTooLong          = vmessaddr.ErrDomainTooLong
 	ErrInvalidUUID            = errors.New("vless: invalid UUID")
+	ErrMuxNamesNoDestination  = errors.New("vless: a Mux request names no destination")
 )
 
 // UUID is the credential of a user, exactly as it appears on the wire. Never
@@ -147,10 +148,17 @@ type Request struct {
 	Destination spec.Destination
 }
 
-// AppendRequest encodes the header for a TCP or UDP command, refusing a
+// AppendRequestHeader encodes the header for a TCP, UDP or Mux command, refusing a
 // destination the address format cannot carry before anything reaches the wire.
-func AppendRequest(destination []byte, request Request) ([]byte, error) {
-	if request.Command != CommandTCP && request.Command != CommandUDP {
+// A Mux request carries no port and no address, so it must be given none.
+func AppendRequestHeader(destination []byte, request Request) ([]byte, error) {
+	switch request.Command {
+	case CommandTCP, CommandUDP:
+	case CommandMux:
+		if request.Destination.IsValid() {
+			return nil, ErrMuxNamesNoDestination
+		}
+	default:
 		return nil, fmt.Errorf("%w: X'%02X'", ErrUnknownCommand, request.Command)
 	}
 	addons, err := appendAddons(nil, request.Flow)
@@ -163,12 +171,15 @@ func AppendRequest(destination []byte, request Request) ([]byte, error) {
 	destination = append(destination, byte(len(addons)))
 	destination = append(destination, addons...)
 	destination = append(destination, request.Command)
+	if request.Command == CommandMux {
+		return destination, nil
+	}
 	return vmessaddr.AppendAddress(destination, request.Destination)
 }
 
-// ReadRequest reads exactly one header and nothing after it, so the payload
+// ReadRequestHeader reads exactly one header and nothing after it, so the payload
 // that follows in the same segment stays in the reader.
-func ReadRequest(reader io.Reader) (Request, error) {
+func ReadRequestHeader(reader io.Reader) (Request, error) {
 	var prefix [RequestPrefixLength]byte
 	if _, err := io.ReadFull(reader, prefix[:]); err != nil {
 		return Request{}, fmt.Errorf("vless: reading request: %w", err)
