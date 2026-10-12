@@ -34,7 +34,7 @@ func openAndAccept(t testing.TB, client *muxcool.Client, server *muxcool.Server,
 }
 
 func TestAStreamCarriesBytesBothWays(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	destination := domainDestination(t, "example.com", 80)
 	opened, accepted := openAndAccept(t, client, server, destination)
 
@@ -62,7 +62,7 @@ func TestAStreamCarriesBytesBothWays(t *testing.T) {
 
 // A read smaller than a frame takes part of it, and the next read takes the rest.
 func TestAReadSmallerThanTheFrameTakesItInParts(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	if _, err := opened.Write([]byte("0123456789")); err != nil {
 		t.Fatal(err)
@@ -76,12 +76,12 @@ func TestAReadSmallerThanTheFrameTakesItInParts(t *testing.T) {
 }
 
 func TestManySubConnectionsInterleaveAndKeepTheirOwnBytes(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	const streams = 30
 
 	go func() {
 		for range streams {
-			accepted, err := server.Accept()
+			accepted, err := server.AcceptSubConnection()
 			if err != nil {
 				return
 			}
@@ -123,7 +123,7 @@ func TestManySubConnectionsInterleaveAndKeepTheirOwnBytes(t *testing.T) {
 }
 
 func TestABigWriteIsCutIntoFramesAndArrivesWhole(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 
 	payload := make([]byte, 1<<20+123)
@@ -142,7 +142,7 @@ func TestABigWriteIsCutIntoFramesAndArrivesWhole(t *testing.T) {
 }
 
 func TestClosingEndsTheSubConnectionAtBothEnds(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 
 	if _, err := opened.Write([]byte("last words")); err != nil {
@@ -175,7 +175,7 @@ func TestClosingEndsTheSubConnectionAtBothEnds(t *testing.T) {
 }
 
 func TestAServerCanEndASubConnectionToo(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	accepted.Close()
 	buffer := make([]byte, 1)
@@ -185,7 +185,7 @@ func TestAServerCanEndASubConnectionToo(t *testing.T) {
 }
 
 func TestThereIsNoHalfClose(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, _ := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	if err := opened.CloseWrite(); !errors.Is(err, spec.ErrNoHalfClose) {
 		t.Errorf("CloseWrite = %v, want spec.ErrNoHalfClose", err)
@@ -193,7 +193,7 @@ func TestThereIsNoHalfClose(t *testing.T) {
 }
 
 func TestEndingOneSubConnectionLeavesTheOthers(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	firstOpened, firstAccepted := openAndAccept(t, client, server, domainDestination(t, "one.example", 80))
 	secondOpened, secondAccepted := openAndAccept(t, client, server, domainDestination(t, "two.example", 80))
 
@@ -209,7 +209,7 @@ func TestEndingOneSubConnectionLeavesTheOthers(t *testing.T) {
 }
 
 func TestAReadDeadlinePassesWithoutLosingTheFrame(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 
 	accepted.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
@@ -232,7 +232,7 @@ func TestAReadDeadlinePassesWithoutLosingTheFrame(t *testing.T) {
 // A passed deadline fails the read even when data is waiting, as on a net.Conn,
 // and the rest of a frame that was read in parts is still there afterwards.
 func TestADeadlineBetweenTwoReadsOfOneFrameLosesNothing(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	opened.Write([]byte("abcdef"))
 
@@ -255,7 +255,7 @@ func TestADeadlineBetweenTwoReadsOfOneFrameLosesNothing(t *testing.T) {
 func TestAWriteDeadlineBoundsTheWaitForTheCarrier(t *testing.T) {
 	clientSide, serverSide := connected(t)
 	gated := newGatedConn(clientSide)
-	client := muxcool.NewClient(gated, muxcool.ClientOptions{})
+	client := muxcool.NewClient(gated)
 	server := muxcool.NewServer(serverSide, muxcool.ServerOptions{})
 	t.Cleanup(func() { client.Close(); server.Close() })
 
@@ -305,7 +305,7 @@ func TestAWriteDeadlineBoundsTheWaitForTheCarrier(t *testing.T) {
 // A sub-connection that nobody reads holds up the others on its main
 // connection: the format has no flow control.
 func TestASubConnectionNobodyReadsHoldsUpTheOthersUntilItEnds(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	slowOpened, slowAccepted := openAndAccept(t, client, server, domainDestination(t, "slow.example", 80))
 	otherOpened, otherAccepted := openAndAccept(t, client, server, domainDestination(t, "other.example", 80))
 
@@ -328,7 +328,7 @@ func TestASubConnectionNobodyReadsHoldsUpTheOthersUntilItEnds(t *testing.T) {
 // Ending a sub-connection in the middle of a frame must drop the rest of that
 // frame, or the next frame would be read from the wrong place.
 func TestClosingInTheMiddleOfAFrameKeepsTheCarrierInStep(t *testing.T) {
-	client, server := pair(t, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(t, muxcool.ServerOptions{})
 	firstOpened, firstAccepted := openAndAccept(t, client, server, domainDestination(t, "one.example", 80))
 	secondOpened, secondAccepted := openAndAccept(t, client, server, domainDestination(t, "two.example", 80))
 
