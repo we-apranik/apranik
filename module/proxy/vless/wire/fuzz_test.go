@@ -8,17 +8,19 @@ import (
 	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
 )
 
-// Anything ReadRequest accepts as a TCP or UDP request encodes and reads back
+// Anything ReadRequestHeader accepts as a TCP, UDP or Mux request encodes and reads back
 // to the same request, and CommandOffset finds its command byte. Never panics.
-func FuzzReadRequest(f *testing.F) {
-	valid, _ := wire.AppendRequest(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandTCP, Destination: domainDestination(f, "example.com", 443)})
+func FuzzReadRequestHeader(f *testing.F) {
+	valid, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandTCP, Destination: domainDestination(f, "example.com", 443)})
 	f.Add(valid)
+	mux, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandMux})
+	f.Add(mux)
 	f.Add([]byte{})
 	f.Add(append([]byte{0}, make([]byte, 18)...))
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		reader := bytes.NewReader(input)
-		request, err := wire.ReadRequest(reader)
+		request, err := wire.ReadRequestHeader(reader)
 		if err != nil {
 			return
 		}
@@ -26,15 +28,15 @@ func FuzzReadRequest(f *testing.F) {
 		if err != nil || input[offset] != request.Command {
 			t.Fatalf("CommandOffset = %d, %v; the command is X'%02X'", offset, err, request.Command)
 		}
-		if request.Command != wire.CommandTCP && request.Command != wire.CommandUDP {
+		if request.Command == wire.CommandReverse {
 			return
 		}
 
-		encoded, err := wire.AppendRequest(nil, request)
+		encoded, err := wire.AppendRequestHeader(nil, request)
 		if err != nil {
 			t.Fatalf("accepted a request it cannot encode: %v", err)
 		}
-		again, err := wire.ReadRequest(bytes.NewReader(encoded))
+		again, err := wire.ReadRequestHeader(bytes.NewReader(encoded))
 		if err != nil || again != request {
 			t.Fatalf("re-read %+v, %v; want %+v", again, err, request)
 		}
