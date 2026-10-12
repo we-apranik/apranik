@@ -1,9 +1,11 @@
 package trojan
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
+	"github.com/The-Apranik/Apranik/shared/delayedrequest"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -14,6 +16,9 @@ import (
 // that inbound the same server.
 type Proxy struct {
 	Settings
+
+	// Set by ConfigureProxyRequestTiming before any client is built; nil means the defaults.
+	requestTiming *delayedrequest.Policy
 
 	buildServerOnce sync.Once
 	builtServer     *server
@@ -36,6 +41,27 @@ func (p *Proxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClien
 	return p.newClient()
 }
 
+// ConfigureProxyRequestTiming is called by core with what the outbound's
+// proxy_request_timing key says: how long the request waits for the first
+// payload, and which ports send it at once. A server needs nothing.
+func (p *Proxy) ConfigureProxyRequestTiming(options spec.ProxyRequestTimingOptions) error {
+	requestTiming, err := delayedrequest.NewPolicy(options)
+	if err != nil {
+		return fmt.Errorf("trojan: %w", err)
+	}
+	p.requestTiming = &requestTiming
+	return nil
+}
+
+// Without a ConfigureProxyRequestTiming, as in a program that uses the module
+// with no core, the defaults.
+func (p *Proxy) requestTimingPolicy() delayedrequest.Policy {
+	if p.requestTiming == nil {
+		return delayedrequest.DefaultPolicy()
+	}
+	return *p.requestTiming
+}
+
 func (p *Proxy) newSharedServer() (*server, error) {
 	p.buildServerOnce.Do(func() {
 		if p.buildServerErr = p.checkAsServer(); p.buildServerErr != nil {
@@ -54,7 +80,7 @@ func (p *Proxy) newClient() (*client, error) {
 	if err := p.checkAsClient(); err != nil {
 		return nil, err
 	}
-	return &client{passwordHash: wire.HashPassword(p.Password.Reveal()), maxFirstPayloadDelay: p.maxFirstPayloadDelay()}, nil
+	return &client{passwordHash: wire.HashPassword(p.Password.Reveal()), requestTiming: p.requestTimingPolicy()}, nil
 }
 
 func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule { return &Proxy{} }
