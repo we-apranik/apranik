@@ -12,6 +12,10 @@
 //	Keep  EXTRA = nothing, or for UDP: NETWORK(1)=2  PORT(2)  TYPE(1)  ADDRESS
 //	End, KeepAlive carry no EXTRA.
 //
+//	TCP   New(id, TCP, address)            Keep(id) + data             End(id)
+//	UDP   New(id, UDP, address) + datagram Keep(id) + datagram         End(id)
+//	XUDP  New(id, UDP, address) + datagram Keep(id, UDP, address) + datagram  End(id)
+//
 // The format is symmetric: both ends send and read the same frames, and a
 // reply carries the ID of its request. A client opens a sub-connection with New
 // (which may carry its first data), moves data in Keep and ends it with End; a
