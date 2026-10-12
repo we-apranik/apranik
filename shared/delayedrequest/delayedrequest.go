@@ -19,7 +19,8 @@ import (
 
 // NewStream returns stream with request put in front of the first Write, or
 // sent alone once maxDelay has passed, whichever comes first. Exactly one of
-// them sends it. A CloseWrite before any payload also owes the server its
+// them sends it. A maxDelay of zero sends it at once, which a server-first
+// connection needs. A CloseWrite before any payload also owes the server its
 // request, so it sends it first.
 //
 // The request is not copied; the caller must not change it afterwards.
