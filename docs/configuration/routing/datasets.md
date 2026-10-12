@@ -6,8 +6,7 @@ A dataset is a named list of domains or of IP ranges, read from a file, that
 holds values only. What to do with them is written in the rules.
 
 Datasets are declared at the top level of the config, beside `routing` and
-`dns`, so both can use them. A config that still declares them inside
-`routing`, where they used to live, is refused with a pointer.
+`dns`, so both can use them. `routing` takes no `datasets`.
 
 ## Structure
 
