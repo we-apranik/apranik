@@ -32,7 +32,7 @@
 | **Mixed** | The special inbound protocol that serves SOCKS5 and HTTP on one port, choosing per connection from the first byte. Built by core in `core/inbound/mixed` from the `socks5` and `http` modules. |
 | **Module** | A folder under `module/` that implements one or more `spec` kinds and exports a `New*Module` constructor (a proxy protocol exports `NewProxyModule`, once, whatever kinds it fills). The value the constructor returns is the module's settings; its `New...` methods build the running parts. |
 | **Module kind** | One of the `spec` interfaces a module fills, each named `...Module`: `BaseStreamTransportModule`, `OverlayStreamTransportModule`, `StreamProxyModule`, `SnifferModule` and so on. |
-| **Mux.Cool** | V2Ray's and Xray's multiplexing format: sub-connections with an ID, a state and options, in frames both ends send and read alike. `shared/muxcool`; VLESS enters it with command 3. |
+| **Mux.Cool** | V2Ray's and Xray's multiplexing format: sub-connections with an ID, a state and options, in frames both ends send and read alike. `shared/muxcool`; VLESS enters it with command 3.  Wire layout: [Mux.Cool on the wire](mux-cool.md). |
 | **NAT** | `core/net/udp/nat`: how freedom maps a UDP session onto real sockets and filters replies, in RFC 4787 terms. |
 | **Outbound** | How traffic leaves: a proxy client plus a dialer stack, freedom, or a group that picks among other outbounds (`component.Outbound`). |
 | **Overlay transport** | A transport that wraps a layer below it, one connection at a time (`WrapClientStream`, `WrapServerStream`), such as TLS or WebSocket. `tls`, `ws` and `httpupgrade` are built. |
@@ -59,3 +59,4 @@
 | **UDP session** | One client's UDP flow, such as one SOCKS5 association: `core/net/udp/session`. |
 | **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream, transport)` or `AcceptStream(ctx, underlyingStream)`. |
 | **uTLS** | The library (`github.com/refraction-networking/utls`) that sends a copy of a real browser's ClientHello; Apranik's one dependency. |
+| **XUDP** | Mux.Cool's UDP form in which every datagram names its address, so one sub-connection carries UDP for many destinations and replies name their source. Xray's and sing-box's clients send most UDP this way. `muxcool.DatagramOptions{XUDP: true}`. |
