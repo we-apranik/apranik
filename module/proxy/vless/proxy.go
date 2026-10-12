@@ -5,9 +5,11 @@
 package vless
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
+	"github.com/The-Apranik/Apranik/shared/delayedrequest"
 	"github.com/The-Apranik/Apranik/spec"
 )
 
@@ -21,6 +23,9 @@ type Proxy struct {
 
 	// Set by ConfigureMuxCool before any client is built.
 	xudp bool
+
+	// Set by ConfigureProxyRequestTiming before any client is built; nil means the defaults.
+	requestTiming *delayedrequest.Policy
 
 	buildServerOnce sync.Once
 	builtServer     *server
@@ -51,6 +56,27 @@ func (p *Proxy) ConfigureMuxCool(options spec.MuxCoolOptions) error {
 	return nil
 }
 
+// ConfigureProxyRequestTiming is called by core with what the outbound's
+// proxy_request_timing key says: how long the request waits for the first
+// payload, and which ports send it at once. A server needs nothing.
+func (p *Proxy) ConfigureProxyRequestTiming(options spec.ProxyRequestTimingOptions) error {
+	requestTiming, err := delayedrequest.NewPolicy(options)
+	if err != nil {
+		return fmt.Errorf("vless: %w", err)
+	}
+	p.requestTiming = &requestTiming
+	return nil
+}
+
+// Without a ConfigureProxyRequestTiming, as in a program that uses the module
+// with no core, the defaults.
+func (p *Proxy) requestTimingPolicy() delayedrequest.Policy {
+	if p.requestTiming == nil {
+		return delayedrequest.DefaultPolicy()
+	}
+	return *p.requestTiming
+}
+
 func (p *Proxy) newSharedServer() (*server, error) {
 	p.buildServerOnce.Do(func() {
 		if p.buildServerErr = p.checkAsServer(); p.buildServerErr != nil {
@@ -76,7 +102,7 @@ func (p *Proxy) newClient() (*client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{uuid: uuid, maxFirstPayloadDelay: p.maxFirstPayloadDelay(), xudp: p.xudp}, nil
+	return &client{uuid: uuid, requestTiming: p.requestTimingPolicy(), xudp: p.xudp}, nil
 }
 
 func NewProxyModule() spec.StreamAndDatagramOverStreamProxyModule { return &Proxy{} }
