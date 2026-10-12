@@ -33,7 +33,7 @@ func BenchmarkRawTCPThroughput(b *testing.B) {
 func BenchmarkStreamThroughput(b *testing.B) {
 	for _, size := range []int{1 << 10, 8 << 10, 32 << 10} {
 		b.Run(byteSize(size), func(b *testing.B) {
-			client, server := pair(b, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+			client, server := pair(b, muxcool.ServerOptions{})
 			opened, accepted := openAndAccept(b, client, server, domainDestinationNoT("example.com", 80))
 			go io.Copy(io.Discard, accepted)
 			payload := make([]byte, size)
@@ -54,7 +54,7 @@ func BenchmarkStreamThroughput(b *testing.B) {
 func BenchmarkStreamsInParallelThroughput(b *testing.B) {
 	for _, streams := range []int{1, 4, 16} {
 		b.Run(byteSize(streams), func(b *testing.B) {
-			client, server := pair(b, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+			client, server := pair(b, muxcool.ServerOptions{})
 			opened := make([]interface{ Write([]byte) (int, error) }, streams)
 			for index := range streams {
 				stream, accepted := openAndAccept(b, client, server, domainDestinationNoT("example.com", 80))
@@ -85,7 +85,7 @@ func BenchmarkStreamsInParallelThroughput(b *testing.B) {
 }
 
 func BenchmarkDatagramRoundTrip(b *testing.B) {
-	client, server := pair(b, muxcool.ClientOptions{}, muxcool.ServerOptions{})
+	client, server := pair(b, muxcool.ServerOptions{})
 	destination := ipDestinationNoT("8.8.8.8", 53)
 	opened, accepted := openDatagramAndAccept(b, client, server, destination, []byte("first"))
 	readBuffer := make([]byte, 100)
