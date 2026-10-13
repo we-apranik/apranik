@@ -73,6 +73,21 @@ func headerCases(t *testing.T) []struct {
 			bytesOf(0x00, 0x0C, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8),
 		},
 		{
+			"New UDP to an IPv4 address, with data and a Global ID (XUDP)",
+			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53), GlobalID: [8]byte{1, 2, 3, 4, 5, 6, 7, 8}},
+			bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8),
+		},
+		{
+			"New UDP to a domain, with data and a Global ID",
+			muxcool.Header{SubConnectionID: 4, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: domainDestination(t, "example.com", 53), GlobalID: [8]byte{9, 9, 9, 9, 9, 9, 9, 9}},
+			bytesOf(0x00, 0x1C, 0x00, 0x04, 0x01, 0x01, 0x02, 0x00, 0x35, 0x02, 0x0B, "example.com", 9, 9, 9, 9, 9, 9, 9, 9),
+		},
+		{
+			"New UDP to an IPv6 address, with data and a Global ID",
+			muxcool.Header{SubConnectionID: 5, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "2001:db8::1", 443), GlobalID: [8]byte{0xFF, 0, 0, 0, 0, 0, 0, 0xEE}},
+			bytesOf(0x00, 0x20, 0x00, 0x05, 0x01, 0x01, 0x02, 0x01, 0xBB, 0x03, 0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0xFF, 0, 0, 0, 0, 0, 0, 0xEE),
+		},
+		{
 			"New TCP to an IPv6 address",
 			muxcool.Header{SubConnectionID: 0x0102, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkTCP, Destination: ipDestination(t, "2001:db8::1", 443)},
 			bytesOf(0x00, 0x18, 0x01, 0x02, 0x01, 0x01, 0x01, 0x01, 0xBB, 0x03, 0x20, 0x01, 0x0D, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
@@ -145,19 +160,29 @@ func TestAppendHeaderKeepsWhatIsAlreadyInTheBuffer(t *testing.T) {
 }
 
 // Both cores skip what they do not know after the fields of a frame: sing-box
-// discards the rest of the metadata, Xray treats it as padding or, after a New
-// frame's address, as the XUDP Global ID.
+// discards the rest of the metadata, Xray treats it as padding. Xray reads the
+// eight bytes after a New frame's address as the XUDP Global ID only for a UDP
+// New with data, and only when eight bytes are there.
 func TestReadHeaderSkipsBytesAfterTheDefinedFields(t *testing.T) {
-	globalID := bytesOf(1, 2, 3, 4, 5, 6, 7, 8)
 	for _, tc := range []struct {
 		name string
 		wire []byte
 		want muxcool.Header
 	}{
 		{
-			"Global ID after a New address",
-			bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, globalID),
+			"bytes after the address of a UDP New without data are not a Global ID",
+			bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x00, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8),
+			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
+		},
+		{
+			"fewer than eight bytes after the address of a UDP New with data are padding",
+			bytesOf(0x00, 0x10, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4),
 			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)},
+		},
+		{
+			"bytes after the address of a TCP New are padding",
+			bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x01, 0x00, 0x50, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8),
+			muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkTCP, Destination: ipDestination(t, "8.8.8.8", 80)},
 		},
 		{
 			"padding after End",
@@ -280,6 +305,10 @@ func TestAppendHeaderRefusesWhatTheFormatCannotCarry(t *testing.T) {
 		{"status five", muxcool.Header{Status: 5}},
 		{"an option bit the format does not define", muxcool.Header{Status: muxcool.StatusEnd, Options: 0x04}},
 		{"a domain over 255 bytes", muxcool.Header{Status: muxcool.StatusNew, Network: muxcool.NetworkTCP, Destination: domainDestination(t, strings.Repeat("a", 256), 80)}},
+		{"a Global ID on a TCP New", muxcool.Header{Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkTCP, Destination: destination, GlobalID: [8]byte{1}}},
+		{"a Global ID on a UDP New without data", muxcool.Header{Status: muxcool.StatusNew, Network: muxcool.NetworkUDP, Destination: destination, GlobalID: [8]byte{1}}},
+		{"a Global ID on a Keep", muxcool.Header{Status: muxcool.StatusKeep, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: destination, GlobalID: [8]byte{1}}},
+		{"a Global ID on an End", muxcool.Header{Status: muxcool.StatusEnd, GlobalID: [8]byte{1}}},
 	} {
 		if got, err := muxcool.AppendHeader(nil, tc.header); err == nil {
 			t.Errorf("%s: accepted, wrote % x", tc.name, got)

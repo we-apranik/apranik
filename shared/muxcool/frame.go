@@ -76,12 +76,15 @@ const (
 )
 
 // Network and Destination are set on New, and on a Keep that names an address.
+// GlobalID is the XUDP session ID, which only a New frame of a UDP
+// sub-connection with data can carry; zero means none.
 type Header struct {
 	SubConnectionID uint16
 	Status          Status
 	Options         FrameOptions
 	Network         Network
 	Destination     spec.Destination
+	GlobalID        [8]byte
 }
 
 func AppendHeader(buffer []byte, header Header) ([]byte, error) {
@@ -131,8 +134,19 @@ func AppendHeader(buffer []byte, header Header) ([]byte, error) {
 		}
 	}
 
+	if header.GlobalID != [8]byte{} {
+		if !carriesGlobalID(header.Status, header.Network, header.Options) {
+			return nil, errors.New("muxcool: only a New frame of a UDP sub-connection with data carries a Global ID")
+		}
+		buffer = append(buffer, header.GlobalID[:]...)
+	}
+
 	binary.BigEndian.PutUint16(buffer[start:], uint16(len(buffer)-start-2))
 	return buffer, nil
+}
+
+func carriesGlobalID(status Status, network Network, options FrameOptions) bool {
+	return status == StatusNew && network == NetworkUDP && options.Has(OptionDataFollows)
 }
 
 // ReadHeader reads one frame's length and metadata and nothing after it, so
@@ -141,8 +155,9 @@ func AppendHeader(buffer []byte, header Header) ([]byte, error) {
 // the metadata gives io.ErrUnexpectedEOF. Everything the format does not allow
 // is an error that wraps ErrProtocol, including an unknown status.
 //
-// Bytes after the fields the status defines are skipped: they are padding, or
-// the Global ID that XUDP puts after a New frame's address.
+// A New frame of a UDP sub-connection with data has its Global ID read from the
+// eight bytes after the address, when they are there. Other bytes after the
+// fields the status defines are skipped: they are padding.
 //
 // A *bufio.Reader of at least 514 bytes is read in place, with no allocation
 // for a frame without a domain; the engine reads its carrier through one.
@@ -215,9 +230,14 @@ func parseMetadata(metadata []byte) (Header, error) {
 		if header.Network != NetworkTCP && header.Network != NetworkUDP {
 			return Header{}, fmt.Errorf("%w: a New frame for the network %d", ErrProtocol, extra[0])
 		}
-		var err error
-		if header.Destination, _, err = vmessaddr.ParseAddress(extra[1:]); err != nil {
+		destination, addressLength, err := vmessaddr.ParseAddress(extra[1:])
+		if err != nil {
 			return Header{}, fmt.Errorf("%w: New frame destination: %w", ErrProtocol, err)
+		}
+		header.Destination = destination
+		// Xray reads the ID when New, data and UDP are all there and eight bytes remain.
+		if afterAddress := extra[1+addressLength:]; carriesGlobalID(header.Status, header.Network, header.Options) && len(afterAddress) >= len(header.GlobalID) {
+			copy(header.GlobalID[:], afterAddress)
 		}
 	case StatusKeep:
 		// Only a UDP Keep names an address; Xray reads it by the network byte,
