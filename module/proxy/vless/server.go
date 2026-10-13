@@ -44,10 +44,11 @@ type server struct {
 	users            atomic.Pointer[[]user]
 	changeUsers      sync.Mutex
 	handshakeTimeout time.Duration
+	acceptsXUDP      bool
 }
 
-func newServer(users []user, handshakeTimeout time.Duration) *server {
-	s := &server{handshakeTimeout: handshakeTimeout}
+func newServer(users []user, handshakeTimeout time.Duration, acceptsXUDP bool) *server {
+	s := &server{handshakeTimeout: handshakeTimeout, acceptsXUDP: acceptsXUDP}
 	s.users.Store(&users)
 	return s
 }
@@ -94,10 +95,11 @@ func (s *server) AcceptDatagramOverStream(ctx context.Context, underlyingStream 
 		return nil, spec.Metadata{}, err
 	}
 	if request.Command == wire.CommandMux {
-		datagram, err := s.acceptXUDP(underlyingStream)
+		datagram, globalID, err := s.acceptXUDP(underlyingStream)
 		if err != nil {
 			return nil, spec.Metadata{}, err
 		}
+		metadata.XUDPGlobalID = globalID
 		return datagram, metadata, nil
 	}
 	return newServerDatagram(underlyingStream, request.Destination), metadata, nil
@@ -129,6 +131,8 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: %q", ErrUnsupportedFlow, request.Flow)
 	case request.Command == wire.CommandReverse:
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: X'%02X'", ErrUnsupportedCommand, request.Command)
+	case request.Command == wire.CommandMux && !s.acceptsXUDP:
+		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: X'%02X', XUDP is turned off on this server", ErrUnsupportedCommand, request.Command)
 	case !slices.Contains(wantedCommands, request.Command):
 		// Core dispatched on IsDatagramOverStream, so this is a mismatch
 		// between the two calls, not a client error.

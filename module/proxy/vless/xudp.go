@@ -21,7 +21,7 @@ import (
 // requestXUDP sends the Mux request with the first frame: the request waits in
 // the delayed stream for the first Write, which is the New frame carrying the
 // first datagram, so the three leave in one write.
-func (c *client) requestXUDP(underlyingStream spec.Stream) (spec.Datagram, error) {
+func (c *client) requestXUDP(underlyingStream spec.Stream, globalID [8]byte) (spec.Datagram, error) {
 	request, err := wire.AppendRequestHeader(nil, wire.Request{UUID: c.uuid, Command: wire.CommandMux})
 	if err != nil {
 		return nil, err
@@ -31,6 +31,7 @@ func (c *client) requestXUDP(underlyingStream spec.Stream) (spec.Datagram, error
 	return &xudpClientDatagram{
 		mux:      muxcool.NewClient(carrier),
 		carrier:  carrier,
+		globalID: globalID,
 		opened:   make(chan struct{}),
 		closedCh: make(chan struct{}),
 	}, nil
@@ -41,8 +42,9 @@ func (c *client) requestXUDP(underlyingStream spec.Stream) (spec.Datagram, error
 //
 // Safe for one reader and many writers, which is what a relay needs.
 type xudpClientDatagram struct {
-	mux     *muxcool.Client
-	carrier spec.Stream
+	mux      *muxcool.Client
+	carrier  spec.Stream
+	globalID [8]byte
 
 	openMutex sync.Mutex // guards the opening of sub
 	sub       spec.Datagram
@@ -71,7 +73,7 @@ func (d *xudpClientDatagram) openFor(firstDestination spec.Destination) (spec.Da
 	if d.sub != nil {
 		return d.sub, nil
 	}
-	sub, err := d.mux.OpenDatagram(firstDestination, muxcool.DatagramOptions{XUDP: true})
+	sub, err := d.mux.OpenDatagram(firstDestination, muxcool.DatagramOptions{XUDP: true, GlobalID: d.globalID})
 	if err != nil {
 		return nil, fmt.Errorf("vless: opening the XUDP sub-connection: %w", err)
 	}
@@ -101,8 +103,9 @@ func (d *xudpClientDatagram) LocalAddr() net.Addr { return d.carrier.LocalAddr()
 
 // acceptXUDP serves the one UDP sub-connection a Mux request may carry: the
 // library refuses TCP and every sub-connection after the first with an End. The
-// peer has the handshake timeout to send its first New frame.
-func (s *server) acceptXUDP(underlyingStream spec.Stream) (spec.Datagram, error) {
+// peer has the handshake timeout to send its first New frame, which may carry
+// the session's Global ID; it is returned beside the datagram.
+func (s *server) acceptXUDP(underlyingStream spec.Stream) (spec.Datagram, [8]byte, error) {
 	carrier := newResponseHeaderFirstStream(underlyingStream)
 	underlyingStream.SetReadDeadline(time.Now().Add(s.handshakeTimeout))
 	mux := muxcool.NewServer(carrier, muxcool.ServerOptions{
@@ -113,10 +116,10 @@ func (s *server) acceptXUDP(underlyingStream spec.Stream) (spec.Datagram, error)
 	accepted, err := mux.AcceptSubConnection()
 	if err != nil {
 		mux.Close()
-		return nil, fmt.Errorf("vless: waiting for the XUDP sub-connection: %w", err)
+		return nil, [8]byte{}, fmt.Errorf("vless: waiting for the XUDP sub-connection: %w", err)
 	}
 	underlyingStream.SetReadDeadline(time.Time{})
-	return &xudpServerDatagram{sub: accepted.Datagram, mux: mux, carrier: carrier}, nil
+	return &xudpServerDatagram{sub: accepted.Datagram, mux: mux, carrier: carrier}, accepted.GlobalID, nil
 }
 
 // xudpServerDatagram reads each datagram with the destination it is for, and

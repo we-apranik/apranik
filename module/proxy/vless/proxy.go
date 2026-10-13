@@ -21,8 +21,11 @@ import (
 type Proxy struct {
 	Settings
 
-	// Set by ConfigureMuxCool before any client is built.
-	xudp bool
+	// Set by ConfigureMuxCool before any client or server is built. Without it, as
+	// in a program that uses the module with no core, a client sends plain UDP and
+	// a server takes XUDP.
+	xudp              bool
+	muxCoolConfigured bool
 
 	// Set by ConfigureProxyRequestTiming before any client is built; nil means the defaults.
 	requestTiming *delayedrequest.Policy
@@ -48,11 +51,12 @@ func (p *Proxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClien
 	return p.newClient()
 }
 
-// ConfigureMuxCool is called by core with what the outbound's muxcool key says:
-// whether UDP goes out as XUDP. A server needs nothing, since it takes either
-// form by the command of the request.
+// ConfigureMuxCool is called by core with what the muxcool key says: whether a
+// client sends UDP as XUDP, and whether a server takes it. A server takes plain
+// UDP either way, by the command of the request.
 func (p *Proxy) ConfigureMuxCool(options spec.MuxCoolOptions) error {
 	p.xudp = options.XUDP
+	p.muxCoolConfigured = true
 	return nil
 }
 
@@ -89,7 +93,7 @@ func (p *Proxy) newSharedServer() (*server, error) {
 				return
 			}
 		}
-		p.builtServer = newServer(users, p.handshakeTimeout())
+		p.builtServer = newServer(users, p.handshakeTimeout(), !p.muxCoolConfigured || p.xudp)
 	})
 	return p.builtServer, p.buildServerErr
 }

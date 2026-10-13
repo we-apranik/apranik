@@ -34,7 +34,7 @@ func (c *client) RequestStream(ctx context.Context, underlyingStream spec.Stream
 // datagram and names its destination, which this stream then serves for good.
 func (c *client) RequestDatagramOverStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
 	if c.xudp {
-		return c.requestXUDP(underlyingStream)
+		return c.requestXUDP(underlyingStream, metadata.XUDPGlobalID)
 	}
 	return newClientDatagram(underlyingStream, c.uuid), nil
 }

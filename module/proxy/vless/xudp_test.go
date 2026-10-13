@@ -476,3 +476,106 @@ func TestSkippedPortsDoNotChangeXUDPWhichStillWaitsForTheFirstFrame(t *testing.T
 		t.Errorf("Read = %d, %v, want nothing on the wire before the first datagram", n, err)
 	}
 }
+
+func TestTheGlobalIDInTheRequestMetadataReachesTheServersMetadata(t *testing.T) {
+	clientSide, serverSide := pipe(t)
+	results := serve(t, serverSide)
+	globalID := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
+
+	upstream, err := newXUDPClient(t, aliceUUID).RequestDatagramOverStream(context.Background(), clientSide, spec.Metadata{Network: spec.NetworkUDP, XUDPGlobalID: globalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+	if _, err := upstream.WriteTo([]byte("hello"), ipDestination("192.0.2.1", 53)); err != nil {
+		t.Fatal(err)
+	}
+
+	result := receive(t, results)
+	if result.err != nil || !result.isDatagram {
+		t.Fatalf("accept = %+v, want a datagram", result)
+	}
+	defer result.datagram.Close()
+	if result.metadata.XUDPGlobalID != globalID {
+		t.Errorf("metadata.XUDPGlobalID = %v, want %v", result.metadata.XUDPGlobalID, globalID)
+	}
+	if payload, _ := readDatagramWithin(t, result.datagram); string(payload) != "hello" {
+		t.Errorf("server read %q", payload)
+	}
+}
+
+func TestWithoutAGlobalIDTheServersMetadataHasNone(t *testing.T) {
+	clientSide, serverSide := pipe(t)
+	results := serve(t, serverSide)
+
+	upstream, err := newXUDPClient(t, aliceUUID).RequestDatagramOverStream(context.Background(), clientSide, spec.Metadata{Network: spec.NetworkUDP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+	upstream.WriteTo([]byte("hello"), ipDestination("192.0.2.1", 53))
+
+	result := receive(t, results)
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	defer result.datagram.Close()
+	if result.metadata.XUDPGlobalID != [8]byte{} {
+		t.Errorf("metadata.XUDPGlobalID = %v, want none", result.metadata.XUDPGlobalID)
+	}
+}
+
+// The plain UDP form has no sub-connection to carry an ID, so the metadata's ID is not sent.
+func TestPlainUDPSendsNoGlobalID(t *testing.T) {
+	clientSide, serverSide := pipe(t)
+	results := serve(t, serverSide)
+	destination := ipDestination("192.0.2.1", 53)
+
+	upstream, err := newClient(t, aliceUUID).RequestDatagramOverStream(context.Background(), clientSide, spec.Metadata{Network: spec.NetworkUDP, XUDPGlobalID: [8]byte{1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer upstream.Close()
+	upstream.WriteTo([]byte("hello"), destination)
+
+	result := receive(t, results)
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	defer result.datagram.Close()
+	if result.metadata.XUDPGlobalID != [8]byte{} {
+		t.Errorf("metadata.XUDPGlobalID = %v, want none", result.metadata.XUDPGlobalID)
+	}
+}
+
+func TestAServerWithXUDPTurnedOffRefusesAMuxRequestAsAnUnsupportedCommand(t *testing.T) {
+	clientSide, serverSide := pipe(t)
+	proxy := &vless.Proxy{Settings: serverSettings}
+	if err := proxy.ConfigureMuxCool(spec.MuxCoolOptions{XUDP: false}); err != nil {
+		t.Fatal(err)
+	}
+	datagramServer, err := proxy.NewDatagramOverStreamServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan error, 1)
+	go func() {
+		peekable := newBufferedStream(serverSide)
+		if _, err := datagramServer.IsDatagramOverStream(context.Background(), peekable); err != nil {
+			results <- err
+			return
+		}
+		_, _, err := datagramServer.AcceptDatagramOverStream(context.Background(), peekable)
+		results <- err
+	}()
+	rawMuxClient(t, clientSide, aliceUUID)
+
+	select {
+	case err := <-results:
+		if !errors.Is(err, vless.ErrUnsupportedCommand) || errors.Is(err, spec.ErrFallbackRequested) {
+			t.Errorf("error = %v, want ErrUnsupportedCommand and no fallback: the client is genuine", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the server never refused")
+	}
+}
