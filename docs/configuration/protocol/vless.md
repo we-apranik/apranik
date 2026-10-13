@@ -126,7 +126,17 @@ understand Mux needs.
 
 An inbound serves one UDP sub-connection per stream. Anything else a Mux request opens, a TCP
 connection or a second UDP sub-connection, is refused with an End frame and the stream waits for
-a UDP one until `handshake_timeout`. TCP over Mux and plain Mux.Cool UDP are not built.
+a UDP one until `handshake_timeout`. TCP over Mux and plain Mux.Cool UDP are not built. An
+inbound's [`muxcool`](../inbound/index.md#muxcool) key turns XUDP off, or the holding of a lost
+session, which is next.
+
+### Getting a UDP session back
+
+XUDP sends a Global ID with the session's first frame. If the stream is lost and the client comes
+back with the same ID, the server gives it the session it held, so the destination sees the same
+source port. It
+works between Apranik's client and server, with an Apranik client against an Xray server, and with an
+Xray client against an Apranik server; sing-box does not send or read the ID.
 
 > [!NOTE]
 > An Xray client with `mux.enabled` set and `xudpConcurrency` left out puts its TCP and its UDP

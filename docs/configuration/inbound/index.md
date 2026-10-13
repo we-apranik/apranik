@@ -42,6 +42,7 @@ An inbound accepts connections from clients: it listens on an address, runs a
 | `socks5` | [SOCKS5](../protocol/socks5.md) | TCP, and UDP through UDP ASSOCIATE |
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP, and UDP framed in the stream |
+| `vless` | [VLESS](../protocol/vless.md) | TCP, and UDP framed in the stream, plain or as XUDP |
 | `mixed` | [Mixed](mixed.md) | SOCKS5 and HTTP on one port |
 
 <div class="cfg-fields" markdown>
@@ -117,6 +118,39 @@ The fallback receives what the client sent inside the overlays: behind `tls` it
 gets the decrypted HTTP request, not TLS records. A client that fails an overlay
 handshake (not TLS at all, or a wrong WebSocket path, which gets a `404`) is
 closed, not forwarded.
+
+### `muxcool`
+
+<span class="cfg cfg-type">object</span>
+<span class="cfg cfg-def">Default: everything on</span>
+<span class="cfg cfg-note">proxy protocols that can carry Mux.Cool only (`vless`)</span>
+
+What the server accepts of [Mux.Cool](../../mux-cool.md). It has the shape of the
+[outbound's `muxcool`](../outbound/index.md#muxcool), and each key means "accept" where the
+outbound's means "send". Left out, the server takes UDP as XUDP, like the servers of Xray and
+sing-box.
+
+```json
+"muxcool": {
+  "udp": {
+    "enabled": true,
+    "xudp": { "enabled": true, "global_id": { "enabled": true, "hold_time": "60s" } }
+  }
+}
+```
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `udp.enabled` | Accept UDP through Mux.Cool. `false` refuses a Mux request, so an Xray or sing-box client's default UDP fails. | `true` |
+| `udp.xudp.enabled` | Accept XUDP. `false` alone is refused: plain Mux.Cool UDP is not built, so turn `udp.enabled` off instead. | `true` |
+| `udp.xudp.global_id.enabled` | Hold a UDP session whose stream was lost and give it to the client that comes back with the same Global ID. | `true` |
+| `udp.xudp.global_id.hold_time` | How long to hold it. A server's key: an outbound refuses it. | `60s` |
+
+A held session keeps its outbound sockets for `hold_time`. It belongs to the user who started it, so
+another user who learns the ID cannot take it, and a stream that arrives while the old one is still
+open takes the session over and closes the old one. A client that ends its session on purpose is not
+held. A resumed session counts twice against [`max_udp_sessions`](#max_udp_sessions) while its new
+stream is live, and its online-users entry keeps the address it started with.
 
 ### `tcp_idle_timeout`
 
