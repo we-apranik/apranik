@@ -1,6 +1,7 @@
 package muxcool
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -36,15 +37,24 @@ func (c *Client) OpenStream(destination spec.Destination) (spec.Stream, error) {
 type DatagramOptions struct {
 	// XUDP names an address in every datagram, so one sub-connection reaches many destinations.
 	XUDP bool
+
+	// GlobalID goes in the New frame, after the address, so a server that
+	// remembers it can give a later main connection this UDP session back. Zero
+	// sends none; only XUDP may send one.
+	GlobalID [8]byte
 }
 
 // OpenDatagram sends nothing: the New frame leaves with the first WriteTo.
 func (c *Client) OpenDatagram(destination spec.Destination, options DatagramOptions) (spec.Datagram, error) {
+	if options.GlobalID != [8]byte{} && !options.XUDP {
+		return nil, errors.New("muxcool: a Global ID belongs to XUDP; set DatagramOptions.XUDP")
+	}
 	sub, err := c.connection.open(NetworkUDP, destination)
 	if err != nil {
 		return nil, err
 	}
 	sub.addressInEveryDatagram.Store(options.XUDP)
+	sub.globalID = options.GlobalID
 	return &datagram{sub}, nil
 }
 

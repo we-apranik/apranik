@@ -29,6 +29,9 @@ type subConnection struct {
 	destination spec.Destination
 	accepted    bool // this end is the server end: it never sends New
 
+	// globalID is sent with the New frame (client end) or was read from it (server end); set before the sub-connection is used.
+	globalID [8]byte
+
 	// addressInEveryDatagram is XUDP: set at open (client) or when the peer first names an address (server).
 	addressInEveryDatagram atomic.Bool
 
@@ -282,6 +285,7 @@ func (s *subConnection) writeDatagram(data []byte, to spec.Destination) error {
 	if !s.newSent {
 		header.Status = StatusNew
 		header.Network = NetworkUDP
+		header.GlobalID = s.globalID
 		if !namesAddress {
 			header.Destination = s.destination
 		}

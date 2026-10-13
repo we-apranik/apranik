@@ -195,3 +195,80 @@ func TestAnXUDPNewIsRefusedLikeAnyUDPNewWhenUDPIsNotAccepted(t *testing.T) {
 		t.Errorf("reply = %+v, want End with the error bit for 3", header)
 	}
 }
+
+func TestAGlobalIDTravelsWithTheFirstDatagramToTheServer(t *testing.T) {
+	client, server := pair(t, muxcool.ServerOptions{})
+	destination := ipDestination(t, "1.2.3.4", 3478)
+	globalID := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
+
+	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{XUDP: true, GlobalID: globalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opened.WriteTo([]byte("hello"), destination); err != nil {
+		t.Fatal(err)
+	}
+
+	accepted := acceptWithin(t, server, 2*time.Second)
+	if accepted.GlobalID != globalID {
+		t.Errorf("accepted.GlobalID = %v, want %v", accepted.GlobalID, globalID)
+	}
+	if got, _, err := readDatagram(t, accepted.Datagram, 100); err != nil || string(got) != "hello" {
+		t.Errorf("server read %q, %v; the ID must not eat into the data", got, err)
+	}
+}
+
+func TestWithoutAGlobalIDTheServerSeesNone(t *testing.T) {
+	client, server := pair(t, muxcool.ServerOptions{})
+	destination := ipDestination(t, "1.2.3.4", 3478)
+
+	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{XUDP: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := opened.WriteTo([]byte("hello"), destination); err != nil {
+		t.Fatal(err)
+	}
+
+	if accepted := acceptWithin(t, server, 2*time.Second); accepted.GlobalID != [8]byte{} {
+		t.Errorf("accepted.GlobalID = %v, want none", accepted.GlobalID)
+	}
+}
+
+func TestAGlobalIDBelongsToXUDP(t *testing.T) {
+	client, _ := pair(t, muxcool.ServerOptions{})
+	if _, err := client.OpenDatagram(ipDestination(t, "1.2.3.4", 53), muxcool.DatagramOptions{GlobalID: [8]byte{1}}); err == nil {
+		t.Error("a Global ID on a plain Mux.Cool UDP sub-connection was accepted")
+	}
+}
+
+func TestOnlyTheNewFrameCarriesTheGlobalID(t *testing.T) {
+	client, peer := rawServerOf(t)
+	destination := ipDestination(t, "1.2.3.4", 3478)
+	globalID := [8]byte{9, 8, 7, 6, 5, 4, 3, 2}
+
+	opened, err := client.OpenDatagram(destination, muxcool.DatagramOptions{XUDP: true, GlobalID: globalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened.WriteTo([]byte("one"), destination)
+	opened.WriteTo([]byte("two"), destination)
+
+	first, _ := peer.receive(2 * time.Second)
+	second, _ := peer.receive(2 * time.Second)
+	if first.Status != muxcool.StatusNew || first.GlobalID != globalID {
+		t.Errorf("first frame = %+v, want a New carrying the Global ID", first)
+	}
+	if second.Status != muxcool.StatusKeep || second.GlobalID != [8]byte{} {
+		t.Errorf("second frame = %+v, want a Keep with no Global ID", second)
+	}
+}
+
+func TestTheGlobalIDOfANewWithoutDataIsNotRead(t *testing.T) {
+	server, peer := rawClientOf(t, muxcool.ServerOptions{})
+	peer.sendBytes(bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x00, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8))
+
+	if accepted := acceptWithin(t, server, 2*time.Second); accepted.GlobalID != [8]byte{} {
+		t.Errorf("accepted.GlobalID = %v, want none: Xray reads the ID only with data", accepted.GlobalID)
+	}
+}

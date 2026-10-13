@@ -121,9 +121,20 @@ func (c *mainConnection) closeAndUnlock(cause error) {
 
 	close(c.done)
 	_ = c.carrier.Close()
+	subCause := endWithoutEnd(cause)
 	for _, sub := range subs {
-		sub.abortBecause(cause)
+		sub.abortBecause(subCause)
 	}
+}
+
+// A sub-connection still open when the main connection ends never got an End
+// from the peer, so its end is not a graceful one: io.EOF is for a graceful end
+// only, and a reader that tells a loss from a deliberate close relies on that.
+func endWithoutEnd(cause error) error {
+	if errors.Is(cause, io.EOF) {
+		return fmt.Errorf("muxcool: the main connection ended before this sub-connection's End: %w", io.ErrUnexpectedEOF)
+	}
+	return cause
 }
 
 func (c *mainConnection) close() error {
@@ -266,6 +277,7 @@ func (c *mainConnection) acceptNewSubConnection(header Header, dataLength int) e
 		return c.discard(dataLength)
 	}
 	sub := newSubConnection(c, header.SubConnectionID, header.Network, header.Destination, true)
+	sub.globalID = header.GlobalID
 	c.subs[sub.id] = sub
 	c.everOpened++
 	c.stopIdleTimerLocked()

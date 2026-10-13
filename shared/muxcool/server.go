@@ -26,6 +26,10 @@ type AcceptedSubConnection struct {
 	Destination spec.Destination
 	Stream      spec.Stream
 	Datagram    spec.Datagram
+
+	// GlobalID is the XUDP session ID the peer sent in the New frame of a UDP
+	// sub-connection, only when that frame carried data; zero means none.
+	GlobalID [8]byte
 }
 
 // Server is safe for concurrent use.
@@ -67,7 +71,7 @@ func (s *Server) AcceptSubConnection() (AcceptedSubConnection, error) {
 }
 
 func acceptedFrom(sub *subConnection) AcceptedSubConnection {
-	accepted := AcceptedSubConnection{Destination: sub.destination}
+	accepted := AcceptedSubConnection{Destination: sub.destination, GlobalID: sub.globalID}
 	if sub.network == NetworkTCP {
 		accepted.Stream = &stream{sub}
 	} else {

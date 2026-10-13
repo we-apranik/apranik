@@ -151,13 +151,16 @@ func TestAnEndedIDMayBeOpenedAgain(t *testing.T) {
 	}
 }
 
-func TestMetadataPaddingAndAGlobalIDAreSkipped(t *testing.T) {
+func TestMetadataPaddingIsSkippedAndAGlobalIDIsRead(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
 	// New UDP to 8.8.8.8:53 with data, a Global ID after the address, then data.
 	peer.sendBytes(bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8, 0x00, 0x02, "hi"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	if accepted.Datagram == nil {
 		t.Fatal("accepted a stream")
+	}
+	if accepted.GlobalID != [8]byte{1, 2, 3, 4, 5, 6, 7, 8} {
+		t.Errorf("accepted.GlobalID = %v", accepted.GlobalID)
 	}
 	if got, _, err := readDatagram(t, accepted.Datagram, 10); err != nil || string(got) != "hi" {
 		t.Errorf("read %q, %v", got, err)
