@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,6 +28,12 @@ import (
 const vlessAliceUUID = "b831381d-6324-4d53-ad4f-8cda48b30811"
 
 func startVLESSServer(t *testing.T, transport string) (port uint16, fallbackReceived <-chan []byte) {
+	t.Helper()
+	return startVLESSServerWith(t, transport, handler.Config{})
+}
+
+// handlerConfig is the traffic handler's, which the run command fills from the inbound's keys.
+func startVLESSServerWith(t *testing.T, transport string, handlerConfig handler.Config) (port uint16, fallbackReceived <-chan []byte) {
 	t.Helper()
 	fallback, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -72,7 +80,7 @@ func startVLESSServer(t *testing.T, transport string) (port uint16, fallbackRece
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { inbound.Close() })
-	if err := inbound.Activate(context.Background(), handler.New(router.NewWithDefaultOutbound(freedom), handler.Config{})); err != nil {
+	if err := inbound.Activate(context.Background(), handler.New(router.NewWithDefaultOutbound(freedom), handlerConfig)); err != nil {
 		t.Fatal(err)
 	}
 	return port, received
@@ -368,5 +376,169 @@ func TestVLESSHoldsTheRequestForAServerFirstPortThatIsNotSkipped(t *testing.T) {
 	// handshake timeout, which the client reads as the end of the stream.
 	if !errors.Is(err, os.ErrDeadlineExceeded) && !errors.Is(err, io.EOF) {
 		t.Fatalf("reading the banner: %v, want no banner because the request is still held", err)
+	}
+}
+
+// killableForwarder passes every connection to targetPort like countingForwarder,
+// and lets a test cut them all, as a network switch does.
+func killableForwarder(t *testing.T, targetPort uint16) (port uint16, cutAll func()) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { listener.Close() })
+	var mutex sync.Mutex
+	var connections []net.Conn
+	go func() {
+		for {
+			accepted, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			target, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", targetPort))
+			if err != nil {
+				accepted.Close()
+				continue
+			}
+			mutex.Lock()
+			connections = append(connections, accepted, target)
+			mutex.Unlock()
+			go func() { io.Copy(target, accepted); target.Close() }()
+			go func() { io.Copy(accepted, target); accepted.Close() }()
+		}
+	}()
+	return uint16(listener.Addr().(*net.TCPAddr).Port), func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+		for _, connection := range connections {
+			connection.Close()
+		}
+		connections = nil
+	}
+}
+
+// startPortEcho answers every datagram with the port it came from, so a test sees
+// which source port the destination saw.
+func startPortEcho(t *testing.T) spec.Destination {
+	t.Helper()
+	echo, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { echo.Close() })
+	go func() {
+		buffer := make([]byte, 2048)
+		for {
+			_, from, err := echo.ReadFromUDP(buffer)
+			if err != nil {
+				return
+			}
+			echo.WriteToUDP([]byte(fmt.Sprint(from.Port)), from)
+		}
+	}()
+	return loopbackDestination(t, echo.LocalAddr().(*net.UDPAddr).Port)
+}
+
+func sessionFrom(t *testing.T, address string) spec.Metadata {
+	t.Helper()
+	endpoint, err := spec.NewEndpoint(netip.MustParseAddrPort(address).Addr(), netip.MustParseAddrPort(address).Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return spec.Metadata{Network: spec.NetworkUDP, User: "alice", Transport: spec.TransportMetadata{SourceEndpoint: endpoint}}
+}
+
+// sourcePortSeenThroughANewStream sends one datagram from a fresh datagram of the
+// outbound, which opens a new stream to the server, and returns the source port
+// the destination saw.
+func sourcePortSeenThroughANewStream(t *testing.T, outbound component.Outbound, session spec.Metadata, destination spec.Destination) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	datagram, err := outbound.CreateDatagram(ctx, session)
+	if err != nil {
+		t.Fatalf("CreateDatagram: %v", err)
+	}
+	t.Cleanup(func() { datagram.Close() })
+	if _, err := datagram.WriteTo([]byte("hello"), destination); err != nil {
+		t.Fatalf("WriteTo: %v", err)
+	}
+	answer := make(chan string, 1)
+	go func() {
+		buffer := make([]byte, 100)
+		n, _, err := datagram.ReadFrom(buffer)
+		if err != nil {
+			answer <- "error: " + err.Error()
+			return
+		}
+		answer <- string(buffer[:n])
+	}()
+	select {
+	case got := <-answer:
+		return got
+	case <-time.After(5 * time.Second):
+		t.Fatal("no answer came back")
+		return ""
+	}
+}
+
+// A client whose stream to the server is cut and which reconnects with the same
+// Global ID is given its UDP session back: the destination sees the same source
+// port. A client that names another session gets a new one.
+func TestVLESSXUDPResumesASessionAfterItsStreamIsCut(t *testing.T) {
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServerWith(t, stack, handler.Config{ResumeUDPSessions: true, UDPSessionResumeHoldTime: time.Minute})
+	forwarderPort, cutAll := killableForwarder(t, serverPort)
+	outbound := buildVLESSClient(t, stack, forwarderPort, vlessAliceUUID)
+	destination := startPortEcho(t)
+	session := sessionFrom(t, "203.0.113.7:50000")
+
+	before := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	cutAll()
+	time.Sleep(100 * time.Millisecond)
+	after := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	if before == "" || before != after {
+		t.Errorf("the destination saw source port %q and then %q, want the same one", before, after)
+	}
+
+	another := sourcePortSeenThroughANewStream(t, outbound, sessionFrom(t, "203.0.113.7:50001"), destination)
+	if another == after {
+		t.Errorf("another session was given the same source port %q", another)
+	}
+}
+
+func TestVLESSXUDPDoesNotResumeWhenTheServerHasItOff(t *testing.T) {
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServerWith(t, stack, handler.Config{})
+	forwarderPort, cutAll := killableForwarder(t, serverPort)
+	outbound := buildVLESSClient(t, stack, forwarderPort, vlessAliceUUID)
+	destination := startPortEcho(t)
+	session := sessionFrom(t, "203.0.113.7:50000")
+
+	before := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	cutAll()
+	time.Sleep(100 * time.Millisecond)
+	after := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	if before == after {
+		t.Errorf("the destination saw source port %q twice, want a new session to get a new port", before)
+	}
+}
+
+// With global_id off on the client it sends no ID, so even a server that resumes has nothing to match.
+func TestVLESSXUDPClientWithTheGlobalIDOffGetsANewSessionEachTime(t *testing.T) {
+	stack := `[{ "type": "tcp" }]`
+	serverPort, _ := startVLESSServerWith(t, stack, handler.Config{ResumeUDPSessions: true, UDPSessionResumeHoldTime: time.Minute})
+	forwarderPort, cutAll := killableForwarder(t, serverPort)
+	outbound := buildVLESSClientWith(t, stack, forwarderPort, vlessAliceUUID, `, "muxcool": { "udp": { "xudp": { "global_id": { "enabled": false } } } }`)
+	destination := startPortEcho(t)
+	session := sessionFrom(t, "203.0.113.7:50000")
+
+	before := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	cutAll()
+	time.Sleep(100 * time.Millisecond)
+	after := sourcePortSeenThroughANewStream(t, outbound, session, destination)
+	if before == after {
+		t.Errorf("the destination saw source port %q twice, want a new session to get a new port", before)
 	}
 }
