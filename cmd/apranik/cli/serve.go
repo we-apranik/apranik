@@ -188,6 +188,8 @@ func startComponents(ctx context.Context, core *runningCore, stackBuilder *build
 			UDPMaxDatagramSize:                  valueOrZero(inboundBlueprint.UDPMaxDatagramSize),
 			UDPRoutingCacheEntryIdleTimeout:     valueOrZero(inboundBlueprint.UDPRoutingCacheEntryIdleTimeout),
 			UDPRoutingCacheMaxEntriesPerSession: valueOrZero(inboundBlueprint.UDPRoutingCacheMaxEntriesPerSession),
+			ResumeUDPSessions:                   inboundBlueprint.MuxCool.XUDPGlobalIDEnabled(),
+			UDPSessionResumeHoldTime:            inboundBlueprint.MuxCool.XUDPGlobalIDHoldTime(),
 
 			LiveTrackingUDPEntryIdleTimeout:     valueOrZero(tracking.UDPEntryIdleTimeout),
 			LiveTrackingUDPMaxEntriesPerSession: valueOrZero(tracking.UDPMaxEntriesPerSession),
