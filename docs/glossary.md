@@ -59,4 +59,5 @@
 | **UDP session** | One client's UDP flow, such as one SOCKS5 association: `core/net/udp/session`. |
 | **Underlying stream** | The stream a layer is handed by the layer below it, as in `WrapServerStream(ctx, underlyingStream, transport)` or `AcceptStream(ctx, underlyingStream)`. |
 | **uTLS** | The library (`github.com/refraction-networking/utls`) that sends a copy of a real browser's ClientHello; Apranik's one dependency. |
+| **Global ID** | Eight bytes in the first frame of an XUDP sub-connection that name a client's UDP session across the streams that carry it, so a server can give a client that reconnects its session back. Core derives it from the session's source and a secret key; `spec.Metadata.XUDPGlobalID`. |
 | **XUDP** | Mux.Cool's UDP form in which every datagram names its address, so one sub-connection carries UDP for many destinations and replies name their source. Xray's and sing-box's clients send most UDP this way. `muxcool.DatagramOptions{XUDP: true}`. |

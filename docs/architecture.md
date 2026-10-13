@@ -183,6 +183,7 @@ real modules need it:
 | `core/outbound` | the proxy outbound (dialer stack + proxy client; UDP too when the protocol frames it in streams), freedom and the delay test |
 | `core/outbound/group` | the outbound groups `urltest`, `fallback` and `selector` |
 | `core/net/udp/session` | one UDP session: one datagram per outbound, replies merged, closed on silence |
+| `core/net/udp/resumable` | keeps a UDP session after its stream is lost and gives it to the stream that comes back with the same Global ID |
 | `core/net/udp/nat` | freedom's UDP: which local socket carries each destination, and which senders may reply (RFC 4787) |
 | `core/logging` | eight RFC 5424 levels over `log/slog`, fanned out to every output, the live subscription hub and the sampler |
 | `core/logging/sink` | the outputs: stderr, file, memory and syslog, each a `logging.Output` |

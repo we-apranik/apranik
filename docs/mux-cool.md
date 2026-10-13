@@ -23,7 +23,7 @@ Mux.Cool carries many sub-connections over one established stream, the main conn
 
 | Status | EXTRA |
 | --- | --- |
-| New | NETWORK(1: 1 TCP, 2 UDP), PORT(2), TYPE(1: 1 IPv4, 2 domain, 3 IPv6), ADDRESS |
+| New | NETWORK(1: 1 TCP, 2 UDP), PORT(2), TYPE(1: 1 IPv4, 2 domain, 3 IPv6), ADDRESS. A UDP New with data may add GLOBAL ID(8) (XUDP) |
 | Keep | Nothing. For UDP it may be NETWORK(1) = 2, PORT(2), TYPE(1), ADDRESS (XUDP) |
 | End, KeepAlive | Nothing |
 
