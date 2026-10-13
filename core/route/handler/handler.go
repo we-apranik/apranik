@@ -15,6 +15,7 @@ import (
 	"github.com/The-Apranik/Apranik/core/component"
 	"github.com/The-Apranik/Apranik/core/logging"
 	"github.com/The-Apranik/Apranik/core/net/udp"
+	"github.com/The-Apranik/Apranik/core/net/udp/resumable"
 	"github.com/The-Apranik/Apranik/core/net/udp/session"
 	"github.com/The-Apranik/Apranik/core/relay"
 	"github.com/The-Apranik/Apranik/core/route/informant"
@@ -36,6 +37,9 @@ type Handler struct {
 
 	udpMaxDatagramSize int
 	udpReplyBuffers    *udp.BufferPool
+
+	// Nil when the inbound does not resume UDP sessions.
+	resumableUDPSessions *resumable.Registry
 
 	// Forgets idle routes, ends idle live entries and flushes the counts of
 	// every UDP session this handler serves, with one goroutine.
@@ -78,6 +82,12 @@ type Config struct {
 	// How many destinations of one UDP session are listed at once; zero means
 	// udp.DefaultLiveTrackingUDPMaxEntriesPerSession.
 	LiveTrackingUDPMaxEntriesPerSession int
+
+	// A UDP session whose stream is lost is held, and given to the next stream of
+	// the same user with the same XUDP Global ID (spec.Metadata.XUDPGlobalID).
+	// Off by default; the hold time zero means resumable.DefaultHoldTime.
+	ResumeUDPSessions        bool
+	UDPSessionResumeHoldTime time.Duration
 
 	// What a routing resolve action asks. Nil: a resolve finds nothing.
 	Resolver informant.DomainResolver
@@ -127,6 +137,10 @@ func New(router component.Router, config Config) *Handler {
 		countFlushInterval = defaultCountFlushInterval
 	}
 	sweepInterval := min(sweepIntervalFor(min(udpRoutingCacheEntryIdleTimeout, liveTrackingUDPEntryIdleTimeout)), countFlushInterval)
+	var resumableUDPSessions *resumable.Registry
+	if config.ResumeUDPSessions {
+		resumableUDPSessions = resumable.NewRegistry(config.UDPSessionResumeHoldTime)
+	}
 	return &Handler{
 		router:                              router,
 		streamIdleTimeout:                   streamIdleTimeout,
@@ -138,6 +152,7 @@ func New(router component.Router, config Config) *Handler {
 		liveTrackingUDPMaxEntriesPerSession: liveTrackingUDPMaxEntriesPerSession,
 		udpMaxDatagramSize:                  udpMaxDatagramSize,
 		udpReplyBuffers:                     udp.NewBufferPool(udpMaxDatagramSize),
+		resumableUDPSessions:                resumableUDPSessions,
 		udpSweeper:                          newPeriodicSweeper(sweepInterval),
 		resolver:                            config.Resolver,
 		stats:                               config.Stats,
@@ -225,6 +240,22 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 // relay asks for every packet; a per-session cache answers repeats. A session
 // that ends quietly, by Close or by going idle, is not an error.
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
+	if h.resumableUDPSessions != nil && metadata.XUDPGlobalID != ([8]byte{}) {
+		key := resumable.Key{User: metadata.User, GlobalID: metadata.XUDPGlobalID}
+		standIn, resumed, streamEnded := h.resumableUDPSessions.Connect(key, clientDatagram)
+		if resumed {
+			// The first call still relays this session; this stream is now its client
+			// side, and this call only holds it open until it is no longer the session's.
+			h.logger.Debug("UDP session resumed", "inbound", metadata.InboundTag, "user", metadata.User)
+			select {
+			case <-streamEnded:
+			case <-ctx.Done():
+			}
+			return nil
+		}
+		clientDatagram = standIn
+	}
+
 	parentContext := ctx
 	closeSession := context.CancelFunc(nil)
 	if h.stats.IsLiveTrackingEnabled() {
