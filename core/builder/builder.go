@@ -56,6 +56,10 @@ type Builder struct {
 	// Built here, not from the blueprint, so closed here: the internal
 	// freedom DNS servers without an outbound go through.
 	internalOutbounds []component.Outbound
+
+	// One secret key per built core, so a UDP session's Global ID is the same for
+	// every outbound and different from the ID of any other core.
+	xudpGlobalIDDeriver *outbound.XUDPGlobalIDDeriver
 }
 
 // New builds the logging system first, so every component it goes on to
@@ -65,7 +69,12 @@ func New(log blueprint.Log) (*Builder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("logging: %w", err)
 	}
-	return &Builder{logging: system, logger: system.Logger(), resolver: dns.NewSystemResolver(system.Logger())}, nil
+	deriver, err := outbound.NewXUDPGlobalIDDeriver()
+	if err != nil {
+		system.Close()
+		return nil, err
+	}
+	return &Builder{logging: system, logger: system.Logger(), resolver: dns.NewSystemResolver(system.Logger()), xudpGlobalIDDeriver: deriver}, nil
 }
 
 func (b *Builder) Logger() *logging.Logger { return b.logger }
@@ -238,6 +247,14 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 		return nil, fmt.Errorf("mixed: %w: it needs both socks5 and http", errNoInboundProtocol)
 	}
 	if inboundBlueprint.Mixed == nil {
+		// Before the server is built, so it is built knowing what UDP it takes. Check
+		// has refused a muxcool key on a protocol that cannot carry it; with no key,
+		// a protocol that can is told the defaults.
+		if configurable, ok := inboundBlueprint.StreamProxy.(spec.MuxCoolConfigurable); ok {
+			if err := configurable.ConfigureMuxCool(inboundBlueprint.MuxCool.Options()); err != nil {
+				return nil, fmt.Errorf("proxy %q: %w", inboundBlueprint.StreamProxy.Info().Name, err)
+			}
+		}
 		server, err := inboundBlueprint.StreamProxy.NewStreamServer()
 		if err != nil {
 			return nil, fmt.Errorf("proxy %q: %w", inboundBlueprint.StreamProxy.Info().Name, err)
@@ -501,12 +518,18 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (comp
 	b.logger.With("module", outboundBlueprint.Proxy.Info().Name).
 		Debug("Stream proxy client built", "outbound", outboundBlueprint.Tag, "udp", datagramClient != nil)
 
+	var globalIDDeriver *outbound.XUDPGlobalIDDeriver
+	if _, carriesMuxCool := outboundBlueprint.Proxy.(spec.MuxCoolConfigurable); carriesMuxCool && outboundBlueprint.MuxCool.XUDPGlobalIDEnabled() {
+		globalIDDeriver = b.xudpGlobalIDDeriver
+	}
+
 	return outbound.NewStream(outbound.StreamConfig{
 		Tag:                      outboundBlueprint.Tag,
 		ServerAddr:               outboundBlueprint.Server,
 		Dialer:                   dialer,
 		ProxyClient:              proxyClient,
 		DatagramOverStreamClient: datagramClient,
+		XUDPGlobalID:             globalIDDeriver,
 		Logger:                   b.logger,
 	}), nil
 }
