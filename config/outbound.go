@@ -103,9 +103,20 @@ func buildMuxCool(raw *rawMuxCool) *blueprint.MuxCool {
 		muxCool.TCP = &blueprint.MuxCoolTCP{Enabled: raw.TCP.Enabled, Concurrency: raw.TCP.Concurrency, MaxTotal: raw.TCP.MaxTotal}
 	}
 	if raw.UDP != nil {
-		muxCool.UDP = &blueprint.MuxCoolUDP{Enabled: raw.UDP.Enabled, XUDP: raw.UDP.XUDP, Concurrency: raw.UDP.Concurrency}
+		muxCool.UDP = &blueprint.MuxCoolUDP{Enabled: raw.UDP.Enabled, Concurrency: raw.UDP.Concurrency, XUDP: buildMuxCoolXUDP(raw.UDP.XUDP)}
 	}
 	return muxCool
+}
+
+func buildMuxCoolXUDP(raw *rawMuxCoolXUDP) *blueprint.MuxCoolXUDP {
+	if raw == nil {
+		return nil
+	}
+	xudp := &blueprint.MuxCoolXUDP{Enabled: raw.Enabled}
+	if raw.GlobalID != nil {
+		xudp.GlobalID = &blueprint.MuxCoolGlobalID{Enabled: raw.GlobalID.Enabled, HoldTime: durationOrNil(raw.GlobalID.HoldTime)}
+	}
+	return xudp
 }
 
 func buildProxyRequestTiming(raw *rawProxyRequestTiming) *blueprint.ProxyRequestTiming {

@@ -19,6 +19,7 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 		UDPRoutingCacheMaxEntriesPerSession: raw.UDPRoutingCacheMaxEntriesPerSession,
 		MaxTCPConnections:                   raw.MaxTCPConnections,
 		MaxUDPSessions:                      raw.MaxUDPSessions,
+		MuxCool:                             buildMuxCool(raw.MuxCool),
 	}
 
 	if raw.Listen != "" {

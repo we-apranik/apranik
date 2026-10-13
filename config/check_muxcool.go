@@ -5,21 +5,46 @@ import (
 	"github.com/The-Apranik/Apranik/spec"
 )
 
-// An outbound's muxcool key. The whole shape is known; what is not
-// built is refused when it is written, so a setting is never silently ignored.
+// muxCoolRole says whose muxcool key is checked: an outbound's client uses
+// Mux.Cool, an inbound's server accepts it. The shape is the same for both.
+type muxCoolRole int
+
+const (
+	muxCoolClient muxCoolRole = iota
+	muxCoolServer
+)
+
+// An outbound's muxcool key.
 func checkMuxCool(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
-	muxCool := outbound.MuxCool
-	if muxCool == nil {
+	if outbound.MuxCool == nil {
 		return
 	}
 	muxCoolLoc := fieldLocation(loc, "muxcool")
-
 	if outbound.Proxy == nil {
 		diagnostics.errorf(muxCoolLoc, "muxcool is for a proxy outbound; freedom and groups reach no proxy server")
 		return
 	}
-	if _, ok := outbound.Proxy.(spec.MuxCoolConfigurable); !ok {
-		diagnostics.errorf(muxCoolLoc, "proxy %q cannot carry muxcool", outbound.Proxy.Info().Name)
+	checkMuxCoolOfProxy(diagnostics, outbound.MuxCool, outbound.Proxy, muxCoolClient, muxCoolLoc)
+}
+
+// An inbound's muxcool key.
+func checkInboundMuxCool(diagnostics *Diagnostics, inbound blueprint.Inbound, loc string) {
+	if inbound.MuxCool == nil {
+		return
+	}
+	muxCoolLoc := fieldLocation(loc, "muxcool")
+	if inbound.StreamProxy == nil {
+		diagnostics.errorf(muxCoolLoc, "muxcool is for an inbound with a proxy protocol; mixed and a udp inbound take none")
+		return
+	}
+	checkMuxCoolOfProxy(diagnostics, inbound.MuxCool, inbound.StreamProxy, muxCoolServer, muxCoolLoc)
+}
+
+// The whole shape is known; what is not built is refused when it is written, so
+// a setting is never silently ignored.
+func checkMuxCoolOfProxy(diagnostics *Diagnostics, muxCool *blueprint.MuxCool, proxy spec.StreamProxyModule, role muxCoolRole, muxCoolLoc string) {
+	if _, ok := proxy.(spec.MuxCoolConfigurable); !ok {
+		diagnostics.errorf(muxCoolLoc, "proxy %q cannot carry muxcool", proxy.Info().Name)
 		return
 	}
 
@@ -37,14 +62,50 @@ func checkMuxCool(diagnostics *Diagnostics, outbound blueprint.Outbound, loc str
 	}
 
 	if udp := muxCool.UDP; udp != nil {
-		udpLoc := fieldLocation(muxCoolLoc, "udp")
-		if udp.Concurrency != nil {
-			diagnostics.errorf(fieldLocation(udpLoc, "concurrency"),
-				"sharing a main connection between UDP sessions is not built yet; each UDP session has its own, so concurrency has no effect")
+		checkMuxCoolUDP(diagnostics, muxCool, role, fieldLocation(muxCoolLoc, "udp"))
+	}
+}
+
+func checkMuxCoolUDP(diagnostics *Diagnostics, muxCool *blueprint.MuxCool, role muxCoolRole, udpLoc string) {
+	udp := muxCool.UDP
+	udpEnabled := udp.Enabled == nil || *udp.Enabled
+	if udp.Concurrency != nil {
+		diagnostics.errorf(fieldLocation(udpLoc, "concurrency"),
+			"sharing a main connection between UDP sessions is not built yet; each UDP session has its own, so concurrency has no effect")
+	}
+	xudp := udp.XUDP
+	if xudp == nil {
+		return
+	}
+	xudpLoc := fieldLocation(udpLoc, "xudp")
+
+	if xudp.Enabled != nil && !*xudp.Enabled && udpEnabled {
+		verb := "send"
+		if role == muxCoolServer {
+			verb = "take"
 		}
-		if udp.XUDP != nil && !*udp.XUDP && (udp.Enabled == nil || *udp.Enabled) {
-			diagnostics.errorf(fieldLocation(udpLoc, "xudp"),
-				"plain Mux.Cool UDP is not built yet; to send plain UDP of the protocol, set muxcool.udp.enabled to false")
-		}
+		diagnostics.errorf(fieldLocation(xudpLoc, "enabled"),
+			"plain Mux.Cool UDP is not built yet; to %s plain UDP of the protocol, set muxcool.udp.enabled to false", verb)
+	}
+	if xudp.GlobalID != nil {
+		checkMuxCoolGlobalID(diagnostics, xudp.GlobalID, muxCool.UDPIsXUDP(), role, fieldLocation(xudpLoc, "global_id"))
+	}
+}
+
+func checkMuxCoolGlobalID(diagnostics *Diagnostics, globalID *blueprint.MuxCoolGlobalID, xudpIsOn bool, role muxCoolRole, globalIDLoc string) {
+	if !xudpIsOn {
+		diagnostics.warnf(globalIDLoc, "global_id has no effect while XUDP is off")
+	}
+	if globalID.HoldTime == nil {
+		return
+	}
+	holdTimeLoc := fieldLocation(globalIDLoc, "hold_time")
+	switch {
+	case role == muxCoolClient:
+		diagnostics.errorf(holdTimeLoc, "hold_time is for a server: only a server holds a session after its stream was lost; leave it out on an outbound")
+	case *globalID.HoldTime <= 0:
+		diagnostics.errorf(holdTimeLoc, "must be positive; leave it out for the default")
+	case globalID.Enabled != nil && !*globalID.Enabled:
+		diagnostics.warnf(holdTimeLoc, "hold_time has no effect while global_id.enabled is false")
 	}
 }

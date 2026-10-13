@@ -88,6 +88,9 @@ type rawInbound struct {
 
 	// Absent means a request the proxy refuses is closed.
 	Fallback *rawFallback `json:"fallback"`
+
+	// What the inbound's server accepts of Mux.Cool.
+	MuxCool *rawMuxCool `json:"muxcool"`
 }
 
 // Where refused streams go, dialed straight over TCP: typically a local web
@@ -141,9 +144,19 @@ type rawMuxCoolTCP struct {
 }
 
 type rawMuxCoolUDP struct {
-	Enabled     *bool `json:"enabled"`
-	XUDP        *bool `json:"xudp"`
-	Concurrency *int  `json:"concurrency"`
+	Enabled     *bool           `json:"enabled"`
+	XUDP        *rawMuxCoolXUDP `json:"xudp"`
+	Concurrency *int            `json:"concurrency"`
+}
+
+type rawMuxCoolXUDP struct {
+	Enabled  *bool               `json:"enabled"`
+	GlobalID *rawMuxCoolGlobalID `json:"global_id"`
+}
+
+type rawMuxCoolGlobalID struct {
+	Enabled  *bool           `json:"enabled"`
+	HoldTime *types.Duration `json:"hold_time"`
 }
 
 // A group's members and the probe that tests them. Tolerance is the urltest

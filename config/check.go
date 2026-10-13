@@ -171,6 +171,8 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		}
 	}
 
+	checkInboundMuxCool(diagnostics, inbound, loc)
+
 	checkLimitIsPositive(diagnostics, fieldLocation(loc, "max_tcp_connections"), inbound.MaxTCPConnections)
 	if inbound.MaxTCPConnections != nil && inbound.Network == spec.NetworkUDP {
 		diagnostics.errorf(fieldLocation(loc, "max_tcp_connections"), "limits TCP connections; a udp inbound has none")

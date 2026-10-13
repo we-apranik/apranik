@@ -87,6 +87,10 @@ type Inbound struct {
 	// Zero means close it instead.
 	Fallback spec.Destination
 
+	// Only with StreamProxy: what the server accepts of Mux.Cool. Nil means the
+	// defaults.
+	MuxCool *MuxCool
+
 	// Silence in both directions ends a TCP connection. Nil means
 	// relay.DefaultStreamIdleTimeout; negative means no bound; zero is refused.
 	TCPIdleTimeout *time.Duration
