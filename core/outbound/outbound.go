@@ -28,6 +28,11 @@ type StreamConfig struct {
 	// Nil means this outbound carries TCP only.
 	DatagramOverStreamClient spec.DatagramOverStreamProxyClient
 
+	// Nil means no Global ID: the client does not send one. Set, a UDP session
+	// that this outbound's client writes in every datagram names itself with the
+	// ID derived from its source.
+	XUDPGlobalID *XUDPGlobalIDDeriver
+
 	// Nil is allowed: NewStream substitutes a silent logger.
 	Logger *logging.Logger
 }
@@ -44,6 +49,7 @@ func NewStream(config StreamConfig) component.Outbound {
 		dialer:         config.Dialer,
 		proxyClient:    config.ProxyClient,
 		datagramClient: config.DatagramOverStreamClient,
+		globalID:       config.XUDPGlobalID,
 		logger:         logger.With("outbound", config.Tag),
 	}
 }
@@ -57,6 +63,7 @@ type streamOutbound struct {
 	dialer         spec.StreamDialer
 	proxyClient    spec.StreamProxyClient
 	datagramClient spec.DatagramOverStreamProxyClient
+	globalID       *XUDPGlobalIDDeriver
 	logger         *logging.Logger
 }
 
@@ -105,6 +112,9 @@ func (o *streamOutbound) CreateDatagram(ctx context.Context, metadata spec.Metad
 
 	switch placement := o.datagramClient.DatagramDestinationIsWritten(); placement {
 	case spec.DatagramDestinationInEveryDatagram:
+		if o.globalID != nil {
+			metadata.XUDPGlobalID = o.globalID.For(metadata.Transport.SourceEndpoint)
+		}
 		return o.createDatagramOnOneStream(ctx, metadata)
 	case spec.DatagramDestinationInStreamRequest:
 		return newDatagramOverStreamPerDestination(ctx, o, metadata), nil

@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"io/fs"
 	"net"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -222,5 +223,70 @@ func TestAFailedDatagramRequestClosesTheServerStream(t *testing.T) {
 	case <-serverStream.closed:
 	default:
 		t.Error("the stream to the server was left open")
+	}
+}
+
+// metadataRecordingClient keeps the metadata its request was made with.
+type metadataRecordingClient struct {
+	fakeDatagramOverStreamClient
+	metadata chan spec.Metadata
+}
+
+func (c metadataRecordingClient) RequestDatagramOverStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
+	c.metadata <- metadata
+	return c.fakeDatagramOverStreamClient.RequestDatagramOverStream(ctx, underlyingStream, metadata)
+}
+
+func sessionMetadataFrom(t *testing.T, text string) spec.Metadata {
+	t.Helper()
+	endpoint, err := spec.NewEndpoint(netip.MustParseAddrPort(text).Addr(), netip.MustParseAddrPort(text).Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return spec.Metadata{Network: spec.NetworkUDP, Transport: spec.TransportMetadata{SourceEndpoint: endpoint}}
+}
+
+// The ID is derived from the session's source, so a stream that replaces a lost one names the same session.
+func TestTheClientIsToldTheGlobalIDOfTheSessionsSource(t *testing.T) {
+	deriver := outbound.NewXUDPGlobalIDDeriverWithKey([32]byte{7})
+	client := metadataRecordingClient{
+		fakeDatagramOverStreamClient: fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 2)},
+		metadata:                     make(chan spec.Metadata, 2),
+	}
+	proxy := outbound.NewStream(outbound.StreamConfig{
+		Tag: "proxy", ServerAddr: proxyServer(t), Dialer: recordingDialer{serverStream: pipeStream{}, dialed: make(chan spec.Destination, 2)},
+		DatagramOverStreamClient: client, XUDPGlobalID: deriver,
+	})
+	session := sessionMetadataFrom(t, "192.0.2.7:50000")
+
+	for range 2 {
+		if _, err := proxy.CreateDatagram(context.Background(), session); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	want := deriver.For(session.Transport.SourceEndpoint)
+	for attempt := range 2 {
+		if got := (<-client.metadata).XUDPGlobalID; got != want || got == ([8]byte{}) {
+			t.Errorf("request %d was made with the ID %v, want %v", attempt+1, got, want)
+		}
+	}
+}
+
+func TestWithoutADeriverTheClientIsToldNoGlobalID(t *testing.T) {
+	client := metadataRecordingClient{
+		fakeDatagramOverStreamClient: fakeDatagramOverStreamClient{requested: make(chan spec.Stream, 1)},
+		metadata:                     make(chan spec.Metadata, 1),
+	}
+	proxy := outbound.NewStream(outbound.StreamConfig{
+		Tag: "proxy", ServerAddr: proxyServer(t), Dialer: recordingDialer{serverStream: pipeStream{}, dialed: make(chan spec.Destination, 1)},
+		DatagramOverStreamClient: client,
+	})
+
+	if _, err := proxy.CreateDatagram(context.Background(), sessionMetadataFrom(t, "192.0.2.7:50000")); err != nil {
+		t.Fatal(err)
+	}
+	if got := (<-client.metadata).XUDPGlobalID; got != ([8]byte{}) {
+		t.Errorf("the request was made with the ID %v, want none", got)
 	}
 }
