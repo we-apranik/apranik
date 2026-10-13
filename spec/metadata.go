@@ -47,6 +47,12 @@ type Metadata struct {
 	InboundTag  string
 	User        string       // set only if the proxy protocol authenticates
 	Sniffed     *SniffResult // filled by core after handshake, never by a module
+
+	// XUDPGlobalID names a UDP session across the streams that carry it, so a
+	// server can give a client that reconnects its session back. Core sets it
+	// for a client request; a server's protocol sets it from the request. Zero
+	// means none.
+	XUDPGlobalID [8]byte
 }
 
 type SniffResult struct {
