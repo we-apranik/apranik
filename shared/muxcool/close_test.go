@@ -49,6 +49,41 @@ func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.
 	}
 }
 
+// io.EOF is for a graceful end only: a peer that closes its carrier with a
+// sub-connection still open never sent that sub-connection's End, so the
+// reader sees a loss, which a caller that holds on to a lost session depends on.
+func TestACarrierThatClosesWithoutAnEndIsALossNotAGracefulEnd(t *testing.T) {
+	server, peer := rawClientOf(t, muxcool.ServerOptions{})
+	peer.send(newTCP(1, muxcool.OptionDataFollows, "example.com"), []byte("hello"))
+	stream := acceptWithin(t, server, 2*time.Second).Stream
+	buffer := make([]byte, 5)
+	if _, err := io.ReadFull(stream, buffer); err != nil {
+		t.Fatal(err)
+	}
+
+	peer.conn.Close()
+
+	_, err := stream.Read(buffer)
+	if !errors.Is(err, io.ErrUnexpectedEOF) || !errors.Is(err, muxcool.ErrClosed) || errors.Is(err, io.EOF) {
+		t.Errorf("Read after the carrier closed with no End = %v, want ErrClosed wrapping io.ErrUnexpectedEOF, not io.EOF", err)
+	}
+}
+
+func TestADatagramSubConnectionAlsoSeesALossWhenTheCarrierClosesWithoutAnEnd(t *testing.T) {
+	server, peer := rawClientOf(t, muxcool.ServerOptions{})
+	peer.send(muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)}, []byte("q"))
+	datagram := acceptWithin(t, server, 2*time.Second).Datagram
+	if _, _, err := readDatagram(t, datagram, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	peer.conn.Close()
+
+	if _, _, err := readDatagram(t, datagram, 10); !errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
+		t.Errorf("ReadFrom after the carrier closed with no End = %v, want io.ErrUnexpectedEOF, not io.EOF", err)
+	}
+}
+
 func TestAcceptReturnsWhenTheMainConnectionCloses(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{IdleTimeout: -1})
 	accepting := make(chan error, 1)
