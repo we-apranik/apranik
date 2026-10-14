@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Host and port are separate fields in the config file, so a bare IPv6 literal

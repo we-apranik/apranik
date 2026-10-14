@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/core/route/dataset/geodata/geodatatest"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // startRoutedSOCKS5 runs a config file's single SOCKS5 inbound the way

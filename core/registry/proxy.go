@@ -3,7 +3,7 @@ package registry
 import (
 	"slices"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ProxyModules is one constructed proxy protocol. Config is the value a config

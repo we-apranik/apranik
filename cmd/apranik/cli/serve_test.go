@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func mustDefaultRegistry(t *testing.T) *registry.Registry {

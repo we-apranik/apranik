@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // TransportRegistry is the transport namespace, independent of the proxy one.
 type TransportRegistry struct {

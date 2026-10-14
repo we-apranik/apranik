@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 var errEmptyName = errors.New("name is empty")

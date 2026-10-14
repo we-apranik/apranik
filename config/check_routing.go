@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/route/dataset"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/route/dataset"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Beyond this a sniff delays every connection whose client does not speak

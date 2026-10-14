@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // memberSet is what every outbound group shares: its tag, its members and the

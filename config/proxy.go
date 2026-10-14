@@ -1,6 +1,6 @@
 package config
 
-import "github.com/The-Apranik/Apranik/core/registry"
+import "github.com/we-apranik/apranik/core/registry"
 
 // A protocol is looked up by name, built and decoded once, whatever kinds it
 // fills. The wanted kind is the one this position needs, so a protocol that

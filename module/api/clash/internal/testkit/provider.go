@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Provider answers from fields a test sets before it starts the server;

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/config"
+	"github.com/we-apranik/apranik/config"
 )
 
 func TestLoadReadsAFile(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 var errNoServerSide = errors.New("fragment has no server side; it only changes outgoing connections")

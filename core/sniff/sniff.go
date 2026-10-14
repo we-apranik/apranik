@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/net/peekable"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/net/peekable"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Server-first protocols such as SSH and SMTP send nothing until the server

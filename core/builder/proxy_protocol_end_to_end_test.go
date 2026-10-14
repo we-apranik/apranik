@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // capturingHandler records the Metadata of the one request that reaches it.

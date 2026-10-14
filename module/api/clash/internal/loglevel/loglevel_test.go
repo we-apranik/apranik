@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/loglevel"
+	"github.com/we-apranik/apranik/module/api/clash/internal/loglevel"
 )
 
 func TestNameFoldsEightSeveritiesIntoClashsFour(t *testing.T) {

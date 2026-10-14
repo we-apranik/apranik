@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // The 65535 IDs of one main connection cannot be opened in a test one by one, so

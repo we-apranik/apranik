@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/apicoreprovider"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/apicoreprovider"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func providerWithResolver(t *testing.T) *apicoreprovider.Provider {

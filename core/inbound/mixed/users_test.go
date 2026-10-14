@@ -12,9 +12,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/inbound/mixed"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/inbound/mixed"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ---------- fan-out, with servers that record what they are asked ----------

@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound/group"
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/outbound/group"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // A member that reaches a test server whatever it is asked for, so a probe

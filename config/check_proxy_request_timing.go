@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // An outbound's proxy_request_timing key.

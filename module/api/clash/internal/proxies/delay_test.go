@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/testkit"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/api/clash/internal/testkit"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // measuredWith records what the module asked core to measure.

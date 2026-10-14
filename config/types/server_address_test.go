@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/we-apranik/apranik/config/types"
 )
 
 func TestServerAddress(t *testing.T) {

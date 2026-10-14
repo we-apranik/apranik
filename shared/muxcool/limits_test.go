@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
 func TestAClientEndHasNoLimitOnSubConnections(t *testing.T) {

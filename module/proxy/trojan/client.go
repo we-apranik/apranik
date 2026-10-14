@@ -3,9 +3,9 @@ package trojan
 import (
 	"context"
 	"fmt"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/shared/delayedrequest"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/shared/delayedrequest"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type client struct {

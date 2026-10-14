@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 // Settings are the module's configuration: the entry of the config's apis list

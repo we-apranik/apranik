@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 // withDNS adds a dns section, and routing when given, to a document with the

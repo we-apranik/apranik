@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/proxy/vless"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/vless"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func userManager(t *testing.T) (spec.UserManager, spec.StreamProxyServer) {

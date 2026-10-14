@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // A stack is read by position: index 0 is the base, the rest are overlays

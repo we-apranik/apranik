@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 // A group reaches no server and has no transport of its own: its members do.

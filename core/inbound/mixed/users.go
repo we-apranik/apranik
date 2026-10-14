@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // userManagingStreamServer is the mixed server when SOCKS5 and HTTP can both

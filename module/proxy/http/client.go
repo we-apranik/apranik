@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/proxy/http/wire"
-	"github.com/The-Apranik/Apranik/shared/streamdeadline"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/http/wire"
+	"github.com/we-apranik/apranik/shared/streamdeadline"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ConnectRefusedError is a CONNECT the upstream proxy answered with a status

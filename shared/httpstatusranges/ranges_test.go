@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 func TestParseReadsCodesRangesAndLists(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 // Format is how a sink writes records. Each output has its own default.

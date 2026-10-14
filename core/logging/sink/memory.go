@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 // Memory keeps the most recent records in a ring buffer, so a client can

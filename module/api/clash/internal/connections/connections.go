@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/memory"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/api/clash/internal/memory"
+	"github.com/we-apranik/apranik/module/api/clash/internal/stream"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/spec"
 )
 
 const (

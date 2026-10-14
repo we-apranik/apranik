@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 // NewSyslog writes to the system log daemon. The eight severities map onto

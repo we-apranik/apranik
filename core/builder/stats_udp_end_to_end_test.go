@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 func startUDPEchoServer(t *testing.T) uint16 {

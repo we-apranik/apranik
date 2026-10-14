@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/route/router"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // VLESS server and client built from config files, as `apranik run` builds

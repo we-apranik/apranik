@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 func pointerTo[T any](value T) *T { return &value }

@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/inbound"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan"
-	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/inbound"
+	"github.com/we-apranik/apranik/module/proxy/trojan"
+	"github.com/we-apranik/apranik/module/transport/base/tcp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // sourceReplacingOverlay stands in for an overlay that learned the real

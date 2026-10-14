@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
+	"github.com/we-apranik/apranik/config"
 )
 
 func outboundWithProxyRequestTiming(protocol, timing string) string {

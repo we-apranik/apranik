@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/shared/delayedrequest"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/shared/delayedrequest"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Proxy fills StreamProxyModule for CONNECT and DatagramOverStreamProxyModule

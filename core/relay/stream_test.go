@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/relay"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/relay"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type pipeStream struct{ net.Conn }

@@ -5,8 +5,8 @@ import (
 
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/builder"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/builder"
 )
 
 var cmdCheck = &Command{

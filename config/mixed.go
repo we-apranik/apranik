@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/spec"
 )
 
 const (

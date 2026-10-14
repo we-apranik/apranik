@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/dns/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/dns/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // socketDatagram is a spec.Datagram over a plain UDP socket, so this test

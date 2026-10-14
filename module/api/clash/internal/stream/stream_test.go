@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
+	"github.com/we-apranik/apranik/module/api/clash/internal/stream"
 )
 
 const tick = 10 * time.Millisecond

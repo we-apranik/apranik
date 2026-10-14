@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/module/proxy/vless"
-	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
-	"github.com/The-Apranik/Apranik/shared/muxcool"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/module/proxy/vless"
+	"github.com/we-apranik/apranik/module/proxy/vless/wire"
+	"github.com/we-apranik/apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func newXUDPClient(t *testing.T, uuid types.Secret) client {

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/module/api/clash"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/module/api/clash"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func settingsFrom(t *testing.T, text string) *clash.Module {

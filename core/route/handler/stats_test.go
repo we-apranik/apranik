@@ -8,13 +8,13 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound/group"
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/outbound/group"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/route/router"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func newStatsRegistry(outbounds ...stats.OutboundDescription) *stats.Registry {

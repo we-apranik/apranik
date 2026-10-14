@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 func TestALoggerHandedOutBeforeSubscribingReachesALaterSubscriber(t *testing.T) {

@@ -3,8 +3,8 @@ package router
 import (
 	"net/netip"
 
-	"github.com/The-Apranik/Apranik/core/route/router/match"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/route/router/match"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // routedRequest is one Route call's view of the request, with the values

@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 // NewStderr writes to stderr in format. NO_COLOR, when set, turns color

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 func corsHandler(origins ...string) http.Handler {

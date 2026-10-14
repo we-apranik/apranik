@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // A module that only reads its settings: no server, no listener.

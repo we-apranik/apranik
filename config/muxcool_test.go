@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
+	"github.com/we-apranik/apranik/config"
 )
 
 // An outbound with a proxy and a muxcool member; protocol is a JSON object.

@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/outbound"
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
-	httpsniffer "github.com/The-Apranik/Apranik/module/sniffer/http"
-	"github.com/The-Apranik/Apranik/module/transport/base/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/outbound"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/route/router"
+	httpsniffer "github.com/we-apranik/apranik/module/sniffer/http"
+	"github.com/we-apranik/apranik/module/transport/base/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // clientDatagram stands in for the datagram an inbound hands the handler for

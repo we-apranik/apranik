@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/The-Apranik/Apranik/cmd/apranik/cli"
+	"github.com/we-apranik/apranik/cmd/apranik/cli"
 )
 
 const (

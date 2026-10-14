@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/udp"
-	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/udp"
+	"github.com/we-apranik/apranik/core/net/udp/session"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ErrDestinationBlocked from OutboundForDestination drops the datagram without

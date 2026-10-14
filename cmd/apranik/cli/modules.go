@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
 var cmdModules = &Command{

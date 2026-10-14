@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // SubscribeToLog starts a live view of the log; the builder's method and the

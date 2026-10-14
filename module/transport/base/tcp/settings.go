@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/we-apranik/apranik/config/types"
 )
 
 // No listen address here: a listener is handed its bind address, so the field

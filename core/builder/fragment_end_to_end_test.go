@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // fragment in both places it is meant for: under tls in a proxy outbound, and

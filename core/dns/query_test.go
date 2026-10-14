@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 func TestQueryAsksForExactlyTheRecordTypeGivenAndKeepsTheTTL(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/net/peekable"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/net/peekable"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Every SOCKS5 connection opens with its version byte; an HTTP request opens

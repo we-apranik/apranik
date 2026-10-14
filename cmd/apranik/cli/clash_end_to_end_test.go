@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
+	"github.com/we-apranik/apranik/config"
 )
 
 const clashSecret = "end-to-end"

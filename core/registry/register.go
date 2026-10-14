@@ -3,7 +3,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Info is all ten kind interfaces have in common. The tables stay typed;

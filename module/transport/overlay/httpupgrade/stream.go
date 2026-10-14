@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // stream is the stream below, except that bytes the handshake read past its

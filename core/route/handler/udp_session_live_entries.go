@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/shared/lru"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/shared/lru"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // One live entry for one destination of one UDP session: listed in the

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // How many members of a group are measured at once.

@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // fakeAddr is a net.Addr of a kind the fast path does not know, so it takes

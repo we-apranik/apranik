@@ -12,15 +12,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/udp"
-	"github.com/The-Apranik/Apranik/core/net/udp/resumable"
-	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/core/relay"
-	"github.com/The-Apranik/Apranik/core/route/informant"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/udp"
+	"github.com/we-apranik/apranik/core/net/udp/resumable"
+	"github.com/we-apranik/apranik/core/net/udp/session"
+	"github.com/we-apranik/apranik/core/relay"
+	"github.com/we-apranik/apranik/core/route/informant"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Handler is component.TrafficHandler. It decides nothing itself, asking the

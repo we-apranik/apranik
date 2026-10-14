@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
-	"github.com/The-Apranik/Apranik/shared/vmessaddr"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/vmessaddr"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func ipDestination(t testing.TB, text string, port uint16) spec.Destination {

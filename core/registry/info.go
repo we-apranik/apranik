@@ -3,7 +3,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // describe is how registering any module starts: the constructor exists, the

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 var errServerNeedsCertificate = errors.New("tls: a server needs at least one entry in certificates")

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
-// Overridable with -ldflags "-X github.com/The-Apranik/Apranik/cmd/cli.version=1.2.3".
+// Overridable with -ldflags "-X github.com/we-apranik/apranik/cmd/cli.version=1.2.3".
 var version = "dev"
 
 var cmdVersion = &Command{

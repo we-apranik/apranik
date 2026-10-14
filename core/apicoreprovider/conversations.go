@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func (p *Provider) LiveConversations() ([]spec.APILiveConversation, error) {

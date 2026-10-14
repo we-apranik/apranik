@@ -3,7 +3,7 @@ package session
 import (
 	"sync/atomic"
 
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // How many datagrams a session counts for itself before it adds them to the

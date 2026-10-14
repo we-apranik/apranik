@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 type SnifferRegistry struct {
 	uniqueNames

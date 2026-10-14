@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // forwardedUpgradeRequest is an HTTPUpgrade request as a proxy in front would forward it.

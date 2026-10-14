@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/stream"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 func Register(router *web.Router, hub *stream.Hub) {

@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // DelayTester sends one HTTP request through an outbound and times it: the one

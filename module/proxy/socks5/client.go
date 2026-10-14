@@ -6,10 +6,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/proxy/socks5/wire"
-	"github.com/The-Apranik/Apranik/shared/socksaddr"
-	"github.com/The-Apranik/Apranik/shared/streamdeadline"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/socks5/wire"
+	"github.com/we-apranik/apranik/shared/socksaddr"
+	"github.com/we-apranik/apranik/shared/streamdeadline"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type streamClient struct {

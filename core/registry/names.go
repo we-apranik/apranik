@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // uniqueNames is what a namespace shares when one name holds one module: the
 // index, the duplicate rule and the listing.

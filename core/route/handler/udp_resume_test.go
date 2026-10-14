@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/route/router"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // An echo outbound that counts the datagrams it opens: the sockets the remote

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // datagram is safe for one reader and many writers.

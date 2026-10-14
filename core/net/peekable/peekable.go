@@ -7,7 +7,7 @@ package peekable
 import (
 	"errors"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Large enough for a post-quantum TLS ClientHello split across records, and

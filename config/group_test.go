@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 // documentWithOutbounds is a good document with the given outbounds, which

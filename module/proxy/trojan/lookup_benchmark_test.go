@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
 )
 
 // lookUp runs once per accepted connection and compares every user, so its

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
-	"github.com/The-Apranik/Apranik/shared/delayedrequest"
-	"github.com/The-Apranik/Apranik/shared/muxcool"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/vless/wire"
+	"github.com/we-apranik/apranik/shared/delayedrequest"
+	"github.com/we-apranik/apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // XUDP is one Mux.Cool sub-connection per UDP session, sent after a request with

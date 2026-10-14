@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/outbound"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/outbound"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // A proxy outbound reaches its server, not the final destination, so it must

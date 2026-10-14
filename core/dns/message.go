@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 const (

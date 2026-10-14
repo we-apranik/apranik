@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 func TestServeStaleAnswersAtOnceAndRefreshes(t *testing.T) {

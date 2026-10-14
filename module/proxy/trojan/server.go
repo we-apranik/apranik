@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/shared/socksaddr"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/shared/socksaddr"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type user struct {

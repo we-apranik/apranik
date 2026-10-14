@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/udp"
-	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/udp"
+	"github.com/we-apranik/apranik/core/net/udp/nat"
+	"github.com/we-apranik/apranik/core/net/udp/session"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Check reports what a Blueprint has but cannot run on: a missing field, a

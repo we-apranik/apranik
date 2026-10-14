@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/core/relay"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/net/udp/session"
+	"github.com/we-apranik/apranik/core/relay"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func destinationOf(t *testing.T, host string, port uint16) spec.Destination {

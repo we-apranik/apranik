@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/ui"
+	"github.com/we-apranik/apranik/module/api/clash/internal/ui"
 )
 
 func serve(t *testing.T) (*httptest.Server, string) {

@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/route/dataset"
-	"github.com/The-Apranik/Apranik/core/route/router/match"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/route/dataset"
+	"github.com/we-apranik/apranik/core/route/router/match"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // config.Check reports every problem found here with its location first; these

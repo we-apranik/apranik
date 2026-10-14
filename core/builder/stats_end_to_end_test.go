@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 func eventuallySnapshot(t *testing.T, registry *stats.Registry, description string, condition func(trafficView) bool) trafficView {

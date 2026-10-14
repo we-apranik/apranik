@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/tlsclienthello"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/tlsclienthello"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // fragmentingStream holds back the first bytes written until they form a

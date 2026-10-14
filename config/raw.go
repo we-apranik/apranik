@@ -3,7 +3,7 @@ package config
 import (
 	"encoding/json"
 
-	"github.com/The-Apranik/Apranik/config/types"
+	"github.com/we-apranik/apranik/config/types"
 )
 
 // The raw types mirror the JSON config file, not what core runs on. Settings stay

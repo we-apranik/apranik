@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
 )
 
 // Anything ReadRequest accepts re-encodes to the bytes it consumed, and

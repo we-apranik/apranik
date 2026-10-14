@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 // DefaultMemoryCapacity is the ring size a MemoryOutput gets when it names none.

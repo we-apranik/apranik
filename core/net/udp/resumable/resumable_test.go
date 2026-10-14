@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/net/udp/resumable"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/net/udp/resumable"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // fakeStream is a client's stream: the test pushes what it reads and sees what is written to it.

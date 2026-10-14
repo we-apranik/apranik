@@ -3,8 +3,8 @@ package blueprint
 import (
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/delayedrequest"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/delayedrequest"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ProxyRequestTiming is an outbound's proxy_request_timing key. Every field is

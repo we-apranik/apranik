@@ -9,7 +9,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Router decides where one request goes. It is shared by every inbound and

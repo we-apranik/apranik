@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
-	"github.com/The-Apranik/Apranik/core/route/router/match"
+	"github.com/we-apranik/apranik/core/route/dataset/geodata/geodatatest"
+	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
 func testSiteFile() []byte {

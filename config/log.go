@@ -3,10 +3,10 @@ package config
 import (
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/logging/sink"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging/sink"
 )
 
 func (b *configBuilder) buildLog(raw rawLog, loc string) blueprint.Log {

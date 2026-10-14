@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound/group"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/outbound/group"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func newTestSelector(t *testing.T, members ...*scriptedMember) component.Outbound {

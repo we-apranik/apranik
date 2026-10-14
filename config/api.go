@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Each entry is a registered API module with its settings decoded into it, like

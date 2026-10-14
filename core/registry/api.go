@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // APIRegistry holds the API modules: ways for another program to read and
 // drive a running Apranik.

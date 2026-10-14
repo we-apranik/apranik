@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type datagramDialer struct{ resolver spec.Resolver }

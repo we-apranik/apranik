@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/vmessaddr"
+	"github.com/we-apranik/apranik/shared/vmessaddr"
 )
 
 // Whatever the bytes, the two readers must not panic, must agree, and what they

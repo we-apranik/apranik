@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/spec"
 )
 
 var errNoResolver = errors.New("apicoreprovider: no resolver was given")

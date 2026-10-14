@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func endpointOf(t *testing.T, text string) spec.Endpoint {

@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 const xudpGlobalIDKeyLength = 32

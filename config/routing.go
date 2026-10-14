@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/route/router/match"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
 // The routing section. Datasets are top-level.

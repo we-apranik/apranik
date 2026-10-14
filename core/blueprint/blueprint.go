@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/udp/nat"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Version is what a config file's min_core is compared against.

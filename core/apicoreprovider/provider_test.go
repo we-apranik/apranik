@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/apicoreprovider"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/logging/sink"
-	"github.com/The-Apranik/Apranik/core/outbound/group"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/apicoreprovider"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging/sink"
+	"github.com/we-apranik/apranik/core/outbound/group"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // An outbound that reaches one address whatever it is asked for.

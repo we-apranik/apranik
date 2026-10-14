@@ -5,7 +5,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // PROVISIONAL: 400 ms. Xray waits 100 ms in its Trojan client and 500 ms in

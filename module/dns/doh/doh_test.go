@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/dns/doh"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/dns/doh"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // plainDialer stands in for core's dialer, whose streams already carry TLS:

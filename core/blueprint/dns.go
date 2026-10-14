@@ -3,7 +3,7 @@ package blueprint
 import (
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // DNS is the resolver's configuration: which DNS servers answer

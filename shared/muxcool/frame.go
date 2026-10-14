@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/The-Apranik/Apranik/shared/vmessaddr"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/vmessaddr"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type Status byte

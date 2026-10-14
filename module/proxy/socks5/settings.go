@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/shared/controlcharacter"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/shared/controlcharacter"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // No server address here: a proxy protocol never dials, so that belongs to the

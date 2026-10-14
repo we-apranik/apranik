@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // A cache hit is what nearly every dial of a domain costs.

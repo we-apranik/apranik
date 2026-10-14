@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/shared/websocket/handshake"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Early data puts the start of the payload in the handshake, base64, so the

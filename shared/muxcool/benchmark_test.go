@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
 // The baseline is the same bytes over the same loopback TCP connection with no

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 // What an API's own settings can say is its module's: Validate and Warnings.

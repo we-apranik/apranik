@@ -3,7 +3,7 @@ package inbound
 import (
 	"errors"
 
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // A deadline is a client that was too slow, in whichever stage it happened;

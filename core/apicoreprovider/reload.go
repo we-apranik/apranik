@@ -1,6 +1,6 @@
 package apicoreprovider
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // RequestReload checks the configuration source again and, when it is valid,
 // asks for it to replace the running one. It returns once the new configuration

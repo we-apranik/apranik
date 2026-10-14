@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging"
 )
 
 func attrsOf(record slog.Record) map[string]string {

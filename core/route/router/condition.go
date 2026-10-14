@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/The-Apranik/Apranik/core/route/router/match"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/route/router/match"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // condition is one compiled field of a match, or a whole match.

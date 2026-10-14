@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/net/udp/session"
-	"github.com/The-Apranik/Apranik/core/outbound"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/module/transport/base/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/net/udp/session"
+	"github.com/we-apranik/apranik/core/outbound"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/module/transport/base/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func newStatsRegistry() *stats.Registry {

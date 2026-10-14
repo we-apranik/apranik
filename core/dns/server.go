@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // DefaultSystemTimeout bounds one lookup through the operating system. The

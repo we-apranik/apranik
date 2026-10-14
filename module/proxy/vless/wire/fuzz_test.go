@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/proxy/vless/wire"
+	"github.com/we-apranik/apranik/module/proxy/vless/wire"
 )
 
 // Anything ReadRequestHeader accepts as a TCP, UDP or Mux request encodes and reads back

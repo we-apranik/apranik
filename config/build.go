@@ -8,8 +8,8 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
 // Parse turns one config file into a *blueprint.Blueprint without checking it. The

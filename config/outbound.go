@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/net/udp/nat"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
 const (

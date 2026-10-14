@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/websocket/handshake"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Largest payload one Write puts in one frame. With the header it fits a

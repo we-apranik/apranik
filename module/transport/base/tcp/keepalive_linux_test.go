@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/module/transport/base/tcp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func keepAliveOptions(t *testing.T, stream spec.Stream) (enabled, idle, interval, count int) {

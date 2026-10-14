@@ -1,6 +1,6 @@
 package socks5
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // Proxy fills StreamProxyModule and nothing else. UDP ASSOCIATE is served
 // through the stream kind rather than through DatagramProxyModule: spec's

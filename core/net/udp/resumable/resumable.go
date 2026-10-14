@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // PROVISIONAL, as the other cores' hold: Xray keeps a session one minute.

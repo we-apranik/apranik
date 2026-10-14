@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/peekable"
-	"github.com/The-Apranik/Apranik/core/relay"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/peekable"
+	"github.com/we-apranik/apranik/core/relay"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // EMFILE is not fatal; a hot loop on it would make a busy server worse.

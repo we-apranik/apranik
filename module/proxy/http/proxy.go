@@ -1,6 +1,6 @@
 package http
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // Proxy fills StreamProxyModule only: HTTP proxying carries TCP and has no
 // datagram form.

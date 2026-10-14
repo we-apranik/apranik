@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/shared/tlsclienthello"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/tlsclienthello"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type Settings struct{}

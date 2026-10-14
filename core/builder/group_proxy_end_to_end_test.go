@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/builder"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound/group"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/builder"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/outbound/group"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func buildTrojanClientWithPassword(t *testing.T, tag, transport string, serverPort uint16, password string) component.Outbound {

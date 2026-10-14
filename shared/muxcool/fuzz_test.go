@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
 // Whatever the bytes, ReadHeader must not panic or read past the metadata, and

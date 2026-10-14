@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/net/udp"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/net/udp"
 )
 
 // A tag a list names must exist, or the user would count nothing and never

@@ -8,8 +8,8 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // classifyDialError sorts a failed dial into the fixed list statistics count

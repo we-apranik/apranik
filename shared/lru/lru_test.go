@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/lru"
+	"github.com/we-apranik/apranik/shared/lru"
 )
 
 func keysMostRecentFirst(cache *lru.Cache[string, int]) []string {

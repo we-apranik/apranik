@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/core/registry"
-	"github.com/The-Apranik/Apranik/module/proxy/socks5"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan"
-	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/net/udp/nat"
+	"github.com/we-apranik/apranik/core/registry"
+	"github.com/we-apranik/apranik/module/proxy/socks5"
+	"github.com/we-apranik/apranik/module/proxy/trojan"
+	"github.com/we-apranik/apranik/module/transport/base/tcp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func modules(t *testing.T) *registry.Registry {

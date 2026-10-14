@@ -3,7 +3,7 @@ package blueprint
 import (
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 // GroupType is what a group does with its members.

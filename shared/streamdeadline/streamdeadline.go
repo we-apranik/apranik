@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // BindToContext makes blocking reads and writes on the stream fail once ctx

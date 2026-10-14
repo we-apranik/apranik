@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 const (

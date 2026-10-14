@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 
-	"github.com/The-Apranik/Apranik/shared/lru"
+	"github.com/we-apranik/apranik/shared/lru"
 )
 
 // DefaultCacheMaxEntries bounds a cache: about a megabyte at a few hundred

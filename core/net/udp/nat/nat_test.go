@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/logging/sink"
-	coreudp "github.com/The-Apranik/Apranik/core/net/udp"
-	"github.com/The-Apranik/Apranik/core/net/udp/nat"
-	"github.com/The-Apranik/Apranik/module/transport/base/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging/sink"
+	coreudp "github.com/we-apranik/apranik/core/net/udp"
+	"github.com/we-apranik/apranik/core/net/udp/nat"
+	"github.com/we-apranik/apranik/module/transport/base/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // countingDialer wraps transport/udp's real dialer so tests can assert how

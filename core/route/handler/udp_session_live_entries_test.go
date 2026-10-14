@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func newLiveEntriesForTest(t *testing.T, idleTimeout time.Duration, maxEntries int) (*udpSessionLiveEntries, *stats.Registry) {

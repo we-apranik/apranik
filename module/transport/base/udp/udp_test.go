@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/transport/base/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/transport/base/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func endpoint(ip string, port uint16) spec.Endpoint {

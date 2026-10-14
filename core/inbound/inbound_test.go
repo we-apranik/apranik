@@ -11,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/inbound"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan"
-	"github.com/The-Apranik/Apranik/module/proxy/trojan/wire"
-	"github.com/The-Apranik/Apranik/module/transport/base/tcp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/inbound"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/module/proxy/trojan"
+	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
+	"github.com/we-apranik/apranik/module/transport/base/tcp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 type handled struct {

@@ -1,4 +1,4 @@
-module github.com/The-Apranik/Apranik
+module github.com/we-apranik/apranik
 
 go 1.27
 

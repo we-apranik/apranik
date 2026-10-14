@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/The-Apranik/Apranik/core/logging/sink"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/logging/sink"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func (p *Provider) SubscribeToLog(minimumLevel slog.Level, bufferedRecords int) (spec.APILogSubscription, error) {

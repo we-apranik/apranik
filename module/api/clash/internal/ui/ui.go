@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 const prefix = "/ui"

@@ -3,7 +3,7 @@ package group
 import (
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 // What a group does when its settings leave a field out, all in one place. They

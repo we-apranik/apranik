@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config"
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/logging/sink"
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/config"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/logging/sink"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
 const defaultConfigSource = "config.json"

@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/config/types"
-	"github.com/The-Apranik/Apranik/module/transport/overlay/tls"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/config/types"
+	"github.com/we-apranik/apranik/module/transport/overlay/tls"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // testAuthority is a certificate authority made in memory, so no key material

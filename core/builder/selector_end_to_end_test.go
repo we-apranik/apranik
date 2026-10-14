@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/apicoreprovider"
-	"github.com/The-Apranik/Apranik/core/component"
+	"github.com/we-apranik/apranik/core/apicoreprovider"
+	"github.com/we-apranik/apranik/core/component"
 )
 
 // A selector over a working member and a dead one: it starts on the first,

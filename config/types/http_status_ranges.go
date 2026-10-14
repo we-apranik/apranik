@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
 // HTTPStatusRanges is a list of HTTP status codes written as one string:

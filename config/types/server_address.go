@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // ServerAddress is a host with an optional port: "8.8.8.8", "dns.google:853",

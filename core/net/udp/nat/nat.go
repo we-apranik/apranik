@@ -16,9 +16,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/logging"
-	"github.com/The-Apranik/Apranik/core/net/udp"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/logging"
+	"github.com/we-apranik/apranik/core/net/udp"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // The values are the strings a config file uses, so a loader converts with

@@ -9,7 +9,7 @@ import (
 
 	utls "github.com/refraction-networking/utls"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Size of the resumption cache shared by every connection of one outbound.

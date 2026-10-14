@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // Routing is what every inbound shares: the outbounds, and the router that

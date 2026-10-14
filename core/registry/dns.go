@@ -1,6 +1,6 @@
 package registry
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // SystemDNSServerName is the special DNS server type core builds itself: the
 // operating system's resolver, which takes no wire messages.

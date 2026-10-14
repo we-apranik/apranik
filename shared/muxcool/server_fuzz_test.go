@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
 // Whatever a peer sends, a server whose sub-connections are all being read must

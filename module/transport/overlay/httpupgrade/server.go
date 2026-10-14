@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/originalsourceip"
-	"github.com/The-Apranik/Apranik/shared/streamdeadline"
-	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/originalsourceip"
+	"github.com/we-apranik/apranik/shared/streamdeadline"
+	"github.com/we-apranik/apranik/shared/websocket/handshake"
+	"github.com/we-apranik/apranik/spec"
 )
 
 var (

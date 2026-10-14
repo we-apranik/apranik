@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func openDatagramAndAccept(t testing.TB, client *muxcool.Client, server *muxcool.Server, destination spec.Destination, first []byte) (spec.Datagram, spec.Datagram) {

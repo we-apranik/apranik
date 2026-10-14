@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/The-Apranik/Apranik/shared/muxcool"
+	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
 // The frames below are sent by hand, one by one, to the engine: what the format

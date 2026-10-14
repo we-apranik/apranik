@@ -4,9 +4,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/route/handler"
-	"github.com/The-Apranik/Apranik/core/route/router"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/route/handler"
+	"github.com/we-apranik/apranik/core/route/router"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 // A UDP session must not cost goroutines beyond the one running HandleDatagram,

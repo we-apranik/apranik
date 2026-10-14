@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // dnsServerTags are the servers a resolve action or a dns_server may name;

@@ -3,7 +3,7 @@ package controlcharacter_test
 import (
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/controlcharacter"
+	"github.com/we-apranik/apranik/shared/controlcharacter"
 )
 
 func TestContains(t *testing.T) {

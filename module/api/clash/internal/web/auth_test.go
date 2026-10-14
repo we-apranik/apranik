@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 const secret = "s3cret"

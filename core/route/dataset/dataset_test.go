@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/route/dataset/geodata/geodatatest"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/route/dataset/geodata/geodatatest"
 )
 
 func writeFixtures(t *testing.T) (sitePath, ipPath string) {

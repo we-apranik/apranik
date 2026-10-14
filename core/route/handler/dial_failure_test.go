@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/core/dns"
-	"github.com/The-Apranik/Apranik/core/stats"
+	"github.com/we-apranik/apranik/core/dns"
+	"github.com/we-apranik/apranik/core/stats"
 )
 
 func TestADialErrorIsSortedByWhatTheStandardLibraryAndTheResolverSay(t *testing.T) {

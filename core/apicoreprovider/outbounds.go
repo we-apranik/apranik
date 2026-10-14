@@ -7,12 +7,12 @@ import (
 	"slices"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/component"
-	"github.com/The-Apranik/Apranik/core/outbound"
-	"github.com/The-Apranik/Apranik/core/stats"
-	"github.com/The-Apranik/Apranik/shared/httpstatusranges"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/component"
+	"github.com/we-apranik/apranik/core/outbound"
+	"github.com/we-apranik/apranik/core/stats"
+	"github.com/we-apranik/apranik/shared/httpstatusranges"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // OutboundTags is a read-only slice made once: the outbounds do not change

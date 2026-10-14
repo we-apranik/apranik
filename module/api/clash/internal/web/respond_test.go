@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func TestWriteErrorAnswersAMessageWithTheStatus(t *testing.T) {

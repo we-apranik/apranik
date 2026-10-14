@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/testkit"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/users"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/module/api/clash/internal/stream"
+	"github.com/we-apranik/apranik/module/api/clash/internal/testkit"
+	"github.com/we-apranik/apranik/module/api/clash/internal/users"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // inbound is a provider over one inbound, "socks-in", that keeps its users in

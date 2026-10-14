@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/blueprint"
 )
 
 // min_core before version, so an old core reading a new config file says so

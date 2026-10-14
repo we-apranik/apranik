@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func TestTheAcceptKeyMatchesRFC6455(t *testing.T) {

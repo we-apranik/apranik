@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/shared/websocket/handshake"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/websocket/handshake"
+	"github.com/we-apranik/apranik/spec"
 )
 
 func TestTheDefaultHostIsTheServersAddress(t *testing.T) {

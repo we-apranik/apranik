@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/info"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/stream"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/testkit"
-	"github.com/The-Apranik/Apranik/module/api/clash/internal/web"
+	"github.com/we-apranik/apranik/module/api/clash/internal/info"
+	"github.com/we-apranik/apranik/module/api/clash/internal/stream"
+	"github.com/we-apranik/apranik/module/api/clash/internal/testkit"
+	"github.com/we-apranik/apranik/module/api/clash/internal/web"
 )
 
 func mount(t *testing.T, provider *testkit.Provider) *testkit.Env {

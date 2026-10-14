@@ -1,6 +1,6 @@
 package wire
 
-import "github.com/The-Apranik/Apranik/spec"
+import "github.com/we-apranik/apranik/spec"
 
 // streamAfterHead is the stream a handshake hands on once the HTTP head has
 // been read. It exists because some bytes must be read before the underlying

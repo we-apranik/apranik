@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/The-Apranik/Apranik/shared/originalsourceip"
-	"github.com/The-Apranik/Apranik/spec"
+	"github.com/we-apranik/apranik/shared/originalsourceip"
+	"github.com/we-apranik/apranik/spec"
 )
 
 // OriginalSourceIP is the settings block `ws` and `httpupgrade` share for

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/The-Apranik/Apranik/core/blueprint"
-	"github.com/The-Apranik/Apranik/core/registry"
+	"github.com/we-apranik/apranik/core/blueprint"
+	"github.com/we-apranik/apranik/core/registry"
 )
 
 // A config file is small. The cap stops a wrong URL from streaming a video into
