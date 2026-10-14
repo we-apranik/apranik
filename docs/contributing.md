@@ -7,7 +7,7 @@ The one third-party dependency, uTLS, is fetched by `go build`; adding another
 needs a justification in the design notes.
 
 ```sh
-git clone https://github.com/The-Apranik/Apranik.git
+git clone https://github.com/we-apranik/apranik.git
 cd Apranik
 go build ./...
 go test -race ./...

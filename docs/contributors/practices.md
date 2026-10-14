@@ -20,7 +20,7 @@ and nothing else from the project. `module/proxy/trojan` also imports
 **Bad** (illustrative):
 
 ```go
-import "github.com/The-Apranik/Apranik/core/logging" // a module reaching into core
+import "github.com/we-apranik/apranik/core/logging" // a module reaching into core
 ```
 
 If a module needs something core has, the question is whether it belongs in

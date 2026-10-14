@@ -1,8 +1,8 @@
 site_name: Apranik
 site_description: An embeddable, open-source proxy core for censorship circumvention.
-site_url: https://the-apranik.github.io/Apranik/
-repo_url: https://github.com/The-Apranik/Apranik
-repo_name: The-Apranik/Apranik
+site_url: https://we-apranik.github.io/apranik/
+repo_url: https://github.com/we-apranik/apranik
+repo_name: we-apranik/apranik
 edit_uri: edit/main/docs/
 docs_dir: docs
 
@@ -64,7 +64,7 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/The-Apranik/Apranik
+      link: https://github.com/we-apranik/apranik
 
 plugins:
   - search

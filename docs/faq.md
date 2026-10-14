@@ -18,7 +18,7 @@ It's built around adding new methods as separate modules, so a researcher can co
 
 ## Is it free, and who can use it?
 
-It's free to use and free to adapt, and any community can adapt it to the censorship it faces, wherever it is. It is released under the [Mozilla Public License 2.0](https://github.com/The-Apranik/Apranik/blob/main/LICENSE).
+It's free to use and free to adapt, and any community can adapt it to the censorship it faces, wherever it is. It is released under the [Mozilla Public License 2.0](https://github.com/we-apranik/apranik/blob/main/LICENSE).
 
 ## How do I add a new method?
 
