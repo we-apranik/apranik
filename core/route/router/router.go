@@ -2,7 +2,7 @@
 // compiled once, with every tag already turned into the outbound or dataset it
 // names, and then only read: one Router serves every inbound at once. What
 // costs work to find out, such as a sniff or a lookup, it asks the traffic
-// informant for, and only when a rule's action says so (a design note, a design note).
+// informant for, and only when a rule's action says so.
 package router
 
 import (
