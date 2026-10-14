@@ -41,6 +41,10 @@ site/
 # Internal working notes, never committed
 notes/
 
+# docs/ holds the docs site only: working files there stay local
+docs/_*.md
+docs/context/
+
 .gitconfig
 
 cmd/apranik/main
