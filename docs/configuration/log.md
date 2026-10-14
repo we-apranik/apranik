@@ -1,5 +1,7 @@
 # Log
 
+Where log records go, and how much is written.
+
 ## Structure
 
 <div class="cfg-structure" markdown>
@@ -19,9 +21,8 @@
 </div>
 
 > [!NOTE]
-> With no outputs, Apranik logs nothing. That is the default on purpose: a log
-> naming what a user reached is evidence on a seized device. `apranik check` warns
-> about it once.
+> With no outputs, Apranik logs nothing, on purpose: a log naming what a user
+> reached is evidence on a seized device.
 
 <div class="cfg-fields" markdown>
 
@@ -32,18 +33,16 @@
 <span class="cfg cfg-type">string</span>
 <span class="cfg cfg-def">Default: <code>info</code></span>
 
-The least severe level written. One of the eight RFC 5424 severities, from most
-to least verbose: `debug`, `info`, `notice`, `warning`, `error`, `critical`,
-`alert`, `emergency`.
+The least severe level written, from most to least verbose: `debug`, `info`,
+`notice`, `warning`, `error`, `critical`, `alert`, `emergency` (RFC 5424).
 
 ### `outputs`
 
 <span class="cfg cfg-type">list of outputs</span>
 <span class="cfg cfg-def">Default: <code>[]</code>, silent</span>
 
-Where records go. Every record goes to every output, so logs can go to several
-places at once. Each output is an object whose `type` is one of the output types
-below.
+Where records go. Every record goes to every output. Each output's `type` is one
+of the [output types](#output-types).
 
 </div>
 
@@ -52,7 +51,11 @@ below.
 === "stderr"
 
     ```json
-    { "type": "stderr", "format": "human", "color": true }
+    {
+      "type": "stderr",
+      "format": "human",
+      "color": true
+    }
     ```
 
     <div class="cfg-fields" markdown>
@@ -68,8 +71,7 @@ below.
     | `json` | `{"time":"…","level":"INFO","msg":"Inbound active","tag":"socks-in"}` |
     | `human` | `2026-09-27T05:24:55.324+03:30 INFO      Inbound active tag=socks-in` |
 
-    The default suits the clients and panels that run Apranik and capture its
-    stderr. Choose `human` when a person reads the terminal.
+    Use `human` when a person reads the terminal.
 
     ### `color`
 
@@ -77,16 +79,19 @@ below.
     <span class="cfg cfg-def">Default: <code>false</code></span>
     <span class="cfg cfg-note">human only</span>
 
-    Color the level name and dim the time. Refused with any other format. When
-    the `NO_COLOR` environment variable is set, color stays off whatever this
-    says.
+    Color the level name and dim the time. `NO_COLOR` in the environment turns it
+    off.
 
     </div>
 
 === "file"
 
     ```json
-    { "type": "file", "path": "/var/log/apranik.log", "format": "json" }
+    {
+      "type": "file",
+      "path": "/var/log/apranik.log",
+      "format": "json"
+    }
     ```
 
     <div class="cfg-fields" markdown>
@@ -109,13 +114,15 @@ below.
     </div>
 
     > [!WARNING]
-    > A log file outlives the process. On a seized device it is evidence about
-    > the person who ran Apranik. Write one only when you need it.
+    > A log file outlives the process and is evidence on a seized device.
 
 === "memory"
 
     ```json
-    { "type": "memory", "capacity": 256 }
+    {
+      "type": "memory",
+      "capacity": 256
+    }
     ```
 
     <div class="cfg-fields" markdown>
@@ -125,15 +132,20 @@ below.
     <span class="cfg cfg-type">integer</span>
     <span class="cfg cfg-def">Default: <code>256</code></span>
 
-    How many recent records to keep; older ones are dropped. The records live
-    only in memory, for a Go program embedding Apranik to read.
+    How many recent records to keep in memory, for a Go program embedding
+    Apranik to read.
 
     </div>
 
 === "syslog"
 
     ```json
-    { "type": "syslog", "network": "udp", "address": "10.0.0.2:514", "tag": "apranik" }
+    {
+      "type": "syslog",
+      "network": "udp",
+      "address": "10.0.0.2:514",
+      "tag": "apranik"
+    }
     ```
 
     <div class="cfg-fields" markdown>
@@ -158,13 +170,6 @@ below.
 
 ## Live view for an API
 
-Besides the outputs above, the logging system always carries one more handler that nobody
-configures: a hub an [API](api.md) can subscribe to for a live view of the log. With nobody
-subscribed it is switched off, so a record is not even built for it, and **no outputs still
-means silent**: nothing is kept, nothing is written.
-
-A subscriber asks for its own level, which may be lower than the outputs use. While a
-`debug` subscriber is connected, debug records exist and only it receives them; the file and
-stderr still get what their level says. A subscriber that cannot keep up loses records, never
-slows logging, and finds one warning in its stream saying how many were dropped and how big
-its buffer was.
+An [API](api/index.md) can subscribe to the log at its own level, without any
+output configured. With no subscriber this costs nothing. A subscriber that falls
+behind loses records and is told how many.

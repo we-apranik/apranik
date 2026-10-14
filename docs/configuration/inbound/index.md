@@ -1,7 +1,7 @@
 # Inbound
 
-An inbound accepts connections from clients: it listens on an address, runs a
-[transport](../transport/index.md) stack, and speaks a proxy protocol.
+An inbound accepts connections: it listens on an address, runs a
+[transport stack](../transport/index.md) and speaks a proxy protocol.
 
 ## Structure
 
@@ -11,16 +11,21 @@ An inbound accepts connections from clients: it listens on an address, runs a
 {
   "inbounds": [
     {
-      "tag": "socks-in",
-      "listen": "127.0.0.1",
-      "port": 1080,
+      "tag": "vless-in",
+      "listen": "0.0.0.0",
+      "port": 443,
       "network": "tcp",
-
       "transport": [{ "type": "tcp" }],
-      "protocol": { "type": "socks5", "settings": {} },
-
-      "fallback": {},
-
+      "protocol": {
+        "type": "vless",
+        "settings": {
+          "users": [
+            { "name": "alice", "uuid": "b831381d-6324-4d53-ad4f-8cda48b30811" }
+          ]
+        }
+      },
+      "fallback": { "server": "127.0.0.1", "server_port": 8080 },
+      "muxcool": {},
       "tcp_idle_timeout": "5m",
       "udp_session_idle_timeout": "5m",
       "udp_max_datagram_size": 8192,
@@ -42,7 +47,7 @@ An inbound accepts connections from clients: it listens on an address, runs a
 | `socks5` | [SOCKS5](../protocol/socks5.md) | TCP, and UDP through UDP ASSOCIATE |
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP, and UDP framed in the stream |
-| `vless` | [VLESS](../protocol/vless.md) | TCP, and UDP framed in the stream, plain or as XUDP |
+| `vless` | [VLESS](../protocol/vless.md) | TCP, and UDP framed in the stream |
 | `mixed` | [Mixed](mixed.md) | SOCKS5 and HTTP on one port |
 
 <div class="cfg-fields" markdown>
@@ -54,7 +59,7 @@ An inbound accepts connections from clients: it listens on an address, runs a
 <span class="cfg cfg-type">string</span>
 <span class="cfg cfg-req">Required</span>
 
-A name unique among inbounds. It appears in logs.
+A name unique among inbounds, used in logs, routing and statistics.
 
 ### `listen`
 
@@ -62,8 +67,7 @@ A name unique among inbounds. It appears in logs.
 <span class="cfg cfg-req">Required</span>
 
 The address to listen on, such as `127.0.0.1` or `::`. There is no default, so
-nothing is exposed on every interface because a field was left out. A domain is
-refused.
+nothing is exposed by accident.
 
 ### `port`
 
@@ -77,165 +81,91 @@ The port to listen on.
 <span class="cfg cfg-type">string</span>
 <span class="cfg cfg-def">Default: <code>tcp</code></span>
 
-`tcp` or `udp`. `udp` is read but refused when the inbound is built: no datagram
-proxy protocol exists yet.
+Only `tcp` is built. `udp` is refused until a datagram proxy protocol exists.
 
 ### `transport`
 
-<span class="cfg cfg-type">list of modules</span>
+<span class="cfg cfg-type">list of transports</span>
 <span class="cfg cfg-req">Required</span>
 
-The [transport stack](../transport/index.md), base transport first, then any
-overlays: `[{ "type": "tcp" }]`, or for example
-`[{ "type": "tcp" }, { "type": "tls", ... }, { "type": "ws", ... }]`. Overlays
-run once per accepted connection, in its own goroutine, each within the
-`handshake_timeout` in its own settings.
+The [transport stack](../transport/index.md): a base transport, then overlays.
 
 ### `protocol`
 
-<span class="cfg cfg-type">module</span>
+<span class="cfg cfg-type">object</span>
 <span class="cfg cfg-req">Required</span>
 
-`{ "type": ..., "settings": {...} }`, one of the [protocols](#protocols) above.
+`type` and `settings` of one of the [protocols](#protocols).
 
 ### `fallback`
 
 <span class="cfg cfg-type">object</span>
-<span class="cfg cfg-def">Default: none</span>
-<span class="cfg cfg-note">TCP only</span>
+<span class="cfg cfg-note">trojan, vless</span>
 
-```json
-"fallback": { "server": "127.0.0.1", "server_port": 8080 }
-```
-
-Where a request the protocol refuses is sent instead of being closed: typically a
-local web server, so a probe sees an ordinary site. Apranik replays the request
-from its first byte over plain TCP. Connections that close, reset or stay silent
-are closed, not forwarded. Today only [`trojan`](../protocol/trojan.md) refuses
-into a fallback.
-
-The fallback receives what the client sent inside the overlays: behind `tls` it
-gets the decrypted HTTP request, not TLS records. A client that fails an overlay
-handshake (not TLS at all, or a wrong WebSocket path, which gets a `404`) is
-closed, not forwarded.
+Where a request the protocol refuses goes, usually a local web server, so a probe
+sees an ordinary site. It is replayed from its first byte over plain TCP, as
+decrypted by the overlays. Connections that fail an overlay handshake are closed.
 
 ### `muxcool`
 
 <span class="cfg cfg-type">object</span>
-<span class="cfg cfg-def">Default: everything on</span>
-<span class="cfg cfg-note">proxy protocols that can carry Mux.Cool only (`vless`)</span>
+<span class="cfg cfg-note">vless</span>
 
-What the server accepts of [Mux.Cool](../../mux-cool.md). It has the shape of the
-[outbound's `muxcool`](../outbound/index.md#muxcool), and each key means "accept" where the
-outbound's means "send". Left out, the server takes UDP as XUDP, like the servers of Xray and
-sing-box.
-
-```json
-"muxcool": {
-  "udp": {
-    "enabled": true,
-    "xudp": { "enabled": true, "global_id": { "enabled": true, "hold_time": "60s" } }
-  }
-}
-```
-
-| Key | Meaning | Default |
-| --- | --- | --- |
-| `udp.enabled` | Accept UDP through Mux.Cool. `false` refuses a Mux request, so an Xray or sing-box client's default UDP fails. | `true` |
-| `udp.xudp.enabled` | Accept XUDP. `false` alone is refused: plain Mux.Cool UDP is not built, so turn `udp.enabled` off instead. | `true` |
-| `udp.xudp.global_id.enabled` | Hold a UDP session whose stream was lost and give it to the client that comes back with the same Global ID. | `true` |
-| `udp.xudp.global_id.hold_time` | How long to hold it. A server's key: an outbound refuses it. | `60s` |
-
-A held session keeps its outbound sockets for `hold_time`. It belongs to the user who started it, so
-another user who learns the ID cannot take it, and a stream that arrives while the old one is still
-open takes the session over and closes the old one. A client that ends its session on purpose is not
-held. A resumed session counts twice against [`max_udp_sessions`](#max_udp_sessions) while its new
-stream is live, and its online-users entry keeps the address it started with.
+What the server accepts of Mux.Cool. See [Mux.Cool](../shared/muxcool.md).
 
 ### `tcp_idle_timeout`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>5m</code></span>
 
-Closes a TCP connection silent in both directions for this long. Negative
-disables; a written `0` is refused.
+Closes a TCP connection silent both ways for this long. Negative disables it.
 
 ### `udp_session_idle_timeout`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>5m</code></span>
 
-Ends a UDP session silent for this long. UDP has no close, so this must be
-greater than zero: a session would never be released.
+Ends a UDP session silent for this long.
 
 ### `udp_max_datagram_size`
 
 <span class="cfg cfg-type">integer, bytes</span>
 <span class="cfg cfg-def">Default: <code>8192</code></span>
 
-The largest UDP datagram a client may send and a reply may be. A bigger one is dropped and
-counted (`too_large_from_client`, `too_large_from_outbound`), never cut short. It sets the
-buffers a UDP session holds: a session needs about 31 KB with the default, against about
-146 KB when buffers held the largest datagram UDP allows (65,507 bytes). A network carries
-about 1,472 bytes without fragmenting, QUIC and WireGuard use about 1,400, and a DNS message
-is at most 4,096, so the default has room to spare. Raise it only if a client really sends
-larger datagrams over a loopback or jumbo-frame link. A written `0` is refused; `apranik check`
-refuses more than 65,507 and warns below 512.
-
-The same limit applies where a datagram enters or leaves other parts: set the SOCKS5
-inbound's [`udp_max_datagram_size`](../protocol/socks5.md#udp_max_datagram_size) and
-freedom's [`nat.max_datagram_size`](../outbound/freedom.md#natmax_datagram_size) to match.
+The largest UDP datagram carried either way; a larger one is dropped and counted,
+never cut. At most 65,507. Keep it equal to SOCKS5's
+[`udp_max_datagram_size`](../protocol/socks5.md#udp_max_datagram_size) and
+freedom's [`nat.max_datagram_size`](../outbound/freedom.md#natmax_datagram_size).
 
 ### `udp_routing_cache_entry_idle_timeout`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>1m</code></span>
 
-A UDP session routes each destination it sends to once and remembers the decision in
-its route cache. After this much silence from the client to one destination, the session
-forgets that decision, and a later packet to it is routed again. Forgetting a decision
-does not end the destination's [live entry](../stats.md#live-conversations-and-online-users).
-Must be greater than zero: a written zero is refused, and leaving the key out gives the default.
-`apranik check` warns when it is longer than `udp_session_idle_timeout`: the session ends first. A very small value makes every session wake often and route almost
-every packet; keep it above a second.
+A UDP session routes each destination once and remembers the decision. After this
+much silence toward a destination, the decision is forgotten and made again.
 
 ### `udp_routing_cache_max_entries_per_session`
 
 <span class="cfg cfg-type">integer</span>
 <span class="cfg cfg-def">Default: <code>1024</code></span>
 
-How many destinations one UDP session remembers a routing decision for. When it is full,
-the destination used longest ago is forgotten. A forgotten destination is simply routed
-again, so a destination is never allowed because of this limit, and it is still carried and
-counted. It only costs a client that uses more destinations at once than this, such as a P2P
-application, extra routing. Nothing is reserved up front. Must be greater than zero: a written
-zero is refused, and leaving the key out gives the default.
+How many routing decisions one UDP session remembers. The oldest is forgotten
+first and simply routed again.
 
 ### `max_tcp_connections`
 
 <span class="cfg cfg-type">integer</span>
-<span class="cfg cfg-def">Default: <code>0</code>, no limit</span>
-<span class="cfg cfg-note">TCP only</span>
+<span class="cfg cfg-def">Default: no limit</span>
 
-How many TCP connections are held at once. One more is closed as soon as it is
-accepted, before any handshake; refusals are logged at most once per 10 seconds.
-Must be greater than zero; leave it out for no limit.
+TCP connections held at once. One more is closed before any handshake.
 
 ### `max_udp_sessions`
 
 <span class="cfg cfg-type">integer</span>
-<span class="cfg cfg-def">Default: <code>0</code>, no limit</span>
+<span class="cfg cfg-def">Default: no limit</span>
 
-How many UDP sessions are held at once: a SOCKS5 UDP association, or a UDP session
-over a Trojan stream. A request for one more is refused (SOCKS5 answers "general
-failure", Trojan closes the stream) and counted as `max_udp_sessions`; refusals are
-logged at most once per 10 seconds. A UDP session also holds its TCP connection, so
-it uses one place of each limit. Must be greater than zero; leave it out for no limit.
-
-There is no limit unless you set one. Set it on a server open to people you do not
-trust, where one client could otherwise open sessions until memory or file descriptors
-run out. Each session holds about 31 KB through the handler, about 48 KB with a SOCKS5
-association and the NAT (measured), so 8,192 sessions is about 390 MB, before the
-destinations' live entries.
+UDP sessions held at once. Each also holds a TCP connection, and costs about
+48 KB. Set it on a server open to people you do not trust.
 
 </div>

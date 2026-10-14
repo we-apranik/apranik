@@ -1,7 +1,6 @@
 # Mux.Cool on the wire
 
-Mux.Cool carries many sub-connections over one established stream, the main connection. It is implemented in `shared/muxcool`
-. All numbers are big endian.
+Mux.Cool carries many sub-connections over one established stream, the main connection. It is implemented in `shared/muxcool`. All numbers are big endian.
 
 ## Frame
 

@@ -22,11 +22,11 @@ It's free to use and free to adapt, and any community can adapt it to the censor
 
 ## How do I add a new method?
 
-Write it as a module, test it on its own, and send it for review. Every change is reviewed before it ships. The [contributing guide](contributing.md) walks through it.
+Write it as a module, test it on its own, and send it for review. Every change is reviewed before it ships. The [contributing guide](../contribute/index.md) walks through it.
 
 ## Is it safe to use?
 
-Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. The [threat model](design/threat-model.md) explains exactly what it protects against.
+Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. It has not had an independent security audit yet; the [security page](security.md) says so plainly.
 
 ## Does it make me anonymous?
 
@@ -38,5 +38,5 @@ Apranik is built for a moving target. Censors keep blocking what works, so no si
 
 ## How do I report a security issue?
 
-Use the private channel on the security page, and please don't post it publicly. **[TODO: add the link to the private reporting channel.]**
+Report it privately, and please don't post it publicly. The [security page](security.md) has the GitHub reporting link and an email address.
 

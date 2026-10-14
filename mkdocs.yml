@@ -6,6 +6,10 @@ repo_name: we-apranik/apranik
 edit_uri: edit/main/docs/
 docs_dir: docs
 
+validation:
+  links:
+    anchors: warn
+
 exclude_docs: |
   _plan.md
   _report.md
@@ -80,20 +84,16 @@ plugins:
       markdown_description: An embeddable, open-source proxy core for censorship circumvention, written in Go.
       sections:
         Get started:
-          - overview.md
-          - cli.md
-          - glossary.md
-          - faq.md
+          - get-started/*.md
+        Guides:
+          - guides/*.md
         Configuration:
           - configuration/*.md
           - configuration/*/*.md
-        How it works:
-          - architecture.md
-          - request-lifecycle.md
-          - mux-cool.md
-        Design:
-          - design/open-questions.md
-          - design/threat-model.md
+        Concepts:
+          - concepts/*.md
+        Contribute:
+          - contribute/*.md
 
 markdown_extensions:
   - tables
@@ -113,60 +113,86 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
-      - Overview: overview.md
-      - Command line: cli.md
-      - Glossary: glossary.md
-      - FAQ: faq.md
+      - What is Apranik: get-started/overview.md
+      - Install and run: get-started/install.md
+      - First configuration: get-started/first-configuration.md
+      - FAQ: get-started/faq.md
+      - Security: get-started/security.md
+  - Guides:
+      - guides/index.md
+      - Run Trojan over TLS: guides/trojan-over-tls.md
+      - Run Trojan behind a CDN: guides/trojan-over-websocket-cdn.md
+      - Run a local proxy: guides/local-proxy.md
+      - Hide the server name: guides/hide-the-server-name.md
   - Configuration:
       - configuration/index.md
       - Log: configuration/log.md
       - Inbound:
           - configuration/inbound/index.md
-          - configuration/inbound/mixed.md
+          - Mixed: configuration/inbound/mixed.md
+          - Users: configuration/inbound/users.md
       - Outbound:
           - configuration/outbound/index.md
-          - configuration/outbound/freedom.md
-          - configuration/outbound/group.md
-      - Protocols:
-          - configuration/protocol/socks5.md
-          - configuration/protocol/http.md
-          - configuration/protocol/trojan.md
-          - configuration/protocol/vless.md
-      - Transport:
-          - configuration/transport/index.md
-          - configuration/transport/tcp.md
-          - configuration/transport/udp.md
-          - configuration/transport/tls.md
-          - configuration/transport/ws.md
-          - configuration/transport/httpupgrade.md
-          - configuration/transport/fragment.md
-          - configuration/transport/proxy_protocol.md
-          - configuration/transport/original_source_ip.md
+          - Freedom: configuration/outbound/freedom.md
+          - URLTest: configuration/outbound/urltest.md
+          - Fallback: configuration/outbound/fallback.md
+          - Selector: configuration/outbound/selector.md
+      - Datasets: configuration/datasets.md
+      - DNS:
+          - configuration/dns/index.md
+          - DNS server: configuration/dns/server.md
+          - DNS rule: configuration/dns/rule.md
       - Routing:
           - configuration/routing/index.md
-          - configuration/routing/datasets.md
-          - configuration/routing/sniffing.md
-      - DNS: configuration/dns/index.md
-      - Users: configuration/users.md
-      - Stats: configuration/stats.md
-      - APIs:
-          - configuration/api.md
-          - configuration/api/clash.md
-      - Timeouts: configuration/timeouts.md
-      - Examples: configuration/examples.md
-  - How it works:
-      - Architecture: architecture.md
-      - Request lifecycle: request-lifecycle.md
-      - Mux.Cool on the wire: mux-cool.md
+          - Rule: configuration/routing/rule.md
+          - Action: configuration/routing/action.md
+          - Sniffing: configuration/routing/sniffing.md
+      - Stats:
+          - configuration/stats/index.md
+          - Counters: configuration/stats/counters.md
+      - API:
+          - configuration/api/index.md
+          - Clash API: configuration/api/clash.md
+          - Clash API endpoints: configuration/api/clash-endpoints.md
+      - Shared:
+          - Transport:
+              - configuration/transport/index.md
+              - TCP: configuration/transport/tcp.md
+              - UDP: configuration/transport/udp.md
+              - TLS: configuration/transport/tls.md
+              - WebSocket: configuration/transport/ws.md
+              - HTTPUpgrade: configuration/transport/httpupgrade.md
+              - Fragment: configuration/transport/fragment.md
+              - PROXY protocol: configuration/transport/proxy_protocol.md
+              - Client address behind a proxy: configuration/transport/original_source_ip.md
+          - Protocol:
+              - SOCKS5: configuration/protocol/socks5.md
+              - HTTP: configuration/protocol/http.md
+              - Trojan: configuration/protocol/trojan.md
+              - VLESS: configuration/protocol/vless.md
+          - Mux.Cool: configuration/shared/muxcool.md
+          - Proxy request timing: configuration/shared/proxy-request-timing.md
+          - Probe: configuration/shared/probe.md
+          - Timeouts: configuration/shared/timeouts.md
+  - Concepts:
+      - concepts/architecture.md
+      - concepts/request-lifecycle.md
+      - Mux.Cool on the wire: concepts/mux-cool.md
+      - concepts/glossary.md
   - Contribute:
-      - Contributing guide: contributing.md
-      - Practices: contributors/practices.md
-      - Performance: contributors/performance.md
-      - Interoperability tests: contributors/interop.md
-      - Good first issues: contributors/good-first-issues.md
-  - Design:
-      - Decisions:
-      - Open questions: design/open-questions.md
-      - Threat model: design/threat-model.md
-      - FAQ: contributors/faq.md
-      - Comparison with other cores: contributors/comparison.md
+      - contribute/index.md
+      - Add a module:
+          - Base stream transport: contribute/base-transport.md
+          - Overlay transport: contribute/overlay-transport.md
+          - Proxy protocol: contribute/proxy-protocol.md
+          - Sniffer: contribute/sniffer.md
+          - DNS server: contribute/dns-server.md
+          - API module: contribute/api-module.md
+      - Tests: contribute/tests.md
+      - Pull requests: contribute/pull-requests.md
+      - Practices: contribute/practices.md
+      - Performance:
+          - contribute/performance.md
+          - contribute/performance-log.md
+      - Good first issues: contribute/good-first-issues.md
+      - Editing the docs: contribute/docs.md

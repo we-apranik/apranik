@@ -1,11 +1,11 @@
 # HTTPUpgrade
 
-An overlay stream transport: the HTTP/1.1 upgrade handshake WebSocket starts
-with, then the payload as raw bytes, with no WebSocket framing. Like
-[`ws`](ws.md) it passes CDNs and HTTP reverse proxies, at no cost after the
-handshake, but only through ones that relay an upgraded connection without
-checking its frames (Cloudflare does, in practice). Compatible with Xray's and
-sing-box's `httpupgrade`; see [how it differs from `ws`](index.md#choosing-a-stack).
+An overlay: the HTTP/1.1 upgrade handshake, then raw bytes with no WebSocket
+framing. It passes CDNs that relay an upgraded connection without checking frames,
+such as Cloudflare, and costs nothing after the handshake. Compatible with Xray's
+and sing-box's. A [`tls`](tls.md) below it must set `"alpn": ["http/1.1"]`.
+
+[![What ws and httpupgrade put on the wire](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)
 
 ## Structure
 
@@ -13,11 +13,12 @@ sing-box's `httpupgrade`; see [how it differs from `ws`](index.md#choosing-a-sta
 
     ```json
     {
-      "transport": [
-        { "type": "tcp" },
-        { "type": "tls", "settings": { "certificates": [{ "certificate_file": "cert.pem", "key_file": "key.pem" }] } },
-        { "type": "httpupgrade", "settings": { "path": "/up", "host": "cdn.example.com" } }
-      ]
+      "type": "httpupgrade",
+      "settings": {
+        "path": "/up",
+        "host": "cdn.example.com",
+        "accept_websocket_key": true
+      }
     }
     ```
 
@@ -25,96 +26,68 @@ sing-box's `httpupgrade`; see [how it differs from `ws`](index.md#choosing-a-sta
 
     ```json
     {
-      "server": "cdn.example.com",
-      "server_port": 443,
-      "transport": [
-        { "type": "tcp" },
-        { "type": "tls", "settings": { "server_name": "cdn.example.com", "alpn": ["http/1.1"] } },
-        { "type": "httpupgrade", "settings": { "path": "/up" } }
-      ]
+      "type": "httpupgrade",
+      "settings": { "path": "/up", "host": "cdn.example.com", "pipeline": false }
     }
     ```
 
 <div class="cfg-fields" markdown>
 
-## Both
+## Fields
 
 ### `path`
 
 <span class="cfg cfg-type">string</span>
 <span class="cfg cfg-def">Default: <code>/</code></span>
 
-The request path. A server compares it without the query string, so an Xray
-client's `/up?ed=2048` matches `/up`. Any other path gets a `404`.
+The request path. A server ignores the query string and answers any other path
+with `404`.
 
 ### `host`
 
 <span class="cfg cfg-type">string</span>
 
-Outbound: the `Host` header, which a CDN routes on; default the server's
-address. Inbound: if set, the `Host` a request must carry (case and port
-ignored); any other gets a `400`. Unset accepts any.
-
-### `handshake_timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>10s</code></span>
-
-How long the upgrade handshake may take. Outbound with `pipeline`, the wait for
-the `101` happens on the first read and is bounded by this too; a read
-deadline the caller set still applies if it is earlier, and stays in force
-afterwards.
-
-## Outbound
+Outbound: the `Host` header a CDN routes on; default the outbound's `server`.
+Inbound: the only `Host` accepted; default any.
 
 ### `headers`
 
 <span class="cfg cfg-type">object of strings</span>
+<span class="cfg cfg-note">outbound</span>
 
-Extra request headers. `Host`, `Upgrade` and `Connection` are written by the
-module and refused here. Without a `User-Agent`, a browser's is sent.
+Extra request headers. Without a `User-Agent`, a browser's is sent.
 
 ### `pipeline`
 
 <span class="cfg cfg-type">boolean</span>
 <span class="cfg cfg-def">Default: <code>false</code></span>
+<span class="cfg cfg-note">outbound</span>
 
-Send the payload right after the request instead of waiting for the server's
-`101`, saving a round trip on every new connection. This is what Xray's `?ed=`
-path setting does for HTTPUpgrade. Apranik's server keeps such early bytes;
-Xray's and sing-box's servers, as their source reads, can drop bytes that
-arrive together with the request, which would lose the first payload. No loss
-was seen against Xray in testing, but the risk is why it is off by default.
-
-## Inbound
+Send the payload without waiting for the server's `101`, saving a round trip. Only
+safe against an Apranik server: Xray's and sing-box's may drop those bytes.
 
 ### `original_source_ip`
 
 <span class="cfg cfg-type">object</span>
-<span class="cfg cfg-def">Default: on, reads <code>X-Forwarded-For</code> from any peer</span>
+<span class="cfg cfg-note">inbound</span>
 
-Read the client's IP from a header a proxy in front added, so routing and logs
-see the client and not the CDN. Its format, the setups for nginx and Cloudflare,
-and how it differs from Xray and sing-box are in
+Reads the client's address from a header the CDN adds. See
 [Client address behind a proxy](original_source_ip.md).
 
 ### `accept_websocket_key`
 
 <span class="cfg cfg-type">boolean</span>
 <span class="cfg cfg-def">Default: <code>true</code></span>
+<span class="cfg cfg-note">inbound</span>
 
-Accept a request carrying `Sec-WebSocket-Key`, as Xray does. `false` answers
-it with a `404`, as sing-box does.
+Accept a request carrying `Sec-WebSocket-Key`, as Xray does. `false` answers it
+with `404`, as sing-box does.
+
+### `handshake_timeout`
+
+<span class="cfg cfg-type">duration</span>
+<span class="cfg cfg-def">Default: <code>10s</code></span>
+
+How long the upgrade may take.
 
 </div>
-
-A request that is not a `GET` upgrade to `websocket` gets a `404`, a malformed
-one a `400`, as sing-box answers. `Connection: keep-alive, Upgrade` is
-accepted. Half-close passes through to the layer below. Behind a CDN the
-client's address comes from `X-Forwarded-For`, as
-[`original_source_ip`](original_source_ip.md) sets.
-
-Its upgrade request is HTTP/1.1, so a [`tls`](tls.md) below it must offer only
-`http/1.1`: set its `alpn` to `["http/1.1"]`, as the outbound above does.
-`apranik check` refuses a `tls` whose list includes anything else
-([why](tls.md#alpn)).

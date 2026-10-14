@@ -8,7 +8,7 @@
 | **Blueprint** | A `blueprint.Blueprint`: every inbound and outbound with its modules looked up, decoded and validated, but nothing opened. |
 | **Builder** | `core/builder`: turns a blueprint into running inbounds and outbounds. It builds each module's components and joins a proxy outbound's base dialer and overlay clients into one dialer. |
 | **Carrier** | A `spec.Stream` or `spec.Datagram` handed from one layer to the next. When the kind is known, Apranik says "stream" or "datagram", and "underlying stream" for the layer below. |
-| **CDN fronting** | Reaching a server through a CDN, so a censor sees the CDN's address and TLS name. `ws` and `httpupgrade` exist for it. See [Examples](configuration/examples.md#trojan-over-websocket-behind-a-cdn). |
+| **CDN fronting** | Reaching a server through a CDN, so a censor sees the CDN's address and TLS name. `ws` and `httpupgrade` exist for it. See [Run Trojan over WebSocket behind a CDN](../guides/trojan-over-websocket-cdn.md). |
 | **Component** | `core/component`: the roles core's own parts play for each other (`Inbound`, `Outbound`, `Router`, `TrafficHandler`). Not module contract, so not in `spec`. |
 | **Core** | Everything under `core/`: the code that composes modules. Modules never import it. |
 | **Dataset** | A named list of domains or IP ranges, read from a file such as `geosite.dat`, that routing and DNS rules look up. Values only; what to do with them is in the rules. Declared at the top level of the config. |
@@ -22,7 +22,7 @@
 | **Fingerprint** | What a TLS ClientHello reveals about the program that sent it: cipher suites, extensions, their order. `tls`'s `fingerprint` picks a browser's to imitate through uTLS. |
 | **Fragment** | The overlay transport that cuts the TLS ClientHello into records, packets or both, so DPI that does not reassemble never sees the server name whole. Outbound only. |
 | **Freedom** | The special outbound protocol that sends straight to each destination, over TCP (its transport: `tcp`, then only transports that need no server side) and UDP. |
-| **Group** | An outbound that connects nowhere itself and picks one of its members, other outbounds, for each connection: `urltest` (the fastest) and `fallback` (the first that works). See [Outbound groups](configuration/outbound/group.md). |
+| **Group** | An outbound that connects nowhere itself and picks one of its members, other outbounds, for each connection: `urltest` (the fastest) and `fallback` (the first that works). See [Outbound groups](../configuration/outbound/urltest.md). |
 | **Handler** | `core/route/handler`: the `component.TrafficHandler` every inbound calls. It asks the router, dials, relays, and owns UDP sessions. |
 | **Inbound** | How traffic enters: a listener stack plus a proxy server (`component.Inbound`). |
 | **Lookup** | What the resolver does: a name in, addresses out. A DNS server module does not look up; its `Query` carries one wire-format message out and one back. |

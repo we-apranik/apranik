@@ -1,50 +1,50 @@
 # Transport
 
-A transport stack is a list of layers under the proxy protocol. It is read
-bottom-up: the first entry is a **base transport**, which opens the connection;
-each later entry is an **overlay**, which wraps the one before it.
+A transport stack is the list of layers under a proxy protocol, in an inbound's or
+outbound's `transport`. The first entry is a **base** transport, which opens the
+connection; each later entry is an **overlay**, which wraps the one before it.
+
+[![How a transport stack is built: an outbound's list, such as tcp, tls, ws, is dialed in order: tcp opens the connection, tls wraps it, ws wraps that, and the proxy protocol sends its request over the result. An inbound with the same list accepts in the same order and its proxy protocol reads the request.](../../assets/diagrams/transport-stack.excalidraw.svg)](../../assets/diagrams/transport-stack.excalidraw.svg)
+
+## Structure
+
+<div class="cfg-structure" markdown>
 
 ```json
-"transport": [
-  { "type": "tcp", "settings": { "no_delay": true } },
-  { "type": "tls", "settings": { "server_name": "example.com" } }
-]
+{
+  "transport": [
+    {
+      "type": "tcp",
+      "settings": { "no_delay": true }
+    },
+    {
+      "type": "tls",
+      "settings": { "server_name": "proxy.example.com" }
+    }
+  ]
+}
 ```
 
-Each entry is a module, `{ "type": ..., "settings": {...} }`. `settings` may be
-left out for the module's defaults.
+</div>
 
-| Type | Kind | Format |
+Each entry has a `type` and optional `settings`.
+
+| Type | Kind | Where |
 | --- | --- | --- |
-| `tcp` | base, stream | [TCP](tcp.md) |
-| `udp` | base, datagram | [UDP](udp.md) |
-| `tls` | overlay, stream | [TLS](tls.md) |
-| `ws` | overlay, stream | [WebSocket](ws.md) |
-| `httpupgrade` | overlay, stream | [HTTPUpgrade](httpupgrade.md) |
-| `fragment` | overlay, stream, outbound only | [Fragment](fragment.md) |
-| `proxy_protocol` | overlay, stream, inbound only | [PROXY protocol](proxy_protocol.md) |
-
-> [!NOTE]
-> `udp` appears only inside [`freedom`](../outbound/freedom.md#udp)'s settings.
-> Overlays run once per connection, after the base has connected or accepted.
-> Every layer bounds its own handshake with the `handshake_timeout` in its own
-> settings (`tcp`'s connect with `dial_timeout`); see [Timeouts](../timeouts.md).
-
-An inbound's stack listens; an outbound's stack reaches the proxy server, or,
-under [`freedom`](../outbound/freedom.md#transport), each destination. The same
-overlay twice in one stack is allowed (TLS inside TLS is a real technique), with a
-warning.
+| [`tcp`](tcp.md) | base | inbound, outbound |
+| [`udp`](udp.md) | base, datagram | freedom's `settings.udp` |
+| [`tls`](tls.md) | overlay | inbound, outbound |
+| [`ws`](ws.md) | overlay | inbound, outbound |
+| [`httpupgrade`](httpupgrade.md) | overlay | inbound, outbound |
+| [`fragment`](fragment.md) | overlay | outbound |
+| [`proxy_protocol`](proxy_protocol.md) | overlay | inbound |
 
 ## Choosing a stack
 
 | Goal | Stack |
 | --- | --- |
-| Look like an HTTPS site | `tcp → tls` |
-| Pass a CDN or HTTP reverse proxy | `tcp → tls → ws`, or `tcp → ws` when the CDN ends TLS |
-| The same, with no cost after the handshake | `httpupgrade` in place of `ws`, where nothing checks WebSocket frames |
-| Know the real client behind a CDN or load balancer | `original_source_ip` on `ws` or `httpupgrade`, or `tcp → proxy_protocol` for a load balancer that sends a PROXY header ([details](original_source_ip.md)) |
-| Hide the SNI from DPI that does not reassemble | `fragment` directly below `tls`, or alone above `tcp` under `freedom` |
-
-[![What ws and httpupgrade put on the wire: both send the same HTTP/1.1 upgrade request and get a 101 answer; ws then carries the payload in WebSocket frames with a header and, from the client, a mask; httpupgrade carries the payload as raw bytes.](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)](../../assets/diagrams/ws-vs-httpupgrade.excalidraw.svg)
-
-[Examples](../examples.md) has complete server and client files for each.
+| Look like an HTTPS site | `tcp`, `tls` |
+| Pass a CDN | `tcp`, `tls`, `ws`; or `tcp`, `ws` where the CDN ends TLS |
+| The same, cheaper after the handshake | `httpupgrade` instead of `ws`, where nothing checks frames |
+| Hide the SNI from DPI that does not reassemble | `fragment` directly below `tls` |
+| Learn the client's address behind a load balancer | `tcp`, `proxy_protocol` |

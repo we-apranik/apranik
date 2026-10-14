@@ -1,6 +1,6 @@
 # TCP
 
-The base stream transport.
+The base stream transport: opens or accepts a TCP connection.
 
 ## Structure
 
@@ -14,7 +14,8 @@ The base stream transport.
     "keep_alive_interval": "15s",
     "keep_alive_count": 9,
     "next_address_delay": "250ms",
-    "no_delay": true
+    "no_delay": true,
+    "dial_timeout": "10s"
   }
 }
 ```
@@ -30,34 +31,30 @@ The base stream transport.
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>15s</code></span>
 
-How long a connection is idle before the first keep-alive probe. Negative
-disables keep-alive; a written `0` is refused.
+Idle time before the first keep-alive probe. Negative disables keep-alive.
 
 ### `keep_alive_interval`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>15s</code></span>
 
-Time between probes. Greater than zero.
+Time between keep-alive probes.
 
 ### `keep_alive_count`
 
 <span class="cfg cfg-type">integer</span>
 <span class="cfg cfg-def">Default: <code>9</code></span>
 
-Unanswered probes before the connection is dropped. From 1 to 255.
+Unanswered probes before the connection is dropped, 1 to 255.
 
 ### `next_address_delay`
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>250ms</code></span>
+<span class="cfg cfg-note">outbound</span>
 
-When a domain has several addresses, how long one connection attempt runs
-before the next starts beside it (Happy Eyeballs, RFC 8305). The
-[resolver](../dns/index.md) orders the addresses by `ip_versions`; `tcp`
-alternates IPv4 and IPv6 from the first, and the first connection to succeed
-wins. A dead first address therefore costs this delay, not the whole
-`dial_timeout`. Must be greater than zero. Outbound only.
+When a domain has several addresses, how long one attempt runs before the next
+starts beside it (Happy Eyeballs, RFC 8305). The first to connect wins.
 
 ### `no_delay`
 
@@ -70,10 +67,8 @@ Send small writes at once instead of batching them (disables Nagle's algorithm).
 
 <span class="cfg cfg-type">duration</span>
 <span class="cfg cfg-def">Default: <code>10s</code></span>
+<span class="cfg cfg-note">outbound</span>
 
-How long connecting may take, name resolution and every attempt included.
-Outbound only. It
-bounds the TCP connection alone; each layer above bounds its own handshake
-with its own `handshake_timeout`.
+How long connecting may take, name resolution included.
 
 </div>
