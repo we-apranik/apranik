@@ -226,13 +226,17 @@ body:has(.ap-home) .md-source__repository::after{content:"GitHub";font-size:.7re
 /* current step: sonar pulse on the list badge, flow on the arrow leading in */
 .ap-home .loop li.sel::before{animation:ap-badge-sonar 1.4s ease-out infinite}
 .ap-home .lseg.flow{stroke-dasharray:6 6;stroke-width:3.5;animation:ap-march .5s linear infinite}
-@keyframes ap-badge-sonar{from{box-shadow:0 0 0 0 var(--accent)}to{box-shadow:0 0 0 10px transparent}}
+@keyframes ap-badge-sonar{from{outline:2px solid var(--accent);outline-offset:0}to{outline:2px solid transparent;outline-offset:8px}}
 @keyframes ap-march{to{stroke-dashoffset:-12}}
 .ap-home .loop li.st,.ap-home .lnode{--accent:var(--ap-ink2)}
 .ap-home .loop li.ppl,.ap-home .lnode.ppl{--accent:var(--ap-blue)}
 .ap-home .loop li.ap,.ap-home .lnode.ap{--accent:var(--ap-green)}
 .ap-home .loop li.cen,.ap-home .lnode.cen{--accent:var(--ap-red)}
 @media (prefers-reduced-motion:reduce){.ap-home *{animation:none!important}}
+
+/* scrolling: pause what is off screen, and skip rendering sections far from view */
+.ap-home .loopwrap.offscreen *,.ap-home .loopwrap.offscreen *::before{animation-play-state:paused}
+.ap-home section:not(.hero){content-visibility:auto;contain-intrinsic-size:auto 640px}
 
 /* one core diagram */
 .ap-home .scroll svg{min-width:700px;max-width:960px;margin:0 auto}

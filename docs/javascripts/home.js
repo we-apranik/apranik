@@ -2,9 +2,15 @@
   function initBackToTop() {
     var button = document.querySelector(".ap-home .totop");
     if (!button) return;
-    function update() { button.hidden = window.scrollY < 600; }
-    window.addEventListener("scroll", update, { passive: true });
-    update();
+    var hero = document.querySelector(".ap-home .hero");
+    if (hero && "IntersectionObserver" in window) {
+      // Shown once the hero has scrolled away; no work on every scroll event.
+      new IntersectionObserver(function (entries) {
+        button.hidden = entries[0].isIntersecting;
+      }).observe(hero);
+    } else {
+      button.hidden = false;
+    }
     button.addEventListener("click", function () {
       var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
@@ -80,7 +86,10 @@
 
     new IntersectionObserver(function (entries) {
       visible = entries[0].isIntersecting;
+      // Infinite animations off screen still repaint every frame while scrolling.
+      wrap.classList.toggle("offscreen", !visible);
     }).observe(wrap);
+    wrap.classList.add("offscreen");
     startTimer();
   }
 
