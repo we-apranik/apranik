@@ -64,7 +64,7 @@ Extra request headers. Without a `User-Agent`, a browser's is sent.
 <span class="cfg cfg-note">outbound</span>
 
 Send the payload without waiting for the server's `101`, saving a round trip. Only
-safe against an Apranik server: Xray's and sing-box's may drop those bytes.
+safe against an Apranik server. Xray's and sing-box's servers may drop those bytes (not tested).
 
 ### `original_source_ip`
 

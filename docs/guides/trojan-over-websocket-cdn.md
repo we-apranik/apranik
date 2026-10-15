@@ -121,4 +121,4 @@ layer on both sides for:
 ```
 
 Leave `pipeline` off unless both ends are Apranik: Xray's and sing-box's
-servers can drop bytes sent before their `101` answer.
+servers may drop bytes sent before their `101` answer.

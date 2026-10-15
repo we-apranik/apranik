@@ -51,7 +51,7 @@ is refused, since plain Mux.Cool UDP is not built.
 
 Name each UDP session with a Global ID, so a session survives a lost stream (a
 phone moving from Wi-Fi to mobile data): the destination keeps seeing the same
-source port. Xray's server supports it; sing-box ignores it.
+source port. Tested against Xray's server, which supports it (Xray 26.10.10). sing-box's server was not found to use it.
 
 ### `udp.xudp.global_id.hold_time`
 

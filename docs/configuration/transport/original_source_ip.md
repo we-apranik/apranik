@@ -74,7 +74,7 @@ ignored. An empty `value` only requires the header to exist.
 
 The header is read from the right, because a proxy appends and a client can only
 prepend. The client is the right-most address that is not a trusted proxy. Xray
-and sing-box take the left-most, which a client can forge.
+and sing-box read the left-most address, which a client can forge (not tested by running them).
 
 ## Setups
 
