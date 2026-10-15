@@ -18,10 +18,66 @@
     });
   }
 
+  var contributorsRequested = false;
+  var contributorsShown = 3;
+  var contributorsFetched = 30;
+
+  function showContributors(section) {
+    var crew = section.querySelector(".crew");
+    if (contributorsRequested || !crew) return;
+    contributorsRequested = true;
+    var url = "https://api.github.com/repos/" + crew.dataset.repo + "/contributors?per_page=" + contributorsFetched;
+    fetch(url, {
+      headers: { Accept: "application/vnd.github+json" },
+      referrerPolicy: "no-referrer",
+      credentials: "omit"
+    }).then(function (response) {
+      return response.ok ? response.json() : [];
+    }).then(function (contributors) {
+      var people = contributors.filter(function (c) { return c.type === "User"; });
+      if (!people.length) return;
+      var faces = crew.querySelector(".faces");
+      people.slice(0, contributorsShown).forEach(function (person) {
+        var photo = document.createElement("img");
+        photo.src = person.avatar_url + (person.avatar_url.indexOf("?") < 0 ? "?" : "&") + "s=56";
+        photo.alt = person.login + ", contributor";
+        photo.title = person.login;
+        photo.width = 28;
+        photo.height = 28;
+        photo.loading = "lazy";
+        photo.referrerPolicy = "no-referrer";
+        faces.appendChild(photo);
+      });
+      var others = people.length - contributorsShown;
+      if (others > 0) {
+        var more = crew.querySelector(".more");
+        // The list is cut at contributorsFetched, so a full page may hide more people than it counts.
+        more.textContent = contributors.length >= contributorsFetched ? "and more" : "+" + others + " more";
+        more.hidden = false;
+      }
+    }).catch(function () { /* offline or blocked: the empty seat alone is fine */ });
+  }
+
+  function initContributors() {
+    var section = document.querySelector(".ap-home .ob");
+    if (!section) return;
+    contributorsRequested = false;
+    if ("IntersectionObserver" in window) {
+      // Nothing is requested from GitHub unless the visitor scrolls here.
+      var watcher = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) { watcher.disconnect(); showContributors(section); }
+      }, { rootMargin: "200px" });
+      watcher.observe(section);
+    } else {
+      showContributors(section);
+    }
+  }
+
   var loopTimer = null;
 
   function init() {
     initBackToTop();
+    initContributors();
     if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
     var wrap = document.querySelector(".ap-home .loopwrap");
     var steps = document.querySelectorAll(".ap-home [data-step]");
