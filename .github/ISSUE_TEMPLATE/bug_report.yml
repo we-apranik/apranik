@@ -1,0 +1,40 @@
+name: Bug report
+description: Something does not work as the documentation says
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems go to a [private advisory](https://github.com/we-apranik/apranik/security/advisories/new), not here.
+        Remove secrets, passwords, UUIDs and server addresses from anything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `apranik version`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected and what happened
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Smallest configuration that shows it
+      description: Does `apranik check` accept it?
+      render: json
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output
+      description: Level `debug` helps. Check it for secrets first.
+      render: text

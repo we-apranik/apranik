@@ -1,0 +1,21 @@
+name: Feature or technique
+description: Propose a feature, a protocol or a circumvention technique
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What problem does it solve, and where?
+      description: The network, the blocking behaviour and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you propose
+      description: If it would need a change to `spec/`, the builder or another module, say what and why.
+  - type: textarea
+    id: others
+    attributes:
+      label: Other cores
+      description: How Xray, sing-box or mihomo do it, if you know. Say when you are unsure.
