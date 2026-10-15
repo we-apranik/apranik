@@ -4,9 +4,8 @@ Apranik is a **proxy core**: the part of a circumvention app that accepts traffi
 from the device, decides where it goes, and carries it there over whatever
 protocol and transport still gets through.
 
-Client apps (Hiddify, v2rayNG, NekoBox, v2box) and server panels run the `apranik`
-binary with a config file, as they run Xray or sing-box. They provide the user
-interface; Apranik is the engine. Its Go packages can be used as a library too.
+Client apps and server panels run the `apranik` binary with a config file. They
+provide the user interface; Apranik is the engine. Its Go packages can be used as a library too.
 
 ## The problem
 
@@ -36,8 +35,8 @@ later module.
 - **A core.** One `apranik` binary that apps and panels drive with a config file.
 - **A framework for new techniques.** What it offers is how quickly a technique
   becomes a module, not how many protocols it lists.
-- **Independent.** Its code is its own, written to be adapted quickly, alongside
-  mature cores such as Xray, sing-box and mihomo.
+- **Independent.** Its code is its own, and where it reads another core's files or
+  speaks its protocols, the [reference](../configuration/index.md) says so.
 
 ## Dependencies
 
