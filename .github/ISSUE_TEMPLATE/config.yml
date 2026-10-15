@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a vulnerability
-    url: https://github.com/we-apranik/apranik/security/advisories/new
-    about: Privately, please. Never in a public issue.
+    url: https://we-apranik.github.io/apranik/get-started/security/
+    about: Privately, by email. Never in a public issue.
   - name: Documentation
     url: https://we-apranik.github.io/apranik/
     about: The guides and the configuration reference.

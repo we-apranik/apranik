@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Security problems go to a [private advisory](https://github.com/we-apranik/apranik/security/advisories/new), not here.
+        Security problems go by email to we-apranik@proton.me, not here.
         Remove secrets, passwords, UUIDs and server addresses from anything you paste.
   - type: input
     id: version
