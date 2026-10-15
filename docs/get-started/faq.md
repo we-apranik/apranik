@@ -26,7 +26,7 @@ Write it as a module, test it on its own, and send it for review. Every change i
 
 ## Is it safe to use?
 
-Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. It has not had an independent security audit yet; the [security page](security.md) says so plainly.
+Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. The [security page](security.md) says how to report one.
 
 ## Does it make me anonymous?
 

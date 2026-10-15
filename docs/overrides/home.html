@@ -159,9 +159,9 @@
       <h2>Don't trust. Check.</h2>
       <div class="cards">
         <div class="card"><h3>The code is public</h3><p>Read it, run it, question it.</p></div>
-        <div class="card"><h3>Report a vulnerability</h3><p>A private way to reach the maintainers.</p></div>
+        <div class="card"><h3>Report a vulnerability</h3><p>Email the maintainers; never a public issue.</p></div>
         <div class="card"><h3>Every change is reviewed</h3><p>Nothing ships without a second pair of eyes.</p></div>
-        <div class="card"><h3>Clear about its limits</h3><p>It has not been independently audited yet, and the security page says so plainly.</p></div>
+        <div class="card"><h3>Handled privately</h3><p>Reports go to the maintainers by email, and a fix ships before the details are public.</p></div>
       </div>
       <a class="lnk" href="{{ 'get-started/security/' | url }}">Read the security page</a>
     </div></section>
@@ -199,7 +199,7 @@
         <details><summary>How is it different from other proxy tools?</summary><p>It's built around adding new methods as separate modules, so a researcher can contribute one without learning the whole project, and a maintainer can review it on its own.</p></details>
         <details><summary>Is it free, and who can use it?</summary><p>It's free to use and free to adapt, and any community can adapt it to the censorship it faces, wherever it is. It is released under the <a href="{{ config.repo_url }}/blob/main/LICENSE">Mozilla Public License 2.0</a>.</p></details>
         <details><summary>How do I add a new method?</summary><p>Write it as a module, test it on its own, and send it for review. Every change is reviewed before it ships. The <a href="{{ 'contribute/' | url }}">contributing guide</a> walks through it.</p></details>
-        <details><summary>Is it safe to use?</summary><p>Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. It has not had an independent security audit yet; the <a href="{{ 'get-started/security/' | url }}">security page</a> says so plainly.</p></details>
+        <details><summary>Is it safe to use?</summary><p>Apranik is open source, so anyone can read and check the code. Every change is reviewed before it ships, and vulnerability reports are handled privately. The <a href="{{ 'get-started/security/' | url }}">security page</a> says how to report one.</p></details>
         <details><summary>Does it make me anonymous?</summary><p>Apranik's job is to get you around blocking. Anonymity is a different goal that needs its own tools, so if it matters to you, plan for it separately.</p></details>
         <details><summary>Will it always work?</summary><p>Apranik is built for a moving target. Censors keep blocking what works, so no single method lasts forever. That is why new methods are added as modules and shipped to every app in one release: access can adapt as fast as blocking does.</p></details>
         <details><summary>How do I report a security issue?</summary><p>Use the private channel on the security page, and please don't post it publicly. <span class="todo">[TODO: add the link to the private reporting channel.]</span></p></details>

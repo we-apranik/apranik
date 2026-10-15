@@ -31,12 +31,13 @@ If a technique needs more, such as an edit to `spec` or to another module, the
 contract is missing a general concept, and that concept is added once for every
 later module.
 
-## What it is not
+## What it is
 
-- **Not an app.** There is no user interface.
-- **Not a protocol collection.** Protocol count is not the goal.
-- **Not a fork.** It shares no code with Xray, sing-box or mihomo, which are mature
-  and useful; their architecture is simply not built for rapid adaptation.
+- **A core.** One `apranik` binary that apps and panels drive with a config file.
+- **A framework for new techniques.** What it offers is how quickly a technique
+  becomes a module, not how many protocols it lists.
+- **Independent.** Its code is its own, written to be adapted quickly, alongside
+  mature cores such as Xray, sing-box and mihomo.
 
 ## Dependencies
 

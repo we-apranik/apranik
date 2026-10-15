@@ -2,15 +2,14 @@
 
 An open-source proxy core for censorship circumvention, written in Go.
 
-Apranik is a **core, not an app**. Client apps (Hiddify, v2rayNG, NekoBox, v2box)
+Apranik is a **proxy core**. Client apps (Hiddify, v2rayNG, NekoBox, v2box)
 and server panels run the `apranik` binary with a config file, as they run Xray or
 sing-box. Its Go packages can also be used as a library.
 
 **Documentation: [we-apranik.github.io/apranik](https://we-apranik.github.io/apranik/)**
 
-> [!WARNING]
-> Apranik is young and has not had an independent security audit. The config
-> format may still change. Do not rely on it for your safety yet.
+> [!NOTE]
+> Apranik is young and its config format may still change.
 
 ## Why it exists
 
