@@ -14,7 +14,7 @@ Use either channel. Do not open a public issue, pull request or discussion for i
 1. **GitHub private reporting.** Open
    [a private security advisory](https://github.com/we-apranik/apranik/security/advisories/new).
    Only the maintainers can see it.
-2. **Email**, for people without a GitHub account: SECURITY_EMAIL_HERE.
+2. **Email**, for people without a GitHub account: we-apranik@proton.me.
 
 [![How a vulnerability report is handled: the reporter uses a GitHub private advisory or email, never a public issue. The maintainers acknowledge within about a week, prepare a fix in private and agree a date with the reporter, then release the fix, publish the advisory and credit the reporter. Reporters publish after up to 90 days.](../assets/diagrams/vulnerability-report.excalidraw.svg)](../assets/diagrams/vulnerability-report.excalidraw.svg)
 
