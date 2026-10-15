@@ -1,9 +1,4 @@
 /* ===== Material theming (global) ===== */
-[data-md-color-scheme="default"]{
-  --md-primary-fg-color:#ffffff;
-  --md-primary-bg-color:#111418;
-  --md-accent-fg-color:#0b7a5c;
-}
 [data-md-color-scheme="slate"]{
   --md-primary-fg-color:#0e1013;
   --md-primary-bg-color:#f1f3f5;
