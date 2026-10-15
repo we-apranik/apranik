@@ -181,6 +181,7 @@ nav:
       - concepts/glossary.md
   - Contribute:
       - contribute/index.md
+      - Your first module: contribute/first-module.md
       - Add a module:
           - Base stream transport: contribute/base-transport.md
           - Overlay transport: contribute/overlay-transport.md

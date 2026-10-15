@@ -60,6 +60,7 @@ See [Architecture](../concepts/architecture.md) for the full map.
 
 ## Where to go next
 
+- New here: [your first module](first-module.md), a sniffer from empty folder to a working rule.
 - Add a module: [base stream transport](base-transport.md), [overlay transport](overlay-transport.md), [proxy protocol](proxy-protocol.md), [sniffer](sniffer.md), [DNS server](dns-server.md) or [API module](api-module.md).
 - [Tests](tests.md) and [pull requests](pull-requests.md): what a change should contain, and the areas that need careful review.
 - [Practices](practices.md) and [performance](performance.md): how the code is written.
