@@ -1,10 +1,14 @@
 # Apranik
 
-An open-source proxy core for censorship circumvention, written in Go.
+[![CI](https://github.com/we-apranik/apranik/actions/workflows/ci.yml/badge.svg)](https://github.com/we-apranik/apranik/actions/workflows/ci.yml)
+[![Licence: MPL 2.0](https://img.shields.io/badge/licence-MPL%202.0-blue.svg)](LICENSE)
 
-Apranik is a **proxy core**. Client apps (Hiddify, v2rayNG, NekoBox, v2box)
-and server panels run the `apranik` binary with a config file, as they run Xray or
-sing-box. Its Go packages can also be used as a library.
+**An open-source proxy core for censorship circumvention, written in Go.**
+
+Apranik accepts traffic from a device, decides where it goes, and carries it over
+the protocols and transports that still get through. Client apps and server panels
+run the `apranik` binary with a JSON config file; its Go packages can also be used
+as a library.
 
 **Documentation: [we-apranik.github.io/apranik](https://we-apranik.github.io/apranik/)**
 
@@ -20,7 +24,7 @@ under `module/` and one line in the registry, with nothing else touched.
 
 [![From a technique to a deployed module: a researcher finds a technique, writes one folder under module/, tests it there without core, adds one line to core/registry/default.go, names it by type in a config file that apranik check validates, and it ships in the apranik binary that clients and panels run. spec, the builder, core's inbound and outbound, other modules and the config parser stay untouched.](docs/assets/diagrams/research-to-deployment.excalidraw.svg)](docs/assets/diagrams/research-to-deployment.excalidraw.svg)
 
-## What is built
+## Features
 
 | Area | Available |
 | --- | --- |
@@ -31,8 +35,8 @@ under `module/` and one line in the registry, with nothing else touched.
 | DNS | UDP, TCP, DNS over TLS and over HTTPS, each through any outbound; DNS rules and a cache |
 | Operation | the whole config checked before start, statistics, users changed while running, reload, the Clash API |
 
-Not yet: REALITY, ECH, XTLS Vision, HTTP/2 and gRPC transports, QUIC, UDP
-inbounds.
+On the roadmap: REALITY, ECH, XTLS Vision, HTTP/2 and gRPC transports, QUIC and
+UDP inbounds.
 
 ## Quick start
 
@@ -91,7 +95,8 @@ client.
 
 ## Contributing
 
-Start with the [contributing guide](https://we-apranik.github.io/apranik/contribute/).
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[first-module tutorial](https://we-apranik.github.io/apranik/contribute/first-module/).
 A module is a package under `module/` that implements one `spec` kind, has tests
 that run without core, and is registered with one line in
 `core/registry/default.go`.
@@ -103,7 +108,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-docs.txt
 .venv/bin/mkdocs serve
 ```
 
-Report vulnerabilities privately: see [SECURITY.md](SECURITY.md).
+## Security
+
+Report vulnerabilities by email, not in a public issue: see [SECURITY.md](SECURITY.md).
 
 ## Licence
 
