@@ -41,15 +41,14 @@ notes/
 # docs/ holds the docs site only: working files there stay local
 docs/_*.md
 docs/context/
+docs/plans/
+
+# VitePress: installed packages, build output and cache
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 
 .gitconfig
 
 cmd/apranik/main
 cmd/apranik/apranik
-
-docs/plans/
-
-# VitePress
-node_modules/
-docs/.vitepress/dist/
-docs/.vitepress/cache/
