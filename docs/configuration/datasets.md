@@ -6,7 +6,7 @@ dataset holds values only; rules decide what to do with them.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -26,7 +26,7 @@ dataset holds values only; rules decide what to do with them.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
