@@ -8,10 +8,12 @@
       <!-- change A: one primary action, one quiet link, licence line -->
       <div class="btns" data-change="A"><a class="b p" :href="withBase('/get-started/install/')">Get started</a><a class="b" href="#loop">How it works</a></div>
       <p class="fine" data-change="A">Open source · MPL 2.0</p>
-    </div></section>
+    </div>
+    <a class="cue" href="#problem" aria-label="Scroll to the next section"><span>Scroll</span><i aria-hidden="true"></i></a>
+    </section>
 
     <!-- 2. PROBLEM -->
-    <section class="alt prob"><div class="wrap">
+    <section id="problem" class="alt prob"><div class="wrap">
       <h2>Blocking changes. Access shouldn't depend on it.</h2>
       <p>Censors don't block once. They watch what works, then block that. A method that connects people today can stop working without warning.</p>
       <p>Researchers keep finding new ways through. But a new method isn't something people can use yet. It has to be rebuilt, tested, and shipped inside each app, one at a time, and by the time it arrives, censors may have moved again.</p>
@@ -19,7 +21,7 @@
     </div></section>
 
     <!-- 3. THE LOOP -->
-    <section id="loop"><div class="wrap">
+    <section id="loop" class="alt cont"><div class="wrap">
       <h2>One loop, every time censors change.</h2>
       <div class="loopwrap">
         <div class="loopgrid">
@@ -67,9 +69,9 @@
     </div></section>
 
     <!-- 4. BUILD ONCE -->
-    <section class="alt"><div class="wrap">
+    <section><div class="wrap">
       <h2>A new method shouldn't mean reinventing the wheel.</h2>
-      <p class="sub">Without Apranik, a new method has to be rebuilt, tested and released inside every app, one at a time. That takes time, and by the time it is ready, censors may already have blocked it. With Apranik, it is added to the core once, and every app picks it up with a release.</p>
+      <p class="sub">Without Apranik, every app rebuilds, tests and releases each new method on its own, and censors may block it before it arrives. With Apranik, it is added to the core once and every app picks it up in a release.</p>
       <div class="ted" role="table" aria-label="Getting one new method to people, with and without Apranik">
         <div class="ted-head" role="row"><span role="columnheader">For each new method</span><span role="columnheader" class="bad"><b>Without Apranik</b><small>Every app on its own</small></span><span role="columnheader" class="ok"><b>With Apranik</b><small>One shared core</small></span></div>
         <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M15 14.5c3 0 6 1 6 4.5"/></svg><span>Who does the work, and how often?</span></span><span class="a bad"><i aria-hidden="true">✕</i><b>Every app’s team, separately, for every new method</b><em>The same work is repeated by many teams, and it grows with every app and every method.</em></span><span class="a ok"><i aria-hidden="true">✓</i><b>One team, once, in the core</b><em>The work is done and reviewed in one place.</em></span></div>
@@ -78,35 +80,35 @@
     </div></section>
 
     <!-- 5. HOW IT WORKS -->
-    <section class="how"><div class="wrap">
+    <section class="how cont"><div class="wrap">
       <h2>Build it once. Everyone gets it.</h2>
       <p>Apranik is the core that clients and server panels build on. It handles the connection itself, so they don't each have to.</p>
       <p>It's modular. Each part of a connection is its own module, and a new method is another module that plugs into the same place. A researcher can add one without changing the rest, and a maintainer can review it on its own.</p>
-      <svg class="metro" viewBox="0 0 760 300" role="img" aria-label="A researcher writes a module, the core maintainers review it, and it ships in a core release. From there four lines carry it to two clients and two panels, which only update the core.">
+      <svg class="metro" viewBox="0 0 1240 300" role="img" aria-label="A researcher writes a module, the core maintainers review it, and it ships in a core release. From there four lines carry it to two clients and two panels, which only update the core.">
           <g class="lines">
-            <path class="l-blue" d="M470 150L570 50H650"/>
-            <path class="l-blue" d="M490 150L530 110H650"/>
-            <path class="l-blue" d="M490 150L530 190H650"/>
-            <path class="l-blue" d="M470 150L570 250H650"/>
-            <path class="l-green" d="M60 150H490"/>
+            <path class="l-blue" d="M800 150L900 50H1160"/>
+            <path class="l-blue" d="M820 150L860 110H1160"/>
+            <path class="l-blue" d="M820 150L860 190H1160"/>
+            <path class="l-blue" d="M800 150L900 250H1160"/>
+            <path class="l-green" d="M80 150H820"/>
           </g>
           <g class="stops">
-            <circle cx="60" cy="150" r="9"/><circle cx="230" cy="150" r="9"/><circle cx="400" cy="150" r="9"/>
-            <circle cx="650" cy="50" r="9"/><circle cx="650" cy="110" r="9"/><circle cx="650" cy="190" r="9"/><circle cx="650" cy="250" r="9"/>
+            <circle cx="80" cy="150" r="9"/><circle cx="400" cy="150" r="9"/><circle cx="720" cy="150" r="9"/>
+            <circle cx="1160" cy="50" r="9"/><circle cx="1160" cy="110" r="9"/><circle cx="1160" cy="190" r="9"/><circle cx="1160" cy="250" r="9"/>
           </g>
           <g class="names">
-            <text x="60" y="118" text-anchor="middle">Researcher</text>
-            <text x="230" y="118" text-anchor="middle">Core maintainers</text>
-            <text x="400" y="118" text-anchor="middle">Core release</text>
-            <text x="672" y="56">Client</text><text x="672" y="116">Client</text><text x="672" y="196">Panel</text><text x="672" y="256">Panel</text>
+            <text x="80" y="118" text-anchor="middle">Researcher</text>
+            <text x="400" y="118" text-anchor="middle">Core maintainers</text>
+            <text x="720" y="118" text-anchor="middle">Core release</text>
+            <text x="1182" y="56">Client</text><text x="1182" y="116">Client</text><text x="1182" y="196">Panel</text><text x="1182" y="256">Panel</text>
           </g>
-          <text class="sub" x="60" y="186" text-anchor="middle">writes a module</text>
-          <text class="sub" x="230" y="186" text-anchor="middle">reviews it on its own</text>
-          <text class="sub" x="400" y="186" text-anchor="middle">ships to everyone</text>
-          <text class="stage" x="60" y="86" text-anchor="middle">ADD</text>
-          <text class="stage" x="230" y="86" text-anchor="middle">REVIEW</text>
-          <text class="stage" x="400" y="86" text-anchor="middle">SHIP</text>
-          <text class="stage" x="650" y="20" text-anchor="middle">UPDATE</text>
+          <text class="sub" x="80" y="186" text-anchor="middle">writes a module</text>
+          <text class="sub" x="400" y="186" text-anchor="middle">reviews it on its own</text>
+          <text class="sub" x="720" y="186" text-anchor="middle">ships to everyone</text>
+          <text class="stage" x="80" y="86" text-anchor="middle">ADD</text>
+          <text class="stage" x="400" y="86" text-anchor="middle">REVIEW</text>
+          <text class="stage" x="720" y="86" text-anchor="middle">SHIP</text>
+          <text class="stage" x="1160" y="20" text-anchor="middle">UPDATE</text>
         </svg>
         <p class="metro-note">Each app updates the core. Nothing is rebuilt.</p>
         <ol class="mlist">
@@ -118,7 +120,7 @@
     </div></section>
 
     <!-- 7. PRINCIPLES -->
-    <section class="ob"><div class="wrap">
+    <section class="ob alt"><div class="wrap">
       <h2>Built in the open, by the people who need it.</h2>
       <div class="cards">
         <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M8 7 3 12l5 5M16 7l5 5-5 5"/></svg></div><h3>Open source</h3><p>The code is public. Anyone can read it, check it, and carry it forward.</p></div>
@@ -129,7 +131,7 @@
     </div></section>
 
     <!-- 8. DOORS -->
-    <section class="alt"><div class="wrap">
+    <section class="alt cont"><div class="wrap">
       <h2>Everyone has a part.</h2>
       <div class="roles">
         <div>
@@ -158,7 +160,7 @@
     </div></section>
 
     <!-- 9. SECURITY AND TRUST -->
-    <section><div class="wrap">
+    <section class="alt"><div class="wrap">
       <h2>Don't trust. Check.</h2>
       <div class="trio">
         <div><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><h3>The code is public</h3><p>Read it, run it, question it.</p><a :href="repositoryUrl + ''">Read the code</a></div>
@@ -168,7 +170,7 @@
     </div></section>
 
     <!-- 10. JOIN -->
-    <section class="join"><div class="wrap">
+    <section class="join cont"><div class="wrap">
       <h2>Join the loop.</h2>
       <p class="sub">Apranik is built in the open. Read the code, talk with the people building it, or send a first change.</p>
       <!-- TODO: add the real Telegram URL, then restore the Telegram button -->
@@ -179,7 +181,7 @@
     <section id="faq"><div class="wrap">
       <h2>Straight answers.</h2>
       <div class="faq">
-        <details><summary>What is Apranik?</summary><p>An open-source core that circumvention apps and server panels are built on. It handles the connection itself, so each app doesn't have to. New ways through are added to it as separate modules. It is not another VPN app: you don't install Apranik and use it directly, it's the layer underneath the apps and panels that people use.</p></details>
+        <details><summary>What is Apranik?</summary><p>An open-source core that circumvention apps and server panels are built on. It handles the connection itself, so each app doesn't have to, and new ways through are added to it as separate modules. It is not a VPN app you use directly: it's the layer underneath the apps and panels people use.</p></details>
         <details><summary>Who is it for?</summary><p>Researchers who find new methods, developers who build clients and server panels, and maintainers of the core. You don't need to be a developer to use an app built on Apranik.</p></details>
         <details><summary>What does the name mean?</summary><p>Apranik was a Sasanian commander who fought the Arab invasion of Persia (Iran) in the seventh century. By tradition, she kept up a guerrilla war after the empire fell, and her motto was “No retreat, no surrender.”</p></details>
         <details><summary>How is it different from other proxy tools?</summary><p>It's built around adding new methods as separate modules, so a researcher can contribute one without learning the whole project, and a maintainer can review it on its own.</p></details>
@@ -216,6 +218,7 @@ import { onBeforeUnmount, onMounted } from "vue";
 import { withBase } from "vitepress";
 
 const repositoryUrl = "https://github.com/we-apranik/apranik";
+
 
 
 function initBackToTop() {
@@ -375,7 +378,22 @@ function init() {
   startTimer();
 }
 
-onMounted(init);
+// The scroll cue goes away for good once the visitor has scrolled.
+function hideScrollCueOnScroll() {
+  var cue = document.querySelector(".ap-home .hero .cue");
+  if (!cue || window.scrollY > 8) { if (cue) cue.classList.add("gone"); return; }
+  function onScroll() {
+    if (window.scrollY <= 8) return;
+    cue.classList.add("gone");
+    window.removeEventListener("scroll", onScroll);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+}
+
+onMounted(function () {
+  init();
+  hideScrollCueOnScroll();
+});
 onBeforeUnmount(function () {
   if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
   if (keyHandler) { document.removeEventListener("keydown", keyHandler); keyHandler = null; }
