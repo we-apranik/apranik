@@ -7,7 +7,7 @@ narrows it or turns on the parts that cost extra. The numbers are read through a
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -27,7 +27,7 @@ narrows it or turns on the parts that cost extra. The numbers are read through a
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
