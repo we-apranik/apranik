@@ -5,7 +5,7 @@ checked in order and the first match wins; `default_server` answers the rest.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -16,7 +16,7 @@ checked in order and the first match wins; `default_server` answers the rest.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

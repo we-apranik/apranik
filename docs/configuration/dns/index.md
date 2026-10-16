@@ -9,7 +9,7 @@ action. Without a `dns` section, the operating system resolves.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -49,7 +49,7 @@ action. Without a `dns` section, the operating system resolves.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

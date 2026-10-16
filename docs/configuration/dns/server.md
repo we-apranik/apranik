@@ -4,7 +4,7 @@ One upstream the [resolver](index.md) may ask, in `dns.servers`.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -20,7 +20,7 @@ One upstream the [resolver](index.md) may ask, in `dns.servers`.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
