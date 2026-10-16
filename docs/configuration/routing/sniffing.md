@@ -7,7 +7,7 @@ A connection is sniffed at most once.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -21,7 +21,7 @@ A connection is sniffed at most once.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

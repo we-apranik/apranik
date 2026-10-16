@@ -8,7 +8,7 @@ rest. Without a `routing` section, every request takes the first outbound.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -32,7 +32,7 @@ rest. Without a `routing` section, every request takes the first outbound.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

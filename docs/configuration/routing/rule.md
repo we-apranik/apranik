@@ -4,7 +4,7 @@ One entry of `routing.rules`: a `match` and an [`action`](action.md).
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
