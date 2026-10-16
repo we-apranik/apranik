@@ -6,94 +6,97 @@ censor sees only a CDN address and TLS to a name on it. Before you start, read
 
 [![Trojan behind a CDN: the Apranik client sends trojan over ws or httpupgrade over TLS to a CDN address. The censor sees only the CDN address and TLS to the CDN's name. The CDN ends TLS, routes on Host and path, and relays the upgraded connection to the Apranik server, which reads the client's address from X-Forwarded-For and sends traffic out through freedom.](../assets/diagrams/cdn-fronting.excalidraw.svg)](../assets/diagrams/cdn-fronting.excalidraw.svg)
 
-=== "Server"
+:::tabs
+== Server
 
-    ```json
+```json
+{
+  "version": 1,
+  "log": {
+    "level": "info",
+    "outputs": [{ "type": "stderr" }]
+  },
+  "inbounds": [
     {
-      "version": 1,
-      "log": {
-        "level": "info",
-        "outputs": [{ "type": "stderr" }]
-      },
-      "inbounds": [
+      "tag": "trojan-ws-in",
+      "listen": "0.0.0.0",
+      "port": 8080,
+      "network": "tcp",
+      "transport": [
+        { "type": "tcp" },
         {
-          "tag": "trojan-ws-in",
-          "listen": "0.0.0.0",
-          "port": 8080,
-          "network": "tcp",
-          "transport": [
-            { "type": "tcp" },
-            {
-              "type": "ws",
-              "settings": { "path": "/chat", "host": "proxy.example.com" }
-            }
-          ],
-          "protocol": {
-            "type": "trojan",
-            "settings": {
-              "users": [{ "name": "alice", "password": "change me" }]
-            }
+          "type": "ws",
+          "settings": { "path": "/chat", "host": "proxy.example.com" }
+        }
+      ],
+      "protocol": {
+        "type": "trojan",
+        "settings": {
+          "users": [{ "name": "alice", "password": "change me" }]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": { "type": "freedom" }
+    }
+  ]
+}
+```
+
+== Client
+
+```json
+{
+  "version": 1,
+  "log": {
+    "level": "info",
+    "outputs": [{ "type": "stderr" }]
+  },
+  "inbounds": [
+    {
+      "tag": "local",
+      "listen": "127.0.0.1",
+      "port": 1080,
+      "network": "tcp",
+      "transport": [{ "type": "tcp" }],
+      "protocol": {
+        "type": "socks5",
+        "settings": { "udp_relay": true }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "server": "proxy.example.com",
+      "server_port": 443,
+      "transport": [
+        { "type": "tcp" },
+        {
+          "type": "tls",
+          "settings": { "alpn": ["http/1.1"] }
+        },
+        {
+          "type": "ws",
+          "settings": {
+            "path": "/chat",
+            "early_data": { "max_bytes": 2048 }
           }
         }
       ],
-      "outbounds": [
-        {
-          "tag": "direct",
-          "protocol": { "type": "freedom" }
-        }
-      ]
+      "protocol": {
+        "type": "trojan",
+        "settings": { "password": "change me" }
+      }
     }
-    ```
+  ]
+}
+```
 
-=== "Client"
-
-    ```json
-    {
-      "version": 1,
-      "log": {
-        "level": "info",
-        "outputs": [{ "type": "stderr" }]
-      },
-      "inbounds": [
-        {
-          "tag": "local",
-          "listen": "127.0.0.1",
-          "port": 1080,
-          "network": "tcp",
-          "transport": [{ "type": "tcp" }],
-          "protocol": {
-            "type": "socks5",
-            "settings": { "udp_relay": true }
-          }
-        }
-      ],
-      "outbounds": [
-        {
-          "tag": "proxy",
-          "server": "proxy.example.com",
-          "server_port": 443,
-          "transport": [
-            { "type": "tcp" },
-            {
-              "type": "tls",
-              "settings": { "alpn": ["http/1.1"] }
-            },
-            {
-              "type": "ws",
-              "settings": {
-                "path": "/chat",
-                "early_data": { "max_bytes": 2048 }
-              }
-            }
-          ],
-          "protocol": {
-            "type": "trojan",
-            "settings": { "password": "change me" }
-          }
-        }
-      ]
-    }
-    ```
+:::
 
 - The CDN ends TLS and reaches the server over plain HTTP on port 8080, so the
   server has no `tls`. If the CDN reaches it over TLS, add `tls` between `tcp` and
