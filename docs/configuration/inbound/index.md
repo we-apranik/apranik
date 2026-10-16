@@ -5,7 +5,7 @@ An inbound accepts connections: it listens on an address, runs a
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -50,7 +50,7 @@ An inbound accepts connections: it listens on an address, runs a
 | `vless` | [VLESS](../protocol/vless.md) | TCP, and UDP framed in the stream |
 | `mixed` | [Mixed](mixed.md) | SOCKS5 and HTTP on one port |
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

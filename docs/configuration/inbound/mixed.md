@@ -7,7 +7,7 @@ SOCKS5, anything else to HTTP. Built by core, not a module.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -31,7 +31,7 @@ SOCKS5, anything else to HTTP. Built by core, not a module.
 
 The other keys are those of every [inbound](index.md).
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
