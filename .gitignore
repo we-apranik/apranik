@@ -34,9 +34,6 @@ go.work.sum
 
 CLAUDE.md
 .claude/
-# MkDocs build output
-site/
-.cache/
 
 # Internal working notes, never committed
 notes/
@@ -51,3 +48,8 @@ cmd/apranik/main
 cmd/apranik/apranik
 
 docs/plans/
+
+# VitePress
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
