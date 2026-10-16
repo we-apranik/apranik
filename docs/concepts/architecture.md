@@ -17,7 +17,7 @@ bottom layer, `spec`, imports nothing from the project.
 
 ## The spec contract
 
-[![What spec declares: the module contract](../assets/diagrams/spec-contract.excalidraw.svg)](../assets/diagrams/spec-contract.excalidraw.svg)
+[![What spec declares: the module contract. Carriers: Stream and Datagram, with PeekableStream and ResolvedWriter. Addresses: Endpoint and Destination, and the Resolver the base transports use. Transport kinds: base stream and datagram transports create, overlay transports wrap (WrapClientStream and WrapServerStream with the transport metadata); implemented are tcp, udp, tls, ws, httpupgrade, fragment and proxy_protocol. Proxy kinds: StreamProxyModule, DatagramOverStreamProxyModule and DatagramProxyModule (none yet), one module registered once for the kinds it fills, with optional UserManager, MuxCoolConfigurable and ProxyRequestTimingConfigurable. Also the sniffer kind with its SniffResult, the DNS server kinds, the API kind, Metadata, the UDP ASSOCIATE and fallback hand-offs, Config and Info on every kind, and the sentinel errors.](../assets/diagrams/spec-contract.excalidraw.svg)](../assets/diagrams/spec-contract.excalidraw.svg)
 
 [`spec/`](https://github.com/we-apranik/apranik/tree/main/spec) is the
 module contract, one package split into a file per group (`doc.go` lists
@@ -170,7 +170,7 @@ real modules need it:
 
 ## From config file to running core
 
-[![From config file to running components: load the file or URL, config.Parse (strict JSON, version, registry lookup, decode settings, Validate) into a blueprint, config.Check and CheckDatasets; every problem goes to Diagnostics. With errors, stop and print them all. Without, apranik check prints valid and exits, and apranik run calls builder.New, BuildOutbound, BuildRouter, BuildInbound and Activate.](../assets/diagrams/config-pipeline.excalidraw.svg)](../assets/diagrams/config-pipeline.excalidraw.svg)
+[![From config file to running components: the file or URL is loaded, config.Parse reads strict JSON and looks each type up in the registry, producing a blueprint that config.Check examines; every error and warning is collected with its location. With errors, nothing runs. Without, apranik check builds everything through builder.Verify without dialing, binding or logging. apranik run builds the log sinks, statistics, datasets, the resolver, the outbounds, the DNS servers, the router and each inbound (which binds its listener), starts group probes and the accept loops, and starts the APIs last. A reload, from SIGHUP or the API, checks the config source again, closes the running core and starts the new one, or starts the previous configuration again if the new one does not start.](../assets/diagrams/config-pipeline.excalidraw.svg)](../assets/diagrams/config-pipeline.excalidraw.svg)
 
 - `config.Parse` reports what cannot be read: bad JSON, unknown module names,
   settings that do not decode, a module's own `Validate` failing.
