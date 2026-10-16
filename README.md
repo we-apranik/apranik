@@ -28,12 +28,11 @@ under `module/` and one line in the registry, with nothing else touched.
 
 | Area | Available |
 | --- | --- |
-| Proxy protocols | SOCKS5, HTTP, Trojan, VLESS (plain UDP and XUDP), and `mixed` (SOCKS5 and HTTP on one port) |
-| Transports | TCP, UDP, TLS (browser ClientHellos through uTLS), WebSocket, HTTPUpgrade, ClientHello fragmenting, PROXY protocol |
-| Outbounds | proxies over any transport stack, `freedom` (direct), and the groups `urltest`, `fallback` and `selector` |
-| Routing | ordered rules on domains, addresses, ports, users and sniffed names; datasets from `geosite.dat` and `geoip.dat` |
-| DNS | UDP, TCP, DNS over TLS and over HTTPS, each through any outbound; DNS rules and a cache |
-| Operation | the whole config checked before start, statistics, users changed while running, reload, the Clash API |
+| Transports | TCP, UDP, TLS, WebSocket, HTTPUpgrade, PROXY protocol, Fragment |
+| Protocols | SOCKS5, HTTP, Trojan, VLESS |
+| Routing | Rules, Datasets, Block, Route |
+| DNS | UDP, TCP, DoT, DoH, Cache |
+| Sniffers | TLS, HTTP |
 
 On the roadmap: REALITY, ECH, XTLS Vision, HTTP/2 and gRPC transports, QUIC and
 UDP inbounds.
@@ -101,13 +100,17 @@ A module is a package under `module/` that implements one `spec` kind, has tests
 that run without core, and is registered with one line in
 `core/registry/default.go`.
 
-The docs site is in `docs/`, built with VitePress:
+The docs site is in `docs/`, built with [VitePress](https://vitepress.dev) (Node 22
+or newer):
 
 ```sh
 cd docs
 npm ci
-npm run dev
+npm run dev       # preview at http://localhost:5173/apranik/
+npm run build     # the check CI runs
 ```
+
+See [Editing the docs](https://we-apranik.github.io/apranik/contribute/docs/).
 
 ## Security
 
