@@ -71,10 +71,10 @@
       <h2>A new method shouldn't mean reinventing the wheel.</h2>
       <p class="sub">Without Apranik, a new method has to be rebuilt, tested and released inside every app, one at a time. That takes time, and by the time it is ready, censors may already have blocked it. With Apranik, it is added to the core once, and every app picks it up with a release.</p>
       <div class="ted" role="table" aria-label="Getting one new method to people, with and without Apranik">
-        <div class="ted-head" role="row"><span role="columnheader">For each new method</span><span role="columnheader" class="ok"><b>With Apranik</b><small>One shared core</small></span><span role="columnheader" class="bad"><b>Without Apranik</b><small>Every app on its own</small></span></div>
-        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M15 14.5c3 0 6 1 6 4.5"/></svg><span>Who does the work, and how often?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>One team, once, in the core</b><em>The work is done and reviewed in one place.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Every app’s team, separately, for every new method</b><em>The same work is repeated by many teams, and it grows with every app and every method.</em></span></div>
-        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>When can people use a new method?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>After one core release, when apps update</b><em>People get it as soon as their app updates.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Only after each app has rebuilt, tested and released it</b><em>People wait even though the method already exists.</em></span></div>
-        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/></svg><span>What if censors block it first?</span></span><span class="a ok"><i aria-hidden="true">✓</i><b>Apps already have it, or get the fix together</b><em>A shorter wait leaves censors less time to react.</em></span><span class="a bad"><i aria-hidden="true">✕</i><b>Many apps are too late</b><em>A slow rollout gives censors time to block it before it reaches many people.</em></span></div></div>
+        <div class="ted-head" role="row"><span role="columnheader">For each new method</span><span role="columnheader" class="bad"><b>Without Apranik</b><small>Every app on its own</small></span><span role="columnheader" class="ok"><b>With Apranik</b><small>One shared core</small></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5M15 14.5c3 0 6 1 6 4.5"/></svg><span>Who does the work, and how often?</span></span><span class="a bad"><i aria-hidden="true">✕</i><b>Every app’s team, separately, for every new method</b><em>The same work is repeated by many teams, and it grows with every app and every method.</em></span><span class="a ok"><i aria-hidden="true">✓</i><b>One team, once, in the core</b><em>The work is done and reviewed in one place.</em></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><span>When can people use a new method?</span></span><span class="a bad"><i aria-hidden="true">✕</i><b>Only after each app has rebuilt, tested and released it</b><em>People wait even though the method already exists.</em></span><span class="a ok"><i aria-hidden="true">✓</i><b>After one core release, when apps update</b><em>People get it as soon as their app updates.</em></span></div>
+        <div class="ted-row" role="row"><span class="q"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/></svg><span>What if censors block it first?</span></span><span class="a bad"><i aria-hidden="true">✕</i><b>Many apps are too late</b><em>A slow rollout gives censors time to block it before it reaches many people.</em></span><span class="a ok"><i aria-hidden="true">✓</i><b>Apps already have it, or get the fix together</b><em>A shorter wait leaves censors less time to react.</em></span></div></div>
     </div></section>
 
     <!-- 5. HOW IT WORKS -->
@@ -217,6 +217,7 @@ import { withBase } from "vitepress";
 
 const repositoryUrl = "https://github.com/we-apranik/apranik";
 
+
 function initBackToTop() {
   var button = document.querySelector(".ap-home .totop");
   if (!button) return;
@@ -292,6 +293,7 @@ function initContributors() {
 }
 
 var loopTimer = null;
+var keyHandler = null;
 
 function init() {
   initBackToTop();
@@ -311,9 +313,6 @@ function init() {
       var on = x.dataset.step === String(index);
       x.classList.toggle("sel", on);
       if (on && !source) source = x;
-    });
-    document.querySelectorAll(".ap-home .lseg").forEach(function (segment, segmentIndex) {
-      segment.classList.toggle("flow", segmentIndex === (index + 6) % 7);
     });
     var accent = source.classList.contains("ap") ? "var(--ap-green)"
       : source.classList.contains("ppl") ? "var(--ap-blue)" : "var(--ap-red)";
@@ -353,22 +352,32 @@ function init() {
     });
   });
 
+  new IntersectionObserver(function (entries) {
+    visible = entries[0].isIntersecting;
+  }).observe(wrap);
+
+  // Left and right arrows move between the steps while the loop is on screen.
+  if (keyHandler) document.removeEventListener("keydown", keyHandler);
+  keyHandler = function (e) {
+    if (!visible || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    var target = e.target;
+    if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+    e.preventDefault();
+    choose((current + (e.key === "ArrowRight" ? 1 : stepCount - 1)) % stepCount);
+  };
+  document.addEventListener("keydown", keyHandler);
+
   if (reduceMotion) {
     pick(2);
     return;
   }
-
-  new IntersectionObserver(function (entries) {
-    visible = entries[0].isIntersecting;
-    // Infinite animations off screen still repaint every frame while scrolling.
-    wrap.classList.toggle("offscreen", !visible);
-  }).observe(wrap);
-  wrap.classList.add("offscreen");
   startTimer();
 }
 
 onMounted(init);
 onBeforeUnmount(function () {
   if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+  if (keyHandler) { document.removeEventListener("keydown", keyHandler); keyHandler = null; }
 });
 </script>

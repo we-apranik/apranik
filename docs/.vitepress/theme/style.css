@@ -229,9 +229,7 @@ html { scroll-behavior: smooth; }
 .ap-home .loop{list-style:none;margin:0;padding:0;counter-reset:step}
 .ap-home .loop li.st{counter-increment:step;display:grid;grid-template-columns:40px 1fr;column-gap:14px;align-items:center;padding:12px 14px;margin:0;border-radius:12px;border:1px solid transparent;transition:background .3s ease,border-color .3s ease}
 .ap-home .loop li.st,.ap-home .lnode{cursor:pointer}
-.ap-home .loop li.st::before{content:counter(step);grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:3px solid var(--ap-ink);font:600 13px var(--ap-body)}
-.ap-home .loop li.ppl::before{border-color:var(--ap-blue)}
-.ap-home .loop li.ap::before{border-color:var(--ap-green)}
+.ap-home .loop li.st::before{content:counter(step);grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:3px solid transparent;color:var(--ap-ink2);font:600 13px var(--ap-body)}
 .ap-home .loop li.sel{background:var(--ap-card);border-color:var(--ap-line)}
 .ap-home .loop li.sel::before{background:var(--ap-ink);color:var(--ap-bg)}
 .ap-home .loop li.ppl.sel::before{background:var(--ap-blue)}
@@ -386,24 +384,13 @@ html { scroll-behavior: smooth; }
 /* censors are red */
 .ap-home .lnode.cen circle{stroke:var(--ap-red)}
 .ap-home .lnode.cen.sel circle{fill:var(--ap-red)}
-.ap-home .loop li.cen::before{border-color:var(--ap-red)}
 .ap-home .loop li.cen small{color:var(--ap-red);font-weight:600}
 .ap-home .loop li.cen.sel{background:var(--ap-red-w);border-color:var(--ap-red)}
 .ap-home .loop li.cen.sel::before{background:var(--ap-red);color:var(--ap-on)}
 
-/* current step: sonar pulse on the list badge, flow on the arrow leading in */
-.ap-home .loop li.sel::before{animation:ap-badge-sonar 1.4s ease-out infinite}
-.ap-home .lseg.flow{stroke-dasharray:6 6;stroke-width:3.5;animation:ap-march .5s linear infinite}
-@keyframes ap-badge-sonar{from{outline:2px solid var(--accent);outline-offset:0}to{outline:2px solid transparent;outline-offset:8px}}
-@keyframes ap-march{to{stroke-dashoffset:-12}}
-.ap-home .loop li.st,.ap-home .lnode{--accent:var(--ap-ink2)}
-.ap-home .loop li.ppl,.ap-home .lnode.ppl{--accent:var(--ap-blue)}
-.ap-home .loop li.ap,.ap-home .lnode.ap{--accent:var(--ap-green)}
-.ap-home .loop li.cen,.ap-home .lnode.cen{--accent:var(--ap-red)}
 @media (prefers-reduced-motion:reduce){.ap-home *{animation:none!important}}
 
-/* scrolling: pause what is off screen, and skip rendering sections far from view */
-.ap-home .loopwrap.offscreen *,.ap-home .loopwrap.offscreen *::before{animation-play-state:paused}
+/* scrolling: skip rendering sections far from view */
 .ap-home section:not(.hero){content-visibility:auto;contain-intrinsic-size:auto 640px}
 
 /* one core diagram */
@@ -455,3 +442,23 @@ html { scroll-behavior: smooth; }
 
 /* the home page has no search box in the header */
 body:has(.ap-home) .VPNavBarSearch{display:none}
+
+/* loop list: numbered rows between hairlines, the current one in its actor's colour */
+.ap-home .loop li.st{grid-template-columns:60px 1fr;padding:13px 6px;border:0;border-bottom:1px solid var(--ap-line);border-radius:0;background:none;transition:color .2s}
+.ap-home .loop li.st:first-child{border-top:1px solid var(--ap-line)}
+.ap-home .loop li.st::before{content:counter(step,decimal-leading-zero);display:block;width:auto;height:auto;border:0;border-radius:0;background:none;color:var(--ap-ink2);font:300 26px/1 var(--ap-head);letter-spacing:-.02em;transition:color .2s}
+.ap-home .loop li.sel,.ap-home .loop li.ppl.sel,.ap-home .loop li.ap.sel,.ap-home .loop li.cen.sel{transform:none;background:none;border-color:var(--ap-line)}
+.ap-home .loop li.sel::before{background:none;color:var(--ap-ink)}
+.ap-home .loop li.ppl.sel::before{background:none;color:var(--ap-blue)}
+.ap-home .loop li.ap.sel::before{background:none;color:var(--ap-green)}
+.ap-home .loop li.cen.sel::before{background:none;color:var(--ap-red)}
+.ap-home .loop b{color:var(--ap-ink2);transition:color .2s}
+.ap-home .loop li.sel b{color:var(--ap-ink)}
+.ap-home .loop:has(.sel) li.st:not(.sel){opacity:1}
+
+/* the ring's numbers sit in a plain circle; only the current one is coloured */
+.ap-home .lnode circle,.ap-home .lnode.ppl circle,.ap-home .lnode.ap circle,.ap-home .lnode.cen circle{fill:var(--ap-bg);stroke:var(--ap-line);stroke-width:2}
+.ap-home .lnode.sel circle{fill:var(--ap-ink);stroke:var(--ap-ink)}
+.ap-home .lnode.ppl.sel circle{fill:var(--ap-blue);stroke:var(--ap-blue)}
+.ap-home .lnode.ap.sel circle{fill:var(--ap-green);stroke:var(--ap-green)}
+.ap-home .lnode.cen.sel circle{fill:var(--ap-red);stroke:var(--ap-red)}
