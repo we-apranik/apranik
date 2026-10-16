@@ -190,9 +190,9 @@ A workable shape, none of it decided:
   upgrade.
 
 **Files.** `module/api/clash/` (the file, the endpoint, the test), `docs/configuration/api/clash.md`,
-`mkdocs.yml`, `requirements-docs.txt`
+`docs/.vitepress/sidebar.mts`
 
-**Acceptance criteria.** Every documented endpoint is in the file; `mkdocs build --strict`
+**Acceptance criteria.** Every documented endpoint is in the file; `npm run build` in `docs/`
 passes; the drift test fails when a route is added without an entry; the page can list the
 users of an inbound against a local core.
 

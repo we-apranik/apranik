@@ -101,11 +101,12 @@ A module is a package under `module/` that implements one `spec` kind, has tests
 that run without core, and is registered with one line in
 `core/registry/default.go`.
 
-The docs site is in `docs/`, built with MkDocs and the Material theme:
+The docs site is in `docs/`, built with VitePress:
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -r requirements-docs.txt
-.venv/bin/mkdocs serve
+cd docs
+npm ci
+npm run dev
 ```
 
 ## Security

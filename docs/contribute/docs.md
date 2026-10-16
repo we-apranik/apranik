@@ -1,13 +1,13 @@
 # Editing the docs
 
-The site is built with MkDocs and the Material theme from `docs/` and
-`mkdocs.yml`.
+The site is built with VitePress from `docs/`; its configuration is in
+`docs/.vitepress/`, and the navigation is `docs/.vitepress/sidebar.mts`.
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-docs.txt
-.venv/bin/mkdocs serve              # live preview at http://127.0.0.1:8000
-.venv/bin/mkdocs build --strict     # the check CI runs
+cd docs
+npm ci
+npm run dev                         # live preview at http://localhost:5173/apranik/
+npm run build                       # the check CI runs
 ```
 
 Rules that keep pages rendering the same on GitHub and on the site:
@@ -15,6 +15,7 @@ Rules that keep pages rendering the same on GitHub and on the site:
 - plain GitHub-flavoured Markdown, `<details>` blocks and images only;
 - every diagram is an Excalidraw drawing; no Mermaid or other diagram syntax;
 - callouts use GitHub alert syntax (`> [!NOTE]`, `> [!WARNING]`);
+- tabs are `:::tabs` with a `== Label` line per tab, closed by `:::`;
 - links to other pages are relative (`[Architecture](../concepts/architecture.md)`);
 - one H1 per page.
 
