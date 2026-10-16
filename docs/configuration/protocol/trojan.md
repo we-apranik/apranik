@@ -10,54 +10,57 @@ ordinary site.
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
+```json
+{
+  "tag": "trojan-in",
+  "listen": "0.0.0.0",
+  "port": 443,
+  "transport": [
+    { "type": "tcp" },
     {
-      "tag": "trojan-in",
-      "listen": "0.0.0.0",
-      "port": 443,
-      "transport": [
-        { "type": "tcp" },
-        {
-          "type": "tls",
-          "settings": {
-            "certificates": [
-              {
-                "certificate_file": "/etc/apranik/cert.pem",
-                "key_file": "/etc/apranik/key.pem"
-              }
-            ]
+      "type": "tls",
+      "settings": {
+        "certificates": [
+          {
+            "certificate_file": "/etc/apranik/cert.pem",
+            "key_file": "/etc/apranik/key.pem"
           }
-        }
-      ],
-      "protocol": {
-        "type": "trojan",
-        "settings": {
-          "users": [{ "name": "alice", "password": "correct horse" }],
-          "handshake_timeout": "10s"
-        }
-      },
-      "fallback": { "server": "127.0.0.1", "server_port": 8080 }
-    }
-    ```
-
-=== "Outbound"
-
-    ```json
-    {
-      "tag": "trojan-out",
-      "server": "proxy.example.com",
-      "server_port": 443,
-      "transport": [{ "type": "tcp" }, { "type": "tls" }],
-      "protocol": {
-        "type": "trojan",
-        "settings": { "password": "correct horse" }
+        ]
       }
     }
-    ```
+  ],
+  "protocol": {
+    "type": "trojan",
+    "settings": {
+      "users": [{ "name": "alice", "password": "correct horse" }],
+      "handshake_timeout": "10s"
+    }
+  },
+  "fallback": { "server": "127.0.0.1", "server_port": 8080 }
+}
+```
 
-<div class="cfg-fields" markdown>
+== Outbound
+
+```json
+{
+  "tag": "trojan-out",
+  "server": "proxy.example.com",
+  "server_port": 443,
+  "transport": [{ "type": "tcp" }, { "type": "tls" }],
+  "protocol": {
+    "type": "trojan",
+    "settings": { "password": "correct horse" }
+  }
+}
+```
+
+:::
+
+<div class="cfg-fields">
 
 ## Inbound fields
 

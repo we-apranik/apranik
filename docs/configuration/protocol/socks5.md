@@ -5,42 +5,45 @@ SOCKS5 (RFC 1928): CONNECT, UDP ASSOCIATE, and username and password login
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
-    {
-      "tag": "socks-in",
-      "listen": "127.0.0.1",
-      "port": 1080,
-      "transport": [{ "type": "tcp" }],
-      "protocol": {
-        "type": "socks5",
-        "settings": {
-          "users": [{ "name": "alice", "password": "correct horse" }],
-          "udp_relay": true,
-          "udp_max_datagram_size": 8192,
-          "handshake_timeout": "10s"
-        }
-      }
+```json
+{
+  "tag": "socks-in",
+  "listen": "127.0.0.1",
+  "port": 1080,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "socks5",
+    "settings": {
+      "users": [{ "name": "alice", "password": "correct horse" }],
+      "udp_relay": true,
+      "udp_max_datagram_size": 8192,
+      "handshake_timeout": "10s"
     }
-    ```
+  }
+}
+```
 
-=== "Outbound"
+== Outbound
 
-    ```json
-    {
-      "tag": "upstream",
-      "server": "203.0.113.5",
-      "server_port": 1080,
-      "transport": [{ "type": "tcp" }],
-      "protocol": {
-        "type": "socks5",
-        "settings": { "username": "alice", "password": "correct horse" }
-      }
-    }
-    ```
+```json
+{
+  "tag": "upstream",
+  "server": "203.0.113.5",
+  "server_port": 1080,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "socks5",
+    "settings": { "username": "alice", "password": "correct horse" }
+  }
+}
+```
 
-<div class="cfg-fields" markdown>
+:::
+
+<div class="cfg-fields">
 
 ## Inbound fields
 

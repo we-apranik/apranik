@@ -5,44 +5,47 @@ Basic authentication. TCP only.
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
-    {
-      "tag": "http-in",
-      "listen": "127.0.0.1",
-      "port": 8080,
-      "transport": [{ "type": "tcp" }],
-      "protocol": {
-        "type": "http",
-        "settings": {
-          "users": [{ "name": "alice", "password": "correct horse" }],
-          "handshake_timeout": "10s"
-        }
-      }
+```json
+{
+  "tag": "http-in",
+  "listen": "127.0.0.1",
+  "port": 8080,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "http",
+    "settings": {
+      "users": [{ "name": "alice", "password": "correct horse" }],
+      "handshake_timeout": "10s"
     }
-    ```
+  }
+}
+```
 
-=== "Outbound"
+== Outbound
 
-    ```json
-    {
-      "tag": "upstream",
-      "server": "203.0.113.5",
-      "server_port": 8080,
-      "transport": [{ "type": "tcp" }],
-      "protocol": {
-        "type": "http",
-        "settings": { "username": "alice", "password": "correct horse" }
-      }
-    }
-    ```
+```json
+{
+  "tag": "upstream",
+  "server": "203.0.113.5",
+  "server_port": 8080,
+  "transport": [{ "type": "tcp" }],
+  "protocol": {
+    "type": "http",
+    "settings": { "username": "alice", "password": "correct horse" }
+  }
+}
+```
+
+:::
 
 > [!WARNING]
 > Basic authentication sends the password readably. Use it only on a trusted
 > network or inside an encrypting transport.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Inbound fields
 
