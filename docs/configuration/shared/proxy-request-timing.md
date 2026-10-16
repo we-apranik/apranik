@@ -7,7 +7,7 @@ a small packet of a fixed length, which DPI can recognise.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -18,7 +18,7 @@ a small packet of a fixed length, which DPI can recognise.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

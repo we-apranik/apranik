@@ -7,7 +7,7 @@ status line arrives. Every member is probed when the core starts, then at each
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -22,7 +22,7 @@ status line arrives. Every member is probed when the core starts, then at each
 
 Every field is optional.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

@@ -7,7 +7,7 @@ multiplexed, as in Xray's and sing-box's clients.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -24,7 +24,7 @@ multiplexed, as in Xray's and sing-box's clients.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
