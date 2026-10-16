@@ -6,7 +6,7 @@ An outbound group that uses the member whose probe answered fastest.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -31,7 +31,7 @@ An outbound group that uses the member whose probe answered fastest.
 
 A group has only `tag` and `protocol`: no `server`, `transport` or `dns_server`.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

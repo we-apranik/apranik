@@ -6,7 +6,7 @@ names are resolved by the [resolver](../dns/index.md).
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -34,7 +34,7 @@ names are resolved by the [resolver](../dns/index.md).
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

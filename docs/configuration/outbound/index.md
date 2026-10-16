@@ -8,7 +8,7 @@ destination, or through a group that picks another outbound.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -51,7 +51,7 @@ destination, or through a group that picks another outbound.
 
 `freedom` and the groups take only some of the keys below; their pages say which.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

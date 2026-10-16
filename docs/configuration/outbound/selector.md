@@ -7,7 +7,7 @@ for example the Clash API's `PUT /proxies/{name}`.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -21,7 +21,7 @@ for example the Clash API's `PUT /proxies/{name}`.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
