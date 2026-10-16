@@ -6,7 +6,7 @@ the [Clash API](clash.md).
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -25,7 +25,7 @@ the [Clash API](clash.md).
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

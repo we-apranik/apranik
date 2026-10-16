@@ -6,7 +6,7 @@ The endpoints are on [Clash API endpoints](clash-endpoints.md).
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -29,7 +29,7 @@ The endpoints are on [Clash API endpoints](clash-endpoints.md).
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
