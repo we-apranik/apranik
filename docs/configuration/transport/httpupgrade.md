@@ -9,29 +9,32 @@ and sing-box's. A [`tls`](tls.md) below it must set `"alpn": ["http/1.1"]`.
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
-    {
-      "type": "httpupgrade",
-      "settings": {
-        "path": "/up",
-        "host": "cdn.example.com",
-        "accept_websocket_key": true
-      }
-    }
-    ```
+```json
+{
+  "type": "httpupgrade",
+  "settings": {
+    "path": "/up",
+    "host": "cdn.example.com",
+    "accept_websocket_key": true
+  }
+}
+```
 
-=== "Outbound"
+== Outbound
 
-    ```json
-    {
-      "type": "httpupgrade",
-      "settings": { "path": "/up", "host": "cdn.example.com", "pipeline": false }
-    }
-    ```
+```json
+{
+  "type": "httpupgrade",
+  "settings": { "path": "/up", "host": "cdn.example.com", "pipeline": false }
+}
+```
 
-<div class="cfg-fields" markdown>
+:::
+
+<div class="cfg-fields">
 
 ## Fields
 

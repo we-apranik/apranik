@@ -6,7 +6,7 @@ sockets, in `settings.udp`. It has no settings yet; domains are resolved by the
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {

@@ -11,37 +11,40 @@ one.
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
-    {
-      "type": "tls",
-      "settings": {
-        "certificates": [
-          {
-            "certificate_file": "/etc/apranik/cert.pem",
-            "key_file": "/etc/apranik/key.pem"
-          }
-        ],
-        "alpn": ["http/1.1"]
+```json
+{
+  "type": "tls",
+  "settings": {
+    "certificates": [
+      {
+        "certificate_file": "/etc/apranik/cert.pem",
+        "key_file": "/etc/apranik/key.pem"
       }
-    }
-    ```
+    ],
+    "alpn": ["http/1.1"]
+  }
+}
+```
 
-=== "Outbound"
+== Outbound
 
-    ```json
-    {
-      "type": "tls",
-      "settings": {
-        "server_name": "proxy.example.com",
-        "fingerprint": "chrome",
-        "alpn": ["http/1.1"]
-      }
-    }
-    ```
+```json
+{
+  "type": "tls",
+  "settings": {
+    "server_name": "proxy.example.com",
+    "fingerprint": "chrome",
+    "alpn": ["http/1.1"]
+  }
+}
+```
 
-<div class="cfg-fields" markdown>
+:::
+
+<div class="cfg-fields">
 
 ## Outbound fields
 

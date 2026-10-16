@@ -6,34 +6,37 @@ reverse proxies. Compatible with Xray's and sing-box's, early data included. A
 
 ## Structure
 
-=== "Inbound"
+:::tabs
+== Inbound
 
-    ```json
-    {
-      "type": "ws",
-      "settings": {
-        "path": "/chat",
-        "host": "cdn.example.com",
-        "original_source_ip": { "headers": ["X-Forwarded-For"] }
-      }
-    }
-    ```
+```json
+{
+  "type": "ws",
+  "settings": {
+    "path": "/chat",
+    "host": "cdn.example.com",
+    "original_source_ip": { "headers": ["X-Forwarded-For"] }
+  }
+}
+```
 
-=== "Outbound"
+== Outbound
 
-    ```json
-    {
-      "type": "ws",
-      "settings": {
-        "path": "/chat",
-        "host": "cdn.example.com",
-        "headers": { "User-Agent": "Mozilla/5.0" },
-        "early_data": { "max_bytes": 2048 }
-      }
-    }
-    ```
+```json
+{
+  "type": "ws",
+  "settings": {
+    "path": "/chat",
+    "host": "cdn.example.com",
+    "headers": { "User-Agent": "Mozilla/5.0" },
+    "early_data": { "max_bytes": 2048 }
+  }
+}
+```
 
-<div class="cfg-fields" markdown>
+:::
+
+<div class="cfg-fields">
 
 ## Fields
 

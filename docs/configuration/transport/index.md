@@ -8,7 +8,7 @@ connection; each later entry is an **overlay**, which wraps the one before it.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {

@@ -13,7 +13,7 @@ outbound, below `tls`.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -33,7 +33,7 @@ outbound, below `tls`.
 
 These are the defaults, so `{ "type": "fragment" }` behaves the same.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

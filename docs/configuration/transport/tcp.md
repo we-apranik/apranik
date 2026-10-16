@@ -4,7 +4,7 @@ The base stream transport: opens or accepts a TCP connection.
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -22,7 +22,7 @@ The base stream transport: opens or accepts a TCP connection.
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

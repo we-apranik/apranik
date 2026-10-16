@@ -10,7 +10,7 @@ Without the key, `X-Forwarded-For` is read from any peer, as Xray and sing-box d
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -34,7 +34,7 @@ Without the key, `X-Forwarded-For` is read from any peer, as Xray and sing-box d
 
 </div>
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 

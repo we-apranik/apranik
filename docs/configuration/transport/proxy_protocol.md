@@ -8,7 +8,7 @@ load balancers and Cloudflare Spectrum send it. Unlike
 
 ## Structure
 
-<div class="cfg-structure" markdown>
+<div class="cfg-structure">
 
 ```json
 {
@@ -25,7 +25,7 @@ load balancers and Cloudflare Spectrum send it. Unlike
 > [!IMPORTANT]
 > Put it directly after `tcp`, before every other overlay. Nothing checks this.
 
-<div class="cfg-fields" markdown>
+<div class="cfg-fields">
 
 ## Fields
 
