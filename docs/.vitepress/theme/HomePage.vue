@@ -261,11 +261,11 @@ function showContributors(section) {
     var faces = crew.querySelector(".faces");
     people.slice(0, contributorsShown).forEach(function (person) {
       var photo = document.createElement("img");
-      photo.src = person.avatar_url + (person.avatar_url.indexOf("?") < 0 ? "?" : "&") + "s=56";
+      photo.src = person.avatar_url + (person.avatar_url.indexOf("?") < 0 ? "?" : "&") + "s=72";
       photo.alt = person.login + ", contributor";
       photo.title = person.login;
-      photo.width = 28;
-      photo.height = 28;
+      photo.width = 36;
+      photo.height = 36;
       photo.loading = "lazy";
       photo.referrerPolicy = "no-referrer";
       faces.appendChild(photo);
