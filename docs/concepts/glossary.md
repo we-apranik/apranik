@@ -1,3 +1,7 @@
+---
+description: "What Apranik's terms mean: carrier, base and overlay transport, proxy protocol, blueprint, dataset, resolver and the rest."
+---
+
 # Glossary
 
 | Term | Meaning |

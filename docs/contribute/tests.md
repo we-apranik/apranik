@@ -1,3 +1,7 @@
+---
+description: "How Apranik's tests are written: next to the code, with real bytes, and a module's tests never import core."
+---
+
 # Tests
 
 - Tests live next to the code, in `_test.go` files, mostly as external test

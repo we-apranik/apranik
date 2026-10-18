@@ -1,3 +1,7 @@
+---
+description: "Every endpoint of Apranik's Clash API: what each one reads or changes, with its request and answer."
+---
+
 # Clash API endpoints
 
 Every request needs the [secret](clash.md#secret). Errors are

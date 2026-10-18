@@ -1,3 +1,7 @@
+---
+description: "What a pull request to Apranik should contain: one change, clean checks, and a new module touching nothing else."
+---
+
 # Pull requests
 
 - One change with a clear purpose, `gofmt`, `go vet` and `go test -race` clean.
