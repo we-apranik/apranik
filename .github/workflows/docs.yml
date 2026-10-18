@@ -1,10 +1,11 @@
 name: docs
 
-# Temporarily manual only: GitHub Pages cannot publish from this private
-# repository. Restore the push trigger below when the repository is public.
 on:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
