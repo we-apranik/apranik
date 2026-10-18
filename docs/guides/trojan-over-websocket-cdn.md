@@ -9,7 +9,7 @@ censor sees only a CDN address and TLS to a name on it. Before you start, read
 :::tabs
 == Server
 
-```json
+```json [server.json]
 {
   "version": 1,
   "log": {
@@ -48,7 +48,7 @@ censor sees only a CDN address and TLS to a name on it. Before you start, read
 
 == Client
 
-```json
+```json [client.json]
 {
   "version": 1,
   "log": {

@@ -8,7 +8,7 @@ read [what these guides assume](index.md).
 :::tabs
 == Server
 
-```json
+```json [server.json]
 {
   "version": 1,
   "log": {
@@ -56,7 +56,7 @@ read [what these guides assume](index.md).
 
 == Client
 
-```json
+```json [client.json]
 {
   "version": 1,
   "log": {
