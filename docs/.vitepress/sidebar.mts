@@ -2,11 +2,16 @@ import type { DefaultTheme } from "vitepress";
 
 export const sidebar: DefaultTheme.Sidebar = {
   "/get-started/": [
-    { text: "What is Apranik", link: "/get-started/overview" },
-    { text: "Install and run", link: "/get-started/install" },
-    { text: "First configuration", link: "/get-started/first-configuration" },
-    { text: "FAQ", link: "/get-started/faq" },
-    { text: "Security", link: "/get-started/security" },
+    {
+      text: "Introduction",
+      items: [
+        { text: "What is Apranik", link: "/get-started/overview" },
+        { text: "Install and run", link: "/get-started/install" },
+        { text: "First configuration", link: "/get-started/first-configuration" },
+        { text: "FAQ", link: "/get-started/faq" },
+        { text: "Security", link: "/get-started/security" },
+      ],
+    },
   ],
   "/guides/": [
     { text: "Guides", link: "/guides/" },
@@ -16,43 +21,56 @@ export const sidebar: DefaultTheme.Sidebar = {
     { text: "Hide the server name", link: "/guides/hide-the-server-name" },
   ],
   "/configuration/": [
-    { text: "Configuration", link: "/configuration/" },
-    { text: "Log", link: "/configuration/log" },
     {
-      text: "Inbound",
-      link: "/configuration/inbound/",
+      text: "General",
+      items: [
+        { text: "The config file", link: "/configuration/" },
+      ],
+    },
+    {
+      text: "Log",
+      collapsed: true,
+      items: [{ text: "Where logs go", link: "/configuration/log" }],
+    },
+    {
+      text: "Datasets",
+      collapsed: true,
+      items: [{ text: "What is a dataset", link: "/configuration/datasets" }],
+    },
+    {
+      text: "DNS",
       collapsed: true,
       items: [
+        { text: "How DNS works", link: "/configuration/dns/" },
+        { text: "DNS server", link: "/configuration/dns/server" },
+        { text: "DNS rule", link: "/configuration/dns/rule" },
+      ],
+    },
+    {
+      text: "Inbound",
+      collapsed: true,
+      items: [
+        { text: "What is an inbound", link: "/configuration/inbound/" },
         { text: "Mixed", link: "/configuration/inbound/mixed" },
         { text: "Users", link: "/configuration/inbound/users" },
       ],
     },
     {
       text: "Outbound",
-      link: "/configuration/outbound/",
       collapsed: true,
       items: [
+        { text: "What is an outbound", link: "/configuration/outbound/" },
         { text: "Freedom", link: "/configuration/outbound/freedom" },
         { text: "URLTest", link: "/configuration/outbound/urltest" },
         { text: "Fallback", link: "/configuration/outbound/fallback" },
         { text: "Selector", link: "/configuration/outbound/selector" },
       ],
     },
-    { text: "Datasets", link: "/configuration/datasets" },
-    {
-      text: "DNS",
-      link: "/configuration/dns/",
-      collapsed: true,
-      items: [
-        { text: "DNS server", link: "/configuration/dns/server" },
-        { text: "DNS rule", link: "/configuration/dns/rule" },
-      ],
-    },
     {
       text: "Routing",
-      link: "/configuration/routing/",
       collapsed: true,
       items: [
+        { text: "How routing works", link: "/configuration/routing/" },
         { text: "Rule", link: "/configuration/routing/rule" },
         { text: "Action", link: "/configuration/routing/action" },
         { text: "Sniffing", link: "/configuration/routing/sniffing" },
@@ -60,17 +78,17 @@ export const sidebar: DefaultTheme.Sidebar = {
     },
     {
       text: "Stats",
-      link: "/configuration/stats/",
       collapsed: true,
       items: [
+        { text: "What is counted", link: "/configuration/stats/" },
         { text: "Counters", link: "/configuration/stats/counters" },
       ],
     },
     {
       text: "API",
-      link: "/configuration/api/",
       collapsed: true,
       items: [
+        { text: "What are APIs", link: "/configuration/api/" },
         { text: "Clash API", link: "/configuration/api/clash" },
         { text: "Clash API endpoints", link: "/configuration/api/clash-endpoints" },
       ],
@@ -81,9 +99,9 @@ export const sidebar: DefaultTheme.Sidebar = {
       items: [
         {
           text: "Transport",
-          link: "/configuration/transport/",
           collapsed: true,
           items: [
+            { text: "How transports stack", link: "/configuration/transport/" },
             { text: "TCP", link: "/configuration/transport/tcp" },
             { text: "UDP", link: "/configuration/transport/udp" },
             { text: "TLS", link: "/configuration/transport/tls" },
