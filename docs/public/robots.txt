@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://we-apranik.github.io/apranik/sitemap.xml
