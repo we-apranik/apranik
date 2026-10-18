@@ -119,6 +119,7 @@ export const sidebar: DefaultTheme.Sidebar = {
   ],
   "/contribute/": [
     { text: "Contribute", link: "/contribute/" },
+    { text: "Contribute safely", link: "/contribute/safety" },
     { text: "Your first module", link: "/contribute/first-module" },
     {
       text: "Add a module",

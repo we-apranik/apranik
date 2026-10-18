@@ -1,5 +1,11 @@
 # Contribute
 
+::: warning Read this first
+Where circumvention is illegal, contributing can put you at risk. You can
+contribute under a pseudonym, and the steps to do it safely are in
+[Contribute safely](safety.md). Do them before your first commit.
+:::
+
 ## Setup
 
 You need Go (the version in `go.mod`, currently `go 1.27`) and nothing else.
