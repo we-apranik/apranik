@@ -73,7 +73,7 @@ curl --socks5-hostname 127.0.0.1:1080 https://example.com/
 
 ## Contributing
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [first-module tutorial](https://we-apranik.github.io/apranik/contribute/first-module/). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). New modules of each kind have their own guides under [Contribute](https://we-apranik.github.io/apranik/contribute/). The docs site is in `docs/`; see [Editing the docs](https://we-apranik.github.io/apranik/contribute/docs/).
+Read [Contribute safely](https://we-apranik.github.io/apranik/contribute/safety/) first: contributing can put you at risk, and you can do it under a pseudonym. Then [CONTRIBUTING.md](CONTRIBUTING.md) and the [first-module tutorial](https://we-apranik.github.io/apranik/contribute/first-module/). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). New modules of each kind have their own guides under [Contribute](https://we-apranik.github.io/apranik/contribute/). The docs site is in `docs/`; see [Editing the docs](https://we-apranik.github.io/apranik/contribute/docs/).
 
 ## Security
 
