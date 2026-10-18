@@ -1,18 +1,12 @@
 # Contributing to Apranik
 
-## Contribute safely
-
-Where circumvention is illegal, contributing can put you at risk. You can
-contribute under a pseudonym: nobody here will ask for your real name.
-
-- Use a new GitHub account and a new email address. Reuse nothing from your
-  real accounts.
-- Do not expose your personal email address or your time zone in commits.
-- Commits are permanent and public. Decide before your first one. Not
-  contributing is a valid choice.
-
-The [full guide](https://we-apranik.github.io/apranik/contribute/safety/) has the
-steps.
+> [!WARNING]
+> **Read this first**
+>
+> Where circumvention is illegal, contributing can put you at risk. You can
+> contribute under a pseudonym, and the steps to do it safely are in
+> [Contribute safely](https://we-apranik.github.io/apranik/contribute/safety/).
+> Do them before your first commit.
 
 ## Get started
 
