@@ -1,4 +1,3 @@
-// Package traffic serves /traffic, the bytes the core carried each second.
 package traffic
 
 import (
@@ -27,9 +26,6 @@ type body struct {
 	DownTotal uint64 `json:"downTotal"`
 }
 
-// serve sends the bytes of the last tick, up and down, every tick. The difference
-// is taken per client from the counters, which never reset, so clients do not
-// share state.
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	previous, err := h.provider.TotalTraffic()
 	if err != nil {
