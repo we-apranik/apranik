@@ -16,8 +16,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// plainDialer stands in for core's dialer, whose streams already carry TLS:
-// the module speaks HTTP/1.1 over whatever it is handed.
 type plainDialer struct {
 	target string
 	dials  atomic.Int64

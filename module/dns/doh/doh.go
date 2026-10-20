@@ -1,8 +1,3 @@
-// Package doh is the DNS server type doh: DNS over HTTPS (RFC 8484), as
-// HTTP/1.1 POST requests carrying the wire-format message. The TLS layer is
-// core's, built from the server's tls field, so this module speaks plain
-// HTTP/1.1 over streams that are already encrypted; net/http keeps the
-// connections alive and reuses them.
 package doh
 
 import (
@@ -39,17 +34,12 @@ const (
 )
 
 type Settings struct {
-	// Where the DNS server is; the port defaults to DefaultPort.
 	Server types.ServerAddress `json:"server"`
 
-	// The request path. Default DefaultPath.
 	Path string `json:"path"`
 
-	// The Host header. Default: the server's host. Set it when the server is
-	// an IP but the service is a name (8.8.8.8 is dns.google).
 	Host string `json:"host"`
 
-	// Bounds one query, the dial included. Absent means DefaultTimeout; a written zero is refused.
 	Timeout *types.Duration `json:"timeout"`
 }
 
@@ -137,8 +127,6 @@ func (s *Server) NewStreamDNSServer(dialer spec.StreamDialer) (spec.DNSServer, e
 	}, nil
 }
 
-// A DNS answer never needs a redirect, and following one could send the query
-// somewhere the user did not choose.
 func refuseRedirects(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 func NewStreamDNSServerModule() spec.StreamDNSServerModule { return &Server{} }
@@ -162,7 +150,6 @@ func (c *client) Query(ctx context.Context, queryMessage []byte) ([]byte, error)
 	}
 	request.Header.Set("Content-Type", dnsMessageMediaType)
 	request.Header.Set("Accept", dnsMessageMediaType)
-	// An empty User-Agent is not sent: Go's default would name the client.
 	request.Header.Set("User-Agent", "")
 
 	response, err := c.httpClient.Do(request)
