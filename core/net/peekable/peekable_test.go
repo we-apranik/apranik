@@ -13,7 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// readerStream is a spec.Stream whose reads come from a fixed reader.
 type readerStream struct {
 	net.Conn
 	reader io.Reader
@@ -22,7 +21,6 @@ type readerStream struct {
 func (s readerStream) Read(p []byte) (int, error) { return s.reader.Read(p) }
 func (readerStream) CloseWrite() error            { return spec.ErrNoHalfClose }
 
-// One byte per Read, so every test exercises fields split across reads.
 func streamOf(data []byte) readerStream {
 	return readerStream{reader: iotest.OneByteReader(bytes.NewReader(data))}
 }
