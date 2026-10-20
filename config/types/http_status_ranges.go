@@ -7,11 +7,6 @@ import (
 	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
-// HTTPStatusRanges is a list of HTTP status codes written as one string:
-// "204", "200-299" or "200,204,300-399". A bare number is refused, as with
-// Duration: one spelling keeps a config file easy to read. The empty value,
-// what a missing field leaves, means "not set", and each user says what that
-// means for it.
 type HTTPStatusRanges []httpstatusranges.Range
 
 func (r HTTPStatusRanges) Ranges() []httpstatusranges.Range { return r }
@@ -20,7 +15,6 @@ func (r HTTPStatusRanges) MarshalJSON() ([]byte, error) {
 	return json.Marshal(httpstatusranges.String(r))
 }
 
-// A JSON null leaves the receiver untouched, as stdlib unmarshalers do.
 func (r *HTTPStatusRanges) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil

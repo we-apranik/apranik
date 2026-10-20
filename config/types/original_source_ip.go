@@ -9,16 +9,9 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// OriginalSourceIP is the settings block `ws` and `httpupgrade` share for
-// reading the client's IP from a header a proxy in front added. A module starts
-// from DefaultOriginalSourceIP before the config file is decoded; Headers is a
-// slice, so a config file replaces the default instead of merging into it.
 type OriginalSourceIP struct {
-	// Turns the feature off: the header is never read and the source stays the
-	// address the layer below reported.
 	Disabled bool `json:"disabled"`
 
-	// Header names, in order; the first one the request carries is read.
 	Headers []string `json:"headers"`
 
 	// Without it the header is believed from any peer.
@@ -26,19 +19,15 @@ type OriginalSourceIP struct {
 }
 
 type OriginalSourceIPVerification struct {
-	// The peer must be one of these, and they are skipped when the header is
-	// read from the right. Empty means the peer is not checked.
 	TrustedProxyAddresses AddressRanges `json:"trusted_proxy_addresses"`
 
-	// A header the proxy adds. Nil means no proof is required.
 	ProofHeader *ProofHeader `json:"proof_header"`
 }
 
 type ProofHeader struct {
 	Name string `json:"name"`
 
-	// Empty means the header only has to be present: a leaked header name is
-	// then enough to pass, which a value is not.
+	// Empty means the header only has to be present
 	Value Secret `json:"value"`
 }
 
@@ -46,7 +35,6 @@ func DefaultOriginalSourceIP() OriginalSourceIP {
 	return OriginalSourceIP{Headers: []string{"X-Forwarded-For"}}
 }
 
-// Unverified reports whether the header would be believed from any peer.
 func (o *OriginalSourceIP) Unverified() bool {
 	return !o.Disabled && len(o.Verification.TrustedProxyAddresses) == 0 && o.Verification.ProofHeader == nil
 }
@@ -84,9 +72,6 @@ func (o *OriginalSourceIP) Warnings() []string {
 	return warnings
 }
 
-// WarningsForListenAddress is the part of the module's warnings that depends on
-// where the inbound listens: an unverified header is safe only when no one but
-// a proxy on this machine can reach the port. module names the caller.
 func (o *OriginalSourceIP) WarningsForListenAddress(module string, listen spec.Endpoint) []string {
 	if !o.Unverified() || listen.Addr().IsLoopback() {
 		return nil
@@ -95,7 +80,6 @@ func (o *OriginalSourceIP) WarningsForListenAddress(module string, listen spec.E
 		module, strings.Join(o.Headers, ", "))}
 }
 
-// NewResolver is nil when the feature is disabled.
 func (o *OriginalSourceIP) NewResolver() *originalsourceip.Resolver {
 	if o.Disabled {
 		return nil

@@ -32,7 +32,6 @@ func TestDurationRoundTrip(t *testing.T) {
 	}
 }
 
-// The point of the type: the value a module reads is a real time.Duration.
 func TestDurationConvertsToTimeDuration(t *testing.T) {
 	var decoded Duration
 	if err := json.Unmarshal([]byte(`"90s"`), &decoded); err != nil {
@@ -68,8 +67,6 @@ func TestDurationRejectsUnparsableString(t *testing.T) {
 	}
 }
 
-// A field absent from the config file keeps the default the constructor set;
-// null does the same, and an explicit value overrides it.
 func TestDurationDecodeIntoPopulatedStruct(t *testing.T) {
 	type settings struct {
 		KeepAlive Duration `json:"keep_alive"`

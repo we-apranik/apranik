@@ -7,13 +7,8 @@ import (
 	"strings"
 )
 
-// AddressRanges is a list of IP addresses and ranges written as JSON strings:
-// "10.0.0.2" (one address) or "104.16.0.0/13" (a range). A slice, so a value a
-// module defaults is replaced, not merged, when the config file sets it.
 type AddressRanges []netip.Prefix
 
-// Contains reports whether the address is in any range. An IPv4-mapped IPv6
-// address (::ffff:10.0.0.2) is compared as the IPv4 address it carries.
 func (r AddressRanges) Contains(address netip.Addr) bool {
 	address = address.Unmap()
 	for _, prefix := range r {
@@ -24,8 +19,6 @@ func (r AddressRanges) Contains(address netip.Addr) bool {
 	return false
 }
 
-// ParseAddressRanges is the one way an entry is read, so the config file and Go
-// code agree.
 func ParseAddressRanges(entries ...string) (AddressRanges, error) {
 	ranges := make(AddressRanges, 0, len(entries))
 	for _, entry := range entries {
@@ -74,7 +67,6 @@ func (r AddressRanges) MarshalJSON() ([]byte, error) {
 	return json.Marshal(entries)
 }
 
-// Covers everything, which makes a trust list meaningless.
 func (r AddressRanges) CoversEverything() bool {
 	for _, prefix := range r {
 		if prefix.Bits() == 0 {

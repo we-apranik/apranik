@@ -12,9 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ServerAddress is a host with an optional port: "8.8.8.8", "dns.google:853",
-// "[2001:db8::1]:53". The port is left to the module, which knows its
-// protocol's default; Destination applies it.
 type ServerAddress struct {
 	host string
 	ip   netip.Addr
@@ -37,7 +34,6 @@ func (a ServerAddress) String() string {
 	return net.JoinHostPort(host, strconv.Itoa(int(a.port)))
 }
 
-// Destination is the address with defaultPort when it named none.
 func (a ServerAddress) Destination(defaultPort uint16) (spec.Destination, error) {
 	port := a.port
 	if port == 0 {
@@ -67,9 +63,6 @@ func (a *ServerAddress) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ParseServerAddress accepts an IP or a hostname, each with or without a port.
-// A hostname is checked to be one, so no bytes but letters, digits, hyphens,
-// underscores and dots reach a dial or a TLS server name.
 func ParseServerAddress(text string) (ServerAddress, error) {
 	if text == "" {
 		return ServerAddress{}, errors.New("empty server address")

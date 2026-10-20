@@ -9,7 +9,6 @@ import (
 
 const password = "correct-horse-battery-staple"
 
-// Every way a credential could reach a log line.
 func TestSecretDoesNotLeakThroughFmt(t *testing.T) {
 	secret := Secret(password)
 
@@ -38,8 +37,6 @@ func TestSecretDoesNotLeakThroughFmt(t *testing.T) {
 	}
 }
 
-// A struct field is the realistic case: nobody prints a bare Secret, they
-// print the settings struct holding one.
 func TestSecretDoesNotLeakAsStructField(t *testing.T) {
 	settings := struct {
 		User     string `json:"user"`
