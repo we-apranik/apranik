@@ -28,12 +28,10 @@ func NewXUDPGlobalIDDeriver() (*XUDPGlobalIDDeriver, error) {
 	return deriver, nil
 }
 
-// NewXUDPGlobalIDDeriverWithKey is for tests that need IDs that do not change between runs.
 func NewXUDPGlobalIDDeriverWithKey(key [xudpGlobalIDKeyLength]byte) *XUDPGlobalIDDeriver {
 	return &XUDPGlobalIDDeriver{key: key}
 }
 
-// For returns no ID (zero) for a session with no known source.
 func (d *XUDPGlobalIDDeriver) For(source spec.Endpoint) (globalID [8]byte) {
 	if !source.IsValid() {
 		return globalID

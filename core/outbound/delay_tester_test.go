@@ -27,7 +27,6 @@ func newTester(t *testing.T, rawURL string) DelayTester {
 	return tester
 }
 
-// A member that reaches one address whatever it is asked for.
 type fixedAddressMember struct{ address string }
 
 func (fixedAddressMember) Tag() string              { return "member" }
@@ -84,8 +83,6 @@ func TestAnHTTPSProbeFailsOnANon2xxStatus(t *testing.T) {
 	}
 }
 
-// The system's roots do not know a test server's certificate, which is what a
-// probe to an impostor would meet.
 func TestAnHTTPSProbeRefusesAnUntrustedCertificate(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusNoContent)

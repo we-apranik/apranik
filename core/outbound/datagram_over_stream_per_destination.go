@@ -11,14 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// datagramOverStreamPerDestination is for proxy protocols that write the
-// datagram destination in the stream request: it opens a new stream to the
-// server the first time a destination is used, and keeps one datagram per
-// destination for the rest of the UDP session. To the session it is one
-// datagram that can be sent to any destination.
-//
-// A destination's datagram that dies is forgotten alone; the next write to
-// that destination opens a new one.
 type datagramOverStreamPerDestination struct {
 	outbound       *streamOutbound
 	sessionContext context.Context
@@ -28,9 +20,6 @@ type datagramOverStreamPerDestination struct {
 	datagramByDestination map[spec.Destination]spec.Datagram
 	closed                bool
 
-	// The first ReadFrom says how big a reply the session takes, by the size
-	// of its buffer; replies are read from the datagrams into buffers of that
-	// size and handed over one at a time.
 	learnReplyBufferSize sync.Once
 	replyBufferSize      int
 	replyBufferSizeKnown chan struct{}
@@ -43,11 +32,8 @@ type replyFromDestination struct {
 	payload []byte
 	from    spec.Destination
 
-	// A reply that could not be read whole, such as one too large; nothing else is set.
 	err error
 
-	// Told once the payload has been copied out, so its datagram may read
-	// into the same buffer again.
 	copied chan<- struct{}
 }
 
@@ -63,8 +49,6 @@ func newDatagramOverStreamPerDestination(sessionContext context.Context, outboun
 	}
 }
 
-// Dialing waits for the server here, so the first datagram to a new destination
-// is delayed by it, and so is whatever else the session sends meanwhile.
 func (d *datagramOverStreamPerDestination) WriteTo(payload []byte, destination spec.Destination) (int, error) {
 	datagram, err := d.datagramFor(destination)
 	if err != nil {
@@ -190,8 +174,6 @@ func (d *datagramOverStreamPerDestination) ReadFrom(buffer []byte) (int, spec.De
 	}
 }
 
-// Only the caller that removes a datagram closes it, so a write that failed
-// racing its dead reply loop racing Close is safe.
 func (d *datagramOverStreamPerDestination) forgetAndClose(destination spec.Destination, datagram spec.Datagram) {
 	d.mutex.Lock()
 	if d.datagramByDestination[destination] != datagram {
@@ -226,5 +208,4 @@ func (d *datagramOverStreamPerDestination) Close() error {
 	return nil
 }
 
-// There is no one socket: each destination has its own stream to the server.
 func (d *datagramOverStreamPerDestination) LocalAddr() net.Addr { return &net.UDPAddr{} }

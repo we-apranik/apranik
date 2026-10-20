@@ -19,10 +19,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// DelayTester sends one HTTP request through an outbound and times it: the one
-// place a delay is measured. A group's prober calls it on a timer, an API calls
-// it once on request. It has no configuration and no defaults: whoever uses it
-// says what to request, which statuses pass and how long to wait.
 type DelayTester struct {
 	destination      spec.Destination
 	hostHeader       string
@@ -31,7 +27,6 @@ type DelayTester struct {
 	useTLS           bool
 	expectedStatuses []httpstatusranges.Range
 
-	// Nil means the system's roots; only a test sets it.
 	rootCAs *x509.CertPool
 }
 
@@ -95,11 +90,6 @@ func NewDelayTester(rawURL string, expectedStatuses []httpstatusranges.Range) (D
 
 var errDelayTestStatus = errors.New("the delay test target did not answer with an expected status")
 
-// MeasureDelay is the time from asking through for a connection to reading the
-// target's status line and headers, so it includes every handshake a real
-// connection pays. Counting only the connection would miss the proxy
-// handshake, which a proxy client may send with the first write. A timeout of
-// any kind comes back as an error wrapping context.DeadlineExceeded.
 func (t DelayTester) MeasureDelay(ctx context.Context, through component.Outbound, timeout time.Duration) (time.Duration, error) {
 	if timeout <= 0 {
 		return 0, errors.New("a delay test needs a timeout")
@@ -142,7 +132,6 @@ func (t DelayTester) measure(ctx context.Context, through component.Outbound) (t
 		return 0, err
 	}
 	request.Host = t.hostHeader
-	// An empty value stops net/http from naming itself in the request.
 	request.Header["User-Agent"] = []string{""}
 	request.Close = true
 	if err := request.Write(connection); err != nil {
@@ -161,8 +150,6 @@ func (t DelayTester) measure(ctx context.Context, through component.Outbound) (t
 	return elapsed, nil
 }
 
-// A deadline can end a test as the context's own error or as a network error
-// from a read, a write or a dial; callers get one answer for both.
 func reportTimeout(ctx context.Context, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("the delay test timed out: %w", err)

@@ -17,23 +17,15 @@ type FreedomConfig struct {
 	Dialer         spec.StreamDialer
 	DatagramDialer spec.DatagramDialer
 
-	// Nil means nat.NewDefaultPolicy().
 	DatagramPolicy *nat.Policy
 
-	// The largest reply the NAT passes on; a bigger one is dropped and counted
-	// as too_large_from_outbound. Zero means udp.DefaultMaxDatagramSize.
 	MaxDatagramSize int
 
-	// Where replies the NAT's filtering drops are counted, as this outbound's
-	// rejected_by_nat drops. Nil counts nothing.
 	Counters *stats.OutboundCounters
 
-	// Nil is allowed: NewFreedom substitutes a silent logger.
 	Logger *logging.Logger
 }
 
-// Freedom is not a proxy protocol pretending to be one: it has no server and no
-// preamble, and dials the address a proxy client would instead encode.
 func NewFreedom(config FreedomConfig) component.Outbound {
 	logger := config.Logger
 	if logger == nil {
@@ -58,16 +50,12 @@ type freedomOutbound struct {
 	datagramPolicy *nat.Policy
 	counters       *stats.OutboundCounters
 
-	// Shared by every NAT this outbound makes, so its replies are read into
-	// buffers lent for the read, not one set per session.
 	replyBuffers *udp.BufferPool
 	logger       *logging.Logger
 }
 
 func (o *freedomOutbound) Tag() string { return o.tag }
 
-// Only what was configured, so routing can rule this outbound out before a
-// packet arrives rather than on a failed dial.
 func (o *freedomOutbound) Networks() []spec.Network {
 	networks := make([]spec.Network, 0, 2)
 	if o.streamDialer != nil {
@@ -95,8 +83,6 @@ func (o *freedomOutbound) DialStream(ctx context.Context, metadata spec.Metadata
 	return destinationStream, nil
 }
 
-// Dials nothing yet: the destination arrives per packet in WriteTo, not at
-// dial time, so nat.Datagram dials lazily from there.
 func (o *freedomOutbound) CreateDatagram(ctx context.Context, metadata spec.Metadata) (spec.Datagram, error) {
 	if o.datagramDialer == nil {
 		return nil, fmt.Errorf("outbound %q has no datagram transport: %w", o.tag, spec.ErrUnsupportedNetwork)
@@ -110,8 +96,6 @@ func (o *freedomOutbound) CreateDatagram(ctx context.Context, metadata spec.Meta
 	o.logger.Debug("NAT datagram created",
 		"mapping", policy.Mapping(), "filtering", policy.Filtering())
 
-	// Zero local address: any address, any free port. A source address, if
-	// this outbound ever takes one, is captured here.
 	dial := func(ctx context.Context) (spec.Datagram, error) {
 		return o.datagramDialer.CreateDatagram(ctx, spec.Endpoint{})
 	}

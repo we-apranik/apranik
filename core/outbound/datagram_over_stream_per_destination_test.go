@@ -23,8 +23,6 @@ func destination(t testing.TB, ip string, port uint16) spec.Destination {
 	return result
 }
 
-// boundDatagram stands for a protocol's datagram bound to one destination:
-// what is written to it is recorded, and replies are whatever a test sends.
 type boundDatagram struct {
 	destination spec.Destination
 	written     chan []byte
@@ -66,9 +64,6 @@ func (d *boundDatagram) Close() error {
 
 func (*boundDatagram) LocalAddr() net.Addr { return &net.UDPAddr{} }
 
-// streamRequestClient answers that it writes the destination in the stream
-// request, and makes one boundDatagram per stream it is handed, bound to the
-// destination in the metadata core passes.
 type streamRequestClient struct {
 	mutex     sync.Mutex
 	datagrams []*boundDatagram
@@ -118,7 +113,6 @@ func (c *streamRequestClient) count() int {
 	return len(c.datagrams)
 }
 
-// countingDialer hands out a new stream per dial and counts them.
 type countingDialer struct {
 	mutex sync.Mutex
 	dials int
@@ -224,7 +218,6 @@ func TestAReplyLargerThanTheBufferIsReportedAndTheNextOneStillArrives(t *testing
 
 	reply := client.datagramFor(t, dns).replies
 	buffer := make([]byte, 4)
-	// The first ReadFrom is what sizes the buffers replies are read into.
 	reply <- []byte("too long for it")
 	if _, _, err := datagram.ReadFrom(buffer); !errors.Is(err, spec.ErrMessageTooLong) {
 		t.Fatalf("error = %v, want spec.ErrMessageTooLong", err)
@@ -262,7 +255,6 @@ func TestADestinationWhoseStreamDiedIsOpenedAgainOnTheNextWrite(t *testing.T) {
 	dns := destination(t, "1.1.1.1", 53)
 	datagram.WriteTo([]byte("first"), dns)
 
-	// The server closes this destination's stream; a write to it fails, once.
 	client.datagramFor(t, dns).Close()
 	if _, err := datagram.WriteTo([]byte("lost"), dns); err == nil {
 		t.Fatal("a write to a closed stream reported no error")
@@ -275,8 +267,6 @@ func TestADestinationWhoseStreamDiedIsOpenedAgainOnTheNextWrite(t *testing.T) {
 	}
 }
 
-// The session reads replies all the time, and that is how a stream that died
-// without a write failing is noticed.
 func TestADestinationWhoseStreamDiedWhileIdleIsForgottenByItsReplyLoop(t *testing.T) {
 	dialer, client := &countingDialer{}, &streamRequestClient{}
 	datagram := newPerDestinationDatagram(t, dialer, client)

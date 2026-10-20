@@ -39,10 +39,6 @@ func TestStreamOutboundRefusesDatagrams(t *testing.T) {
 	}
 }
 
-// The NAT package is only for an outbound that sends UDP to final destinations
-// itself. A proxy outbound that acquired one would silently NAT traffic that
-// is already encapsulated, so the set of places allowed to build one is fixed
-// here rather than left to review.
 func TestOnlyTheFreedomOutboundBuildsANAT(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
@@ -73,7 +69,6 @@ func TestOnlyTheFreedomOutboundBuildsANAT(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// The nat package's own constructor is not a call site.
 		if strings.HasPrefix(relative, "core/net/udp/nat/") {
 			return nil
 		}
@@ -122,7 +117,6 @@ type pipeStream struct{ net.Conn }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// recordingDialer hands out one stream and remembers where it was asked to go.
 type recordingDialer struct {
 	serverStream spec.Stream
 	dialed       chan spec.Destination
@@ -154,7 +148,6 @@ func (c fakeDatagramOverStreamClient) RequestDatagramOverStream(ctx context.Cont
 	return fakeDatagram{}, nil
 }
 
-// closeRecordingStream reports whether the outbound closed its server stream.
 type closeRecordingStream struct {
 	pipeStream
 	closed chan struct{}
@@ -226,7 +219,6 @@ func TestAFailedDatagramRequestClosesTheServerStream(t *testing.T) {
 	}
 }
 
-// metadataRecordingClient keeps the metadata its request was made with.
 type metadataRecordingClient struct {
 	fakeDatagramOverStreamClient
 	metadata chan spec.Metadata
@@ -246,7 +238,6 @@ func sessionMetadataFrom(t *testing.T, text string) spec.Metadata {
 	return spec.Metadata{Network: spec.NetworkUDP, Transport: spec.TransportMetadata{SourceEndpoint: endpoint}}
 }
 
-// The ID is derived from the session's source, so a stream that replaces a lost one names the same session.
 func TestTheClientIsToldTheGlobalIDOfTheSessionsSource(t *testing.T) {
 	deriver := outbound.NewXUDPGlobalIDDeriverWithKey([32]byte{7})
 	client := metadataRecordingClient{
