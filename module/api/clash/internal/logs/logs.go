@@ -1,4 +1,3 @@
-// Package logs serves /logs: the core's log as it is written.
 package logs
 
 import (
@@ -14,8 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Register serves /logs; bufferRecords is how far one client may fall behind
-// before records are dropped.
 func Register(router *web.Router, provider spec.APICoreProvider, hub *stream.Hub, bufferRecords int) {
 	handler := handler{provider: provider, hub: hub, bufferRecords: bufferRecords}
 	router.Handle("/logs", web.Methods{"GET": handler.serve})
@@ -32,9 +29,6 @@ type line struct {
 	Payload string `json:"payload"`
 }
 
-// serve streams the records at or above ?level= (default info), one subscription
-// per request. A client that reads too slowly loses records, and the stream says
-// how many where it happened.
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	levelName := r.URL.Query().Get("level")
 	if levelName == "" {
@@ -70,9 +64,6 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// describe writes a record as its message followed by key=value pairs, the way a
-// person reads a log line. A value with a space, a quote or an equals sign is
-// quoted.
 func describe(record slog.Record) string {
 	var text strings.Builder
 	text.WriteString(record.Message)
