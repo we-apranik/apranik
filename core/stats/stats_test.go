@@ -198,8 +198,6 @@ func TestConcurrentCountingAndReading(t *testing.T) {
 	}
 }
 
-// What one relay read costs. The parallel variants share counters between
-// goroutines, as every connection of one inbound does, to show contention.
 func BenchmarkCountOneRead(b *testing.B) {
 	registry := newTestRegistry(Config{})
 	counters := []*Counters{registry.Inbound("socks-in").Base(), registry.Outbound("server-a").Base(), registry.User("alice")}
@@ -224,8 +222,6 @@ func BenchmarkCountOneReadSharedCountersParallel(b *testing.B) {
 	})
 }
 
-// The fallback if the shared version contends: count per connection, add to the
-// shared counters once per flushEvery reads.
 func BenchmarkCountOneReadLocalThenFlushParallel(b *testing.B) {
 	registry := newTestRegistry(Config{})
 	counters := []*Counters{registry.Inbound("socks-in").Base(), registry.Outbound("server-a").Base(), registry.User("alice")}

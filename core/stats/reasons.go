@@ -1,8 +1,7 @@
 package stats
 
-// RefusalReason says why an inbound closed a connection before any outbound
-// was reached. A fixed list, never a value a peer supplies, so counting by
-// reason costs a fixed amount of memory whatever the traffic.
+// A fixed list, never a value a peer supplies, so counting by reason costs a fixed amount of memory
+// whatever the traffic.
 type RefusalReason uint8
 
 const (
@@ -28,7 +27,6 @@ var refusalReasonNames = [refusalReasonCount]string{
 	RefusalOther:                    "other",
 }
 
-// The name a reader sees. These are an interface once something reads them.
 func (r RefusalReason) String() string {
 	if r >= refusalReasonCount {
 		return refusalReasonNames[RefusalOther]
@@ -36,7 +34,6 @@ func (r RefusalReason) String() string {
 	return refusalReasonNames[r]
 }
 
-// DialFailureReason says why an outbound could not connect.
 type DialFailureReason uint8
 
 const (
@@ -69,9 +66,7 @@ func (r DialFailureReason) String() string {
 	return dialFailureReasonNames[r]
 }
 
-// InboundDatagramDropReason says why a UDP datagram from a client was lost on
-// the inbound's side, before it was accepted by an outbound. A separate type
-// from the outbound's, so a reason counted on the wrong side does not compile.
+// A separate type from the outbound's, so a reason counted on the wrong side does not compile.
 type InboundDatagramDropReason uint8
 
 const (
@@ -100,8 +95,6 @@ func (r InboundDatagramDropReason) String() string {
 	return inboundDatagramDropReasonNames[r]
 }
 
-// OutboundDatagramDropReason says why a UDP datagram was lost on an outbound's
-// side: it could not be sent, or a reply could not be handed on.
 type OutboundDatagramDropReason uint8
 
 const (
@@ -130,7 +123,6 @@ func (r OutboundDatagramDropReason) String() string {
 	return outboundDatagramDropReasonNames[r]
 }
 
-// Only the reasons that happened, by name, and nil when none did.
 func nonzeroByName(names []string, counts []uint64) map[string]uint64 {
 	var byName map[string]uint64
 	for index, count := range counts {

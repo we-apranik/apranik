@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// DNSFailureReason says why a lookup produced no address. A fixed list.
 type DNSFailureReason uint8
 
 const (
@@ -32,26 +31,19 @@ func (r DNSFailureReason) String() string {
 	return dnsFailureReasonNames[r]
 }
 
-// DNSCounters is the resolver's numbers. The Registry makes them and hands
-// them to the resolver, which counts into them; the resolver knows nothing of
-// who reads. Methods do nothing on a nil *DNSCounters, which is counting off.
-//
-// A lookup is one name asked of the resolver; an address literal and
-// "localhost" never reach a server and are not counted. A cache hit or a
-// stale answer is one record type answered from the cache, so a name looked
-// up for both address families can count two. A query is one exchange with a
-// server, which a cache hit never makes.
+// A lookup is one name asked of the resolver; an address literal and "localhost" never reach a server
+// and are not counted. A cache hit or a stale answer is one record type answered from the cache, so a
+// name looked up for both address families can count two. A query is one exchange with a server, which
+// a cache hit never makes.
 type DNSCounters struct {
 	lookups       atomic.Uint64
 	cacheHits     atomic.Uint64
 	staleAnswers  atomic.Uint64
 	lookupFailure [dnsFailureReasonCount]atomic.Uint64
 
-	// One entry per DNS server tag, made once so reads take no lock.
 	servers map[string]*DNSServerCounters
 }
 
-// DNSServerCounters is one DNS server's numbers.
 type DNSServerCounters struct {
 	queries           atomic.Uint64
 	failures          atomic.Uint64
@@ -78,15 +70,12 @@ func (c *DNSCounters) CacheHit() {
 	}
 }
 
-// A stale answer was served while a fresh one is fetched.
 func (c *DNSCounters) StaleAnswerServed() {
 	if c != nil {
 		c.staleAnswers.Add(1)
 	}
 }
 
-// A lookup ended with no address. The reason is one of the fixed list; one
-// outside it counts as DNSOther.
 func (c *DNSCounters) LookupFailed(reason DNSFailureReason) {
 	if c == nil {
 		return
@@ -97,7 +86,6 @@ func (c *DNSCounters) LookupFailed(reason DNSFailureReason) {
 	c.lookupFailure[reason].Add(1)
 }
 
-// Nil for a nil receiver or a tag the counters were not made for.
 func (c *DNSCounters) Server(tag string) *DNSServerCounters {
 	if c == nil {
 		return nil
@@ -105,8 +93,6 @@ func (c *DNSCounters) Server(tag string) *DNSServerCounters {
 	return c.servers[tag]
 }
 
-// One exchange with the server ended, in took, with failed saying whether it
-// produced an answer.
 func (s *DNSServerCounters) QueryFinished(took time.Duration, failed bool) {
 	if s == nil {
 		return
@@ -118,8 +104,6 @@ func (s *DNSServerCounters) QueryFinished(took time.Duration, failed bool) {
 	}
 }
 
-// DNSTraffic is a copy of the resolver's numbers. Failures is the sum of
-// FailuresByReason, which holds only the reasons that happened, by name.
 type DNSTraffic struct {
 	Lookups          uint64
 	CacheHits        uint64
@@ -129,8 +113,6 @@ type DNSTraffic struct {
 	Servers          map[string]DNSServerTraffic
 }
 
-// DNSServerTraffic is a copy of one server's numbers; the mean latency is
-// TotalLatency over Queries.
 type DNSServerTraffic struct {
 	Queries      uint64
 	Failures     uint64

@@ -262,8 +262,6 @@ func BenchmarkLiveConversationsListOf10000(b *testing.B) {
 	}
 }
 
-// The heap one live entry holds, measured over 10000 of them, to put a number
-// on the memory a switched-on registry costs.
 func BenchmarkLiveConversationMemory(b *testing.B) {
 	info := ConversationInfo{Network: spec.NetworkTCP, InboundTag: "socks-in", User: "alice", OutboundTags: []string{"auto", "server-a"}, Rule: "routing.rules[3]"}
 	for b.Loop() {

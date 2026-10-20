@@ -12,42 +12,26 @@ type OutboundDescription struct {
 	IsGroup bool
 }
 
-// Config says what exists and what to count. An empty tracked list means
-// everything of that kind; a list narrows counting to the names in it.
 type Config struct {
 	InboundTags []string
 	Outbounds   []OutboundDescription
 
-	// Where each routing rule sits in the config, plus the default, as
-	// router.RuleLocation and router.DefaultRuleLocation write them. Hits are
-	// counted per location; the set is fixed here and never grows.
+	// Hits are counted per location; the set is fixed here and never grows.
 	RuleLocations []string
 
-	// The tags of the DNS servers, so the resolver's counters are made once and
-	// never change. Include the operating system's server, tagged "system",
-	// which a config with no dns section uses.
+	// The tags of the DNS servers, so the resolver's counters are made once and never change.
 	DNSServerTags []string
 
-	// Whether live conversations are listed: each TCP connection, and each UDP
-	// destination of a session. Each one costs a small entry for as long as it lives, which is why it is a setting: the builder turns it
-	// on when something reads it, such as an API.
 	TrackLiveConversations bool
 
-	// Whether each outbound's dials are timed (dial health). The handler reads
-	// the clock around a dial only when this is on.
 	TimeDials bool
 
 	TrackedInboundTags  []string
 	TrackedOutboundTags []string
 }
 
-// Registry holds every key's Counters. Inbound and outbound counters are made
-// once, so looking them up takes no lock. A user's counters are made the first
-// time core asks for that user, which core does only after the protocol has
-// authenticated the user, so a peer that never authenticates creates nothing.
-//
-// A nil *Registry is counting switched off: every lookup returns nil, and
-// callers skip nil counters.
+// A user's counters are made the first time core asks for that user, which core does only after the
+// protocol has authenticated the user, so a peer that never authenticates creates nothing.
 type Registry struct {
 	startedAt time.Time
 
@@ -57,7 +41,6 @@ type Registry struct {
 	inboundList []*InboundCounters
 	outbounds   map[string]*outboundCounters
 
-	// One counter per rule location, made once so reads take no lock.
 	ruleHits map[string]*atomic.Uint64
 
 	dns                    *DNSCounters
@@ -70,16 +53,12 @@ type Registry struct {
 	users     map[string]*Counters
 }
 
-// The live conversations are split by number over several locks, so connections
-// that begin and end at the same moment, as UDP destinations do, rarely wait
-// for each other.
 const liveShardCount = 16
 
 type liveShard struct {
 	mu            sync.Mutex
 	conversations map[uint64]*Conversation
 
-	// Keeps two shards' locks off one cache line.
 	_ [48]byte
 }
 
@@ -121,7 +100,6 @@ func isTracked(trackedNames []string, name string) bool {
 	return len(trackedNames) == 0 || slices.Contains(trackedNames, name)
 }
 
-// Nil when counting is off, the tag is unknown or the tag is not tracked.
 func (r *Registry) Inbound(tag string) *InboundCounters {
 	if r == nil {
 		return nil
@@ -129,7 +107,6 @@ func (r *Registry) Inbound(tag string) *InboundCounters {
 	return r.inbounds[tag]
 }
 
-// Nil when counting is off, the tag is unknown or the tag is not tracked.
 func (r *Registry) Outbound(tag string) *OutboundCounters {
 	if r == nil {
 		return nil
@@ -140,8 +117,6 @@ func (r *Registry) Outbound(tag string) *OutboundCounters {
 	return nil
 }
 
-// Nil when counting is off or the name is empty. The
-// caller asks once per connection and keeps the answer.
 func (r *Registry) User(name string) *Counters {
 	if r == nil || name == "" {
 		return nil
@@ -156,8 +131,7 @@ func (r *Registry) User(name string) *Counters {
 	return counters
 }
 
-// When this process began counting. Counters never reset, so a reader that
-// sees it change knows they began again from zero.
+// Counters never reset, so a reader that sees it change knows they began again from zero.
 func (r *Registry) StartedAt() time.Time {
 	if r == nil {
 		return time.Time{}
@@ -180,7 +154,6 @@ func (r *Registry) InboundTraffic() map[string]InboundTraffic {
 }
 
 // A copy, with groups marked, so a reader summing across outbounds knows to
-// skip them.
 func (r *Registry) OutboundTraffic() map[string]OutboundTraffic {
 	if r == nil {
 		return nil
@@ -209,10 +182,8 @@ func (r *Registry) UserTraffic() map[string]Traffic {
 	return traffic
 }
 
-// The payload every counted inbound carried, by network and together. Each
-// connection and each UDP session enters through exactly one inbound, so unlike
-// the outbounds this never counts a group's traffic twice. It allocates
-// nothing, so a reader may ask every second.
+// Each connection and each UDP session enters through exactly one inbound, so unlike the outbounds
+// this never counts a group's traffic twice. It allocates nothing, so a reader may ask every second.
 func (r *Registry) TotalTraffic() TrafficTotals {
 	if r == nil {
 		return TrafficTotals{}
@@ -257,13 +228,10 @@ func (r *Registry) RuleHits() map[string]uint64 {
 	return hits
 }
 
-// Whether the handler should time each dial. A nil registry times nothing.
 func (r *Registry) TimesDials() bool {
 	return r != nil && r.timeDials
 }
 
-// What the resolver counts into: nil when counting is off, which the resolver
-// reads as counting nothing.
 func (r *Registry) DNSCounters() *DNSCounters {
 	if r == nil {
 		return nil
@@ -271,7 +239,6 @@ func (r *Registry) DNSCounters() *DNSCounters {
 	return r.dns
 }
 
-// A copy of the resolver's numbers. The zero DNSTraffic for a nil registry.
 func (r *Registry) DNS() DNSTraffic {
 	if r == nil {
 		return DNSTraffic{}
