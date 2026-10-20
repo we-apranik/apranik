@@ -11,16 +11,12 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// forwardedUpgradeRequest is a WebSocket upgrade as a proxy in front would forward it.
 func forwardedUpgradeRequest(extraHeaders ...string) string {
 	return "GET / HTTP/1.1\r\nHost: example.com\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
 		"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n" +
 		strings.Join(extraHeaders, "") + "\r\n"
 }
 
-// sourceAfterUpgrade sends the request to a server with the given
-// original_source_ip settings, sitting behind a peer at below, and returns the
-// source the server reports.
 func sourceAfterUpgrade(t *testing.T, settingsJSON, request, below string) spec.Endpoint {
 	t.Helper()
 	transport := NewOverlayStreamTransportModule().(*Transport)

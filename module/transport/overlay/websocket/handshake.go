@@ -21,7 +21,6 @@ var (
 	errTooMuchEarlyData = errors.New("websocket: more early data than max_bytes")
 )
 
-// An endpoint's key and the value the peer must answer with.
 func acceptKeyFor(key string) string {
 	digest := sha1.Sum([]byte(key + acceptKeySuffix))
 	return base64.StdEncoding.EncodeToString(digest[:])

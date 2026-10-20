@@ -9,7 +9,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// One value per configured component, so nothing has to narrow a config.
 type Transport struct{ Settings }
 
 func (*Transport) Info() spec.ModuleInfo {
@@ -29,8 +28,6 @@ func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	return newServer(&t.Settings), nil
 }
 
-// The return type is the kind declaration: registering this as anything else
-// will not compile.
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule {
 	return &Transport{Settings: Settings{Path: "/", OriginalSourceIP: types.DefaultOriginalSourceIP()}}
 }

@@ -104,8 +104,6 @@ func readFrameHeader(reader *bufio.Reader) (frameHeader, error) {
 	return header, nil
 }
 
-// readExactly returns the next n bytes, valid until the next read. A stream
-// that ends partway is io.ErrUnexpectedEOF; one that ends before is io.EOF.
 func readExactly(reader *bufio.Reader, n int) ([]byte, error) {
 	peeked, err := reader.Peek(n)
 	if len(peeked) < n {
@@ -118,7 +116,6 @@ func readExactly(reader *bufio.Reader, n int) ([]byte, error) {
 	return peeked, nil
 }
 
-// appendFrameHeader uses the shortest length encoding, as RFC 6455 requires.
 func appendFrameHeader(destination []byte, header frameHeader) []byte {
 	first := header.opcode
 	if header.final {
@@ -144,13 +141,6 @@ func appendFrameHeader(destination []byte, header frameHeader) []byte {
 	return destination
 }
 
-// maskBytes XORs payload in place with the key, starting at keyOffset into
-// the key, and returns the offset to continue from. Masking and unmasking are
-// the same operation.
-//
-// Eight bytes at a time: the key repeats every four bytes, so a 64-bit word of
-// it, rotated to keyOffset, masks eight at once and leaves the offset where it
-// was.
 func maskBytes(key [4]byte, keyOffset int, payload []byte) int {
 	if len(payload) >= 8 {
 		var rotated [8]byte

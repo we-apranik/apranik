@@ -4,8 +4,6 @@ import (
 	"testing"
 )
 
-// Throughput of the stream in each direction: the client masks every byte,
-// the server unmasks it. Run with -benchmem; allocations per write should be 0.
 func benchmarkDirection(b *testing.B, clientWrites bool, writeSize int) {
 	client, server := connect(b, newModule(b, nil), newModule(b, nil))
 	writer, reader := client, server

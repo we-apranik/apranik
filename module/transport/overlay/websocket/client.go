@@ -20,7 +20,6 @@ type client struct {
 	extraHeaderLines string
 	handshakeTimeout time.Duration
 
-	// Zero sends no early data. An empty header name puts it in the path.
 	maxEarlyData        int
 	earlyDataHeaderName string
 }
@@ -41,7 +40,6 @@ func newClient(settings *Settings) *client {
 	return built
 }
 
-// clientHandshake is everything needed to send the upgrade request later.
 type clientHandshake struct {
 	client *client
 	host   string
@@ -133,8 +131,6 @@ func pathWithEarlyData(path, encoded string) string {
 	return path + encoded
 }
 
-// completeHandshakeWithEarlyData runs a deferred handshake on the first
-// Write, putting up to maxEarlyData bytes of p in it, and reports how many.
 func (s *stream) completeHandshakeWithEarlyData(p []byte) (int, error) {
 	if s.handshakeDone.Load() {
 		return 0, nil
@@ -194,9 +190,6 @@ func (s *stream) completeHandshake() error {
 	}
 }
 
-// waitForHandshakeUntil reports finished as false when the read deadline
-// changed before the handshake ended, so the caller waits again with the new
-// one.
 func (s *stream) waitForHandshakeUntil(readDeadline time.Time, readDeadlineChanged <-chan struct{}) (finished bool, err error) {
 	var readDeadlinePassed <-chan time.Time
 	if !readDeadline.IsZero() {
@@ -216,9 +209,6 @@ func (s *stream) waitForHandshakeUntil(readDeadline time.Time, readDeadlineChang
 	}
 }
 
-// The zero time ends the handshake's bound. Either way the caller's own
-// deadlines stay in force: one set before the first Write, an idle bound for
-// example, must outlive the handshake.
 func (s *stream) setHandshakeDeadline(handshakeDeadline time.Time) {
 	s.deadlinesMutex.Lock()
 	defer s.deadlinesMutex.Unlock()
@@ -226,7 +216,6 @@ func (s *stream) setHandshakeDeadline(handshakeDeadline time.Time) {
 	s.applyDeadlinesLocked()
 }
 
-// The zero time means no deadline, so it is later than any other.
 func earlierDeadline(first, second time.Time) time.Time {
 	switch {
 	case first.IsZero():

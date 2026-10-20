@@ -66,8 +66,6 @@ func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Str
 	return wrapped, nil
 }
 
-// acceptUpgrade reads and checks the request, answers it, and returns any
-// early data it carried. A request it refuses gets an ordinary HTTP answer.
 func (s *server) acceptUpgrade(underlyingStream spec.Stream, reader *bufio.Reader) ([]byte, http.Header, error) {
 	request, err := http.ReadRequest(reader)
 	if err != nil {

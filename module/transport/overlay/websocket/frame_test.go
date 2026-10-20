@@ -86,7 +86,6 @@ func TestMalformedFramesAreRefused(t *testing.T) {
 	}
 }
 
-// Masking can stop and resume mid-key, as a Read that fills a small buffer does.
 func TestMaskingResumesAcrossCalls(t *testing.T) {
 	key := [4]byte{0xde, 0xad, 0xbe, 0xef}
 	original := []byte("the quick brown fox jumps over")
@@ -123,13 +122,10 @@ func FuzzReadFrameHeader(f *testing.F) {
 	})
 }
 
-// discardingStream accepts every write, so a fuzzed stream can answer pings.
 type discardingStream struct{ spec.Stream }
 
 func (discardingStream) Write(p []byte) (int, error) { return len(p), nil }
 
-// Whatever a client sends, reading it as a server never panics or hangs, and
-// every byte it returns came from a data frame's payload.
 func FuzzServerStreamRead(f *testing.F) {
 	f.Add(append(maskedFrame(opcodeBinary, false, []byte("hel")), maskedFrame(opcodeContinuation, true, []byte("lo"))...))
 	f.Add(append(maskedFrame(opcodePing, true, []byte("x")), maskedFrame(opcodeClose, true, []byte{3, 232})...))

@@ -69,15 +69,12 @@ type wrapResult struct {
 	err    error
 }
 
-// connect runs both sides' WrapXStream at once over a loopback TCP pair.
 func connect(t testing.TB, clientModule, serverModule *Transport) (client, server spec.Stream) {
 	t.Helper()
 	overlayClient, _ := clientModule.NewStreamOverlayClient()
 	overlayServer, _ := serverModule.NewStreamOverlayServer()
 	clientSide, serverSide := tcpPair(t)
 
-	// Not cancelled on return: with early data the server's handshake is
-	// still running when connect returns.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
 	serverDone := make(chan wrapResult, 1)
@@ -90,8 +87,6 @@ func connect(t testing.TB, clientModule, serverModule *Transport) (client, serve
 		t.Fatalf("WrapClientStream: %v", err)
 	}
 	if clientModule.EarlyData != nil {
-		// The client's handshake waits for its first Write, so the server
-		// can only finish once the test writes; hand back a lazy result.
 		return clientStream, &lazyServer{done: serverDone, t: t}
 	}
 	result := <-serverDone
@@ -101,7 +96,6 @@ func connect(t testing.TB, clientModule, serverModule *Transport) (client, serve
 	return clientStream, result.stream
 }
 
-// lazyServer waits for the server's handshake on first use.
 type lazyServer struct {
 	spec.Stream
 	done chan wrapResult
@@ -141,8 +135,6 @@ func TestBytesOfEverySizeCrossBothWays(t *testing.T) {
 	}
 }
 
-// rawRequest sends an upgrade request by hand and returns the server's
-// response and a reader positioned after it.
 func rawRequest(t *testing.T, serverModule *Transport, request string) (*http.Response, *bufio.Reader, *net.TCPConn, <-chan wrapResult) {
 	t.Helper()
 	overlayServer, _ := serverModule.NewStreamOverlayServer()
@@ -251,7 +243,6 @@ func TestEarlyDataFromOurClient(t *testing.T) {
 	}
 }
 
-// With early data, a Read first waits for the Write that sends the handshake.
 func TestAReadBeforeTheFirstWriteWaitsForIt(t *testing.T) {
 	edit := func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }
 	client, server := connect(t, newModule(t, edit), newModule(t, edit))
@@ -299,8 +290,6 @@ func TestClosingAClientWaitingForItsHandshakeEndsItsRead(t *testing.T) {
 	}
 }
 
-// acceptedByHand upgrades a connection with a hand-written client, so a test
-// can send frames the module's client never would.
 func acceptedByHand(t *testing.T) (spec.Stream, *net.TCPConn, *bufio.Reader) {
 	t.Helper()
 	response, reader, clientSide, serverDone := rawRequest(t, newModule(t, nil), upgradeRequest("/", ""))
@@ -587,8 +576,6 @@ func TestInfoIsTheSameForEveryValue(t *testing.T) {
 	}
 }
 
-// The upgrade request is HTTP/1.1, so the config check refuses a TLS below
-// that offers anything else.
 func TestItSpeaksHTTP1Point1(t *testing.T) {
 	provider, provides := NewOverlayStreamTransportModule().(spec.TransportInfoProvider)
 	if !provides {
@@ -619,8 +606,6 @@ func TestTheServerRefusesMoreEarlyDataThanItsMaxBytes(t *testing.T) {
 	}
 }
 
-// The deferred handshake bounds itself, then puts back the deadline the
-// caller set before the first Write instead of clearing it.
 func TestTheDeferredHandshakeKeepsTheCallersReadDeadline(t *testing.T) {
 	client, _ := connect(t, newModule(t, func(s *Settings) { s.EarlyData = &EarlyData{MaxBytes: 64} }), newModule(t, nil))
 	client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
@@ -729,8 +714,6 @@ func TestAReadWaitingForTheHandshakeObeysTheReadDeadline(t *testing.T) {
 	}
 }
 
-// A caller clearing its deadlines mid-handshake must not lift the handshake's
-// own bound.
 func TestADeadlineSetDuringTheDeferredHandshakeKeepsItsTimeout(t *testing.T) {
 	clientSide, serverSide := tcpPair(t)
 	go io.Copy(io.Discard, serverSide)

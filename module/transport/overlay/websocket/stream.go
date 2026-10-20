@@ -16,12 +16,8 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Largest payload one Write puts in one frame. With the header it fits a
-// pooled buffer, so a frame is one write to the stream below: one TLS record
-// batch, not a header record and a payload record.
 const maxFramePayloadLength = 32 << 10
 
-// How long Close waits to send its Close frame before giving up on it.
 const closeFrameTimeout = time.Second
 
 // RFC 6455 section 7.4.1.
@@ -48,32 +44,23 @@ type stream struct {
 	underlyingStream spec.Stream
 	reader           *bufio.Reader
 
-	// A client masks what it writes and expects the server not to.
 	isClient bool
 
-	// Server: early data from the handshake, returned before any frame.
 	pendingEarlyData []byte
 
-	// The data frame being read: payload bytes left, and where the mask is.
 	remainingPayload uint64
 	current          frameHeader
 	maskOffset       int
 	readErr          error
 
-	// Client with early data: the handshake waits for the first Write, which
-	// carries the start of the payload; a Read waits for it. nil once done.
 	pendingHandshake *clientHandshake
 	handshakeLimiter *handshake.LimitedReader
 	handshakeMutex   sync.Mutex
 	handshakeErr     error
 	handshakeDone    atomic.Bool
 
-	// Closed when a deferred handshake succeeds or fails.
 	handshakeFinished chan struct{}
 
-	// What the caller last set through this stream. While a deferred
-	// handshake runs, handshakeDeadline is set too and the stream below gets
-	// the earlier of the two; afterwards it gets the caller's alone.
 	deadlinesMutex      sync.Mutex
 	callerReadDeadline  time.Time
 	callerWriteDeadline time.Time
@@ -132,8 +119,6 @@ func (s *stream) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// readFrameUntilData reads one frame header and handles it if it is a control
-// frame. For a data frame it leaves remainingPayload set.
 func (s *stream) readFrameUntilData() error {
 	header, err := readFrameHeader(s.reader)
 	if err != nil {
@@ -223,8 +208,6 @@ func (s *stream) hasPendingControlFrames() bool {
 	return s.pendingPongPayload.Load() != nil || s.pendingCloseStatus.Load() != nil
 }
 
-// Checking again after unlocking catches a frame stored between the send and
-// the unlock, whose reader found the lock still held.
 func (s *stream) unlockWriteAfterSendingPendingControlFrames() {
 	s.sendPendingControlFramesLocked()
 	s.writeMutex.Unlock()
@@ -275,9 +258,6 @@ func (s *stream) writeFrameLocked(opcode byte, payload []byte) error {
 // the whole stream instead.
 func (s *stream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// Sends a normal-closure Close if nothing is mid-write, then closes the
-// stream below. A writer blocked on a stalled peer is not waited for. A Close
-// already sent, by us or as an echo, makes writeFrameLocked refuse this one.
 func (s *stream) Close() error {
 	if s.handshakeDone.Load() && s.writeMutex.TryLock() {
 		s.underlyingStream.SetWriteDeadline(time.Now().Add(closeFrameTimeout))
@@ -320,7 +300,6 @@ func (s *stream) SetWriteDeadline(t time.Time) error {
 	return s.applyDeadlinesLocked()
 }
 
-// The caller holds deadlinesMutex.
 func (s *stream) announceCallerReadDeadlineChangedLocked() {
 	if s.callerReadDeadlineChanged != nil {
 		close(s.callerReadDeadlineChanged)
