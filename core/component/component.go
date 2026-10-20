@@ -12,10 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Router decides where one request goes. It is shared by every inbound and
-// holds no per-request state; what it needs to know about the request, and
-// what it can find out on demand, it asks the informant. Streams ask once per
-// connection; datagrams ask once per new destination in a UDP session.
 type Router interface {
 	Route(ctx context.Context, informant RouterTrafficInformant) (Decision, error)
 }
@@ -46,49 +42,28 @@ type RouterTrafficInformant interface {
 type Decision struct {
 	Outbound Outbound
 
-	// Which rule decided, for logs: "routing.rules[3]", or "default".
 	Rule string
 }
 
 func (d Decision) IsBlock() bool { return d.Outbound == nil }
 
-// TrafficHandler receives what an inbound accepted: routes it and relays it.
 type TrafficHandler interface {
 	HandleStream(ctx context.Context, clientStream spec.Stream, metadata spec.Metadata) error
 
-	// A UDP session has no natural end, so core owns the session table
-	// and the idle timeout, not the inbound.
 	HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error
 }
 
-// Inbound = listener stack + proxy server.
-// Not Listen: a TUN inbound reads packets off a device and accepts nothing.
 type Inbound interface {
 	Tag() string
 	Activate(ctx context.Context, handler TrafficHandler) error // returns once ready
 	Close() error
 }
 
-// UserManagingInbound is optional on an Inbound whose protocol may let its users
-// change while it runs. UserManager is nil when the protocol's server does not
-// implement spec.UserManager, and callers must check for it.
 type UserManagingInbound interface {
 	Inbound
 	UserManager() spec.UserManager
 }
 
-// Outbound = proxy client + dialer stack.
-//
-// Networks reports what this outbound can actually carry, so routing can rule
-// it out before a packet arrives rather than discovering it on a failed dial.
-// Calling a method for a network Networks does not list returns
-// spec.ErrUnsupportedNetwork, but that is an invariant violation, not a path
-// routing is expected to take.
-//
-// Shares a name with spec.StreamDialer.DialStream at a different signature, so
-// no type can be both. Accepted: core only ever holds an Outbound as an
-// Outbound. An Outbound that must act as an underlying dialer needs an adapter
-// holding it as a field rather than embedding it.
 type Outbound interface {
 	Tag() string
 	Networks() []spec.Network
@@ -106,23 +81,13 @@ type ProbingOutbound interface {
 	StartProbing(ctx context.Context)
 }
 
-// GroupStateReporter is implemented by an outbound group so that something
-// outside core's data path, such as an API, can say what it holds. Nothing on
-// the data path reads it.
 type GroupStateReporter interface {
-	// The members' tags, in the order the group was configured.
 	MemberTags() []string
 
-	// The member the group uses now: a selector's choice, the member urltest's
-	// probes favour, or the first member a fallback tries.
 	CurrentMemberTag() string
 }
 
-// SelectableOutbound is an outbound group a person drives, such as a selector.
-// An automatic group, which chooses by its probes, does not implement it.
 type SelectableOutbound interface {
-	// SelectMember makes the member with this tag the one new connections use,
-	// and returns the one it replaced. ErrNoSuchMember leaves the choice alone.
 	SelectMember(memberTag string) (previousMemberTag string, err error)
 }
 
@@ -139,17 +104,10 @@ var (
 	ErrNotSelectable = errors.New("component: this outbound is not a group a person drives")
 )
 
-// CarryingOutboundsReporter is implemented by the stream an outbound group
-// returns. It names the outbounds beneath the group that
-// carried it: the member, and for a group of groups the member's own member,
-// so statistics can count the traffic under each of them. Nothing else reads it.
 type CarryingOutboundsReporter interface {
 	CarryingOutboundTags() []string
 }
 
-// TagsOfOutboundsThatCarried lists outbound's own tag, then those the carrier
-// it returned reports beneath it. A carrier that reports nothing, as every
-// outbound but a group's does, adds nothing.
 func TagsOfOutboundsThatCarried(outbound Outbound, carrier any) []string {
 	reporter, reports := carrier.(CarryingOutboundsReporter)
 	if !reports {
