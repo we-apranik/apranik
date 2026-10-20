@@ -1,7 +1,4 @@
-// Package udp is the DNS server type udp: plain DNS over UDP (RFC 1035). Each
-// query gets its own datagram, so its own source port (RFC 5452), and only an
-// answer from the server carrying the query's ID is taken; anything else that
-// arrives -- a stray packet, a blind injection -- is ignored until the timeout.
+// Package udp is DNS over UDP (RFC 1035); only an answer carrying the query's ID is taken (RFC 5452).
 package udp
 
 import (
@@ -19,7 +16,6 @@ import (
 const (
 	DefaultPort = 53
 
-	// PROVISIONAL.
 	DefaultTimeout = 5 * time.Second
 
 	// Above the 1232 bytes core advertises with EDNS(0); a larger answer is
@@ -30,11 +26,8 @@ const (
 )
 
 type Settings struct {
-	// Where the DNS server is; the port defaults to DefaultPort. An IP: a
-	// hostname here would have to be resolved by the resolver it serves.
 	Server types.ServerAddress `json:"server"`
 
-	// Bounds one query. Absent means DefaultTimeout; a written zero is refused.
 	Timeout *types.Duration `json:"timeout"`
 }
 
@@ -95,7 +88,6 @@ func (c *client) Query(ctx context.Context, queryMessage []byte) ([]byte, error)
 		return nil, fmt.Errorf("udp: %w", err)
 	}
 	defer datagram.Close()
-	// A Datagram has no deadline: closing it is what ends a read that waits.
 	stopClosing := context.AfterFunc(ctx, func() { datagram.Close() })
 	defer stopClosing()
 
@@ -121,8 +113,6 @@ func (c *client) Query(ctx context.Context, queryMessage []byte) ([]byte, error)
 	}
 }
 
-// answers: from the server, a response, with the query's ID. Core checks the
-// question.
 func (c *client) answers(queryMessage, response []byte, from spec.Destination) bool {
 	if len(response) < headerLength || response[2]&0x80 == 0 {
 		return false
@@ -137,5 +127,4 @@ func (c *client) answers(queryMessage, response []byte, from spec.Destination) b
 	return true
 }
 
-// Holds nothing: each query's datagram is closed with it.
 func (c *client) Close() error { return nil }

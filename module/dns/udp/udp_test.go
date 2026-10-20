@@ -14,8 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// socketDatagram is a spec.Datagram over a plain UDP socket, so this test
-// needs no transport module.
 type socketDatagram struct{ connection *net.UDPConn }
 
 func (d socketDatagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
@@ -57,8 +55,6 @@ func asResponse(query []byte) []byte {
 	return response
 }
 
-// startServer answers each query with whatever respond returns, packet by
-// packet; nil answers nothing.
 func startServer(t *testing.T, respond func(query []byte) [][]byte) *net.UDPConn {
 	t.Helper()
 	connection, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -119,8 +115,6 @@ func TestQueryReturnsTheServersAnswer(t *testing.T) {
 	}
 }
 
-// A wrong ID and a non-response are what blind injection looks like; both
-// are skipped and the real answer still taken.
 func TestQueryIgnoresWhatDoesNotAnswerIt(t *testing.T) {
 	listener := startServer(t, func(q []byte) [][]byte {
 		wrongID := asResponse(q)
@@ -145,7 +139,6 @@ func TestQueryIgnoresAnswersFromAnotherAddress(t *testing.T) {
 	impostor, _ := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	defer impostor.Close()
 
-	// The impostor learns the client's port from the server and answers first.
 	server := newServer(t, listener.LocalAddr().String(), "300ms")
 	go func() {
 		buffer := make([]byte, 512)
