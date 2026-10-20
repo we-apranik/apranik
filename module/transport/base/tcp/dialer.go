@@ -161,8 +161,6 @@ func (d *streamDialer) dialFirstToAnswer(ctx context.Context, targets []netip.Ad
 	return nil, errors.Join(failures...)
 }
 
-// closeLateConnections ends once every remaining attempt has reported, which
-// the cancelled race context makes prompt.
 func closeLateConnections(attempts <-chan dialAttempt, remaining int) {
 	for range remaining {
 		if attempt := <-attempts; attempt.connection != nil {
@@ -171,7 +169,6 @@ func closeLateConnections(attempts <-chan dialAttempt, remaining int) {
 	}
 }
 
-// Holds nothing of its own: every Stream it returns owns its socket.
 func (d *streamDialer) Close() error { return nil }
 
 // A bind address may carry port 0, meaning "any free port" -- that is how a

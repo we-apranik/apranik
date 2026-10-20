@@ -14,8 +14,6 @@ type streamListener struct {
 	noDelay   bool
 }
 
-// The accept syscall takes no context, so ctx is only checked before
-// blocking; Close is the real way to stop it.
 func (l *streamListener) AcceptStream(ctx context.Context) (spec.Stream, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -26,8 +24,6 @@ func (l *streamListener) AcceptStream(ctx context.Context) (spec.Stream, error) 
 		return nil, fmt.Errorf("tcp: accept: %w", err)
 	}
 
-	// The same settings the dialer applies, so both directions of a relay
-	// behave alike.
 	connection.SetNoDelay(l.noDelay)
 	if l.keepAlive.Enable {
 		connection.SetKeepAliveConfig(l.keepAlive)

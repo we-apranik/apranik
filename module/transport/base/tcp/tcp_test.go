@@ -20,8 +20,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// listenLocal binds a listener on an ephemeral local port and returns it with
-
 func endpoint(ip string, port uint16) spec.Endpoint {
 	e, err := spec.NewEndpoint(netip.MustParseAddr(ip), port)
 	if err != nil {
@@ -38,7 +36,6 @@ func domainDst(domain string, port uint16) spec.Destination {
 	return destination
 }
 
-// the destination a dialer needs to reach it.
 func listenLocal(t *testing.T) (spec.StreamListener, spec.Destination) {
 	t.Helper()
 
@@ -55,7 +52,6 @@ func listenLocal(t *testing.T) (spec.StreamListener, spec.Destination) {
 	return ln, spec.NewEndpointFromNetAddr(addr).Destination()
 }
 
-// connect dials the listener and returns both ends.
 func connect(t *testing.T, ln spec.StreamListener, dst spec.Destination) (client, server spec.Stream) {
 	t.Helper()
 
@@ -116,9 +112,6 @@ func TestDialAndAcceptCarryBytesBothWays(t *testing.T) {
 	}
 }
 
-// TestCloseWriteIsARealHalfClose is the reason spec.Stream is net.Conn plus one
-// method. The writer says it is finished, the reader sees EOF, and the reverse
-// direction still works.
 func TestCloseWriteIsARealHalfClose(t *testing.T) {
 	ln, dst := listenLocal(t)
 	client, server := connect(t, ln, dst)
@@ -138,7 +131,6 @@ func TestCloseWriteIsARealHalfClose(t *testing.T) {
 		t.Errorf("server read %q, want %q", rest, "request")
 	}
 
-	// The read half is untouched: the response still gets through.
 	if _, err := server.Write([]byte("response")); err != nil {
 		t.Fatalf("server write after peer half-close: %v", err)
 	}
@@ -177,8 +169,6 @@ func TestAcceptStreamHonoursACancelledContext(t *testing.T) {
 	}
 }
 
-// TestDialAcceptsADomain checks the domain path, which is the one that matters:
-// a domain reaches the base transport unresolved and is resolved only here.
 func TestDialAcceptsADomain(t *testing.T) {
 	ln, dst := listenLocal(t)
 	port := dst.Port()
@@ -208,8 +198,6 @@ func TestDialRejectsMalformedAddresses(t *testing.T) {
 		dst  spec.Destination
 		want string
 	}{
-		// "both domain and IP" and "neither" are gone from this table:
-		// spec.Destination's constructors make both unrepresentable.
 		{"no destination", spec.Destination{}, "no destination"},
 		{"no port", domainDst("example.com", 0), "no port"},
 	} {
@@ -226,9 +214,6 @@ func TestDialRejectsMalformedAddresses(t *testing.T) {
 	}
 }
 
-// The constructor, not the zero value, is what a user gets: decoding
-// overwrites only the keys present in the config file, so anything left out keeps
-// the default set here.
 func TestModuleConstructorPopulatesDefaults(t *testing.T) {
 	transport := tcp.NewBaseStreamTransportModule().(*tcp.Transport)
 
@@ -240,8 +225,6 @@ func TestModuleConstructorPopulatesDefaults(t *testing.T) {
 	}
 }
 
-// Settings is embedded, so its fields decode through the outer type without
-// the outer type restating them.
 func TestDecodeFillsPromotedFields(t *testing.T) {
 	module := tcp.NewBaseStreamTransportModule()
 
@@ -255,7 +238,6 @@ func TestDecodeFillsPromotedFields(t *testing.T) {
 	if time.Duration(types.ValueOrDefault(transport.KeepAlive, 0)) != 30*time.Second {
 		t.Errorf("KeepAlive = %v, want 30s", transport.KeepAlive)
 	}
-	// Absent from the config file, so the default survives.
 	if !transport.NoDelay {
 		t.Error("NoDelay was overwritten by a config file that never mentioned it")
 	}
@@ -284,8 +266,6 @@ func TestValidateRefusesAnAbsurdKeepAlive(t *testing.T) {
 	}
 }
 
-// Info identifies the module, not the configured component: the registry
-// constructs twice and compares, so this must not vary with any setting.
 func TestInfoIsConstantAcrossSettings(t *testing.T) {
 	plain := (&tcp.Transport{}).Info()
 	configured := (&tcp.Transport{Settings: tcp.Settings{KeepAlive: types.Pointer(types.Duration(time.Minute)), NoDelay: false}}).Info()
@@ -298,15 +278,12 @@ func TestInfoIsConstantAcrossSettings(t *testing.T) {
 	}
 }
 
-// The bind address arrives as a parameter now, so an unusable one is refused
-// at build time rather than on the first connection.
 func TestBadBindAddressIsRefusedWhileBuilding(t *testing.T) {
 	if _, err := (&tcp.Transport{}).NewStreamListener(spec.Endpoint{}); err == nil {
 		t.Error("NewStreamListener with neither domain nor IP succeeded, want an error")
 	}
 }
 
-// What was decoded is what the built component uses.
 func TestListenerBindsWhereItWasTold(t *testing.T) {
 	listener, err := (&tcp.Transport{}).NewStreamListener(endpoint("127.0.0.1", 0))
 	if err != nil {
@@ -344,7 +321,6 @@ func TestValidateRefusesNegativeKeepAliveIntervalAndCount(t *testing.T) {
 	}
 }
 
-// staticResolver answers from a table, so these tests reach no DNS server.
 type staticResolver map[string][]netip.Addr
 
 func (r staticResolver) ResolveDomain(_ context.Context, domain string) ([]netip.Addr, error) {
@@ -371,8 +347,6 @@ func TestDialReportsAFailedLookup(t *testing.T) {
 	}
 }
 
-// A first address that never answers costs about next_address_delay, not the
-// whole dial_timeout: the next address is tried beside it.
 func TestDialTriesTheNextAddressWhenTheFirstIsSlow(t *testing.T) {
 	ln, dst := listenLocal(t)
 	go ln.AcceptStream(context.Background())

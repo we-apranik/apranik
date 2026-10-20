@@ -9,12 +9,7 @@ import (
 	"github.com/we-apranik/apranik/config/types"
 )
 
-// No listen address here: a listener is handed its bind address, so the field
-// would be meaningless on an outbound.
 type Settings struct {
-	// How long a connection is idle before the first probe. Absent means 15s
-	// (the constructor's default); negative disables probes; a written zero is
-	// refused.
 	KeepAlive *types.Duration `json:"keep_alive"`
 
 	// Between unanswered probes, and how many before the connection is
@@ -25,8 +20,6 @@ type Settings struct {
 	KeepAliveInterval *types.Duration `json:"keep_alive_interval"`
 	KeepAliveCount    *int            `json:"keep_alive_count"`
 
-	// How long a dial may take, name resolution included. Absent means
-	// defaultDialTimeout; a written zero is refused.
 	DialTimeout *types.Duration `json:"dial_timeout"`
 
 	// When a domain has several addresses, how long one connection attempt
@@ -34,8 +27,6 @@ type Settings struct {
 	// Delay). Absent means defaultNextAddressDelay; a written zero is refused.
 	NextAddressDelay *types.Duration `json:"next_address_delay"`
 
-	// Disables Nagle's algorithm. On by default: a proxy carries interactive
-	// traffic, where coalescing small writes shows up as lag.
 	NoDelay bool `json:"no_delay"`
 }
 
@@ -81,7 +72,6 @@ func (s *Settings) dialTimeout() time.Duration {
 	return time.Duration(types.ValueOrDefault(s.DialTimeout, types.Duration(defaultDialTimeout)))
 }
 
-// A field left out stays zero, which net.KeepAliveConfig reads as Go's default.
 func (s *Settings) keepAliveConfig() net.KeepAliveConfig {
 	if s.KeepAlive != nil && *s.KeepAlive < 0 {
 		return net.KeepAliveConfig{Enable: false}

@@ -29,8 +29,6 @@ func keepAliveOptions(t *testing.T, stream spec.Stream) (enabled, idle, interval
 	return enabled, idle, interval, count
 }
 
-// Both ends of a relay must carry all three keep-alive settings, not only the
-// idle time.
 func TestKeepAliveIntervalAndCountReachBothEnds(t *testing.T) {
 	transport := &tcp.Transport{Settings: tcp.Settings{
 		KeepAlive:         types.Pointer(types.Duration(20 * time.Second)),

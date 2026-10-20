@@ -13,7 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// One value per configured component, so nothing has to narrow a config.
 type Transport struct{ Settings }
 
 func (*Transport) Info() spec.ModuleInfo {
@@ -35,8 +34,6 @@ func (t *Transport) NewStreamDialer(resolver spec.Resolver) (spec.StreamDialer, 
 	}, nil
 }
 
-// Binds here rather than on first accept, so a port conflict is a startup
-// error a user can read.
 func (t *Transport) NewStreamListener(bind spec.Endpoint) (spec.StreamListener, error) {
 	address, err := bindTarget(bind)
 	if err != nil {
@@ -61,8 +58,6 @@ func (t *Transport) NewStreamListener(bind spec.Endpoint) (spec.StreamListener, 
 	}, nil
 }
 
-// The return type is the kind declaration: registering this as anything else
-// will not compile.
 func NewBaseStreamTransportModule() spec.BaseStreamTransportModule {
 	return &Transport{Settings: Settings{
 		KeepAlive: types.Pointer(types.Duration(15 * time.Second)),
