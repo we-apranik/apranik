@@ -18,8 +18,6 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-// testZone answers A queries from a table, as a recursive resolver would,
-// and counts what it was asked, so a test can tell its lookups went there.
 type testZone struct {
 	addresses map[string]netip.Addr
 	queries   atomic.Int64
@@ -73,8 +71,6 @@ func startUDPDNSServer(t *testing.T, zone *testZone) string {
 	return connection.LocalAddr().String()
 }
 
-// startStreamDNSServer serves DNS over TCP, or over TLS when tlsConfig is
-// set: length-prefixed messages on a connection kept open.
 func startStreamDNSServer(t *testing.T, zone *testZone, tlsConfig *tls.Config) string {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -139,8 +135,6 @@ func trustedTLSBlock(t *testing.T, server *httptest.Server, alpn string) string 
 	return block + `}`
 }
 
-// dnsRoutedConfig is a SOCKS5 inbound and one freedom outbound, resolving
-// through the given dns section, with the given routing.
 func dnsRoutedConfig(proxyPort uint16, dns, routing string) string {
 	document := fmt.Sprintf(`{
 		"version": 1,
@@ -156,8 +150,6 @@ func dnsRoutedConfig(proxyPort uint16, dns, routing string) string {
 	return document + `}`
 }
 
-// Freedom dials a domain through each DNS server type in turn, and the
-// lookup is seen to reach that server.
 func TestFreedomResolvesThroughEachDNSServerType(t *testing.T) {
 	zone := &testZone{addresses: map[string]netip.Addr{"app.test.": netip.MustParseAddr("127.0.0.1")}}
 	doh := startDoHServer(t, zone)
@@ -190,7 +182,6 @@ func TestFreedomResolvesThroughEachDNSServerType(t *testing.T) {
 	}
 }
 
-// A resolve action lets an IP rule decide a domain destination.
 func TestResolveActionFeedsIPRules(t *testing.T) {
 	zone := &testZone{addresses: map[string]netip.Addr{
 		"app.test.":     netip.MustParseAddr("127.0.0.1"),

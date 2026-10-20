@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/core/component"
 )
 
-// A selector over a working member and a dead one: it starts on the first,
-// and only a person's choice moves new connections to the other.
 func TestASelectorSendsNewConnectionsToTheMemberThatWasChosen(t *testing.T) {
 	echoPort := startTCPEchoServer(t)
 	proxyPort := freeLoopbackPort(t)
@@ -60,8 +58,6 @@ func TestASelectorSendsNewConnectionsToTheMemberThatWasChosen(t *testing.T) {
 	}
 }
 
-// A person switches the selector through the API's provider: the connection
-// that went through the old member is ended, and the next one is not.
 func TestASwitchThroughTheProviderEndsTheOpenConnectionThroughTheOldMember(t *testing.T) {
 	echoPort := startTCPEchoServer(t)
 	proxyPort := freeLoopbackPort(t)
@@ -81,7 +77,6 @@ func TestASwitchThroughTheProviderEndsTheOpenConnectionThroughTheOldMember(t *te
 		"routing": {"default_action": {"type": "route", "settings": {"outbound": "proxy"}}},
 		"stats": {"tracking": {"enabled": true}}
 	}`, proxyPort, deadServerPort))
-	// The provider is asked about outbounds here, so it is given none of the inbounds.
 	withoutInbounds := *described
 	withoutInbounds.Inbounds = nil
 	provider, err := apicoreprovider.New(apicoreprovider.RunningCore{Stats: registry, Blueprint: &withoutInbounds, Outbounds: outbounds})

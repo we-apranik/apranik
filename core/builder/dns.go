@@ -17,14 +17,8 @@ import (
 
 var errDNSAfterOutbounds = errors.New("dns: UseDNS must come before the first outbound, which takes the resolver")
 
-// Resolver is what every base transport resolves through, and what the
-// routing resolve action asks.
 func (b *Builder) Resolver() *dns.Resolver { return b.resolver }
 
-// UseDNS is the first half of building the resolver: outbounds
-// need it to be built, and its servers need the built outbounds, so it is
-// created here, empty, and BuildDNS attaches the servers afterwards. A nil
-// section keeps the system resolver.
 func (b *Builder) UseDNS(section *blueprint.DNS) error {
 	if section == nil {
 		return nil
@@ -38,8 +32,6 @@ func (b *Builder) UseDNS(section *blueprint.DNS) error {
 	return previous.Close()
 }
 
-// BuildDNS builds each DNS server over its outbound and attaches them to the
-// resolver UseDNS created. Nothing to do for a nil section.
 func (b *Builder) BuildDNS(section *blueprint.DNS, outbounds []component.Outbound, datasets map[string]*dataset.Dataset) error {
 	if section == nil {
 		return nil
@@ -115,8 +107,6 @@ func (b *Builder) buildDNSServer(section *blueprint.DNS, serverBlueprint bluepri
 	return server, nil
 }
 
-// dnsServerOutbound is the outbound a server named, or the internal freedom,
-// built once and only when some server needs it.
 func (b *Builder) dnsServerOutbound(tag string, outboundsByTag map[string]component.Outbound) (component.Outbound, error) {
 	if tag == "" {
 		tag = blueprint.DefaultDNSOutboundTag
@@ -139,10 +129,6 @@ func (b *Builder) dnsServerOutbound(tag string, outboundsByTag map[string]compon
 	return internal, nil
 }
 
-// dnsServerStreamDialer is the dialer a stream DNS server module is handed:
-// the server's outbound, with the server's own TLS on top. It holds the
-// outbound as a field rather than being one: component.Outbound and
-// spec.StreamDialer both have DialStream, with different signatures.
 type dnsServerStreamDialer struct {
 	outbound  component.Outbound
 	bootstrap spec.Resolver
@@ -176,8 +162,6 @@ func (d *dnsServerStreamDialer) DialStream(ctx context.Context, destination spec
 
 func (d *dnsServerStreamDialer) Close() error { return nil }
 
-// dnsServerDatagramDialer is the dialer a datagram DNS server module is
-// handed: the server's outbound's datagram path.
 type dnsServerDatagramDialer struct {
 	outbound  component.Outbound
 	bootstrap spec.Resolver
@@ -194,9 +178,6 @@ func (d *dnsServerDatagramDialer) CreateDatagram(ctx context.Context, _ spec.End
 
 func (d *dnsServerDatagramDialer) Close() error { return nil }
 
-// bootstrappingDatagram resolves a hostname it is asked to write to with the
-// server's dns_server, as dnsServerStreamDialer does. Its context is the one
-// query's: a DNS server's datagram lives for one query.
 type bootstrappingDatagram struct {
 	spec.Datagram
 	ctx       context.Context

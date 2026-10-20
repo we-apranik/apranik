@@ -217,8 +217,6 @@ func TestTheResolverCountsIntoTheRegistryTheBuilderMade(t *testing.T) {
 	defer built.Close()
 	counted := built.BuildStats(coreBlueprint)
 
-	// Whether the name resolves depends on the machine; either way the lookup
-	// reaches the system server and is counted.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	built.Resolver().ResolveDomain(ctx, "no-such-name.invalid")
@@ -277,8 +275,6 @@ func TestAConnectionThatCannotBeDialedIsCountedAsADialFailure(t *testing.T) {
 		func(snapshot trafficView) bool { return snapshot.Outbounds["auto"].DialFailures == 1 })
 }
 
-// Everything the registry's fixed-size reads return, for assertions that look
-// at several kinds at once.
 type trafficView struct {
 	Inbounds  map[string]stats.InboundTraffic
 	Outbounds map[string]stats.OutboundTraffic

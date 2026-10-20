@@ -22,9 +22,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// VLESS server and client built from config files, as `apranik run` builds
-// them, over a given transport stack.
-
 const vlessAliceUUID = "b831381d-6324-4d53-ad4f-8cda48b30811"
 
 func startVLESSServer(t *testing.T, transport string) (port uint16, fallbackReceived <-chan []byte) {
@@ -32,7 +29,6 @@ func startVLESSServer(t *testing.T, transport string) (port uint16, fallbackRece
 	return startVLESSServerWith(t, transport, handler.Config{})
 }
 
-// handlerConfig is the traffic handler's, which the run command fills from the inbound's keys.
 func startVLESSServerWith(t *testing.T, transport string, handlerConfig handler.Config) (port uint16, fallbackReceived <-chan []byte) {
 	t.Helper()
 	fallback, err := net.Listen("tcp", "127.0.0.1:0")
@@ -91,7 +87,6 @@ func buildVLESSClient(t *testing.T, transport string, serverPort uint16, uuid st
 	return buildVLESSClientWith(t, transport, serverPort, uuid, "")
 }
 
-// extra is more members of the outbound, such as `, "muxcool": {...}`.
 func buildVLESSClientWith(t *testing.T, transport string, serverPort uint16, uuid, extra string) component.Outbound {
 	t.Helper()
 	clientBlueprint := parseConfig(t, fmt.Sprintf(`{
@@ -165,17 +160,12 @@ func TestVLESSAcceptsAUserWrittenAsShortText(t *testing.T) {
 	checkTCPThrough(t, buildVLESSClient(t, stack, port, "my-secret-id"))
 }
 
-// One UDP session talking to two destinations; both answers come back through
-// the one datagram from the right destination. With no muxcool key the client
-// sends XUDP, the other cores' default.
 func TestVLESSCarriesOneUDPSessionToTwoDestinations(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServer(t, stack)
 	checkOneUDPSessionToTwoDestinations(t, buildVLESSClient(t, stack, serverPort, vlessAliceUUID))
 }
 
-// countingForwarder passes every connection to targetPort and counts them, so a
-// test can tell how many connections a client made to the server.
 func countingForwarder(t *testing.T, targetPort uint16) (port uint16, connections *atomic.Int32) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -206,8 +196,6 @@ func countingForwarder(t *testing.T, targetPort uint16) (port uint16, connection
 	return uint16(listener.Addr().(*net.TCPAddr).Port), connections
 }
 
-// XUDP carries a whole UDP session on one connection to the server, whatever
-// the number of destinations.
 func TestVLESSXUDPUsesOneConnectionForAUDPSessionToTwoDestinations(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServer(t, stack)
@@ -218,8 +206,6 @@ func TestVLESSXUDPUsesOneConnectionForAUDPSessionToTwoDestinations(t *testing.T)
 	}
 }
 
-// With the UDP part switched off the protocol's own UDP is used: plain VLESS
-// names one destination per stream, so a stream is opened for each.
 func TestVLESSPlainUDPUsesAConnectionPerDestination(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServer(t, stack)
@@ -318,8 +304,6 @@ func TestVLESSServerHandsAWrongUUIDToTheFallback(t *testing.T) {
 	}
 }
 
-// A server that speaks first, as SMTP does: it sends nothing until the proxy
-// request has reached it, and the client writes nothing until it has read.
 func startServerFirstBanner(t *testing.T) uint16 {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -372,15 +356,11 @@ func TestVLESSSendsTheRequestAtOnceToASkippedPortSoAServerFirstBannerArrives(t *
 
 func TestVLESSHoldsTheRequestForAServerFirstPortThatIsNotSkipped(t *testing.T) {
 	err := readBannerThroughVLESS(t, `, "proxy_request_timing": {"max_delay": "1h", "skip": {"enabled": false, "ports": [%d]}}`, 400*time.Millisecond)
-	// The server gives up on a connection with no request after its 300 ms
-	// handshake timeout, which the client reads as the end of the stream.
 	if !errors.Is(err, os.ErrDeadlineExceeded) && !errors.Is(err, io.EOF) {
 		t.Fatalf("reading the banner: %v, want no banner because the request is still held", err)
 	}
 }
 
-// killableForwarder passes every connection to targetPort like countingForwarder,
-// and lets a test cut them all, as a network switch does.
 func killableForwarder(t *testing.T, targetPort uint16) (port uint16, cutAll func()) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -418,8 +398,6 @@ func killableForwarder(t *testing.T, targetPort uint16) (port uint16, cutAll fun
 	}
 }
 
-// startPortEcho answers every datagram with the port it came from, so a test sees
-// which source port the destination saw.
 func startPortEcho(t *testing.T) spec.Destination {
 	t.Helper()
 	echo, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -449,9 +427,6 @@ func sessionFrom(t *testing.T, address string) spec.Metadata {
 	return spec.Metadata{Network: spec.NetworkUDP, User: "alice", Transport: spec.TransportMetadata{SourceEndpoint: endpoint}}
 }
 
-// sourcePortSeenThroughANewStream sends one datagram from a fresh datagram of the
-// outbound, which opens a new stream to the server, and returns the source port
-// the destination saw.
 func sourcePortSeenThroughANewStream(t *testing.T, outbound component.Outbound, session spec.Metadata, destination spec.Destination) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -483,9 +458,6 @@ func sourcePortSeenThroughANewStream(t *testing.T, outbound component.Outbound, 
 	}
 }
 
-// A client whose stream to the server is cut and which reconnects with the same
-// Global ID is given its UDP session back: the destination sees the same source
-// port. A client that names another session gets a new one.
 func TestVLESSXUDPResumesASessionAfterItsStreamIsCut(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServerWith(t, stack, handler.Config{ResumeUDPSessions: true, UDPSessionResumeHoldTime: time.Minute})
@@ -525,7 +497,6 @@ func TestVLESSXUDPDoesNotResumeWhenTheServerHasItOff(t *testing.T) {
 	}
 }
 
-// With global_id off on the client it sends no ID, so even a server that resumes has nothing to match.
 func TestVLESSXUDPClientWithTheGlobalIDOffGetsANewSessionEachTime(t *testing.T) {
 	stack := `[{ "type": "tcp" }]`
 	serverPort, _ := startVLESSServerWith(t, stack, handler.Config{ResumeUDPSessions: true, UDPSessionResumeHoldTime: time.Minute})

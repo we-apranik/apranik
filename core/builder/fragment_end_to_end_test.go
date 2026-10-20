@@ -14,9 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// fragment in both places it is meant for: under tls in a proxy outbound, and
-// under freedom, where the ClientHello it cuts is the user's own.
-
 const fragmentTransport = `{ "type": "fragment", "settings": { "piece_delays": ["1-2ms"] } }`
 
 func TestTrojanOverTLSOverFragmentCarriesTCPAndUDP(t *testing.T) {
@@ -81,7 +78,6 @@ func TestFreedomOverFragmentReachesATLSServer(t *testing.T) {
 	}
 	defer stream.Close()
 
-	// The user's own TLS, end to end, as a browser behind freedom would run it.
 	client := cryptotls.Client(streamConn{stream}, &cryptotls.Config{ServerName: proxyServerName, RootCAs: certificates.authority})
 	if err := client.HandshakeContext(ctx); err != nil {
 		t.Fatalf("handshake through freedom and fragment: %v", err)

@@ -29,11 +29,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// End-to-end tests run a Trojan server and client built from config files,
-// as `apranik run` builds them, over a given transport stack. This file holds
-// the helpers every stack's tests share, and the tests for TLS; the other
-// overlays' tests sit in their own files.
-
 const proxyServerName = "proxy.example"
 
 type testCertificates struct {
@@ -136,13 +131,10 @@ func tlsClientTransport(t *testing.T, certificates testCertificates) string {
 	]`, proxyServerName, jsonString(t, certificates.authorityPEM))
 }
 
-// startServer runs a Trojan-over-TLS inbound that sends everything out
-// through freedom, and a fallback that records what it is sent.
 func startServer(t *testing.T, certificates testCertificates) (port uint16, fallbackReceived <-chan []byte) {
 	return startTrojanServer(t, tlsServerTransport(t, certificates))
 }
 
-// startTrojanServer is startServer over any transport stack, given as JSON.
 func startTrojanServer(t *testing.T, transport string) (port uint16, fallbackReceived <-chan []byte) {
 	t.Helper()
 	fallback, err := net.Listen("tcp", "127.0.0.1:0")
@@ -200,7 +192,6 @@ func buildClientOutbound(t *testing.T, certificates testCertificates, serverPort
 	return buildTrojanClient(t, tlsClientTransport(t, certificates), serverPort)
 }
 
-// buildTrojanClient is buildClientOutbound over any transport stack.
 func buildTrojanClient(t *testing.T, transport string, serverPort uint16) component.Outbound {
 	t.Helper()
 	clientBlueprint := parseConfig(t, fmt.Sprintf(`{
@@ -240,7 +231,6 @@ func TestTrojanOverTLSCarriesTCP(t *testing.T) {
 	checkTCPThrough(t, buildClientOutbound(t, certificates, serverPort))
 }
 
-// checkTCPThrough echoes a message through outbound to a local TCP server.
 func checkTCPThrough(t *testing.T, outbound component.Outbound) {
 	t.Helper()
 	echo, err := net.Listen("tcp", "127.0.0.1:0")
@@ -284,7 +274,6 @@ func TestTrojanOverTLSCarriesUDP(t *testing.T) {
 	checkUDPThrough(t, buildClientOutbound(t, certificates, serverPort))
 }
 
-// checkUDPThrough echoes a datagram through outbound to a local UDP server.
 func checkUDPThrough(t *testing.T, outbound component.Outbound) {
 	t.Helper()
 	echo, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -336,8 +325,6 @@ func checkUDPThrough(t *testing.T, outbound component.Outbound) {
 	}
 }
 
-// A client that completes TLS but sends no valid Trojan request is handed to
-// the fallback with the bytes it sent inside TLS, not TLS records.
 func TestTheFallbackReceivesWhatWasSentInsideTLS(t *testing.T) {
 	certificates := newTestCertificates(t)
 	serverPort, fallbackReceived := startServer(t, certificates)
@@ -362,8 +349,6 @@ func TestTheFallbackReceivesWhatWasSentInsideTLS(t *testing.T) {
 	}
 }
 
-// The TLS handshake runs per connection, so a client that connects and says
-// nothing is closed by the handshake timeout and holds up nobody else.
 func TestASilentClientDoesNotDelayAnother(t *testing.T) {
 	certificates := newTestCertificates(t)
 	serverPort, _ := startServer(t, certificates)

@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Routing is what every inbound shares: the outbounds, and the router that
-// chooses between them.
 type Routing struct {
 	Outbounds []component.Outbound
 	Router    component.Router
@@ -25,9 +23,6 @@ func (r Routing) Close() error {
 	return errors.Join(errs...)
 }
 
-// BuildRouting builds the datasets, the resolver, the outbounds and the router
-// in the one order that works: the outbounds resolve through the resolver, and
-// its servers go through the outbounds.
 func (b *Builder) BuildRouting(coreBlueprint *blueprint.Blueprint) (Routing, error) {
 	if len(coreBlueprint.Outbounds) == 0 {
 		return Routing{}, errors.New("no outbounds configured")
@@ -53,7 +48,6 @@ func (b *Builder) BuildRouting(coreBlueprint *blueprint.Blueprint) (Routing, err
 		return Routing{}, err
 	}
 
-	// One router for every inbound: it holds no per-connection state.
 	if routing.Router, err = b.BuildRouter(coreBlueprint.Routing, routing.Outbounds, datasets); err != nil {
 		routing.Close()
 		return Routing{}, err
@@ -72,13 +66,7 @@ func (r Routing) StartProbing(ctx context.Context) {
 	}
 }
 
-// VerifyOptions says how far Verify goes beyond building.
 type VerifyOptions struct {
-	// Bind every inbound's address, as run would, and close the sockets again
-	// at the end. Every inbound is bound before any is closed, so two
-	// inbounds on one port are found too. Off by default: whether a port is
-	// free is the machine's and the moment's, and a config is often checked
-	// while the process it replaces still holds its ports.
 	CheckPorts bool
 }
 

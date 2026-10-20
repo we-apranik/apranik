@@ -23,24 +23,16 @@ import (
 	"github.com/we-apranik/apranik/core/stats"
 )
 
-// startRoutedSOCKS5 runs a config file's single SOCKS5 inbound the way
-// apranik run does: every outbound built, one router over them, and a handler
-// per inbound. The config is loaded from a file beside its datasets, so
-// relative dataset paths resolve as they would for a user.
 func startRoutedSOCKS5(t *testing.T, directory, configText string) uint16 {
 	port, _ := startCountedSOCKS5(t, directory, configText)
 	return port
 }
 
-// startCountedSOCKS5 is startRoutedSOCKS5 that also returns the registry the
-// handler counts into: nil when the config switches counting off.
 func startCountedSOCKS5(t *testing.T, directory, configText string) (uint16, *stats.Registry) {
 	port, registry, _, _ := startSOCKS5WithOutbounds(t, directory, configText)
 	return port, registry
 }
 
-// startSOCKS5WithOutbounds is startCountedSOCKS5 that also returns the built
-// outbounds, for a test that drives one, such as a selector.
 func startSOCKS5WithOutbounds(t *testing.T, directory, configText string) (uint16, *stats.Registry, []component.Outbound, *blueprint.Blueprint) {
 	t.Helper()
 	configPath := filepath.Join(directory, "config.json")
@@ -118,8 +110,6 @@ func startTCPEchoServer(t *testing.T) uint16 {
 	return uint16(listener.Addr().(*net.TCPAddr).Port)
 }
 
-// socks5Connect opens a SOCKS5 CONNECT with no authentication to a host that
-// is an IP or a domain, and returns the stream once the server accepted it.
 func socks5Connect(t *testing.T, proxyPort uint16, host string, port uint16) net.Conn {
 	t.Helper()
 	connection, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort))
@@ -151,7 +141,6 @@ func socks5Connect(t *testing.T, proxyPort uint16, host string, port uint16) net
 	return connection
 }
 
-// echoed reports whether payload came back whole, or the stream closed first.
 func echoed(t *testing.T, connection net.Conn, payload string) bool {
 	t.Helper()
 	if _, err := connection.Write([]byte(payload)); err != nil {
@@ -215,8 +204,6 @@ func TestRoutingEndToEnd(t *testing.T) {
 		}
 	})
 
-	// localhost is in the dataset. The sniffed name wins when there is one;
-	// without one, the destination's name decides.
 	t.Run("sniffed name wins over the destination name", func(t *testing.T) {
 		connection := socks5Connect(t, proxy, "localhost", echoPort)
 		if !echoed(t, connection, "GET / HTTP/1.1\r\nHost: allowed.test\r\n\r\n") {

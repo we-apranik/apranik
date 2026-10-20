@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// Trojan over WebSocket, with and without TLS below it and with and without
-// early data, built from config files as `apranik run` builds them.
-
 func webSocketTransport(earlyData int) string {
 	if earlyData == 0 {
 		return `{ "type": "ws", "settings": { "path": "/chat" } }`
@@ -40,8 +37,6 @@ func TestTrojanOverWebSocketOverTLSCarriesTCPAndUDP(t *testing.T) {
 	checkUDPThrough(t, outbound)
 }
 
-// A prober that completes TLS and asks for the wrong path sees a web server's
-// 404, nothing more.
 func TestAWrongPathOverTLSGetsANotFound(t *testing.T) {
 	certificates := newTestCertificates(t)
 	stack := tlsServerTransport(t, certificates)

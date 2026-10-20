@@ -29,41 +29,26 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A blueprint written in Go need not have passed config.Check, so a missing
-// piece is an error here rather than a nil dereference.
 var (
 	errNoInboundProtocol = errors.New("no proxy protocol")
 	errNoBaseTransport   = errors.New("the transport stack has no base transport")
 )
 
-// Builder holds no registry: every module in a Config is already constructed
-// and validated, so there is nothing left to look up or dispatch on.
 type Builder struct {
 	logging *logging.LoggerManager
 	logger  *logging.Logger
 
-	// What every base transport resolves through. The system resolver until
-	// UseDNS replaces it.
 	resolver *dns.Resolver
 
-	// UseDNS must come before any outbound, which takes the resolver.
 	outboundsBuilt bool
 
-	// Nil until BuildStats, and nil when the blueprint switches counting off:
-	// nothing is counted then.
 	stats *stats.Registry
 
-	// Built here, not from the blueprint, so closed here: the internal
-	// freedom DNS servers without an outbound go through.
 	internalOutbounds []component.Outbound
 
-	// One secret key per built core, so a UDP session's Global ID is the same for
-	// every outbound and different from the ID of any other core.
 	xudpGlobalIDDeriver *outbound.XUDPGlobalIDDeriver
 }
 
-// New builds the logging system first, so every component it goes on to
-// build is handed a logger.
 func New(log blueprint.Log) (*Builder, error) {
 	system, err := logging.New(log)
 	if err != nil {
@@ -79,15 +64,10 @@ func New(log blueprint.Log) (*Builder, error) {
 
 func (b *Builder) Logger() *logging.Logger { return b.logger }
 
-// SubscribeToLog starts a live view of the log; see logging.LoggerManager.SubscribeToLog.
 func (b *Builder) SubscribeToLog(minimumLevel logging.Level, bufferedRecords int) (*logging.Subscription, error) {
 	return b.logging.SubscribeToLog(minimumLevel, bufferedRecords)
 }
 
-// BuildStats makes the registry every inbound and handler counts into. Counting
-// is on unless the blueprint's stats section disables it, so a blueprint
-// written in Go with no section counts everything. Call it before BuildInbound
-// and hand Stats to each handler; BuildRouting calls it for run and Verify.
 func (b *Builder) BuildStats(coreBlueprint *blueprint.Blueprint) *stats.Registry {
 	section := coreBlueprint.Stats
 	if section != nil && section.Disabled {
@@ -125,12 +105,8 @@ func (b *Builder) BuildStats(coreBlueprint *blueprint.Blueprint) *stats.Registry
 	return b.stats
 }
 
-// Stats is the registry BuildStats made: nil before it, and when counting is
-// off. Its reads are how an embedder gets the numbers.
 func (b *Builder) Stats() *stats.Registry { return b.stats }
 
-// Close closes the resolver and the DNS servers it holds, the outbounds this
-// builder made for them, then the log.
 func (b *Builder) Close() error {
 	errs := []error{b.resolver.Close()}
 	for _, internal := range b.internalOutbounds {
@@ -140,9 +116,6 @@ func (b *Builder) Close() error {
 	return errors.Join(errs...)
 }
 
-// BuildInbound builds everything an inbound needs and binds its listener last,
-// so a refusal only a constructor can make (a certificate that fails to load)
-// leaves no port open.
 func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.Inbound, error) {
 	prepared, err := b.prepareInbound(inboundBlueprint)
 	if err != nil {
@@ -170,8 +143,6 @@ func (b *Builder) BuildInbound(inboundBlueprint blueprint.Inbound) (component.In
 	}), nil
 }
 
-// CheckInbound makes every refusal BuildInbound makes except the bind, which
-// says something about the machine and not about the config.
 func (b *Builder) CheckInbound(inboundBlueprint blueprint.Inbound) error {
 	prepared, err := b.prepareInbound(inboundBlueprint)
 	if err != nil {
@@ -181,7 +152,6 @@ func (b *Builder) CheckInbound(inboundBlueprint blueprint.Inbound) error {
 	return nil
 }
 
-// preparedInbound is an inbound with everything built except its socket.
 type preparedInbound struct {
 	overlays       []inbound.StreamOverlay
 	proxyServer    spec.StreamProxyServer
@@ -280,8 +250,6 @@ func buildInboundProxyServer(inboundBlueprint blueprint.Inbound) (spec.StreamPro
 	return server, nil
 }
 
-// mixed is one inbound with one list of users, which lives at its own level; a
-// user written under socks5 or http would be known to one protocol only.
 func checkMixedHalvesHaveNoUsers(socks5Server, httpServer spec.StreamProxyServer) error {
 	halves := []struct {
 		name   string
@@ -295,9 +263,6 @@ func checkMixedHalvesHaveNoUsers(socks5Server, httpServer spec.StreamProxyServer
 	return nil
 }
 
-// Before the listener exists, so no client is ever accepted without them. Each
-// user goes to both protocols, which apply their own rules; the entry and the
-// protocol that refused it are named.
 func addMixedUsers(server spec.StreamProxyServer, users []json.RawMessage) error {
 	if len(users) == 0 {
 		return nil
@@ -340,9 +305,6 @@ func (b *Builder) BuildOutbound(outboundBlueprint blueprint.Outbound) (component
 	}
 }
 
-// BuildOutbounds builds every outbound, in the order given: the first is the
-// default when there is no routing section. Groups are built after the
-// outbounds they pick among, whatever order the config file lists them in.
 func (b *Builder) BuildOutbounds(outboundBlueprints []blueprint.Outbound) ([]component.Outbound, error) {
 	built := make([]component.Outbound, len(outboundBlueprints))
 	builtByTag := make(map[string]component.Outbound, len(outboundBlueprints))
@@ -538,7 +500,6 @@ func (b *Builder) buildProxyOutbound(outboundBlueprint blueprint.Outbound) (comp
 // association, each on its own ephemeral port, on the same address the inbound
 // listens on. Lazy: a proxy that never does ASSOCIATE never opens one.
 func (b *Builder) buildUDPAssociateSocket(bindAddr spec.Endpoint) spec.UDPAssociateSocketFunc {
-	// The inbound's address, but its own port: zero means ephemeral.
 	bind, bindErr := spec.NewEndpoint(bindAddr.Addr(), 0)
 	stack := blueprint.DatagramTransportStack{Base: udp.NewBaseDatagramTransportModule()}
 
@@ -589,8 +550,6 @@ type namedStreamOverlayClient struct {
 	client spec.StreamOverlayClient
 }
 
-// overlayStreamDialer dials through the base, then runs each overlay's client
-// side in stack order over the stream, all within the caller's context.
 type overlayStreamDialer struct {
 	underlyingDialer spec.StreamDialer
 	clients          []namedStreamOverlayClient
@@ -614,9 +573,6 @@ func (d *overlayStreamDialer) DialStream(ctx context.Context, server spec.Destin
 
 func (d *overlayStreamDialer) Close() error { return d.underlyingDialer.Close() }
 
-// Binds here, not at activation: LocalAddr must return a real address, and a
-// port conflict should be a startup error a user can read. Only the base:
-// overlays run per connection in core/inbound.
 func buildStreamListener(stack blueprint.StreamTransportStack, bind spec.Endpoint) (spec.StreamListener, error) {
 	if stack.Base == nil {
 		return nil, errNoBaseTransport
@@ -680,8 +636,6 @@ func buildDatagramListener(stack blueprint.DatagramTransportStack, bind spec.End
 	return listener, nil
 }
 
-// LoadDatasets reads every dataset the blueprint declares, once, for the
-// router and the DNS rules alike.
 func (b *Builder) LoadDatasets(declarations []blueprint.Dataset) (map[string]*dataset.Dataset, error) {
 	datasets, errs := dataset.LoadAll(declarations)
 	if err := dataset.Joined(declarations, errs); err != nil {
@@ -693,9 +647,6 @@ func (b *Builder) LoadDatasets(declarations []blueprint.Dataset) (map[string]*da
 	return datasets, nil
 }
 
-// BuildRouter compiles the routing section's rules against the outbounds
-// already built and the datasets loaded. With no routing section, every
-// request takes the first outbound.
 func (b *Builder) BuildRouter(routing *blueprint.Routing, outbounds []component.Outbound, datasets map[string]*dataset.Dataset) (component.Router, error) {
 	if len(outbounds) == 0 {
 		return nil, errors.New("router: no outbounds to route to")

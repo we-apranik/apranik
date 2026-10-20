@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// A group is listed before its members, one member refuses every connection,
-// and a client still gets through: the group's members are built first, and
-// the group moves past the member that fails.
 func TestAGroupRoutesPastAMemberThatFails(t *testing.T) {
 	echoPort := startTCPEchoServer(t)
 	probeTarget := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
@@ -48,8 +45,6 @@ func TestAGroupRoutesPastAMemberThatFails(t *testing.T) {
 	}
 }
 
-// A DNS server whose outbound is a group: its UDP queries go through the group's
-// member, and the name it answers is then dialed.
 func TestADNSServerMayGoThroughAGroup(t *testing.T) {
 	zone := &testZone{addresses: map[string]netip.Addr{"app.test.": netip.MustParseAddr("127.0.0.1")}}
 	dnsServer := startUDPDNSServer(t, zone)

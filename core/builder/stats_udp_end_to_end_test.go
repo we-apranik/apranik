@@ -31,9 +31,6 @@ func startUDPEchoServer(t *testing.T) uint16 {
 	return uint16(echo.LocalAddr().(*net.UDPAddr).Port)
 }
 
-// socks5Associate opens a UDP ASSOCIATE with no authentication and returns a
-// UDP socket connected to the relay address, plus the control stream, which
-// must stay open for the association to live.
 func socks5Associate(t *testing.T, proxyPort uint16) (relaySide *net.UDPConn, control net.Conn) {
 	t.Helper()
 	control, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort))
@@ -62,8 +59,6 @@ func socks5Associate(t *testing.T, proxyPort uint16) (relaySide *net.UDPConn, co
 	return relaySide, control
 }
 
-// Sends one datagram to 127.0.0.1:port in SOCKS5's UDP framing and waits for
-// the echo, returning its payload.
 func socks5UDPExchange(t *testing.T, relaySide *net.UDPConn, port uint16, payload string) string {
 	t.Helper()
 	frame := append([]byte{0, 0, 0, 0x01, 127, 0, 0, 1}, binary.BigEndian.AppendUint16(nil, port)...)
@@ -134,7 +129,6 @@ func TestUDPThroughSOCKS5IsCountedByNetworkAndListedPerDestination(t *testing.T)
 	}
 }
 
-// Replies a server makes as large as asked: "big" gets 9000 bytes, anything else is echoed.
 func startUDPBigReplyServer(t *testing.T) uint16 {
 	t.Helper()
 	server, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -164,7 +158,6 @@ func TestADatagramOverTheLimitIsDroppedAndCountedAndTheSessionGoesOn(t *testing.
 	port, registry := startCountedSOCKS5(t, t.TempDir(), statsConfig(freeLoopbackPort(t), startProbeTarget(t), ""))
 	relaySide, _ := socks5Associate(t, port)
 
-	// Too big from the client: 9000 bytes against the default 8192.
 	frame := append([]byte{0, 0, 0, 0x01, 127, 0, 0, 1}, binary.BigEndian.AppendUint16(nil, serverPort)...)
 	if _, err := relaySide.Write(append(frame, make([]byte, 9000)...)); err != nil {
 		t.Fatal(err)
@@ -174,7 +167,6 @@ func TestADatagramOverTheLimitIsDroppedAndCountedAndTheSessionGoesOn(t *testing.
 			return snapshot.Inbounds["socks-in"].DatagramDropsByReason["too_large_from_client"] == 1
 		})
 
-	// Too big from the server: a 9000 byte reply to a small request.
 	frame = append([]byte{0, 0, 0, 0x01, 127, 0, 0, 1}, binary.BigEndian.AppendUint16(nil, serverPort)...)
 	if _, err := relaySide.Write(append(frame, "big"...)); err != nil {
 		t.Fatal(err)
@@ -184,7 +176,6 @@ func TestADatagramOverTheLimitIsDroppedAndCountedAndTheSessionGoesOn(t *testing.
 			return snapshot.Outbounds["direct"].DatagramDropsByReason["too_large_from_outbound"] == 1
 		})
 
-	// The same session still works.
 	if got := socks5UDPExchange(t, relaySide, serverPort, "still here"); got != "still here" {
 		t.Errorf("echo after the oversized datagrams = %q, want the session to go on", got)
 	}

@@ -41,8 +41,6 @@ func buildTrojanClientWithPassword(t *testing.T, tag, transport string, serverPo
 	return member
 }
 
-// echoesThrough reports whether a message came back whole; unlike
-// checkTCPThrough it fails quietly, so a test can wait for it to start working.
 func echoesThrough(member component.Outbound, echoPort uint16) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -64,9 +62,6 @@ func echoesThrough(member component.Outbound, echoPort uint16) bool {
 	return err == nil && string(reply) == "through a trojan member"
 }
 
-// Trojan sends its request with the first write, so dialing a member with the
-// wrong password succeeds and only the first exchange fails. Only a probe, which
-// sends a real request through the member, can tell the two members apart.
 func TestAGroupProbesThroughTrojanAndLeavesAMemberWithTheWrongPassword(t *testing.T) {
 	certificates := newTestCertificates(t)
 	serverPort, _ := startServer(t, certificates)
@@ -114,8 +109,6 @@ func eventuallyTrue(limit time.Duration, condition func() bool) bool {
 	return false
 }
 
-// A real SOCKS5 proxy is a member: the group's connection goes through the
-// upstream proxy the member names.
 func TestAGroupMemberMayBeARealSOCKS5Proxy(t *testing.T) {
 	echoPort := startTCPEchoServer(t)
 	upstreamPort := startRoutedSOCKS5(t, t.TempDir(), fmt.Sprintf(`{

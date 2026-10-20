@@ -17,9 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A counting no-op overlay proves the builder builds each layer's client and
-// server side in stack order. Per-connection wrapping is exercised with the
-// real TLS module in the end-to-end tests.
 type countingOverlay struct {
 	label   string
 	applied *[]string
@@ -113,7 +110,6 @@ func TestStreamTransportStackComposesOutwardFromTheWire(t *testing.T) {
 	}
 	defer outbound.Close()
 
-	// Base first, then each overlay outward from the wire.
 	want := []string{"inner", "outer"}
 	mu.Lock()
 	defer mu.Unlock()
@@ -166,7 +162,6 @@ func TestAFailedOverlayLeavesNoPortOpen(t *testing.T) {
 		t.Fatal("a failing overlay was accepted")
 	}
 
-	// The overlay fails before the listener binds, so the port is free.
 	listener, rebindErr := base.NewStreamListener(bind)
 	if rebindErr != nil {
 		t.Fatalf("rebinding after a failed overlay: %v", rebindErr)
@@ -174,8 +169,6 @@ func TestAFailedOverlayLeavesNoPortOpen(t *testing.T) {
 	listener.Close()
 }
 
-// The smallest thing that satisfies the proxy kind: it consumes no preamble
-// and reports a fixed destination.
 type passthroughProxy struct{}
 
 func (passthroughProxy) Validate() error    { return nil }
@@ -279,8 +272,6 @@ func TestAMixedInboundServesSOCKS5UDPAndHTTP(t *testing.T) {
 	}
 }
 
-// A blueprint written in Go skips config.Check, so the builder must refuse the
-// pieces Check would have caught instead of dereferencing nil.
 func TestAnIncompleteBlueprintIsAnErrorNotAPanic(t *testing.T) {
 	built, err := builder.New(blueprint.Log{})
 	if err != nil {

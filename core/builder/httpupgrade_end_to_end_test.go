@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// Trojan over HTTPUpgrade, with and without TLS below it and with and without
-// pipelining, built from config files as `apranik run` builds them.
-
 func httpUpgradeTransport(pipeline bool) string {
 	return fmt.Sprintf(`{ "type": "httpupgrade", "settings": { "path": "/up", "pipeline": %t } }`, pipeline)
 }

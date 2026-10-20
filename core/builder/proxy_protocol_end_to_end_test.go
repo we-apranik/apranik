@@ -15,7 +15,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// capturingHandler records the Metadata of the one request that reaches it.
 type capturingHandler struct{ received chan spec.Metadata }
 
 func (h capturingHandler) HandleStream(_ context.Context, stream spec.Stream, metadata spec.Metadata) error {
@@ -28,9 +27,6 @@ func (h capturingHandler) HandleDatagram(_ context.Context, datagram spec.Datagr
 	return datagram.Close()
 }
 
-// A load balancer sends a PROXY header naming a CDN edge, and the CDN put the
-// client in X-Forwarded-For: the proxy_protocol overlay and httpupgrade each
-// learn their part, and the request reaches the handler as the client's.
 func TestAProxyHeaderAndAForwardedHeaderNameTheClient(t *testing.T) {
 	port := freeLoopbackPort(t)
 	serverBlueprint := parseConfig(t, fmt.Sprintf(`{
@@ -105,8 +101,6 @@ func TestAProxyHeaderAndAForwardedHeaderNameTheClient(t *testing.T) {
 	}
 }
 
-// Without a header from a listed peer, the connection is closed before any
-// later layer sees it.
 func TestAConnectionWithoutAProxyHeaderIsClosed(t *testing.T) {
 	port := freeLoopbackPort(t)
 	serverBlueprint := parseConfig(t, fmt.Sprintf(`{
