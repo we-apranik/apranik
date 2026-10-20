@@ -12,11 +12,7 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// One live entry for one destination of one UDP session: listed in the
-// registry from the destination's first accepted datagram or reply until it
-// has been silent for the idle time, the session lists too many and it is the
-// one used longest ago, or the session ends. It lives apart from the routing
-// cache: forgetting a routing decision does not end it, because the
+// It lives apart from the routing cache: forgetting a routing decision does not end it, because the
 // destination may still be sending and receiving.
 type liveEntry struct {
 	conversation       *stats.Conversation
@@ -29,22 +25,15 @@ func (e *liveEntry) idleDuration() time.Duration {
 	return time.Since(time.Unix(0, e.lastActiveUnixNano.Load()))
 }
 
-// One per UDP session. Its entries are bounded by maxEntries, so a client that
-// sends to endless destinations costs a fixed amount of memory: when it is
-// full, the entry used longest ago, in either direction, goes.
+// Its entries are bounded by maxEntries, so a client that sends to endless destinations costs a fixed
+// amount of memory: when it is full, the entry used longest ago, in either direction, goes.
 type udpSessionLiveEntries struct {
 	registry *stats.Registry
 
-	// What every entry of the session shares; each adds its destination, rule
-	// and outbounds.
 	sessionInfo stats.ConversationInfo
 
-	// The outbounds that carried the session's datagram through the routed
-	// outbound, known once something was sent through it.
 	carryingOutboundTags func(routed component.Outbound) []string
 
-	// Ends the whole UDP session: what closing any one entry means, since the
-	// relay and the session can only be cancelled together.
 	closeSession context.CancelFunc
 
 	idleTimeout time.Duration
@@ -65,14 +54,10 @@ func newUDPSessionLiveEntries(registry *stats.Registry, sessionInfo stats.Conver
 	return live
 }
 
-// A datagram of size bytes was accepted by the outbound for destination, which
-// the decision routed.
 func (l *udpSessionLiveEntries) uplinkAccepted(destination spec.Destination, decision component.Decision, size int) {
 	l.entryFor(destination, decision).conversation.Bytes().AddUplinkBytes(uint64(size))
 }
 
-// A reply of size bytes arrived from destination. It counts on the destination's
-// entry when there is one; found says whether there was.
 func (l *udpSessionLiveEntries) downlinkReceived(destination spec.Destination, size int) (found bool) {
 	l.mu.Lock()
 	entry, found := l.entries.Get(destination)
@@ -87,12 +72,10 @@ func (l *udpSessionLiveEntries) downlinkReceived(destination spec.Destination, s
 
 // A reply can be taken before the relay has told the entry that the datagram it
 // answers was accepted, so a reply from a destination that is still routed
-// lists its entry too.
 func (l *udpSessionLiveEntries) downlinkReceivedFromRoutedDestination(destination spec.Destination, decision component.Decision, size int) {
 	l.entryFor(destination, decision).conversation.Bytes().AddDownlinkBytes(uint64(size))
 }
 
-// The destination's entry, made when there is none, and used now.
 func (l *udpSessionLiveEntries) entryFor(destination spec.Destination, decision component.Decision) *liveEntry {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -112,7 +95,6 @@ func (l *udpSessionLiveEntries) entryFor(destination spec.Destination, decision 
 	return entry
 }
 
-// Ends every entry: the session is over.
 func (l *udpSessionLiveEntries) close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()

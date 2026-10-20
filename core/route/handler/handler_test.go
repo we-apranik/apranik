@@ -21,8 +21,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// clientDatagram stands in for the datagram an inbound hands the handler for
-// one UDP session, such as a SOCKS5 association.
 type clientDatagram struct {
 	outgoing chan spec.Destination
 	returned chan []byte
@@ -133,7 +131,6 @@ func TestTwoUDPSessionsToOneDestinationDoNotCross(t *testing.T) {
 		}
 	}
 
-	// Neither session may receive a second packet: one reply each, not both.
 	for _, clientSide := range []*clientDatagram{first, second} {
 		select {
 		case extra := <-clientSide.returned:
@@ -172,7 +169,6 @@ func blockEverything(t *testing.T) *router.Router {
 	return blocking
 }
 
-// Hands each dialed stream to the test, so it can see what the handler relayed.
 type capturingOutbound struct {
 	tag    string
 	dialed chan net.Conn
@@ -190,8 +186,6 @@ func (o capturingOutbound) CreateDatagram(context.Context, spec.Metadata) (spec.
 }
 func (o capturingOutbound) Close() error { return nil }
 
-// A rule sniffs, the next routes by the sniffed name, and the outbound still
-// receives every byte the client sent, including the ones peeked.
 func TestSniffedStreamIsRoutedByNameAndRelayedWhole(t *testing.T) {
 	direct := capturingOutbound{tag: "direct", dialed: make(chan net.Conn, 1)}
 	proxy := capturingOutbound{tag: "proxy", dialed: make(chan net.Conn, 1)}
@@ -236,7 +230,6 @@ func TestSniffedStreamIsRoutedByNameAndRelayedWhole(t *testing.T) {
 	}
 }
 
-// net.Pipe takes deadlines, which sniffing needs to bound its wait.
 type deadlineStream struct{ net.Conn }
 
 func (deadlineStream) CloseWrite() error { return spec.ErrNoHalfClose }

@@ -18,8 +18,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// An outbound whose datagram answers every datagram it is sent with the same
-// bytes, from the destination it was sent to.
 type echoUDPOutbound struct{ tag string }
 
 func (o echoUDPOutbound) Tag() string              { return o.tag }
@@ -68,7 +66,6 @@ func (d *echoDatagram) Close() error {
 
 func (d *echoDatagram) LocalAddr() net.Addr { return nil }
 
-// A member of a group, carrying UDP like echoUDPOutbound.
 func newUDPGroup(t *testing.T, members ...component.Outbound) component.Outbound {
 	t.Helper()
 	groupOutbound, err := group.NewFallback(group.FallbackConfig{
@@ -106,8 +103,6 @@ type udpSessionUnderTest struct {
 	payload int
 }
 
-// Runs one UDP session through the handler; each packet the test sends is the
-// size of label.
 func startUDPSession(t *testing.T, trafficHandler *handler.Handler, metadata spec.Metadata, label string) *udpSessionUnderTest {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -125,7 +120,6 @@ func startUDPSession(t *testing.T, trafficHandler *handler.Handler, metadata spe
 	return session
 }
 
-// Sends one packet and waits for its echo to reach the client.
 func (s *udpSessionUnderTest) exchange(t *testing.T, to spec.Destination) {
 	t.Helper()
 	s.client.outgoing <- to
@@ -385,8 +379,6 @@ func TestNothingIsListedForUDPWhenLiveConversationsAreNotTracked(t *testing.T) {
 	}
 }
 
-// The same datagrams are counted in three places (the session's keys, the
-// relay's report to the destination entry, the handler's entry); they must agree.
 func TestTheLiveEntriesAddUpToWhatTheInboundCounted(t *testing.T) {
 	registry := udpTrackingRegistry(stats.OutboundDescription{Tag: "out"})
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(echoUDPOutbound{tag: "out"}), handler.Config{Stats: registry, UDPCountFlushInterval: 5 * time.Millisecond})

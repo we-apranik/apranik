@@ -1,9 +1,4 @@
-// Package handler is the component.TrafficHandler core gives every inbound. It
-// asks the router where traffic goes and hands the carriers to the relay:
-// once per TCP connection, and once per new destination in a UDP session,
-// whose answers it caches in a bounded per-session cache that forgets idle
-// destinations. It keeps the client's stream to itself; the router learns
-// about it through a traffic informant.
+// Package handler is the component.TrafficHandler core gives every inbound.
 package handler
 
 import (
@@ -23,8 +18,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Handler is component.TrafficHandler. It decides nothing itself, asking the
-// router about every connection and every new UDP destination.
 type Handler struct {
 	router                              component.Router
 	streamIdleTimeout                   time.Duration
@@ -38,11 +31,8 @@ type Handler struct {
 	udpMaxDatagramSize int
 	udpReplyBuffers    *udp.BufferPool
 
-	// Nil when the inbound does not resume UDP sessions.
 	resumableUDPSessions *resumable.Registry
 
-	// Forgets idle routes, ends idle live entries and flushes the counts of
-	// every UDP session this handler serves, with one goroutine.
 	udpSweeper *periodicSweeper
 
 	resolver informant.DomainResolver
@@ -52,54 +42,34 @@ type Handler struct {
 	logger              *logging.Logger
 }
 
-// One per inbound, so each inbound's timeouts apply to its own traffic.
 type Config struct {
-	// Zero means relay.DefaultStreamIdleTimeout; negative means no idle bound.
 	StreamIdleTimeout time.Duration
 
-	// Zero means session.DefaultIdleTimeout.
 	UDPSessionIdleTimeout time.Duration
 
-	// How often a UDP session adds the datagrams it counted privately to the
-	// shared counters, besides every 64 datagrams and when it ends. Zero means
-	// one second. Not a config file setting: a reader lags by about this much.
 	UDPCountFlushInterval time.Duration
 
-	// Zero means udp.DefaultRoutingCacheEntryIdleTimeout.
 	UDPRoutingCacheEntryIdleTimeout time.Duration
 
-	// Zero means udp.DefaultRoutingCacheMaxEntriesPerSession.
 	UDPRoutingCacheMaxEntriesPerSession int
 
-	// The largest UDP datagram a client may send and a reply may be; a bigger
-	// one is dropped and counted. Zero means udp.DefaultMaxDatagramSize.
 	UDPMaxDatagramSize int
 
-	// A UDP destination's live entry ends after this much silence in either
-	// direction; zero means udp.DefaultLiveTrackingUDPEntryIdleTimeout.
 	LiveTrackingUDPEntryIdleTimeout time.Duration
 
-	// How many destinations of one UDP session are listed at once; zero means
-	// udp.DefaultLiveTrackingUDPMaxEntriesPerSession.
 	LiveTrackingUDPMaxEntriesPerSession int
 
-	// A UDP session whose stream is lost is held, and given to the next stream of
-	// the same user with the same XUDP Global ID (spec.Metadata.XUDPGlobalID).
-	// Off by default; the hold time zero means resumable.DefaultHoldTime.
+	// A UDP session whose stream is lost is held, and given to the next stream of the same user with the
+	// same XUDP Global ID (spec.Metadata.XUDPGlobalID).
 	ResumeUDPSessions        bool
 	UDPSessionResumeHoldTime time.Duration
 
-	// What a routing resolve action asks. Nil: a resolve finds nothing.
 	Resolver informant.DomainResolver
 
-	// The inbound's protocol as the registry names it, shown with each of its
-	// live conversations.
 	InboundProtocolName string
 
-	// Where traffic is counted. Nil counts nothing.
 	Stats *stats.Registry
 
-	// Nil is allowed: New substitutes a silent logger.
 	Logger *logging.Logger
 }
 
@@ -236,16 +206,11 @@ func (h *Handler) HandleStream(ctx context.Context, clientStream spec.Stream, me
 	return relayErr
 }
 
-// The handler owns the UDP session and closes it when the relay ends. The
-// relay asks for every packet; a per-session cache answers repeats. A session
-// that ends quietly, by Close or by going idle, is not an error.
 func (h *Handler) HandleDatagram(ctx context.Context, clientDatagram spec.Datagram, metadata spec.Metadata) error {
 	if h.resumableUDPSessions != nil && metadata.XUDPGlobalID != ([8]byte{}) {
 		key := resumable.Key{User: metadata.User, GlobalID: metadata.XUDPGlobalID}
 		standIn, resumed, streamEnded := h.resumableUDPSessions.Connect(key, clientDatagram)
 		if resumed {
-			// The first call still relays this session; this stream is now its client
-			// side, and this call only holds it open until it is no longer the session's.
 			h.logger.Debug("UDP session resumed", "inbound", metadata.InboundTag, "user", metadata.User)
 			select {
 			case <-streamEnded:
@@ -365,10 +330,7 @@ func (h *Handler) routeUDPDestination(ctx context.Context, sessionMetadata spec.
 	return decision, nil
 }
 
-// Everything one connection adds to: the client's inbound, and its user once
-// the protocol authenticated one, then each outbound that carried it, which is
-// the outbound routing named and, for a group, each one beneath it. Worked out
-// once per connection, never per read.
+// Worked out once per connection, never per read.
 func (h *Handler) countersCarrying(metadata spec.Metadata, carryingOutboundTags []string) []*stats.Counters {
 	if h.stats == nil {
 		return nil
@@ -388,7 +350,6 @@ func (h *Handler) countersCarrying(metadata spec.Metadata, carryingOutboundTags 
 	return counters
 }
 
-// The sniffed name, empty when no rule asked for a sniff or it found none.
 func sniffedDomainOf(metadata spec.Metadata) string {
 	if metadata.Sniffed == nil {
 		return ""

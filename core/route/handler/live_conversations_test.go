@@ -106,8 +106,6 @@ func TestALiveConversationIsListedWhileItRelaysAndGoneWhenItEnds(t *testing.T) {
 	if users := registry.OnlineUsers(); len(users) != 1 || users[0].Name != "alice" || len(users[0].IPs) != 1 || users[0].IPs[0].Address.String() != "203.0.113.7" {
 		t.Errorf("online users = %+v, want alice from 203.0.113.7", users)
 	}
-	// The connection's own bytes are not added to the inbound twice: the
-	// inbound's total still counts the payload once.
 	if up := registry.TotalTraffic().All.UplinkBytes; up != 100 {
 		t.Errorf("total uplink = %d, want 100", up)
 	}
@@ -180,7 +178,6 @@ func TestNothingIsListedWhenLiveConversationsAreNotTracked(t *testing.T) {
 	}
 }
 
-// slowOutbound takes a while to connect, so dial time has something to show.
 type slowOutbound struct {
 	capturingOutbound
 	delay time.Duration

@@ -21,8 +21,6 @@ func newStatsRegistry(outbounds ...stats.OutboundDescription) *stats.Registry {
 	return stats.NewRegistry(stats.Config{InboundTags: []string{"in"}, Outbounds: outbounds})
 }
 
-// Sends request one way and response the other through the handler, then
-// closes both ends and waits for the handler to return.
 func relayOneExchange(t *testing.T, trafficHandler *handler.Handler, destinationSide <-chan net.Conn, metadata spec.Metadata, request, response int) {
 	t.Helper()
 	clientSide, inboundSide := net.Pipe()
@@ -205,8 +203,6 @@ func TestNoRegistryMeansNothingIsCounted(t *testing.T) {
 	relayOneExchange(t, trafficHandler, out.dialed, spec.Metadata{Network: spec.NetworkTCP, InboundTag: "in", User: "alice"}, 10, 10)
 }
 
-// Everything the registry's fixed-size reads return, for assertions that look
-// at several kinds at once.
 type trafficView struct {
 	Inbounds  map[string]stats.InboundTraffic
 	Outbounds map[string]stats.OutboundTraffic

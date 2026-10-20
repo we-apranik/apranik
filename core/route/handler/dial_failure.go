@@ -12,12 +12,10 @@ import (
 	"github.com/we-apranik/apranik/core/stats"
 )
 
-// classifyDialError sorts a failed dial into the fixed list statistics count
-// by. It reads only what the standard library and the resolver say, never an
-// error's text. A proxy refusing a request in its own protocol says nothing
-// a classifier can read, so that is DialOther, not DialHandshakeFailed, which
-// covers a TLS handshake that failed: an alert from the peer or a certificate
-// that did not verify.
+// It reads only what the standard library and the resolver say, never an error's text. A proxy
+// refusing a request in its own protocol says nothing a classifier can read, so that is DialOther, not
+// DialHandshakeFailed, which covers a TLS handshake that failed: an alert from the peer or a
+// certificate that did not verify.
 func classifyDialError(err error) stats.DialFailureReason {
 	var timeoutError interface{ Timeout() bool }
 	switch {
@@ -53,7 +51,6 @@ func isTLSHandshakeFailure(err error) bool {
 		errors.As(err, &recordHeaderError):
 		return true
 	case errors.As(err, &operationError):
-		// The peer sent a TLS alert: crypto/tls and uTLS both report it as a "remote error".
 		return operationError.Op == "remote error"
 	default:
 		return false

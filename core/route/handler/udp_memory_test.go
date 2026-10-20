@@ -34,8 +34,6 @@ func distinctDestinations(b *testing.B, count int) []spec.Destination {
 	return destinations
 }
 
-// What one remembered routing decision holds on the heap, the cache's
-// bookkeeping included, measured over many.
 func BenchmarkRouteCacheEntryMemory(b *testing.B) {
 	const entries = 10000
 	destinations := distinctDestinations(b, entries)
@@ -55,8 +53,6 @@ func BenchmarkRouteCacheEntryMemory(b *testing.B) {
 	}
 }
 
-// What one listed UDP destination holds: the registry's connection, the live
-// entry and the cache's bookkeeping.
 func BenchmarkUDPLiveEntryMemory(b *testing.B) {
 	const entries = 10000
 	destinations := distinctDestinations(b, entries)

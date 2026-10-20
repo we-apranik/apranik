@@ -11,8 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// An echo outbound that counts the datagrams it opens: the sockets the remote
-// peer sees, so one open across a resume is the same source port.
 type openCountingUDPOutbound struct {
 	echoUDPOutbound
 	opened atomic.Int32

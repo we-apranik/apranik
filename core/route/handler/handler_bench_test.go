@@ -12,8 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// One short connection through the handler, from accept to the handler
-// returning: what a statistics setting adds to every connection.
 func benchmarkHandleOneShortStream(b *testing.B, registry *stats.Registry) {
 	out := capturingOutbound{tag: "out", dialed: make(chan net.Conn, 1)}
 	trafficHandler := handler.New(router.NewWithDefaultOutbound(out), handler.Config{Stats: registry})
