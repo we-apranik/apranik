@@ -198,8 +198,6 @@ func randomIPv4Prefix(random *rand.Rand) netip.Prefix {
 	return netip.PrefixFrom(randomIPv4Address(random), 8+random.IntN(25)).Masked()
 }
 
-// Sizes close to the real geodata categories people route by: tens of
-// thousands of domains in category-ads-all and ir, thousands of ranges in ir.
 func largeDomainMatcher(size int) (*DomainMatcher, []string) {
 	names := make([]string, size)
 	for index := range names {

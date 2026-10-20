@@ -7,9 +7,8 @@ import (
 	"slices"
 )
 
-// PrefixMatcher answers whether an address falls in any of a set of IP
-// ranges. The ranges are merged and sorted when built, so a lookup is one
-// binary search whatever the number of prefixes.
+// The ranges are merged and sorted when built, so a lookup is one binary search whatever the number of
+// prefixes.
 type PrefixMatcher struct {
 	ipv4 []ipv4Range
 	ipv6 []ipv6Range
@@ -64,11 +63,8 @@ func (m *PrefixMatcher) Contains(address netip.Addr) bool {
 	return index > 0 && m.ipv6[index-1].last.Compare(address) >= 0
 }
 
-// Len reports how many merged ranges the matcher holds.
 func (m *PrefixMatcher) Len() int { return len(m.ipv4) + len(m.ipv6) }
 
-// ::ffff:10.0.0.0/104 is 10.0.0.0/8, so an IPv4 range written either way
-// matches an IPv4 address.
 func unmapPrefix(prefix netip.Prefix) netip.Prefix {
 	if !prefix.Addr().Is4In6() {
 		return prefix

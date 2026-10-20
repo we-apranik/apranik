@@ -1,11 +1,9 @@
 package match
 
-// PortRange is inclusive at both ends; a single port has First == Last.
 type PortRange struct {
 	First, Last uint16
 }
 
-// PortMatcher is a short list scanned in order: rules name a handful of ports.
 type PortMatcher struct {
 	ranges []PortRange
 }
