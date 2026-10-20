@@ -13,12 +13,6 @@ import (
 
 // BindToContext makes blocking reads and writes on the stream fail once ctx
 // ends: at its deadline, or as soon as it is cancelled.
-//
-// release must be called before the stream is handed on. It clears the
-// deadline, so the stream is usable again, and returns ctx's error if ctx
-// ended first: the handshake may have been cut short and should be abandoned.
-// Callers that only need the deadline cleared may defer it and ignore the
-// error.
 func BindToContext(ctx context.Context, stream spec.Stream) (release func() error) {
 	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
 		stream.SetDeadline(deadline)
