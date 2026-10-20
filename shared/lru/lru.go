@@ -1,20 +1,12 @@
 // Package lru is a least-recently-used cache bounded by entry count: when it
 // is full, adding an entry removes the one used longest ago. Lookups, adds and
 // removals are constant time, and an entry costs one allocation.
-//
-// A Cache is not safe for concurrent use. Its users already hold a lock around
-// the data that goes with each entry, and a lock inside would be a second one.
 package lru
 
-// Cache keeps at most maxEntries entries. The zero value is not usable; make
-// one with New.
 type Cache[K comparable, V any] struct {
 	maxEntries int
 	entries    map[K]*entry[K, V]
 
-	// A ring through every entry: next is less recently used, previous is more.
-	// recency.next is the most recently used entry and recency.previous the
-	// least, so the cache needs no nil checks while linking.
 	recency entry[K, V]
 }
 
@@ -25,8 +17,6 @@ type entry[K comparable, V any] struct {
 	previous *entry[K, V]
 }
 
-// New makes a cache that holds at most maxEntries entries. A maxEntries below
-// one holds one entry: a cache that holds nothing is a mistake, not a setting.
 func New[K comparable, V any](maxEntries int) *Cache[K, V] {
 	if maxEntries < 1 {
 		maxEntries = 1
@@ -38,7 +28,6 @@ func New[K comparable, V any](maxEntries int) *Cache[K, V] {
 
 func (c *Cache[K, V]) Len() int { return len(c.entries) }
 
-// Get returns the value for key and makes it the most recently used.
 func (c *Cache[K, V]) Get(key K) (value V, found bool) {
 	used, ok := c.entries[key]
 	if !ok {
@@ -48,7 +37,6 @@ func (c *Cache[K, V]) Get(key K) (value V, found bool) {
 	return used.value, true
 }
 
-// Peek returns the value for key without changing which entry is oldest.
 func (c *Cache[K, V]) Peek(key K) (value V, found bool) {
 	peeked, ok := c.entries[key]
 	if !ok {
@@ -57,9 +45,6 @@ func (c *Cache[K, V]) Peek(key K) (value V, found bool) {
 	return peeked.value, true
 }
 
-// Add stores value under key as the most recently used entry, replacing any
-// value the key had. When that makes the cache hold more than maxEntries, the
-// least recently used entry is removed and returned.
 func (c *Cache[K, V]) Add(key K, value V) (evictedKey K, evictedValue V, evicted bool) {
 	if existing, ok := c.entries[key]; ok {
 		existing.value = value
@@ -75,7 +60,6 @@ func (c *Cache[K, V]) Add(key K, value V) (evictedKey K, evictedValue V, evicted
 	return evictedKey, evictedValue, false
 }
 
-// Remove deletes key and returns what it held.
 func (c *Cache[K, V]) Remove(key K) (value V, found bool) {
 	removed, ok := c.entries[key]
 	if !ok {
@@ -86,7 +70,6 @@ func (c *Cache[K, V]) Remove(key K) (value V, found bool) {
 	return removed.value, true
 }
 
-// Oldest returns the least recently used entry without changing the cache.
 func (c *Cache[K, V]) Oldest() (key K, value V, found bool) {
 	oldest := c.recency.previous
 	if oldest == &c.recency {
@@ -95,7 +78,6 @@ func (c *Cache[K, V]) Oldest() (key K, value V, found bool) {
 	return oldest.key, oldest.value, true
 }
 
-// RemoveOldest deletes the least recently used entry and returns it.
 func (c *Cache[K, V]) RemoveOldest() (key K, value V, found bool) {
 	oldest := c.recency.previous
 	if oldest == &c.recency {
@@ -116,7 +98,6 @@ func (c *Cache[K, V]) Each(visit func(key K, value V) bool) {
 	}
 }
 
-// Clear removes every entry.
 func (c *Cache[K, V]) Clear() {
 	clear(c.entries)
 	c.recency.next, c.recency.previous = &c.recency, &c.recency
