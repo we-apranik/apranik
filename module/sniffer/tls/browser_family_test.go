@@ -55,8 +55,6 @@ func TestBrowserFamilyOfEveryUTLSPreset(t *testing.T) {
 	}
 }
 
-// The first flight a uTLS client writes, which is one record carrying the
-// whole ClientHello for every preset.
 func clientHelloFromPreset(t *testing.T, helloID utls.ClientHelloID) []byte {
 	t.Helper()
 	clientEnd, serverEnd := net.Pipe()

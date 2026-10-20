@@ -1,7 +1,3 @@
-// Package tls is a sniffer: it recognises a TLS ClientHello in the first
-// bytes of a stream and reports the server name (SNI) the client asked for,
-// so routing can see a domain where the client only gave an IP, and a guess
-// at the browser family that sent it.
 package tls
 
 import (
@@ -23,7 +19,6 @@ func (*Sniffer) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "tls", Description: "sniff server name (SNI) and browser family from a TLS ClientHello"}
 }
 
-// Nothing to prepare: the sniffer reads only the bytes it is given.
 func (*Sniffer) NewSniffer() (spec.Sniffer, error) { return clientHelloSniffer{}, nil }
 
 func NewSnifferModule() spec.SnifferModule { return &Sniffer{} }
@@ -52,10 +47,6 @@ const (
 )
 
 // The signals, checked against every uTLS preset (browser_family_test.go):
-// Chromium and Apple clients send GREASE, Firefox never does; Chromium sends
-// session_ticket, Safari does not; Firefox sends record_size_limit, which Go
-// and most libraries do not. Anything else, or an old client lacking these,
-// is left unguessed rather than guessed wrong.
 func guessBrowserFamily(clientHello []byte) string {
 	extensionTypes, err := tlsclienthello.ExtensionTypes(clientHello)
 	if err != nil {
