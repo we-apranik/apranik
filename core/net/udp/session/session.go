@@ -1,11 +1,4 @@
-// Package session is one client's UDP session: a SOCKS5 association, a proxied
-// UDP stream, a mux sub-stream, or one source address on a plain UDP listener
-// or TUN. A session may reach several outbounds, so the session opens one
-// datagram per outbound, merges their replies, and closes them all together.
-// It routes nothing: the caller has already chosen the outbound.
-//
-// An outbound datagram lives as long as the session. Its own idle behaviour,
-// such as freedom's per-socket NAT timeout, belongs to the outbound.
+// Package session is one client's UDP session: a SOCKS5 association, a proxied UDP stream, a mux sub-stream, or one source address on a plain UDP listener or TUN.
 package session
 
 import (
@@ -24,7 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// UDP has no close, so silence is the only signal a session is finished.
 // PROVISIONAL: 5 minutes.
 const DefaultIdleTimeout = 5 * time.Minute
 
@@ -38,22 +30,18 @@ var (
 	ErrSendingToOutbound = errors.New("session: sending to outbound")
 )
 
-// Payload is valid until Release, which the receiver calls exactly once when
-// it has finished with it.
 type Reply struct {
 	Payload []byte
 	From    spec.Destination
 
-	// The tag of the outbound whose datagram received it.
 	OutboundTag string
 
 	buffer *[]byte
 	pool   *udp.BufferPool
 }
 
-// Release hands the payload's buffer back for the next reply. A receiver that
-// never calls it only costs an allocation later; one that reads Payload after
-// it would see another reply's bytes.
+// A receiver that never calls it only costs an allocation later; one that reads Payload after it would
+// see another reply's bytes.
 func (r Reply) Release() {
 	if r.buffer != nil {
 		r.pool.Release(r.buffer)
@@ -61,27 +49,16 @@ func (r Reply) Release() {
 }
 
 type Config struct {
-	// Identifies the session. Destination varies per packet and is not read here.
 	Metadata spec.Metadata
 
-	// Zero means DefaultIdleTimeout.
 	IdleTimeout time.Duration
 
-	// Where the session counts its datagrams, sessions and drops, on the
-	// session's inbound and user and on each outbound that carried it. Nil
-	// counts nothing.
 	Stats *stats.Registry
 
-	// Says why an outbound's datagram could not be created, for the outbound's
-	// dial failures. Nil counts every failure as stats.DialOther.
 	DialFailureReasonFor func(error) stats.DialFailureReason
 
-	// Where reply buffers come from, which also sets the largest reply the
-	// session takes: a bigger one is dropped and counted. Nil means a pool of
-	// udp.DefaultMaxDatagramSize buffers shared by every session that names none.
 	Buffers *udp.BufferPool
 
-	// Nil is allowed: New substitutes a silent logger.
 	Logger *logging.Logger
 }
 
@@ -91,21 +68,14 @@ type outboundDatagram struct {
 	outboundTag string
 	datagram    spec.Datagram
 
-	// The outbound that was asked for the datagram, where this datagram's
-	// drops are counted: a group counts them, not its member.
 	routedOutbound *stats.OutboundCounters
 
-	// What every datagram through it adds to, worked out once when it opened:
-	// the routed outbound and, for a group, the members beneath it. Added in
-	// batches from pending.
 	counters []*stats.Counters
 	pending  pendingDatagramCounts
 
-	// The routed outbound's tag, then the tags beneath it that carried it.
 	carryingOutboundTags []string
 
-	// Closed on removal, to free a reply loop blocked handing a packet to the
-	// session. Closing the datagram would not: it is not blocked on a read then.
+	// Closing the datagram would not: it is not blocked on a read then.
 	stopForwardingReplies chan struct{}
 }
 
@@ -115,8 +85,6 @@ func (o *outboundDatagram) stopForwardingAndClose() {
 }
 
 type Session struct {
-	// component.Outbound.CreateDatagram takes a context, and Send has nowhere
-	// else to get one.
 	ctx      context.Context
 	metadata spec.Metadata
 	logger   *logging.Logger
@@ -125,8 +93,6 @@ type Session struct {
 	dialFailureReasonFor func(error) stats.DialFailureReason
 	replyBuffers         *udp.BufferPool
 
-	// The session's inbound and user, worked out once. Added in batches from
-	// clientPending.
 	clientCounters []*stats.Counters
 	clientPending  pendingDatagramCounts
 
@@ -184,8 +150,6 @@ func New(ctx context.Context, config Config) *Session {
 	return newSession
 }
 
-// The session's inbound and its user once the protocol authenticated one;
-// none when counting is off.
 func countersOfClient(registry *stats.Registry, metadata spec.Metadata) []*stats.Counters {
 	if registry == nil {
 		return nil
@@ -263,9 +227,8 @@ func (s *Session) Send(payload []byte, to spec.Destination, via component.Outbou
 	return nil
 }
 
-// FlushCounts adds what the session has counted privately to the shared
-// counters now. It is done every so many datagrams, when the session ends and
-// whenever a caller asks, so a reader's numbers lag by little.
+// It is done every so many datagrams, when the session ends and whenever a caller asks, so a reader's
+// numbers lag by little.
 func (s *Session) FlushCounts() {
 	s.clientPending.flushInto(s.clientCounters)
 
@@ -280,9 +243,7 @@ func (s *Session) FlushCounts() {
 	}
 }
 
-// The tags of the outbounds that carried this session's datagram through via:
-// via's own, then those beneath it when it is a group. Nil before a datagram
-// was sent through via. The slice is shared; the caller must not change it.
+// The slice is shared; the caller must not change it.
 func (s *Session) CarryingOutboundTags(via component.Outbound) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -308,13 +269,11 @@ func (s *Session) openOrReuseOutboundDatagram(via component.Outbound) (*outbound
 
 	// Checked only here, when the outbound datagram is first opened: an
 	// outbound's networks never change, and Networks() may allocate, which
-	// would cost every packet.
 	if !slices.Contains(via.Networks(), spec.NetworkUDP) {
 		return nil, fmt.Errorf("session: outbound %q cannot carry udp: %w", tag, spec.ErrUnsupportedNetwork)
 	}
 
 	// Created outside the lock so a slow outbound does not stall sends heading
-	// for a different one.
 	datagram, err := via.CreateDatagram(s.ctx, s.metadata)
 	if err != nil {
 		s.countOpeningFailure(tag, err)
@@ -353,8 +312,6 @@ func (s *Session) openOrReuseOutboundDatagram(via component.Outbound) (*outbound
 	return outboundDatagram, nil
 }
 
-// An outbound that could not open a datagram, or the way to a destination for
-// one, counts as a dial failure of that outbound and a drop that says so.
 func (s *Session) countOpeningFailure(outboundTag string, err error) {
 	routedOutbound := s.stats.Outbound(outboundTag)
 	reason := stats.DialOther
@@ -383,15 +340,11 @@ func (s *Session) forwardRepliesFrom(outboundDatagram *outboundDatagram) {
 	// Send through that outbound opens a new one instead of finding a dead one.
 	defer s.forgetAndCloseOutboundDatagram(outboundDatagram)
 
-	// The last thing this datagram counts, so nothing it counted stays pending
-	// once nobody will flush it.
 	defer func() {
 		outboundDatagram.pending.flushInto(outboundDatagram.counters)
 		s.clientPending.flushInto(s.clientCounters)
 	}()
 
-	// Each reply is read straight into its own pooled buffer, which travels
-	// with it to the receiver; the next read takes a fresh one.
 	replyBuffer := s.replyBuffers.Acquire()
 	defer func() { s.replyBuffers.Release(replyBuffer) }()
 	for {

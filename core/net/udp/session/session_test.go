@@ -1,6 +1,4 @@
-// Package session_test drives a session against fake outbounds, where what it
-// opened and closed is observable, and against the real freedom outbound over
-// loopback, where the socket behaviour is real.
+// Package session_test drives a session against fake outbounds, where what it opened and closed is observable, and against the real freedom outbound over loopback, where the socket behaviour is real.
 package session_test
 
 import (
@@ -272,8 +270,6 @@ func TestRacingFirstSendsOpenOneOutboundDatagram(t *testing.T) {
 	}
 	senders.Wait()
 
-	// Dialing happens outside the lock, so several may be dialed; only one
-	// may survive, the losers being closed.
 	if surviving := out.survivingDatagramCount(); surviving != 1 {
 		t.Errorf("16 racing sends left %d datagrams alive out of %d dialed, want 1", surviving, out.datagramCount())
 	}
@@ -347,8 +343,7 @@ func TestAQuietSessionEndsWithTheIdleReason(t *testing.T) {
 	if !errors.Is(udpSession.Err(), session.ErrIdle) {
 		t.Errorf("Err() = %v, want session.ErrIdle", udpSession.Err())
 	}
-	// Done closes first and the datagrams right after it, so give the close a
-	// moment instead of racing it.
+	// Done closes first and the datagrams right after it, so give the close a moment instead of racing it.
 	datagram := out.datagramAt(t, 0)
 	deadline := time.Now().Add(2 * time.Second)
 	for !datagram.wasClosed() && time.Now().Before(deadline) {
@@ -394,7 +389,6 @@ func TestCloseEndsWithTheClosedReasonAndLeaksNothing(t *testing.T) {
 	}
 }
 
-// One NAT per session, over the real freedom outbound.
 func TestTwoSessionsToOneDestinationUseDifferentSockets(t *testing.T) {
 	peer, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
@@ -547,9 +541,6 @@ func BenchmarkSessionReplyCounting(b *testing.B) {
 	}
 }
 
-// Every goroutine drives its own session, as concurrent clients do, and all of
-// them count into the same inbound, user and outbound: the shared counters are
-// what contends.
 func benchmarkSessionSendParallel(b *testing.B, shared session.Config) {
 	destination, err := spec.NewDestinationFromIP(netip.MustParseAddr("192.0.2.1"), 53)
 	if err != nil {

@@ -30,7 +30,6 @@ func statsSessionConfig(registry *stats.Registry) session.Config {
 	return session.Config{Metadata: spec.Metadata{Network: spec.NetworkUDP, InboundTag: "in", User: "alice"}, Stats: registry}
 }
 
-// A group's datagram says which member carried it, as component.CarryingOutboundsReporter asks.
 type carriedFakeDatagram struct {
 	*fakeDatagram
 	tags []string
@@ -187,9 +186,6 @@ func TestAFailedOpenCountsADialFailureAndADropOnTheOutbound(t *testing.T) {
 	}
 }
 
-// A datagram that opens the way to each destination on its first write
-// (a protocol naming the destination in its stream request) fails to open in a
-// write, and that counts as the outbound failing to open, not a failed send.
 func TestAWriteThatFailsToOpenTheWayToADestinationCountsADialFailure(t *testing.T) {
 	registry := newStatsRegistry()
 	out := newFakeOutbound("out")
