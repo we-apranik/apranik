@@ -39,7 +39,7 @@ func TestResolve(t *testing.T) {
 		config Config
 		header http.Header
 		below  spec.Endpoint
-		want   string // empty: ignored
+		want   string
 	}{
 		{"single entry", Config{Headers: forwarded}, headers("X-Forwarded-For", "5.6.7.8"), endpoint("10.0.0.2", 1), "5.6.7.8:0"},
 		{"a forged prefix is ignored", Config{Headers: forwarded}, headers("X-Forwarded-For", "1.2.3.4, 5.6.7.8"), endpoint("10.0.0.2", 1), "5.6.7.8:0"},

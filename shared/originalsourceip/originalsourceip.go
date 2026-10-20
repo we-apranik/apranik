@@ -2,8 +2,6 @@
 // header names, and whether to believe it. A proxy in front of the server
 // appends the address it saw to a header such as X-Forwarded-For; anyone can
 // also write that header, so the address is taken from the right, past the
-// proxies the operator listed, and only from a peer and a request that pass the
-// operator's checks. It knows nothing of what carries the request.
 package originalsourceip
 
 import (
@@ -16,17 +14,10 @@ import (
 )
 
 type Config struct {
-	// Header names, in order. The first one the request carries is read; a
-	// value that does not parse is not passed over for the next name, or a
-	// client could choose which header counts.
 	Headers []string
 
-	// Addresses and ranges of the operator's proxies. Empty means the peer is
-	// not checked and no address is skipped: the right-most entry is the client.
 	TrustedProxies []netip.Prefix
 
-	// A header the proxy adds. Empty name means no proof is required; an empty
-	// value means the header only has to be present.
 	ProofHeaderName  string
 	ProofHeaderValue string
 }
@@ -35,10 +26,6 @@ type Resolver struct{ config Config }
 
 func New(config Config) *Resolver { return &Resolver{config: config} }
 
-// Resolve returns the client's endpoint and true, or false when the request
-// must be treated as if it had no such header: the caller keeps the address
-// the layer below reported. below is that address. The port is the entry's, or
-// 0 when the header carries none.
 func (r *Resolver) Resolve(header http.Header, below spec.Endpoint) (spec.Endpoint, bool) {
 	if len(r.config.TrustedProxies) > 0 && !r.trusted(below.Addr()) {
 		return spec.Endpoint{}, false
@@ -95,7 +82,6 @@ func (r *Resolver) proven(header http.Header) bool {
 	return matched == 1
 }
 
-// Repeated header lines are one list, in the order they arrived.
 func (r *Resolver) entries(header http.Header) ([]string, bool) {
 	for _, name := range r.config.Headers {
 		lines := header.Values(name)
@@ -113,8 +99,6 @@ func (r *Resolver) entries(header http.Header) ([]string, bool) {
 	return nil, false
 }
 
-// "1.2.3.4", "1.2.3.4:5678", "::1", "[::1]", "[::1]:80". A zone, an empty
-// entry or anything else is not an address.
 func parseEntry(entry string) (spec.Endpoint, bool) {
 	var address netip.Addr
 	var port uint16
