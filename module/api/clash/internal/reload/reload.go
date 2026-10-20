@@ -1,5 +1,3 @@
-// Package reload serves POST /reload: load the configuration again. It is an
-// Apranik extension; Mihomo reloads through PUT /configs.
 package reload
 
 import (
@@ -17,9 +15,6 @@ func Register(router *web.Router, provider spec.APICoreProvider) {
 
 type handler struct{ provider spec.APICoreProvider }
 
-// reload asks the core to load its configuration source again. The answer says
-// whether the configuration was accepted. It is applied afterwards, and this
-// server is closed and started again with the rest, so the client reconnects.
 func (h handler) reload(w http.ResponseWriter, r *http.Request) {
 	err := h.provider.RequestReload()
 	switch {
