@@ -13,7 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// fakeStream is a client's stream: the test pushes what it reads and sees what is written to it.
 type fakeStream struct {
 	reads     chan readResult
 	written   chan []byte

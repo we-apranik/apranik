@@ -1,13 +1,4 @@
-// Package resumable keeps a UDP session alive after the stream that carried it
-// is lost, so a client that reconnects with the same XUDP Global ID gets its
-// session back: its outbound sockets, and so the source port the destination
-// sees, stay the same.
-//
-// The relay is given a Datagram that stands in for the client's stream. While a
-// stream is attached it passes datagrams through. When the stream is lost it
-// waits for the hold time, and a stream with the same key that arrives in time
-// is attached in its place; a stream the client ended on purpose ends the
-// session at once.
+// Package resumable keeps a UDP session alive after the stream that carried it is lost, so a client that reconnects with the same XUDP Global ID gets its session back: its outbound sockets, and so the source port the destination sees, stay the same.
 package resumable
 
 import (
@@ -23,15 +14,12 @@ import (
 // PROVISIONAL, as the other cores' hold: Xray keeps a session one minute.
 const DefaultHoldTime = time.Minute
 
-// Key names a client's UDP session across the streams that carry it. The user is
-// in it so that another user who read the ID off an unencrypted carrier cannot
-// take the session.
+// The user is in it so that another user who read the ID off an unencrypted carrier cannot
 type Key struct {
 	User     string
 	GlobalID [8]byte
 }
 
-// Registry holds the sessions of one inbound. Safe for concurrent use.
 type Registry struct {
 	holdTime time.Duration
 
@@ -39,7 +27,6 @@ type Registry struct {
 	sessions map[Key]*Datagram
 }
 
-// NewRegistry: a hold time that is not positive means DefaultHoldTime.
 func NewRegistry(holdTime time.Duration) *Registry {
 	if holdTime <= 0 {
 		holdTime = DefaultHoldTime
@@ -47,12 +34,6 @@ func NewRegistry(holdTime time.Duration) *Registry {
 	return &Registry{holdTime: holdTime, sessions: make(map[Key]*Datagram)}
 }
 
-// Connect says what to do with a client's stream. For a key with no session it
-// returns the stand-in the session is to run on, with the stream attached
-// (resumed is false). For a key that has one it attaches the stream to it, closing
-// the stream it replaces if that is still open, and returns resumed true with a
-// channel that is closed when this stream is no longer the session's: the caller
-// holds the stream until then and has nothing else to do.
 func (r *Registry) Connect(key Key, stream spec.Datagram) (standIn *Datagram, resumed bool, streamEnded <-chan struct{}) {
 	for {
 		r.mutex.Lock()
@@ -68,7 +49,6 @@ func (r *Registry) Connect(key Key, stream spec.Datagram) (standIn *Datagram, re
 		if ended, attached := existing.attach(stream); attached {
 			return existing, true, ended
 		}
-		// It closed between the lookup and the attach.
 		r.forget(key, existing)
 	}
 }
@@ -81,8 +61,6 @@ func (r *Registry) forget(key Key, session *Datagram) {
 	}
 }
 
-// Datagram is the client side of one UDP session, whatever stream carries it.
-// Safe for one reader and many writers, which is what a relay needs.
 type Datagram struct {
 	registry  *Registry
 	key       Key
@@ -110,7 +88,6 @@ func newDatagram(registry *Registry, key Key, first spec.Datagram) *Datagram {
 	}
 }
 
-// signalChangeLocked wakes every reader waiting for a stream.
 func (d *Datagram) signalChangeLocked() {
 	close(d.changed)
 	d.changed = make(chan struct{})
@@ -142,9 +119,6 @@ func (d *Datagram) attach(stream spec.Datagram) (streamEnded <-chan struct{}, at
 	return ended, true
 }
 
-// A read waits while no stream is attached. An error that ends a stream is a
-// loss, which starts the hold, unless it is io.EOF: the client ended the session
-// on purpose, so it ends here and now.
 func (d *Datagram) ReadFrom(payload []byte) (int, spec.Destination, error) {
 	for {
 		d.mutex.Lock()
@@ -170,7 +144,6 @@ func (d *Datagram) ReadFrom(payload []byte) (int, spec.Destination, error) {
 	}
 }
 
-// hold detaches a lost stream, if it is still the current one, and starts the clock.
 func (d *Datagram) hold(lost spec.Datagram) {
 	d.mutex.Lock()
 	if d.closed || d.current != lost {
@@ -195,9 +168,8 @@ func (d *Datagram) holdRanOut() {
 	}
 }
 
-// WriteTo drops a reply while no stream is attached, and one a lost stream
-// fails to carry: the read side finds the loss, and an error here would end the
-// session the hold is there to keep.
+// WriteTo drops a reply while no stream is attached, and one a lost stream fails to carry: the read
+// side finds the loss, and an error here would end the session the hold is there to keep.
 func (d *Datagram) WriteTo(payload []byte, source spec.Destination) (int, error) {
 	d.mutex.Lock()
 	current := d.current
@@ -212,15 +184,12 @@ func (d *Datagram) WriteTo(payload []byte, source spec.Destination) (int, error)
 	return len(payload), nil
 }
 
-// Close ends the session for good and the stream attached, if any.
 func (d *Datagram) Close() error {
 	d.closeBecause(net.ErrClosed)
 	return nil
 }
 
-// closeBecause: reason is what a read returns from now on. The session ending
-// on its own, the hold running out or the client ending it, is io.EOF, which the
-// inbound does not log as a failure.
+// closeBecause: reason is what a read returns from now on.
 func (d *Datagram) closeBecause(reason error) {
 	d.mutex.Lock()
 	if d.closed {
