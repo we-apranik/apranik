@@ -14,9 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A client datagram and a server datagram over one pipe: the first write names
-// the destination, the server reads every frame as bound for it, and what it
-// answers comes back from it.
 func TestUDPRoundTripBindsTheStreamToTheFirstDestination(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	results := serve(t, serverSide)
@@ -42,7 +39,6 @@ func TestUDPRoundTripBindsTheStreamToTheFirstDestination(t *testing.T) {
 		t.Fatalf("server read %q to %s, %v, want the query bound for %s", buffer[:size], to, err, dns)
 	}
 
-	// The destination argument of a reply is ignored.
 	go result.datagram.WriteTo([]byte("answer"), ipDestination("203.0.113.9", 4000))
 	size, from, err := datagram.ReadFrom(buffer)
 	if err != nil || string(buffer[:size]) != "answer" || from != dns {

@@ -14,13 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// XUDP is one Mux.Cool sub-connection per UDP session, sent after a request with
-// the Mux command, so one stream to the server carries a session's datagrams to
-// every destination. Each stream holds exactly one sub-connection.
-
-// requestXUDP sends the Mux request with the first frame: the request waits in
-// the delayed stream for the first Write, which is the New frame carrying the
-// first datagram, so the three leave in one write.
 func (c *client) requestXUDP(underlyingStream spec.Stream, globalID [8]byte) (spec.Datagram, error) {
 	request, err := wire.AppendRequestHeader(nil, wire.Request{UUID: c.uuid, Command: wire.CommandMux})
 	if err != nil {
@@ -101,10 +94,6 @@ func (d *xudpClientDatagram) Close() error {
 
 func (d *xudpClientDatagram) LocalAddr() net.Addr { return d.carrier.LocalAddr() }
 
-// acceptXUDP serves the one UDP sub-connection a Mux request may carry: the
-// library refuses TCP and every sub-connection after the first with an End. The
-// peer has the handshake timeout to send its first New frame, which may carry
-// the session's Global ID; it is returned beside the datagram.
 func (s *server) acceptXUDP(underlyingStream spec.Stream) (spec.Datagram, [8]byte, error) {
 	carrier := newResponseHeaderFirstStream(underlyingStream)
 	underlyingStream.SetReadDeadline(time.Now().Add(s.handshakeTimeout))

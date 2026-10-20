@@ -24,8 +24,6 @@ const (
 	thirtyOneByte = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
 
-// A setting left out has its default; a written zero or negative duration is
-// refused, never taken as the default.
 func TestAWrittenZeroOrNegativeDurationIsRefused(t *testing.T) {
 	for _, key := range []string{"handshake_timeout"} {
 		for _, written := range []string{"0s", "-1s"} {

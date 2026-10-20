@@ -13,21 +13,12 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Proxy fills StreamProxyModule for CONNECT and DatagramOverStreamProxyModule
-// for UDP, whose datagrams are framed inside the same stream. It is registered
-// once, so one Proxy is decoded for an inbound and its server is built once and
-// serves both: reusing a Proxy for a second inbound would give that inbound the
-// same server.
 type Proxy struct {
 	Settings
 
-	// Set by ConfigureMuxCool before any client or server is built. Without it, as
-	// in a program that uses the module with no core, a client sends plain UDP and
-	// a server takes XUDP.
 	xudp              bool
 	muxCoolConfigured bool
 
-	// Set by ConfigureProxyRequestTiming before any client is built; nil means the defaults.
 	requestTiming *delayedrequest.Policy
 
 	buildServerOnce sync.Once
@@ -51,18 +42,12 @@ func (p *Proxy) NewDatagramOverStreamClient() (spec.DatagramOverStreamProxyClien
 	return p.newClient()
 }
 
-// ConfigureMuxCool is called by core with what the muxcool key says: whether a
-// client sends UDP as XUDP, and whether a server takes it. A server takes plain
-// UDP either way, by the command of the request.
 func (p *Proxy) ConfigureMuxCool(options spec.MuxCoolOptions) error {
 	p.xudp = options.XUDP
 	p.muxCoolConfigured = true
 	return nil
 }
 
-// ConfigureProxyRequestTiming is called by core with what the outbound's
-// proxy_request_timing key says: how long the request waits for the first
-// payload, and which ports send it at once. A server needs nothing.
 func (p *Proxy) ConfigureProxyRequestTiming(options spec.ProxyRequestTimingOptions) error {
 	requestTiming, err := delayedrequest.NewPolicy(options)
 	if err != nil {
@@ -72,8 +57,6 @@ func (p *Proxy) ConfigureProxyRequestTiming(options spec.ProxyRequestTimingOptio
 	return nil
 }
 
-// Without a ConfigureProxyRequestTiming, as in a program that uses the module
-// with no core, the defaults.
 func (p *Proxy) requestTimingPolicy() delayedrequest.Policy {
 	if p.requestTiming == nil {
 		return delayedrequest.DefaultPolicy()

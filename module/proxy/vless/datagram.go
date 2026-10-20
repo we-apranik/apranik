@@ -12,11 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ErrStreamServesAnotherDestination is a client datagram asked to send to a
-// second destination. Plain VLESS names one destination per stream, in its
-// request; core opens a stream per destination for it (the client says so with
-// DatagramDestinationIsWritten), so this is a bug in the caller, not a
-// condition to recover from.
 var ErrStreamServesAnotherDestination = errors.New("vless: this stream serves another destination")
 
 // clientDatagram carries the datagrams of ONE destination as length-prefixed
@@ -35,11 +30,8 @@ type clientDatagram struct {
 	frameBuffer []byte // reused for every frame; guarded by writeMutex
 	requestSent bool   // guarded by writeMutex
 
-	// Set once, by the first WriteTo, and read by the reader to say where each
-	// datagram came from.
 	servedDestination atomic.Pointer[spec.Destination]
 
-	// Touched by the reader only.
 	responseHeaderRead bool
 }
 
@@ -47,9 +39,6 @@ func newClientDatagram(stream spec.Stream, uuid wire.UUID) *clientDatagram {
 	return &clientDatagram{stream: stream, reader: bufio.NewReader(stream), uuid: uuid}
 }
 
-// The first call reads the server's answer header, which the server sends in
-// front of its first frame. Every datagram is reported as coming from the
-// destination the request named.
 func (d *clientDatagram) ReadFrom(payload []byte) (int, spec.Destination, error) {
 	if !d.responseHeaderRead {
 		if err := wire.ReadResponseHeader(d.reader); err != nil {
@@ -68,8 +57,6 @@ func (d *clientDatagram) ReadFrom(payload []byte) (int, spec.Destination, error)
 	return size, *served, nil
 }
 
-// One Write per frame, under the lock, so frames from concurrent writers never
-// interleave.
 func (d *clientDatagram) WriteTo(payload []byte, destination spec.Destination) (int, error) {
 	d.writeMutex.Lock()
 	defer d.writeMutex.Unlock()

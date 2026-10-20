@@ -19,14 +19,8 @@ type Settings struct {
 	// which becomes one.
 	UUID types.Secret `json:"uuid"`
 
-	// Who an inbound accepts; an outbound refuses it. The matched user's name
-	// lands in Metadata.User. Users can be added and removed while the inbound
-	// runs (UserManager), and a name is unique within the inbound.
 	Users []User `json:"users"`
 
-	// Server: how long a client may take to send its request. A client sends
-	// its request with the first payload and waits for no answer, so it has
-	// nothing to bound. Absent means defaultHandshakeTimeout; a written zero is refused.
 	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
@@ -42,8 +36,6 @@ type User struct {
 	UUID types.Secret `json:"uuid"`
 }
 
-// Validate holds what is wrong for either role; checkAsServer and checkAsClient
-// hold what is wrong for one, and run where the role is known.
 func (s *Settings) Validate() error {
 	if err := types.CheckPositive(s.HandshakeTimeout); err != nil {
 		return fmt.Errorf("vless: handshake_timeout %w", err)
@@ -78,8 +70,6 @@ func (s *Settings) Validate() error {
 	return nil
 }
 
-// checkUser says what is wrong with one user on its own, without saying where
-// the user is and without ever naming a UUID.
 func checkUser(user User) error {
 	switch {
 	case user.Name == "":

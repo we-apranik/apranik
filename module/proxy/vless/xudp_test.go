@@ -88,8 +88,6 @@ func TestXUDPCarriesManyDestinationsAndRepliesFromManySourcesOnOneStream(t *test
 		t.Errorf("metadata = %+v, want alice over udp with no destination", result.metadata)
 	}
 
-	// The reader of a main connection waits for the first datagram to be read
-	// before it reads the next frame, so the test reads each as it goes.
 	payload, to := readDatagramWithin(t, result.datagram)
 	if string(payload) != "one" || to != first {
 		t.Errorf("server read %q for %s, want one for %s", payload, to, first)
@@ -116,8 +114,6 @@ func TestXUDPCarriesManyDestinationsAndRepliesFromManySourcesOnOneStream(t *test
 	}
 }
 
-// The request, the New frame and the first datagram go out in one Write, so a
-// connection never opens with a small packet of a fixed length on its own.
 func TestXUDPSendsTheRequestTheNewFrameAndTheFirstDatagramInOneWrite(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	go io.Copy(io.Discard, serverSide)
@@ -153,7 +149,6 @@ func TestXUDPSendsTheRequestTheNewFrameAndTheFirstDatagramInOneWrite(t *testing.
 	}
 }
 
-// recordedWrites keeps each Write separately and passes it on.
 type recordedWrites struct {
 	spec.Stream
 	writes chan []byte
@@ -227,8 +222,6 @@ func TestClosingTheClientDatagramEndsAReadThatWaitsForTheFirstWrite(t *testing.T
 	}
 }
 
-// skipsResponseHeader stands in for the client's side of a raw Mux conversation:
-// the server's answer header comes before its first frame.
 type skipsResponseHeader struct {
 	spec.Stream
 	skipped bool
@@ -525,7 +518,6 @@ func TestWithoutAGlobalIDTheServersMetadataHasNone(t *testing.T) {
 	}
 }
 
-// The plain UDP form has no sub-connection to carry an ID, so the metadata's ID is not sent.
 func TestPlainUDPSendsNoGlobalID(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	results := serve(t, serverSide)

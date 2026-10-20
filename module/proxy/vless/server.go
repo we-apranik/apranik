@@ -15,12 +15,8 @@ import (
 )
 
 var (
-	// A request from a known user asking for a flow (XTLS Vision), which this
-	// module does not implement. The client is genuine, so this is no fallback.
 	ErrUnsupportedFlow = errors.New("vless: flow not supported")
 
-	// A request from a known user for a command this module does not implement
-	// (Reverse).
 	ErrUnsupportedCommand = errors.New("vless: command not supported")
 )
 
@@ -53,8 +49,6 @@ func newServer(users []user, handshakeTimeout time.Duration, acceptsXUDP bool) *
 	return s
 }
 
-// Only the addons, whose length the request gives, sit before the command byte,
-// so the kind of request is known without reading, or judging, the rest.
 func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec.PeekableStream) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
@@ -79,8 +73,6 @@ func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec
 	return command == wire.CommandUDP || command == wire.CommandMux, nil
 }
 
-// Nothing is written during the handshake, so every refusal may ask for the
-// fallback.
 func (s *server) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	_, metadata, err := s.acceptRequest(ctx, underlyingStream, wire.CommandTCP)
 	if err != nil {
@@ -134,8 +126,6 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 	case request.Command == wire.CommandMux && !s.acceptsXUDP:
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("%w: X'%02X', XUDP is turned off on this server", ErrUnsupportedCommand, request.Command)
 	case !slices.Contains(wantedCommands, request.Command):
-		// Core dispatched on IsDatagramOverStream, so this is a mismatch
-		// between the two calls, not a client error.
 		return wire.Request{}, spec.Metadata{}, fmt.Errorf("vless: command X'%02X' reached the wrong accept: %w", request.Command, spec.ErrUnsupportedNetwork)
 	}
 
@@ -144,7 +134,6 @@ func (s *server) acceptRequest(ctx context.Context, underlyingStream spec.Stream
 		metadata.Network = spec.NetworkTCP
 		metadata.Destination = request.Destination
 	} else {
-		// UDP and XUDP name their destinations per datagram, or in the request.
 		metadata.Network = spec.NetworkUDP
 	}
 	return request, metadata, nil
@@ -166,8 +155,6 @@ func (s *server) lookUp(uuid wire.UUID) (string, bool) {
 	return users[matchedIndex].name, true
 }
 
-// Only bytes that are not a VLESS request go to the fallback. A closed, reset
-// or silent connection is closed.
 func isMalformedRequest(err error) bool {
 	return errors.Is(err, wire.ErrUnknownVersion) || errors.Is(err, wire.ErrUnknownCommand) ||
 		errors.Is(err, wire.ErrMalformedAddons) || errors.Is(err, wire.ErrUnsupportedAddressType) ||

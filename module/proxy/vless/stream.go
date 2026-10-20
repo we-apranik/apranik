@@ -55,10 +55,6 @@ func (s *responseHeaderFirstStream) CloseWrite() error {
 	return s.Stream.CloseWrite()
 }
 
-// responseHeaderSkippingStream is the client's side: the server's answer header
-// is read and dropped before the first payload byte is returned. Nothing is
-// read until the application reads, so the client never waits for the server
-// before sending.
 type responseHeaderSkippingStream struct {
 	spec.Stream
 
@@ -71,8 +67,6 @@ func (s *responseHeaderSkippingStream) Read(buffer []byte) (int, error) {
 	defer s.readMutex.Unlock()
 	if !s.headerRead {
 		if err := wire.ReadResponseHeader(s.Stream); err != nil {
-			// A server that ends the stream without answering has nothing to
-			// deliver; that is the end of the stream, not a broken header.
 			if errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 				return 0, io.EOF
 			}

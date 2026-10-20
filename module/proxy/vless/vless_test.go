@@ -29,7 +29,6 @@ type pipeStream struct{ net.Conn }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// bufferedStream is the smallest spec.PeekableStream, standing in for core's.
 type bufferedStream struct {
 	spec.Stream
 	reader *bufio.Reader
@@ -38,8 +37,6 @@ type bufferedStream struct {
 func (s bufferedStream) Read(p []byte) (int, error) { return s.reader.Read(p) }
 func (s bufferedStream) Peek(n int) ([]byte, error) { return s.reader.Peek(n) }
 
-// A bufio.Reader always reads ahead, so this stand-in cannot keep the promise;
-// VLESS never asks for it.
 func (bufferedStream) PeekExactly(int) ([]byte, error) { panic("vless does not use PeekExactly") }
 func newBufferedStream(s spec.Stream) bufferedStream   { return bufferedStream{s, bufio.NewReader(s)} }
 
@@ -112,7 +109,6 @@ type accepted struct {
 	err        error
 }
 
-// serve does what core does: identify, then call the matching accept.
 func serve(t *testing.T, underlyingStream spec.Stream) <-chan accepted {
 	server := newServer(t)
 	results := make(chan accepted, 1)
@@ -176,8 +172,6 @@ func TestConnectRoundTripKeepsTheEarlyPayloadAndPutsTheAnswerHeaderOnlyBeforeSer
 	}
 }
 
-// writeRecordingStream keeps each Write separately, so a test can tell one
-// segment carrying header and payload from two.
 type writeRecordingStream struct {
 	pipeStream
 	writes chan []byte
@@ -313,8 +307,6 @@ func TestTheClientSaysItWritesTheDatagramDestinationInTheStreamRequest(t *testin
 	}
 }
 
-// What a client that is not VLESS, or not a user, sends is handed to the
-// fallback; nothing has been written back.
 func TestTheServerAsksForTheFallbackOnWhatIsNotAKnownUsersRequest(t *testing.T) {
 	validFor := func(uuid string) []byte {
 		parsed, _ := wire.ParseUUID(uuid)
@@ -331,9 +323,6 @@ func TestTheServerAsksForTheFallbackOnWhatIsNotAKnownUsersRequest(t *testing.T) 
 	}{
 		{"unknown uuid", validFor("c0ffee00-0000-4000-8000-000000000000"), true},
 		{"another version", wrongVersion, false},
-		// Long enough to hold the command byte wherever the addons length it
-		// took from the text puts it. A shorter probe waits for its handshake
-		// timeout and is closed, as with Trojan (an open question in CLAUDE.md).
 		{"http", []byte("GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: " + strings.Repeat("x", 300) + "\r\n\r\n"), false},
 		{"tls client hello", append([]byte{0x16, 0x03, 0x01, 0x02, 0x00, 0x01, 0x00, 0x01, 0xfc, 0x03, 0x03}, make([]byte, 40)...), false},
 	}
@@ -505,7 +494,6 @@ func TestAnAcceptedStreamClosedBeforeWritingSendsNothing(t *testing.T) {
 	}
 }
 
-// halfCloseRecordingStream is a server-side stream with a canned request.
 type halfCloseRecordingStream struct {
 	input      *bytes.Reader
 	writes     chan []byte
