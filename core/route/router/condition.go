@@ -9,12 +9,10 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// condition is one compiled field of a match, or a whole match.
 type condition interface {
 	matches(request *routedRequest) bool
 }
 
-// Every condition must hold; none at all matches every request.
 type allOf []condition
 
 func (c allOf) matches(request *routedRequest) bool {
@@ -66,7 +64,6 @@ func (c sniffedProtocolCondition) matches(request *routedRequest) bool {
 	return sniffed != nil && slices.Contains(c, sniffed.Protocol)
 }
 
-// Literal domains and domain datasets alike: any matcher matching the name.
 type domainCondition []*match.DomainMatcher
 
 func (c domainCondition) matches(request *routedRequest) bool {
@@ -122,7 +119,6 @@ func (c sourcePortCondition) matches(request *routedRequest) bool {
 	return request.metadata.Transport.SourceEndpoint.IsValid() && c.ports.Contains(request.metadata.Transport.SourceEndpoint.Port())
 }
 
-// Every named header must be present and match; header names are lowercase.
 type sniffedRequestHeaderCondition map[string]*regexp.Regexp
 
 func (c sniffedRequestHeaderCondition) matches(request *routedRequest) bool {
@@ -146,7 +142,6 @@ func (c sniffedBrowserFamilyCondition) matches(request *routedRequest) bool {
 	return sniffed != nil && sniffed.BrowserFamily != "" && slices.Contains(c, sniffed.BrowserFamily)
 }
 
-// A domain destination matches no version until a resolve action has run.
 type ipVersionCondition []int
 
 func (c ipVersionCondition) matches(request *routedRequest) bool {

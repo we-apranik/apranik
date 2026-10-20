@@ -29,7 +29,6 @@ func (o fakeOutbound) CreateDatagram(context.Context, spec.Metadata) (spec.Datag
 }
 func (o fakeOutbound) Close() error { return nil }
 
-// Answers Sniff with a fixed result, and counts the calls.
 type fakeInformant struct {
 	metadata   spec.Metadata
 	sniffed    *spec.SniffResult
@@ -357,8 +356,6 @@ func TestResolveFeedsIPRulesWithoutRewritingTheDestination(t *testing.T) {
 		}
 	}
 
-	// An IP destination is its own answer; what a resolve found does not
-	// replace it.
 	byIP := &fakeInformant{metadata: tcpTo(toIP("8.8.8.8", 443)), resolved: []netip.Addr{netip.MustParseAddr("185.143.233.2")}}
 	if got := decide(t, router, byIP); got != "proxy" {
 		t.Errorf("IP destination: got %s, want proxy", got)
@@ -402,9 +399,6 @@ func TestNewRefusesWhatCheckWouldHave(t *testing.T) {
 	}
 }
 
-// The router runs once per TCP connection and once per new UDP destination.
-// A realistic config: sniff, block ads, private direct, Iran direct, the rest
-// proxied, with dataset sizes close to the real ir and ads categories.
 func BenchmarkRouteRealisticConfig(b *testing.B) {
 	adsDomains := make([]string, 60_000)
 	for index := range adsDomains {

@@ -1,8 +1,4 @@
-// Package router decides where each request goes. Rules are
-// compiled once, with every tag already turned into the outbound or dataset it
-// names, and then only read: one Router serves every inbound at once. What
-// costs work to find out, such as a sniff or a lookup, it asks the traffic
-// informant for, and only when a rule's action says so.
+// Package router decides where each request goes.
 package router
 
 import (
@@ -20,10 +16,6 @@ import (
 // DefaultRuleLocation is what Decision.Rule holds when no rule decided.
 const DefaultRuleLocation = "default"
 
-// RuleLocation is where the rule at index sits in the config, the text a
-// Decision names it by. A rule has no name of its own; statistics key their
-// per-rule counts by this, and the builder derives the same strings from the
-// blueprint before any router exists.
 func RuleLocation(index int) string { return fmt.Sprintf("routing.rules[%d]", index) }
 
 type Router struct {
@@ -52,12 +44,9 @@ type compiledAction struct {
 	sniffers     []spec.Sniffer
 	sniffTimeout time.Duration
 
-	// The DNS server a resolve asks; empty means the DNS rules choose.
 	resolveServer string
 }
 
-// Config is what New compiles: the routing blueprint, and everything its tags
-// name, already built.
 type Config struct {
 	Routing   blueprint.Routing
 	Outbounds map[string]component.Outbound
@@ -96,8 +85,6 @@ func New(config Config) (*Router, error) {
 	return router, nil
 }
 
-// NewWithDefaultOutbound is the router for a config with no routing section:
-// every request takes one outbound.
 func NewWithDefaultOutbound(outbound component.Outbound) *Router {
 	return &Router{defaultDecision: component.Decision{Outbound: outbound, Rule: DefaultRuleLocation}}
 }

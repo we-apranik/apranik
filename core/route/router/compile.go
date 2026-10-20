@@ -12,14 +12,11 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// config.Check reports every problem found here with its location first; these
-// errors are for a blueprint written in Go that skipped it.
 type ruleCompiler struct {
 	outbounds map[string]component.Outbound
 	datasets  map[string]*dataset.Dataset
 }
 
-// Each field becomes one condition; a match holds only if all of them do.
 func (c ruleCompiler) compileMatch(fields blueprint.Match) (condition, error) {
 	var (
 		conditions allOf
