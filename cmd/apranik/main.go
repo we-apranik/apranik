@@ -1,6 +1,4 @@
-// Command apranik runs Apranik as a standalone process, so the library can be
-// used and tested without an embedding app. It loads a configuration
-// config file and serves it, or checks one without running it.
+// Command apranik runs Apranik as a standalone process.
 //
 //	apranik run [-config path]     load a config file and serve it
 //	apranik check [-config path]   check a config file without running it
@@ -8,8 +6,6 @@
 //	apranik generate uuid          generate a value a config file needs
 //	apranik version                version and build information
 //	apranik help [command]         usage
-//
-// main owns the control flow and is the only place that calls os.Exit.
 package main
 
 import (
@@ -37,7 +33,6 @@ func main() {
 	}
 
 	if err := command.Run(args); err != nil {
-		// -h on a subcommand: flag printed the usage already.
 		if errors.Is(err, flag.ErrHelp) {
 			os.Exit(exitSuccess)
 		}
@@ -51,8 +46,7 @@ func main() {
 	os.Exit(exitSuccess)
 }
 
-// A bare invocation and the help flags all mean help, so everything
-// downstream sees a command name.
+// A bare invocation and the help flags all mean help, so everything downstream sees a command name.
 func parseInvocation(argv []string) (name string, args []string) {
 	if len(argv) == 0 {
 		return "help", nil
