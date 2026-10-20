@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// Silence is the default: with no sinks configured nothing is written anywhere,
-// so a user on a censored network leaves no trail unless one is asked for.
 func TestNoSinksMeansSilent(t *testing.T) {
 	system, err := New(Config{})
 	if err != nil {
@@ -76,8 +74,6 @@ type closeCountingSink struct {
 
 func (s *closeCountingSink) Close() error { s.closed++; return nil }
 
-// Outputs are opened by New and nowhere else, and a failure partway through
-// releases what was already opened.
 func TestNewOpensOutputsAndUnwindsOnFailure(t *testing.T) {
 	first := &closeCountingSink{recordingSink: recordingSink{level: LevelDebug}}
 	_, err := New(Config{Outputs: []Output{HandlerOutput{Handler: first}, failingOutput{}}})

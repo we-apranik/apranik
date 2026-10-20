@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// recordingSink captures what reaches it, so a test can assert a sink saw the
-// attrs and not just the message.
 type recordingSink struct {
 	level    Level
 	failWith error
@@ -65,8 +63,6 @@ func TestEverySinkSeesTheAttrs(t *testing.T) {
 	}
 }
 
-// mutatingSink adds an attr to the record it is handed -- what a handler with
-// preformatted attrs does -- and keeps it without copying first.
 type mutatingSink struct {
 	marker string
 	seen   []slog.Record
@@ -83,17 +79,10 @@ func (s *mutatingSink) Handle(_ context.Context, record slog.Record) error {
 func (s *mutatingSink) WithAttrs([]slog.Attr) slog.Handler { return s }
 func (s *mutatingSink) WithGroup(string) slog.Handler      { return s }
 
-// This is what a missing Record.Clone in Handle costs. Attrs past the record's
-// five inline slots live in a backing slice shared by every copy of the record.
-// When that slice has spare capacity, two sinks that both AddAttrs write to the
-// same slot, and slog marks the damage with a "!BUG" attribute.
 func TestCloneKeepsSinksFromCorruptingEachOther(t *testing.T) {
 	first, second := &mutatingSink{marker: "first"}, &mutatingSink{marker: "second"}
 	multi := &multiHandler{sinks: []slog.Handler{first, second}}
 
-	// Built in steps on purpose: Record.Add sizes the backing slice exactly,
-	// but repeated AddAttrs grows it by doubling, which is what leaves the
-	// spare slot two sinks can collide over.
 	record := slog.NewRecord(time.Now(), LevelInfo, "relayed", 0)
 	record.AddAttrs(slog.Int("a", 1), slog.Int("b", 2), slog.Int("c", 3),
 		slog.Int("d", 4), slog.Int("e", 5), slog.Int("f", 6))

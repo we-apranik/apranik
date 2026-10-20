@@ -17,7 +17,6 @@ func benchmarkLoggerManager(b *testing.B, outputLevel Level) *LoggerManager {
 	return system
 }
 
-// What every component pays for each log call below the configured level.
 func BenchmarkLogCallAtADisabledLevel(b *testing.B) {
 	logger := benchmarkLoggerManager(b, LevelWarning).Logger().With("outbound", "auto")
 	b.ReportAllocs()

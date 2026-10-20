@@ -6,8 +6,6 @@ import (
 	"log/slog"
 )
 
-// multiHandler fans one record out to every sink. slog.Logger wraps exactly one
-// handler, so supporting several sinks means being one.
 type multiHandler struct {
 	sinks []slog.Handler
 }
@@ -27,9 +25,6 @@ func (m *multiHandler) Handle(ctx context.Context, record slog.Record) error {
 		if !sink.Enabled(ctx, record.Level) {
 			continue
 		}
-		// Clone per sink: a Record's attrs live in a shared backing array, so
-		// two sinks that both AddAttrs to the same record overwrite each
-		// other's additions.
 		if err := sink.Handle(ctx, record.Clone()); err != nil {
 			failures = append(failures, err)
 		}

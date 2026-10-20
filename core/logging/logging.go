@@ -10,7 +10,6 @@ import (
 )
 
 type Config struct {
-	// Zero value is LevelInfo.
 	Level Level
 
 	// Empty means the logger is silent. That is the default on purpose: a log
@@ -18,8 +17,6 @@ type Config struct {
 	Outputs []Output
 }
 
-// LoggerManager owns the opened outputs, hands out the logger, takes live
-// subscribers and closes everything.
 type LoggerManager struct {
 	logger *Logger
 	sinks  []slog.Handler
@@ -56,10 +53,6 @@ func New(config Config) (*LoggerManager, error) {
 	return &LoggerManager{logger: newLogger(handler), sinks: sinks, hub: hub}, nil
 }
 
-// SubscribeToLog starts a live view of the log at minimumLevel or above, with room
-// for bufferedRecords records. A subscriber may ask for a lower level than the
-// outputs use: records of that level exist while it is subscribed, and only
-// it receives them. The records are read-only.
 func (s *LoggerManager) SubscribeToLog(minimumLevel Level, bufferedRecords int) (*Subscription, error) {
 	return s.hub.add(minimumLevel, bufferedRecords)
 }

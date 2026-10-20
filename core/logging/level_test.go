@@ -46,8 +46,6 @@ func TestLevelNameParseLevelRoundTrip(t *testing.T) {
 	}
 }
 
-// Without the ReplaceAttr every sink installs, slog renders a level it does not
-// know as an offset from one it does: NOTICE would reach the sink as "INFO+2".
 func TestAddedSeveritiesRenderByName(t *testing.T) {
 	for _, testCase := range []struct {
 		level Level
@@ -101,7 +99,6 @@ func TestLoggerExposesAllEightSeverities(t *testing.T) {
 	}
 }
 
-// With re-wraps, so a tagged logger keeps the four severities slog lacks.
 func TestWithKeepsTheAddedSeverities(t *testing.T) {
 	sink := &recordingSink{level: LevelDebug}
 	newLogger(sink).With("module", "tcp").Notice("tagged")

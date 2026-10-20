@@ -16,8 +16,6 @@ type Output interface {
 	Open(level Level) (slog.Handler, error)
 }
 
-// HandlerOutput is an already-built handler, for an embedder that brings its
-// own sink. A *sink.Memory passed this way stays readable by the embedder.
 type HandlerOutput struct {
 	Handler slog.Handler
 }

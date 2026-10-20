@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Level is slog.Level. An alias, not a defined type, so it passes straight into
-// slog.HandlerOptions without conversions.
 type Level = slog.Level
 
 // The RFC 5424 severities, most verbose first. slog's built-ins are spaced
@@ -56,8 +54,6 @@ func ParseLevel(name string) (Level, error) {
 	return 0, fmt.Errorf("logging: %q is not a severity level", name)
 }
 
-// slog prints a level it does not know as an offset from one it does, so
-// LevelNotice would reach a sink as "INFO+2". Every sink installs this.
 func ReplaceLevelWithName(_ []string, attr slog.Attr) slog.Attr {
 	if attr.Key == slog.LevelKey {
 		if level, ok := attr.Value.Any().(slog.Level); ok {

@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// Subscription is one client's live view of the log, from the moment it
-// subscribed. Records closes after Cancel or when the logging system closes.
 type Subscription struct {
 	minimumLevel Level
 	records      chan slog.Record
@@ -24,7 +22,6 @@ type Subscription struct {
 
 func (s *Subscription) Records() <-chan slog.Record { return s.records }
 
-// Cancel is safe to call more than once.
 func (s *Subscription) Cancel() { s.hub.remove(s) }
 
 // offer never blocks logging. A client that fell behind loses records; when
@@ -54,15 +51,10 @@ func droppedRecordsNotice(droppedCount uint64, bufferedRecords int) slog.Record 
 	return notice
 }
 
-// subscriptionHub is one handler in every logging system's chain, so loggers
-// derived before anyone subscribed still reach a later subscriber. With no
-// subscriber it is disabled, and a record is not even built for it.
 type subscriptionHub struct {
 	mu            sync.Mutex
 	subscriptions map[*Subscription]struct{}
 
-	// The lowest level any subscriber wants; above every real level while
-	// nobody is subscribed.
 	lowestWantedLevel atomic.Int64
 }
 
@@ -105,7 +97,6 @@ func (h *subscriptionHub) recomputeLowestWantedLevel() {
 	h.lowestWantedLevel.Store(lowest)
 }
 
-// Close ends every subscription.
 func (h *subscriptionHub) Close() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -148,8 +139,6 @@ func (h *subscriptionHub) WithGroup(name string) slog.Handler {
 	return &derivedSubscriptionHandler{hub: h, groups: []string{name}}
 }
 
-// derivedSubscriptionHandler is what With and WithGroup return: the same hub,
-// plus the attributes and open groups the derived logger carries.
 type derivedSubscriptionHandler struct {
 	hub    *subscriptionHub
 	attrs  []slog.Attr

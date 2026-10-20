@@ -5,7 +5,6 @@ import (
 	"log/slog"
 )
 
-// Logger is slog.Logger plus the four severities slog has no method for.
 type Logger struct {
 	*slog.Logger
 }
@@ -14,10 +13,8 @@ func newLogger(handler slog.Handler) *Logger {
 	return &Logger{Logger: slog.New(handler)}
 }
 
-// Discard saves every component a nil check before every call.
 func Discard() *Logger { return newLogger(slog.DiscardHandler) }
 
-// With re-wraps so a tagged logger keeps all eight levels.
 func (l *Logger) With(args ...any) *Logger {
 	return &Logger{Logger: l.Logger.With(args...)}
 }
