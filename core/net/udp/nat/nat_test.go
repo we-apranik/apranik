@@ -1,6 +1,4 @@
-// Package nat_test exercises nat against real loopback UDP sockets,
-// matching how transport/udp and proxy/socks5's association tests already do
-// it in this codebase, rather than against a fake spec.Datagram.
+// Package nat_test exercises nat against real loopback UDP sockets, matching how transport/udp and proxy/socks5's association tests already do it in this codebase, rather than against a fake spec.Datagram.
 package nat_test
 
 import (
@@ -23,8 +21,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// countingDialer wraps transport/udp's real dialer so tests can assert how
-// many times a Datagram actually dialed.
 func countingDialer(t *testing.T) (nat.CreateDatagramFunc, func() int) {
 	t.Helper()
 
@@ -41,8 +37,6 @@ func countingDialer(t *testing.T) (nat.CreateDatagramFunc, func() int) {
 	return dial, func() int { return int(calls.Load()) }
 }
 
-// destination stands up a real UDP socket to send from and receive at, so
-// tests exercise genuine wire behavior rather than an in-memory stand-in.
 func destination(t *testing.T, ip string) (*net.UDPConn, spec.Destination) {
 	t.Helper()
 
@@ -56,9 +50,6 @@ func destination(t *testing.T, ip string) (*net.UDPConn, spec.Destination) {
 	return connection, spec.NewEndpointFromNetAddr(local).Destination()
 }
 
-// sourceSeenBy reports the address the nat datagram's packet actually came from,
-// which is what a real peer replies to. natDatagram.LocalAddr() is a wildcard bind
-// -- [::] or 0.0.0.0 -- and is not an address anyone can send back to.
 func sourceSeenBy(t *testing.T, peer *net.UDPConn) *net.UDPAddr {
 	t.Helper()
 
@@ -104,12 +95,11 @@ func newNAT(t *testing.T, dial nat.CreateDatagramFunc, p nat.Policy) *nat.Datagr
 	return natDatagram
 }
 
-// startReading runs exactly one goroutine looping natDatagram.ReadFrom for the rest
-// of the test, matching how relay.Datagram actually uses a spec.Datagram: one
-// continuous reader, never a fresh one per call. Spawning a new reader per
-// assertion would race: a call that times out still leaves its ReadFrom
-// blocked, and a later packet can be delivered to that abandoned goroutine
-// instead of the one a later assertion is waiting on.
+// startReading runs exactly one goroutine looping natDatagram.ReadFrom for the rest of the test,
+// matching how relay.Datagram actually uses a spec.Datagram: one continuous reader, never a fresh one
+// per call. Spawning a new reader per assertion would race: a call that times out still leaves its
+// ReadFrom blocked, and a later packet can be delivered to that abandoned goroutine instead of the one
+// a later assertion is waiting on.
 func startReading(t *testing.T, natDatagram *nat.Datagram) <-chan spec.Destination {
 	t.Helper()
 
@@ -127,7 +117,6 @@ func startReading(t *testing.T, natDatagram *nat.Datagram) <-chan spec.Destinati
 	return arrivals
 }
 
-// expectArrival asserts a packet shows up within wait and returns its sender.
 func expectArrival(t *testing.T, arrivals <-chan spec.Destination, wait time.Duration) *spec.Destination {
 	t.Helper()
 
@@ -139,7 +128,6 @@ func expectArrival(t *testing.T, arrivals <-chan spec.Destination, wait time.Dur
 	}
 }
 
-// expectNothing asserts no packet shows up within wait.
 func expectNothing(t *testing.T, arrivals <-chan spec.Destination, wait time.Duration) {
 	t.Helper()
 
@@ -211,8 +199,6 @@ func TestMappingUnderAddressAndPortDependentOpensOnePerDestination(t *testing.T)
 		t.Errorf("dial count = %d, want 2: AddressAndPortDependentMapping must open a new socket per port even on the same host", got)
 	}
 
-	// Writing to portOne again must reuse the entry already open for it, not
-	// dial a third time.
 	natDatagram.WriteTo([]byte("x"), portOne)
 	if got := dialCount(); got != 2 {
 		t.Errorf("dial count = %d, want 2: a destination already mapped must not be re-dialed", got)
@@ -233,14 +219,11 @@ func TestFilteringUnderEndpointIndependentAcceptsAnySender(t *testing.T) {
 	}
 	tableAddr := sourceSeenBy(t, contacted)
 
-	// The contacted destination's reply must always get through.
 	mustSend(t, contacted, "reply", tableAddr)
 	if from := expectArrival(t, arrivals, shortWait); from == nil {
 		t.Fatal("reply from the contacted destination did not arrive")
 	}
 
-	// Under EndpointIndependentFiltering, an uncontacted stranger also gets
-	// through -- this is the permissive, least-secure behavior being tested.
 	mustSend(t, stranger, "uninvited", tableAddr)
 	if from := expectArrival(t, arrivals, shortWait); from == nil {
 		t.Error("a packet from an uncontacted sender did not arrive under EndpointIndependentFiltering, want it to")
@@ -346,7 +329,6 @@ func TestCloseEndsTheSocketsItDialed(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	// The dialed socket should already be closed: writing to it now must fail.
 	if _, err := lastDialed.WriteTo([]byte("x"), destinationAddr); err == nil {
 		t.Error("the socket Table dialed still accepted writes after Close")
 	}
@@ -405,8 +387,6 @@ func TestNewPolicyRefusesNonsense(t *testing.T) {
 	}
 }
 
-// Table and module/transport/base/udp both implement spec.Datagram, so they must
-// agree that a short buffer is an error rather than a silent truncation.
 func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 	dial, _ := countingDialer(t)
 	natDatagram := newNAT(t, dial, policy(nat.EndpointIndependentMapping, nat.EndpointIndependentFiltering))
@@ -425,7 +405,6 @@ func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 }
 
 // A write that fails must not count as activity, or a socket whose every send
-// fails would outlive its idle timeout.
 func TestAFailedWriteDoesNotKeepASocketAlive(t *testing.T) {
 	failing := &failingDatagram{}
 	dial := func(context.Context) (spec.Datagram, error) { return failing, nil }
@@ -489,7 +468,6 @@ func TestWriteToAfterCloseReturnsErrClosed(t *testing.T) {
 	natDatagram.Close()
 
 	// A nil map would panic here rather than return; the closed check is what
-	// makes this an error.
 	if _, err := natDatagram.WriteTo([]byte("after"), destinationAddr); !errors.Is(err, nat.ErrClosed) {
 		t.Errorf("WriteTo after Close: %v, want nat.ErrClosed", err)
 	}
@@ -580,8 +558,6 @@ func (d *trackedDatagram) wasClosed() bool {
 	return d.closed
 }
 
-// --- D9: domain destinations --------------------------------------------------
-
 func domainDestination(t *testing.T, domain string, port uint16) spec.Destination {
 	t.Helper()
 
@@ -592,10 +568,6 @@ func domainDestination(t *testing.T, domain string, port uint16) spec.Destinatio
 	return d
 }
 
-// The reply to a domain destination arrives from the resolved IP. Under the
-// default filtering it used to match nothing and be dropped; now it is matched
-// against what the write actually went to, and reported back under the domain
-// the caller asked for.
 func TestDomainRepliesAreAcceptedAndReportedAsTheDomain(t *testing.T) {
 	for _, filtering := range []nat.FilteringBehavior{
 		nat.AddressAndPortDependentFiltering,
@@ -649,8 +621,6 @@ func TestAnUnrelatedSenderIsStillDroppedForADomainDestination(t *testing.T) {
 	expectNothing(t, arrivals, shortWait)
 }
 
-// A domain can resolve to several addresses, and the answer can change between
-// writes, so what was sent to is accumulated rather than replaced.
 func TestEveryResolvedAddressIsAccepted(t *testing.T) {
 	first := netip.MustParseAddr("192.0.2.10")
 	second := netip.MustParseAddr("192.0.2.11")
@@ -683,8 +653,6 @@ func TestEveryResolvedAddressIsAccepted(t *testing.T) {
 	}
 }
 
-// scriptedResolver is a carrier that resolves: it hands out a different
-// address per write, which is what a domain with several A records does.
 type scriptedResolver struct {
 	mu     sync.Mutex
 	sentTo []netip.Addr
@@ -749,8 +717,7 @@ func requireArrival(t *testing.T, arrivals <-chan spec.Destination, wait time.Du
 	return *arrived
 }
 
-// Two domains behind one CDN address. A reply must be reported under the
-// domain actually contacted on that ip:port, never the other one.
+// A reply must be reported under the domain actually contacted on that ip:port, never the other one.
 func TestSharedAddressReportsTheDomainContactedOnThatPort(t *testing.T) {
 	shared := netip.MustParseAddr("192.0.2.50")
 
@@ -845,7 +812,6 @@ func TestALiteralDestinationIsNeverRelabelled(t *testing.T) {
 }
 
 // A sprayer sending many packets that filtering rejects must not produce one
-// log line per packet.
 func TestASprayerIsLoggedOncePerInterval(t *testing.T) {
 	memory := sink.NewMemory(64, logging.LevelDebug)
 	system, err := logging.New(logging.Config{Level: logging.LevelDebug, Outputs: []logging.Output{logging.HandlerOutput{Handler: memory}}})
@@ -951,8 +917,6 @@ func TestAReplyBiggerThanTheBuffersIsReportedAndTheMappingSurvives(t *testing.T)
 	expectNothing(t, arrivals, 100*time.Millisecond)
 }
 
-// benchSocket stands in for freedom's UDP socket: writes vanish, and reads
-// return the same reply from the same sender until closed.
 type benchSocket struct {
 	reply     []byte
 	from      spec.Destination

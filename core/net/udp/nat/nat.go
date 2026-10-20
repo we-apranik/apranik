@@ -1,9 +1,4 @@
-// Package nat makes UDP sent straight to the internet behave like a NAT, in
-// RFC 4787 terms. A socket decides neither which local socket carries each
-// destination (mapping) nor which senders may reply (filtering); Datagram
-// decides both, behind the ordinary spec.Datagram interface.
-//
-// There is one Datagram per session: it separates destinations, not clients.
+// Package nat makes UDP sent straight to the internet behave like a NAT, in RFC 4787 terms.
 package nat
 
 import (
@@ -26,8 +21,6 @@ import (
 type MappingBehavior string
 
 const (
-	// Default: every socket leaves from the same server IP, so separate
-	// mappings per destination buy no privacy.
 	EndpointIndependentMapping     MappingBehavior = "endpoint-independent"
 	AddressDependentMapping        MappingBehavior = "address-dependent"
 	AddressAndPortDependentMapping MappingBehavior = "address-and-port-dependent"
@@ -44,12 +37,9 @@ func (m MappingBehavior) Valid() bool {
 type FilteringBehavior string
 
 const (
-	// Least safe: anyone who can reach the socket can inject packets.
 	EndpointIndependentFiltering FilteringBehavior = "endpoint-independent"
 	AddressDependentFiltering    FilteringBehavior = "address-dependent"
 
-	// Default: DNS, QUIC, STUN and WireGuard all reply from the exact
-	// endpoint contacted, so strictness costs them nothing.
 	AddressAndPortDependentFiltering FilteringBehavior = "address-and-port-dependent"
 )
 
@@ -61,13 +51,10 @@ func (f FilteringBehavior) Valid() bool {
 	return false
 }
 
-// UDP has no close, so silence is the only signal that a socket is finished.
-// Independent of the session idle timeout, which is a whole-session backstop.
 // PROVISIONAL: 5 minutes.
 const DefaultIdleTimeout = 5 * time.Minute
 
-// Build one with NewDefaultPolicy or NewPolicy. Fields are unexported so an
-// unvalidated Policy cannot be built by hand; New rejects the zero value.
+// Fields are unexported so an unvalidated Policy cannot be built by hand; New rejects the zero value.
 type Policy struct {
 	mapping     MappingBehavior
 	filtering   FilteringBehavior
@@ -99,26 +86,21 @@ func (p Policy) Mapping() MappingBehavior     { return p.mapping }
 func (p Policy) Filtering() FilteringBehavior { return p.filtering }
 func (p Policy) IdleTimeout() time.Duration   { return p.idleTimeout }
 
-// CreateDatagramFunc opens one unconnected socket. It takes no address: the Datagram decides
-// which peers each socket carries, and which local address to bind is the
-// outbound's business, captured by the closure it passes in.
 type CreateDatagramFunc func(ctx context.Context) (spec.Datagram, error)
 
 type mapping struct {
 	datagram spec.Datagram
 
-	// Set when the carrier can say what it resolved a domain to. Nil for a
-	// carrier that never resolves, and then domain destinations behave as they
-	// did before: recorded as given, matched as given.
+	// Nil for a carrier that never resolves, and then domain destinations behave as they did before:
+	// recorded as given, matched as given.
 	resolving spec.ResolvedWriter
 
 	mu        sync.Mutex
 	contacted map[spec.Destination]struct{} // peers we have sent to; filtering reads this
 
-	// A reply always arrives from an IP, so a domain destination needs the
-	// addresses it actually went to, both to match the reply and to hand the
-	// caller back the domain it asked for. Accumulated, never replaced: a
-	// domain may resolve to several addresses and the answer may change.
+	// A reply always arrives from an IP, so a domain destination needs the addresses it actually went to,
+	// both to match the reply and to hand the caller back the domain it asked for. Accumulated, never
+	// replaced: a domain may resolve to several addresses and the answer may change.
 	resolved map[netip.AddrPort]map[string]struct{}
 
 	lastActive atomic.Int64 // unix nanoseconds of the last successful send or accepted receive
@@ -159,9 +141,8 @@ func (m *mapping) rememberPeer(peer spec.Destination) {
 	m.contacted[peer] = struct{}{}
 }
 
-// Only a domain needs this. An IP destination is already matched exactly by
-// contacted, and recording it here would let a reply from another port be
-// reported under the first port we used.
+// An IP destination is already matched exactly by contacted, and recording it here would let a reply
+// from another port be reported under the first port we used.
 func (m *mapping) rememberResolved(peer spec.Destination, sentTo spec.Endpoint) {
 	if _, isDomain := peer.Domain(); !isDomain || !sentTo.IsValid() {
 		return
@@ -191,8 +172,6 @@ func (m *mapping) send(payload []byte, to spec.Destination) (int, error) {
 	return size, err
 }
 
-// A sender is allowed if it matches a destination as written, or an address a
-// domain destination actually resolved to. A spoofed sender matches neither.
 func (m *mapping) allows(sender spec.Destination, filtering FilteringBehavior) bool {
 	if filtering == EndpointIndependentFiltering {
 		return true
@@ -230,11 +209,9 @@ func (m *mapping) allows(sender spec.Destination, filtering FilteringBehavior) b
 	return false
 }
 
-// A client that addressed a domain expects its reply to come back from that
-// domain. Matching is ordered so a shared address cannot mislabel a reply:
-// a sender we contacted literally is never translated, an exact ip:port we
-// resolved to wins next, and an address-only match counts only when one
-// domain claims that address. Anything still ambiguous stays as the sender.
+// Matching is ordered so a shared address cannot mislabel a reply: a sender we contacted literally is
+// never translated, an exact ip:port we resolved to wins next, and an address-only match counts only
+// when one domain claims that address.
 func (m *mapping) reportedSender(sender spec.Destination) spec.Destination {
 	senderIP, senderIsIP := sender.IP()
 	if !senderIsIP {
@@ -290,11 +267,9 @@ type mappingKey struct {
 }
 
 // "*" cannot come from a real host: a valid spec.Destination always carries a
-// non-empty domain or IP.
 var sharedMappingKey = mappingKey{host: "*"}
 
 // A domain stays a domain here, so the same host reached by name and by
-// literal IP is correctly two keys.
 func mappingKeyFor(destination spec.Destination, mapping MappingBehavior) mappingKey {
 	switch mapping {
 	case EndpointIndependentMapping:
@@ -311,7 +286,6 @@ var ErrClosed = errors.New("nat: datagram is closed")
 // PROVISIONAL: one rejection notice per UDP session per 10 seconds.
 const rejectedLogInterval = 10 * time.Second
 
-// buffer is pooled: ReadFrom copies payload out and releases it.
 type receivedPacket struct {
 	payload []byte
 	buffer  *[]byte
@@ -322,24 +296,17 @@ var defaultBuffers = udp.NewBufferPool(udp.DefaultMaxDatagramSize)
 
 type Datagram struct {
 	// spec.Datagram's WriteTo takes no context, so a dial it triggers has
-	// nowhere else to get one.
 	ctx            context.Context
 	createDatagram CreateDatagramFunc
 	policy         Policy
 	logger         *logging.Logger
 
-	// Where reply buffers come from, which also sets the largest reply: a
-	// bigger one is dropped and reported as spec.ErrMessageTooLong.
 	buffers *udp.BufferPool
 
-	// Called once for every reply bigger than the buffer. Nil when nobody counts them.
 	onReplyTooLarge func()
 
-	// Called once for every reply filtering rejects. Nil when nobody counts them.
 	onReplyRejected func()
 
-	// Rejections are what a sprayer causes, so they are logged at most once
-	// per interval with a count, not once per packet.
 	rejectedLogSampler *logging.Sampler
 
 	mu       sync.Mutex
@@ -347,24 +314,18 @@ type Datagram struct {
 
 	// Unbuffered on purpose: the kernel receive buffers are the queue, and
 	// blocking a readLoop is backpressure. A buffer here would trade that for
-	// unbounded memory and latency.
 	received  chan receivedPacket
 	done      chan struct{} // closed under mu: the one record that the table is shut
 	closeOnce sync.Once
 }
 
-// An Option changes how New builds a Datagram.
 type Option func(*Datagram)
 
-// WithBuffers takes reply buffers from pool, whose buffer size is the largest
-// reply the NAT passes on. Without it, buffers hold udp.DefaultMaxDatagramSize.
 func WithBuffers(pool *udp.BufferPool) Option {
 	return func(d *Datagram) { d.buffers = pool }
 }
 
-// WithReplyTooLarge calls onTooLarge for every reply bigger than the NAT's
-// buffers, which is dropped. It runs on the socket's read loop, so it must not
-// block.
+// It runs on the socket's read loop, so it must not block.
 func WithReplyTooLarge(onTooLarge func()) Option {
 	return func(d *Datagram) { d.onReplyTooLarge = onTooLarge }
 }
@@ -469,7 +430,6 @@ func (d *Datagram) insert(key mappingKey, datagram spec.Datagram) (*mapping, err
 	}
 
 	// Two writers can race to dial the same new key; the first to insert wins
-	// and the other discards its socket.
 	if existing, found := d.mappings[key]; found {
 		d.mu.Unlock()
 		datagram.Close()
@@ -486,11 +446,6 @@ func (d *Datagram) insert(key mappingKey, datagram spec.Datagram) (*mapping, err
 	return mapped, nil
 }
 
-// A datagram longer than buffer is reported as spec.ErrMessageTooLong and
-// dropped, not truncated: module/transport/base/udp does the same, and two
-// implementations of one contract disagreeing about truncation is worse than
-// either rule. relay.Datagram treats it as a dropped packet, not a dead
-// session.
 func (d *Datagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 	select {
 	case packet := <-d.received:
@@ -508,9 +463,6 @@ func (d *Datagram) ReadFrom(buffer []byte) (int, spec.Destination, error) {
 func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 	defer d.remove(key, mapped)
 
-	// Each packet is read straight into its own pooled buffer, which travels
-	// with it to ReadFrom; the next read takes a fresh one. That replaces a
-	// per-packet copy and allocation.
 	buffer := d.buffers.Acquire()
 	defer func() { d.buffers.Release(buffer) }()
 	for {
@@ -531,8 +483,6 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 			if d.onReplyRejected != nil {
 				d.onReplyRejected()
 			}
-			// Notice, not Debug: under the default filtering this is the
-			// spoofing case the policy exists to stop.
 			if allowed, alsoRejected := d.rejectedLogSampler.Allow(); allowed {
 				d.logger.Notice("Inbound datagram rejected by filtering policy",
 					"filtering", d.policy.filtering, "also_rejected_since_last_notice", alsoRejected)
@@ -555,11 +505,8 @@ func (d *Datagram) readLoop(key mappingKey, mapped *mapping) {
 	}
 }
 
-// Runs when the idle timer fires. Activity only records a timestamp, so
-// writers never race the timer; the check happens here instead.
+// Activity only records a timestamp, so writers never race the timer; the check happens here instead.
 func (d *Datagram) expireIfIdle(key mappingKey, mapped *mapping) {
-	// Close has already shut this socket down and stopped its timer; rearming
-	// would outlive the table.
 	if d.closed() {
 		return
 	}
@@ -571,8 +518,6 @@ func (d *Datagram) expireIfIdle(key mappingKey, mapped *mapping) {
 	d.remove(key, mapped)
 }
 
-// Safe to call more than once and concurrently with Close: only the caller
-// that actually deletes the socket from the map shuts it down.
 func (d *Datagram) remove(key mappingKey, mapped *mapping) {
 	d.mu.Lock()
 	if d.mappings[key] != mapped {
@@ -601,8 +546,6 @@ func (d *Datagram) Close() error {
 	return nil
 }
 
-// Ambiguous when the mapping allows more than one live socket: returns any
-// one of them, or nil before the first send.
 func (d *Datagram) LocalAddr() net.Addr {
 	d.mu.Lock()
 	defer d.mu.Unlock()
