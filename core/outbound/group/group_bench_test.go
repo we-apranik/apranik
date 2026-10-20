@@ -26,8 +26,6 @@ func (connectingMember) CreateDatagram(context.Context, spec.Metadata) (spec.Dat
 }
 func (connectingMember) Close() error { return nil }
 
-// What a group adds to every new connection: choosing the order to try its
-// members in. The members connect instantly, so the time is the group's own.
 func BenchmarkGroupDialStream(b *testing.B) {
 	for _, picksFastest := range []bool{true, false} {
 		for _, memberCount := range []int{3, 10} {

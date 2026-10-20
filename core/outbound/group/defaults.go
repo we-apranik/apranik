@@ -14,8 +14,6 @@ const (
 	defaultGroupProbeInterval = 5 * time.Minute
 	defaultGroupProbeTimeout  = 10 * time.Second
 
-	// How much faster than the current member another must be before urltest
-	// switches to it.
 	defaultURLTestTolerance = 50 * time.Millisecond
 )
 

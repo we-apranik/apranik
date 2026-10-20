@@ -17,18 +17,11 @@ type URLTestConfig struct {
 
 	Probe ProbeConfig
 
-	// How much faster than the current member another must be before the group
-	// switches to it. Zero means the group's default.
 	Tolerance time.Duration
 
-	// Nil is allowed: a silent logger is substituted.
 	Logger *logging.Logger
 }
 
-// urlTestGroup is an outbound that connects nowhere itself. For each
-// connection it tries its members, the one whose probe answered fastest first,
-// and returns the first that connects, so a member that fails between two
-// probes costs one connection a retry, not an error.
 type urlTestGroup struct {
 	memberSet
 	prober *prober
@@ -62,14 +55,10 @@ func (g *urlTestGroup) StartProbing(ctx context.Context) { g.prober.StartProbing
 
 func (g *urlTestGroup) Close() error { return g.prober.Close() }
 
-// CurrentMemberTag is the member the probes favour now.
 func (g *urlTestGroup) CurrentMemberTag() string {
 	return g.members[g.prober.order()[0]].Tag()
 }
 
-// fastestWithinTolerance keeps the current member unless it failed or another
-// is faster by more than the tolerance; when no probe passed the current one
-// stays, which is the last good member.
 type fastestWithinTolerance struct{ tolerance time.Duration }
 
 func (s fastestWithinTolerance) next(previous *memberHealth, passed []bool, latency []time.Duration) *memberHealth {

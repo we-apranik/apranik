@@ -32,7 +32,6 @@ func newMemberSet(tag string, members []component.Outbound, logger *logging.Logg
 
 func (m *memberSet) Tag() string { return m.tag }
 
-// MemberTags are the members' tags in the order the group was configured.
 func (m *memberSet) MemberTags() []string {
 	tags := make([]string, len(m.members))
 	for index, member := range m.members {
@@ -55,8 +54,6 @@ func (m *memberSet) Networks() []spec.Network {
 	return networks
 }
 
-// dialStreamInOrder tries the members named by order, by index, and returns the
-// first stream that connects.
 func (m *memberSet) dialStreamInOrder(ctx context.Context, metadata spec.Metadata, order []int) (spec.Stream, error) {
 	var failures []error
 	for _, index := range order {
@@ -97,8 +94,6 @@ func (m *memberSet) everyMemberFailed(failures []error) error {
 	return fmt.Errorf("outbound %q: every member failed: %w", m.tag, errors.Join(failures...))
 }
 
-// The streams a group returns say which outbounds beneath it carried them
-// (component.CarryingOutboundsReporter); every other call is the member's own.
 type carriedStream struct {
 	spec.Stream
 	carryingOutboundTags []string
@@ -106,8 +101,6 @@ type carriedStream struct {
 
 func (s carriedStream) CarryingOutboundTags() []string { return s.carryingOutboundTags }
 
-// The datagrams a group returns say which outbounds beneath it carried them,
-// as its streams do; every other call is the member's own.
 type carriedDatagram struct {
 	spec.Datagram
 	carryingOutboundTags []string

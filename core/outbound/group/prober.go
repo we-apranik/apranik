@@ -14,8 +14,6 @@ import (
 	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
-// ProbeConfig is the request a group sends through each member on a timer. Zero
-// fields mean the group's defaults; a negative duration is refused.
 type ProbeConfig struct {
 	URL              string
 	Interval         time.Duration
@@ -31,25 +29,15 @@ type memberHealth struct {
 	passed  []bool
 	latency []time.Duration
 
-	// The member urltest prefers: the last good one when no probe passes.
-	// Unused by fallback.
 	preferred int
 
-	// Member indexes in the order a connection tries them, worked out once per
-	// round so a connection allocates nothing to choose.
 	order []int
 }
 
-// probeStrategy is how a group type turns one probe round into the order its
-// connections follow; it is the only difference between urltest and fallback.
-// previous is nil for the first, assumed round.
 type probeStrategy interface {
 	next(previous *memberHealth, passed []bool, latency []time.Duration) *memberHealth
 }
 
-// prober probes every member on a timer, through one DelayTester, and keeps the
-// order connections follow. It starts only after StartProbing: until the first
-// round ends a group uses list order.
 type prober struct {
 	tag      string
 	members  []component.Outbound
@@ -99,7 +87,6 @@ func newProber(tag string, members []component.Outbound, probe ProbeConfig, stra
 	return p, nil
 }
 
-// order is the member indexes a connection tries, best first.
 func (p *prober) order() []int { return p.health.Load().order }
 
 func (p *prober) StartProbing(ctx context.Context) {
@@ -145,7 +132,6 @@ func (p *prober) probeEveryMemberOnce(ctx context.Context) {
 		}()
 	}
 	probes.Wait()
-	// A round cut short by Close says nothing about the members.
 	if ctx.Err() != nil {
 		return
 	}
@@ -180,10 +166,6 @@ func (p *prober) Close() error {
 	return nil
 }
 
-// Members that passed their probe come first and the rest follow, so a
-// connection still tries a member whose probe failed rather than refusing when
-// all have failed: a failed probe may be one lost packet. less breaks ties
-// between two members that both passed or both failed.
 func orderPassedFirst(passed []bool, less func(a, b int) int) []int {
 	order := make([]int, len(passed))
 	for index := range order {

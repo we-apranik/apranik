@@ -18,13 +18,9 @@ type FallbackConfig struct {
 
 	Probe ProbeConfig
 
-	// Nil is allowed: a silent logger is substituted.
 	Logger *logging.Logger
 }
 
-// fallbackGroup is an outbound that connects nowhere itself. For each
-// connection it tries its members in list order, those that passed their probe
-// first, and returns the first that connects.
 type fallbackGroup struct {
 	memberSet
 	prober *prober
@@ -54,12 +50,10 @@ func (g *fallbackGroup) StartProbing(ctx context.Context) { g.prober.StartProbin
 
 func (g *fallbackGroup) Close() error { return g.prober.Close() }
 
-// CurrentMemberTag is the member a connection tries first now.
 func (g *fallbackGroup) CurrentMemberTag() string {
 	return g.members[g.prober.order()[0]].Tag()
 }
 
-// firstThatPassed keeps list order among members that passed.
 type firstThatPassed struct{}
 
 func (firstThatPassed) next(_ *memberHealth, passed []bool, latency []time.Duration) *memberHealth {

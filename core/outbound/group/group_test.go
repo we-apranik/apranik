@@ -17,9 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A member that reaches a test server whatever it is asked for, so a probe
-// and a real connection both succeed or fail by the server's answer and the
-// member's delay. Real connections are told apart by their destination.
 type scriptedMember struct {
 	tag           string
 	serverAddress string
@@ -118,7 +115,6 @@ func newTestGroup(t *testing.T, picksFastest bool, tolerance time.Duration, memb
 	return groupOutbound
 }
 
-// Which member carried the next real connection.
 func memberUsed(t *testing.T, groupOutbound component.Outbound, members ...*scriptedMember) string {
 	t.Helper()
 	before := make([]int64, len(members))
@@ -235,7 +231,6 @@ func TestFallbackUsesTheFirstMemberThatPassed(t *testing.T) {
 	eventually(t, "the broken member to be skipped", func() bool {
 		return memberUsed(t, groupOutbound, broken, working, spare) == "working"
 	})
-	// A faster later member does not matter: list order decides.
 	working.delay.Store(int64(100 * time.Millisecond))
 	spare.delay.Store(0)
 	time.Sleep(150 * time.Millisecond)
@@ -453,7 +448,6 @@ func TestAPlainOutboundsCarrierNamesOnlyTheOutbound(t *testing.T) {
 }
 
 func TestAProbeCountsOnlyTheStatusesTheGroupExpects(t *testing.T) {
-	// The first member answers 200, which the default 2xx accepts but this group does not.
 	picky, expected := newMember(t, "picky", 200), newMember(t, "expected", 204)
 	statuses, err := httpstatusranges.Parse("204")
 	if err != nil {

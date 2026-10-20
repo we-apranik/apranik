@@ -17,7 +17,6 @@ type SelectorConfig struct {
 	// The first is where the selector starts.
 	Members []component.Outbound
 
-	// Nil is allowed: a silent logger is substituted.
 	Logger *logging.Logger
 }
 
@@ -55,9 +54,6 @@ func (s *selector) CurrentMemberTag() string {
 	return s.members[s.currentIndex.Load()].Tag()
 }
 
-// SelectMember moves new connections and new UDP sessions to the member with
-// this tag. Connections already open keep the member they were dialled through;
-// ending them is the caller's choice. Choosing the current member is allowed.
 func (s *selector) SelectMember(memberTag string) (string, error) {
 	for index, member := range s.members {
 		if member.Tag() != memberTag {
