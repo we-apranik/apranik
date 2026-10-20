@@ -1,5 +1,4 @@
-// Package geodatatest writes small geosite.dat and geoip.dat files for tests,
-// so no test depends on a binary blob checked into the repository.
+// Package geodatatest writes small geosite.dat and geoip.dat files for tests, so no test depends on a binary blob checked into the repository.
 package geodatatest
 
 import (
@@ -7,7 +6,6 @@ import (
 	"net/netip"
 )
 
-// Domain match types, as geosite.dat numbers them.
 const (
 	Keyword = 0
 	Regex   = 1
@@ -21,7 +19,6 @@ type Domain struct {
 	Attributes []string
 }
 
-// Site returns a geosite.dat holding the given categories.
 func Site(categories map[string][]Domain) []byte {
 	var file []byte
 	for code, domains := range categories {
@@ -41,7 +38,6 @@ func Site(categories map[string][]Domain) []byte {
 	return file
 }
 
-// IP returns a geoip.dat holding the given categories.
 func IP(categories map[string][]netip.Prefix) []byte {
 	var file []byte
 	for code, prefixes := range categories {
