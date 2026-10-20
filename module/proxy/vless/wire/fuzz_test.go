@@ -8,8 +8,6 @@ import (
 	"github.com/we-apranik/apranik/module/proxy/vless/wire"
 )
 
-// Anything ReadRequestHeader accepts as a TCP, UDP or Mux request encodes and reads back
-// to the same request, and CommandOffset finds its command byte. Never panics.
 func FuzzReadRequestHeader(f *testing.F) {
 	valid, _ := wire.AppendRequestHeader(nil, wire.Request{UUID: sequentialUUID, Command: wire.CommandTCP, Destination: domainDestination(f, "example.com", 443)})
 	f.Add(valid)

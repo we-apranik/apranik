@@ -41,13 +41,10 @@ const (
 
 const UUIDLength = 16
 
-// RequestPrefixLength is version, UUID and the addons length: the bytes that
-// come before the addons, whose length they give.
 const RequestPrefixLength = 1 + UUIDLength + 1
 
 const MaxDomainLength = vmessaddr.MaxDomainLength
 
-// MaxUDPPayload is what the two-byte length field can express.
 const MaxUDPPayload = 0xFFFF
 
 // The Flow addons key and the one Xray and sing-box know besides it.
@@ -67,12 +64,8 @@ var (
 	ErrMuxNamesNoDestination  = errors.New("vless: a Mux request names no destination")
 )
 
-// UUID is the credential of a user, exactly as it appears on the wire. Never
-// log or format it.
 type UUID [UUIDLength]byte
 
-// Format keeps a UUID out of logs and error text under every verb, as
-// types.Secret does for passwords.
 func (UUID) Format(state fmt.State, verb rune) {
 	if verb == 'q' {
 		fmt.Fprintf(state, "%q", "[redacted]")
@@ -115,8 +108,6 @@ func ParseUUID(text string) (UUID, error) {
 	return parsed, nil
 }
 
-// Dashes are allowed only where the canonical form has them, and either all
-// of them or none.
 func isDashPosition(index, length int) bool {
 	if length != 36 {
 		return false
@@ -138,19 +129,13 @@ func uuidVersion5InNilNamespace(text string) UUID {
 type Request struct {
 	UUID UUID
 
-	// Empty, or what the client asked for: "xtls-rprx-vision" is the one flow
-	// that exists. The module supports none and refuses any.
 	Flow string
 
 	Command byte
 
-	// Zero for Mux and Reverse, which name none.
 	Destination spec.Destination
 }
 
-// AppendRequestHeader encodes the header for a TCP, UDP or Mux command, refusing a
-// destination the address format cannot carry before anything reaches the wire.
-// A Mux request carries no port and no address, so it must be given none.
 func AppendRequestHeader(destination []byte, request Request) ([]byte, error) {
 	switch request.Command {
 	case CommandTCP, CommandUDP:
@@ -177,8 +162,6 @@ func AppendRequestHeader(destination []byte, request Request) ([]byte, error) {
 	return vmessaddr.AppendAddress(destination, request.Destination)
 }
 
-// ReadRequestHeader reads exactly one header and nothing after it, so the payload
-// that follows in the same segment stays in the reader.
 func ReadRequestHeader(reader io.Reader) (Request, error) {
 	var prefix [RequestPrefixLength]byte
 	if _, err := io.ReadFull(reader, prefix[:]); err != nil {
@@ -220,10 +203,6 @@ func ReadRequestHeader(reader io.Reader) (Request, error) {
 	return request, nil
 }
 
-// CommandOffset reports where the command byte sits in a request that begins
-// with prefix, which must hold at least RequestPrefixLength bytes: only the
-// addons, whose length the prefix gives, come before it. io.ErrUnexpectedEOF
-// means prefix is too short to tell yet.
 func CommandOffset(prefix []byte) (int, error) {
 	if len(prefix) < RequestPrefixLength {
 		return 0, io.ErrUnexpectedEOF
@@ -231,8 +210,6 @@ func CommandOffset(prefix []byte) (int, error) {
 	return RequestPrefixLength + int(prefix[RequestPrefixLength-1]), nil
 }
 
-// AppendResponseHeader encodes what the server puts in front of its first
-// payload: the version and no addons.
 func AppendResponseHeader(destination []byte) []byte {
 	return append(destination, Version, 0)
 }
@@ -253,8 +230,6 @@ func ReadResponseHeader(reader io.Reader) error {
 	return nil
 }
 
-// AppendUDPFrame encodes one datagram. A payload longer than the length field
-// can express is spec.ErrMessageTooLong, not a truncation.
 func AppendUDPFrame(destination []byte, payload []byte) ([]byte, error) {
 	if len(payload) > MaxUDPPayload {
 		return nil, fmt.Errorf("vless: %d byte datagram: %w", len(payload), spec.ErrMessageTooLong)

@@ -35,9 +35,6 @@ func ipDestination(t testing.TB, ip string, port uint16) spec.Destination {
 
 var sequentialUUID = wire.UUID{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 
-// A request written by hand from the VLESS description, byte by byte, so a
-// mistake shared by encoder and decoder still shows up here: port before the
-// address, domain type 2, an empty addons block.
 func TestRequestMatchesHandWrittenBytes(t *testing.T) {
 	want := []byte{0x00}
 	want = append(want, sequentialUUID[:]...)
@@ -57,7 +54,6 @@ func TestRequestMatchesHandWrittenBytes(t *testing.T) {
 	}
 }
 
-// The Mux command carries no port and no address: the header ends at the command.
 func TestMuxRequestMatchesHandWrittenBytes(t *testing.T) {
 	want := []byte{0x00}
 	want = append(want, sequentialUUID[:]...)
@@ -131,8 +127,6 @@ func TestReadRequestHeaderStopsAtTheEndOfTheHeader(t *testing.T) {
 	}
 }
 
-// A Mux or Reverse command carries no port and no address, so the byte after
-// the command is already payload.
 func TestMuxAndReverseCarryNoDestination(t *testing.T) {
 	for _, command := range []byte{wire.CommandMux, wire.CommandReverse} {
 		input := []byte{0x00}
@@ -162,7 +156,6 @@ func TestFlowRoundTripsThroughTheAddons(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 0x0A is the protobuf header of field 1, length-delimited.
 	if want := append([]byte{18, 0x0A, 16}, "xtls-rprx-vision"...); !bytes.Contains(encoded, want) {
 		t.Errorf("request = % X, want it to hold the addons % X", encoded, want)
 	}
@@ -175,7 +168,6 @@ func TestFlowRoundTripsThroughTheAddons(t *testing.T) {
 func TestSeedInTheAddonsIsAcceptedAndIgnored(t *testing.T) {
 	input := []byte{0x00}
 	input = append(input, sequentialUUID[:]...)
-	// Seed (field 2) of 3 bytes, then Flow (field 1) of 1 byte.
 	input = append(input, 8, 0x12, 3, 1, 2, 3, 0x0A, 1, 'v')
 	input = append(input, wire.CommandTCP, 0x00, 0x50, 0x01, 192, 0, 2, 1)
 
