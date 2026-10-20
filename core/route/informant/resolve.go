@@ -8,14 +8,11 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// DomainResolver is what the routing resolve action asks: core/dns's
-// Resolver.
 type DomainResolver interface {
 	ResolveDomain(ctx context.Context, domain string) ([]netip.Addr, error)
 	ResolveDomainWithServer(ctx context.Context, domain, serverTag string) ([]netip.Addr, error)
 }
 
-// destinationResolution is one informant's resolve: done once, remembered.
 type destinationResolution struct {
 	done      bool
 	addresses []netip.Addr
@@ -38,7 +35,6 @@ func (r *destinationResolution) resolve(ctx context.Context, resolver DomainReso
 		r.addresses, err = resolver.ResolveDomainWithServer(ctx, domain, serverTag)
 	}
 	if err != nil {
-		// The rules after the resolve see no addresses; the request goes on.
 		logger.Debug("Resolve for routing failed", "domain", domain, "error", err)
 		r.addresses = nil
 	}

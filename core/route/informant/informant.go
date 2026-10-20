@@ -11,10 +11,8 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Stream answers the router about one TCP connection. The
-// stream is wrapped for peeking only when a rule sniffs, so a connection
-// nobody sniffs is relayed untouched; one that was sniffed must be relayed
-// from StreamToRelay, which replays the peeked bytes.
+// The stream is wrapped for peeking only when a rule sniffs, so a connection nobody sniffs is relayed
+// untouched; one that was sniffed must be relayed from StreamToRelay, which replays the peeked bytes.
 type Stream struct {
 	metadata     spec.Metadata
 	clientStream spec.Stream
@@ -28,7 +26,6 @@ type Stream struct {
 	resolution destinationResolution
 }
 
-// NewStream makes the informant for one TCP connection.
 func NewStream(metadata spec.Metadata, clientStream spec.Stream, resolver DomainResolver, logger *logging.Logger) *Stream {
 	return &Stream{metadata: metadata, clientStream: clientStream, resolver: resolver, logger: logger}
 }
@@ -64,8 +61,6 @@ func (i *Stream) StreamToRelay() spec.Stream {
 	return i.clientStream
 }
 
-// UDPSession answers for one destination of a UDP session.
-// Nothing is sniffed until UDP sniffing exists (open question Q2).
 type UDPSession struct {
 	metadata spec.Metadata
 
@@ -74,7 +69,6 @@ type UDPSession struct {
 	resolution destinationResolution
 }
 
-// NewUDPSession makes the informant for one destination of a UDP session.
 func NewUDPSession(metadata spec.Metadata, resolver DomainResolver, logger *logging.Logger) *UDPSession {
 	return &UDPSession{metadata: metadata, resolver: resolver, logger: logger}
 }

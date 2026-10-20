@@ -69,8 +69,6 @@ func TestStreamInformantReusesAPeekableStream(t *testing.T) {
 	}
 }
 
-// Per TCP connection: the informant and a router with no rules. With rules,
-// see the router's own benchmark.
 func BenchmarkRouteStreamWithoutRules(b *testing.B) {
 	router := defaultOnlyRouter{}
 	metadata := spec.Metadata{Network: spec.NetworkTCP}
