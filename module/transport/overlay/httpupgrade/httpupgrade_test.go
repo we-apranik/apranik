@@ -66,8 +66,6 @@ type wrapResult struct {
 	err    error
 }
 
-// connect runs both sides at once over a loopback TCP pair. With pipelining
-// the server finishes on its own, since the client does not wait for it.
 func connect(t testing.TB, clientModule, serverModule *Transport) (client, server spec.Stream) {
 	t.Helper()
 	overlayClient, _ := clientModule.NewStreamOverlayClient()
@@ -118,7 +116,6 @@ func TestBytesCrossBothWays(t *testing.T) {
 	}
 }
 
-// requestFromClient captures what the module's client sends.
 func requestFromClient(t *testing.T, edit func(*Settings)) (raw string) {
 	t.Helper()
 	overlayClient, _ := newModule(t, edit).NewStreamOverlayClient()
@@ -274,7 +271,6 @@ func TestPayloadSentWithTheRequestIsKept(t *testing.T) {
 	}
 }
 
-// And the other way: data the server sends with its 101 reaches the client.
 func TestPayloadSentWithTheResponseIsKept(t *testing.T) {
 	for name, pipeline := range map[string]bool{"waiting": false, "pipelining": true} {
 		overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = pipeline }).NewStreamOverlayClient()
@@ -294,7 +290,6 @@ func TestPayloadSentWithTheResponseIsKept(t *testing.T) {
 	}
 }
 
-// With pipelining the client writes before the 101 arrives.
 func TestAPipeliningClientWritesBeforeTheResponse(t *testing.T) {
 	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
 	clientSide, serverSide := tcpPair(t)
@@ -404,8 +399,6 @@ func TestInfoIsTheSameForEveryValue(t *testing.T) {
 	}
 }
 
-// After the handshake the stream is the stream below: no allocation per
-// write or read.
 func BenchmarkClientToServer16KiB(b *testing.B) {
 	client, server := connect(b, newModule(b, nil), newModule(b, nil))
 	payload := make([]byte, 16<<10)
@@ -458,8 +451,6 @@ func BenchmarkBareTCP16KiB(b *testing.B) {
 	<-done
 }
 
-// The upgrade request is HTTP/1.1, so the config check refuses a TLS below
-// that offers anything else.
 func TestItSpeaksHTTP1Point1(t *testing.T) {
 	provider, provides := NewOverlayStreamTransportModule().(spec.TransportInfoProvider)
 	if !provides {
@@ -470,8 +461,6 @@ func TestItSpeaksHTTP1Point1(t *testing.T) {
 	}
 }
 
-// A failed read of the pending 101 may have consumed part of it, so a retry
-// would parse garbage; every later Read reports the first failure instead.
 func TestAPipeliningClientKeepsReportingAFailedResponse(t *testing.T) {
 	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
 	clientSide, serverSide := tcpPair(t)
@@ -495,8 +484,6 @@ func TestAPipeliningClientKeepsReportingAFailedResponse(t *testing.T) {
 	}
 }
 
-// A read deadline set while the client waits for the 101 bounds that wait at
-// once, as it would a read on the stream below.
 func TestAReadDeadlineSetDuringTheResponseWaitApplies(t *testing.T) {
 	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
 	clientSide, _ := tcpPair(t)
@@ -521,8 +508,6 @@ func TestAReadDeadlineSetDuringTheResponseWaitApplies(t *testing.T) {
 	}
 }
 
-// The response deadline ends with the response; a caller's earlier read
-// deadline outlives it.
 func TestTheCallerReadDeadlineOutlivesTheResponse(t *testing.T) {
 	overlayClient, _ := newModule(t, func(s *Settings) { s.Pipeline = true }).NewStreamOverlayClient()
 	clientSide, serverSide := tcpPair(t)

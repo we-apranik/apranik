@@ -88,15 +88,11 @@ func checkResponse(reader *bufio.Reader) error {
 	return nil
 }
 
-// pendingResponse is the 101 a pipelining client has not read yet.
 type pendingResponse struct {
 	limiter *handshake.LimitedReader
 	timeout time.Duration
 }
 
-// Only the read deadline is touched: a Write may be in flight, and its own
-// deadline is not this method's to change. A read deadline the caller sets
-// while this waits takes effect at once (see stream.setResponseDeadline).
 func (p *pendingResponse) read(s *stream) error {
 	s.setResponseDeadline(time.Now().Add(p.timeout))
 	err := checkResponse(s.handshakeReader)
