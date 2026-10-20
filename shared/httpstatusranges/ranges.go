@@ -16,7 +16,6 @@ const (
 	highestStatusCode = 599
 )
 
-// Range is inclusive: {204, 204} is one code, {200, 299} the 2xx class.
 type Range struct {
 	First int
 	Last  int
@@ -24,7 +23,6 @@ type Range struct {
 
 // Parse reads codes and ranges separated by commas; spaces around a part are
 // ignored. Duplicates and overlaps are fine. Empty text is an error, because
-// what it should mean belongs to the caller.
 func Parse(text string) ([]Range, error) {
 	if strings.TrimSpace(text) == "" {
 		return nil, errors.New("no status given; write codes and ranges such as 204 or 200-299")
@@ -75,7 +73,6 @@ func Contains(ranges []Range, code int) bool {
 	return false
 }
 
-// String writes the ranges the way Parse reads them: "200-299,301".
 func String(ranges []Range) string {
 	parts := make([]string, len(ranges))
 	for index, accepted := range ranges {
