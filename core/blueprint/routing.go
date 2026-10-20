@@ -8,9 +8,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Routing decides which outbound serves each request: the first rule whose
-// action decides wins, and DefaultAction serves the rest. The
-// datasets its rules name are the Blueprint's.
 type Routing struct {
 	Rules         []Rule
 	DefaultAction Action
@@ -34,17 +31,14 @@ type Match struct {
 	Users            []string
 	SniffedProtocols []string
 
-	// Every header named must be present and match its pattern.
 	SniffedRequestHeaders  map[string]*regexp.Regexp
 	SniffedBrowserFamilies []string
 
-	// Lowercase, without a trailing dot; suffixes also without a leading one.
 	Domains        []string
 	DomainSuffixes []string
 	DomainKeywords []string
 	DomainRegexes  []*regexp.Regexp
 
-	// A single address is a /32 or /128.
 	IPs         []netip.Prefix
 	IPIsPrivate *bool
 	IPVersions  []int // 4 or 6; a domain destination matches neither
@@ -54,11 +48,9 @@ type Match struct {
 	SourceIPIsPrivate *bool
 	SourcePorts       []PortRange
 
-	// The local end of the accepted inbound socket (spec.Metadata.InboundLocalEndpoint).
 	InboundLocalIPs   []netip.Prefix
 	InboundLocalPorts []PortRange
 
-	// Dataset tags, each of the kind the field compares.
 	DomainDatasets   []string
 	IPDatasets       []string
 	SourceIPDatasets []string
@@ -68,7 +60,6 @@ type Match struct {
 	Not *Match
 }
 
-// PortRange is inclusive; a single port has First == Last.
 type PortRange struct {
 	First, Last uint16
 }
@@ -86,7 +77,6 @@ type Action struct {
 // ResolveAction looks the destination's domain up so IP fields can match it.
 // The destination itself is never rewritten.
 type ResolveAction struct {
-	// The DNS server to ask. Empty means the DNS rules choose.
 	Server string
 }
 
@@ -97,24 +87,17 @@ type RouteAction struct {
 type SniffAction struct {
 	Sniffers []spec.SnifferModule
 
-	// Nil means sniff.DefaultTimeout; a value must be positive.
 	Timeout *time.Duration
 }
 
-// Dataset is a named list of values rules look up: domains or IP
-// ranges, read from a file when the router is built. Nothing is read here.
 type Dataset struct {
 	Tag  string
 	Kind DatasetKind
 
-	// Absolute when the config was loaded through config.LoadFile or LoadURL.
 	File string
 
-	// The file's format: "geodata" for V2Ray's geosite.dat and geoip.dat.
 	Format string
 
-	// geodata: the list inside the file, and optionally only the entries
-	// carrying an attribute.
 	Category  string
 	Attribute string
 }

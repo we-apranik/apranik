@@ -11,7 +11,6 @@ func pointerTo[T any](value T) *T { return &value }
 
 func xudp(enabled *bool) *blueprint.MuxCoolXUDP { return &blueprint.MuxCoolXUDP{Enabled: enabled} }
 
-// Left out means the other cores' default: UDP as XUDP.
 func TestMuxCoolDefaultsToXUDP(t *testing.T) {
 	for name, muxCool := range map[string]*blueprint.MuxCool{
 		"nil":            nil,
