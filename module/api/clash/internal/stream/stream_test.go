@@ -18,8 +18,6 @@ import (
 
 const tick = 10 * time.Millisecond
 
-// serveCounting serves a stream that sends {"n":1}, {"n":2}... every tick, and
-// counts the handlers that returned.
 func serveCounting(t *testing.T, options stream.Options) (*httptest.Server, *stream.Hub, *atomic.Int32) {
 	t.Helper()
 	if options.Tick == 0 {
@@ -57,8 +55,6 @@ func dial(t *testing.T, server *httptest.Server, origin string) (*websocket.Conn
 	return connection, err
 }
 
-// rawUpgrade opens a TCP connection to the server and does the WebSocket handshake
-// by hand, so the test can drop it without a close frame.
 func rawUpgrade(t *testing.T, server *httptest.Server, extraHeaders string) (net.Conn, *http.Response, *bufio.Reader) {
 	t.Helper()
 	address := strings.TrimPrefix(server.URL, "http://")
@@ -145,7 +141,6 @@ func TestTheHandlerReturnsWhenAWebSocketClientVanishes(t *testing.T) {
 	if response.StatusCode != http.StatusSwitchingProtocols {
 		t.Fatalf("handshake = %d", response.StatusCode)
 	}
-	// Dropped with no close frame, as a phone going out of range does.
 	raw.Close()
 	eventually(t, "the handler returning", func() bool { return returned.Load() == 1 })
 }
@@ -161,7 +156,6 @@ func TestAWebSocketClientsPingIsAnswered(t *testing.T) {
 	if response.StatusCode != http.StatusSwitchingProtocols {
 		t.Fatalf("handshake = %d", response.StatusCode)
 	}
-	// A masked ping with a four byte payload.
 	mask := []byte{1, 2, 3, 4}
 	ping := append([]byte{0x89, 0x80 | 4}, mask...)
 	for index, b := range []byte("ping") {
@@ -202,8 +196,6 @@ func TestClosingTheHubEndsEveryStreamTellsTheWebSocketAndWaitReturns(t *testing.
 	if returned.Load() != 2 {
 		t.Errorf("%d handlers returned, want 2", returned.Load())
 	}
-	// The client was told: a close frame, which the library reports as an end of
-	// the stream.
 	if _, err := receive(connection); err == nil {
 		t.Error("the WebSocket was still open")
 	}
