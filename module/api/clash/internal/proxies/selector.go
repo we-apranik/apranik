@@ -14,8 +14,6 @@ type selectBody struct {
 	Name string `json:"name"`
 }
 
-// selectMember switches a selector. Only a selector can be switched: the other
-// groups choose by themselves, and GLOBAL is a view.
 func (h handler) selectMember(w http.ResponseWriter, r *http.Request) {
 	selectorTag := r.PathValue("name")
 	state, err := h.provider.OutboundState(selectorTag)

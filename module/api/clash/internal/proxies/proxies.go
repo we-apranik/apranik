@@ -1,5 +1,3 @@
-// Package proxies serves the outbounds: /proxies, switching a selector, and the
-// delay tests of one outbound or of a group's members.
 package proxies
 
 import (
@@ -13,8 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// DelayDefaults are what a delay request gets for the values it leaves out. Core
-// has none, so the module passes every value.
 type DelayDefaults struct {
 	URL            string
 	Timeout        time.Duration
@@ -34,8 +30,6 @@ type handler struct {
 	defaults DelayDefaults
 }
 
-// The name dashboards expect for the group of every outbound. It is a view built
-// here, not an outbound: a real outbound with this tag wins.
 const globalGroupName = "GLOBAL"
 
 type proxyBody struct {
@@ -44,7 +38,6 @@ type proxyBody struct {
 	UDP     bool       `json:"udp"`
 	History []struct{} `json:"history"`
 
-	// Only a group has these.
 	Now *string  `json:"now,omitempty"`
 	All []string `json:"all,omitempty"`
 }
@@ -92,9 +85,6 @@ func proxyOf(state spec.APIOutboundState) proxyBody {
 	return body
 }
 
-// The fake group dashboards show first: every outbound, and the default one as
-// the current. A request that no rule decides goes to the default outbound, so the
-// group is accurate about where traffic goes by default.
 func (h handler) globalGroup(tags []string, carriesUDP bool) proxyBody {
 	now := h.provider.DefaultOutboundTag()
 	if now == "" && len(tags) > 0 {

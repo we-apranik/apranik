@@ -14,7 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// measuredWith records what the module asked core to measure.
 type measuredWith struct {
 	mu                    sync.Mutex
 	tag, rawURL, expected string

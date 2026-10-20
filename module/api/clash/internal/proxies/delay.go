@@ -12,7 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// How many members of a group are measured at once.
 const groupDelayConcurrency = 8
 
 type delayRequest struct {
@@ -21,9 +20,6 @@ type delayRequest struct {
 	expectedStatus string
 }
 
-// requestOf reads url, timeout (milliseconds) and expected from the query, and
-// fills what it leaves out from the defaults. Mihomo names the last one
-// "expected"; "expected_status" is the name Apranik's own settings use.
 func (h handler) requestOf(r *http.Request) (delayRequest, error) {
 	query := r.URL.Query()
 	request := delayRequest{url: h.defaults.URL, timeout: h.defaults.Timeout, expectedStatus: h.defaults.ExpectedStatus}
@@ -83,8 +79,6 @@ func writeDelayError(w http.ResponseWriter, err error) {
 	}
 }
 
-// groupDelay measures each member of a group and answers {member: milliseconds}.
-// A member that failed is left out, so a dashboard shows it as untested.
 func (h handler) groupDelay(w http.ResponseWriter, r *http.Request) {
 	groupTag := r.PathValue("name")
 	state, err := h.provider.OutboundState(groupTag)
