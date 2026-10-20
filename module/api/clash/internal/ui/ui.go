@@ -1,6 +1,3 @@
-// Package ui serves a dashboard's static files, which the user unpacked into a
-// directory, under /ui/. Dashboards are web pages that ask for the secret
-// themselves, so the files are served without it.
 package ui
 
 import (
@@ -13,13 +10,11 @@ import (
 
 const prefix = "/ui"
 
-// Files is an opened dashboard directory.
 type Files struct {
 	root    *os.Root
 	handler http.Handler
 }
 
-// Open opens the directory; a symbolic link inside it cannot lead outside it.
 func Open(directory string) (*Files, error) {
 	root, err := os.OpenRoot(directory)
 	if err != nil {
@@ -32,7 +27,6 @@ func (f *Files) Close() error {
 	return f.root.Close()
 }
 
-// Serves reports whether the request is for the dashboard: /ui and everything below /ui/.
 func Serves(path string) bool {
 	return path == prefix || len(path) > len(prefix) && path[:len(prefix)+1] == prefix+"/"
 }
