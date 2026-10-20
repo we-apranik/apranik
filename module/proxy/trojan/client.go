@@ -13,15 +13,10 @@ type client struct {
 	requestTiming delayedrequest.Policy
 }
 
-// Nothing goes on the wire here. The request travels with the first payload,
-// so a connection never opens with a header of fixed length on its own. There
-// is no reply either, so a wrong password surfaces as the server closing the
-// stream.
 func (c *client) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("trojan: %w: UDP goes through RequestDatagramOverStream", spec.ErrUnsupportedNetwork)
 	}
-	// Encoded now so a destination the format cannot carry fails here.
 	request, err := wire.AppendRequest(nil, wire.Request{PasswordHash: c.passwordHash, Command: wire.CommandConnect, Destination: metadata.Destination})
 	if err != nil {
 		return nil, err
@@ -36,8 +31,6 @@ func (c *client) RequestDatagramOverStream(ctx context.Context, underlyingStream
 	return newClientStreamDatagram(underlyingStream, c.passwordHash), nil
 }
 
-// Trojan names the destination in every UDP frame, so one stream carries all of
-// a UDP session's destinations.
 func (c *client) DatagramDestinationIsWritten() spec.DatagramDestinationPlacement {
 	return spec.DatagramDestinationInEveryDatagram
 }

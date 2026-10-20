@@ -25,7 +25,6 @@ type pipeStream struct{ net.Conn }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// bufferedStream is the smallest spec.PeekableStream, standing in for core's.
 type bufferedStream struct {
 	spec.Stream
 	reader *bufio.Reader
@@ -34,8 +33,6 @@ type bufferedStream struct {
 func (s bufferedStream) Read(p []byte) (int, error) { return s.reader.Read(p) }
 func (s bufferedStream) Peek(n int) ([]byte, error) { return s.reader.Peek(n) }
 
-// A bufio.Reader always reads ahead, so this stand-in cannot keep the promise;
-// Trojan never asks for it.
 func (bufferedStream) PeekExactly(int) ([]byte, error) { panic("trojan does not use PeekExactly") }
 func newBufferedStream(s spec.Stream) bufferedStream   { return bufferedStream{s, bufio.NewReader(s)} }
 
@@ -98,7 +95,6 @@ type acceptedStream struct {
 	err        error
 }
 
-// serveStream does what core does: identify, then call the matching accept.
 func serveStream(t *testing.T, underlyingStream spec.Stream) <-chan acceptedStream {
 	server := newServer(t)
 	results := make(chan acceptedStream, 1)
@@ -126,7 +122,6 @@ func TestConnectRoundTripKeepsEarlyPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Written straight after the header, so it may share its segment.
 	go upstream.Write([]byte("early payload"))
 
 	got := <-results
@@ -195,8 +190,6 @@ func TestUDPRoundTripBothDirections(t *testing.T) {
 	}
 }
 
-// Nothing is written back before refusing, so core can hand every byte to a
-// fallback as if the proxy were never there.
 func TestRefusalsAskForTheFallback(t *testing.T) {
 	validHeader := func(password string) []byte {
 		header, _ := wire.AppendRequest(nil, wire.Request{
@@ -227,8 +220,6 @@ func TestRefusalsAskForTheFallback(t *testing.T) {
 	}
 }
 
-// A wrong password is a valid Trojan request nobody may make; garbage is not.
-// Core counts the first apart from the second, so a guessing run shows.
 func TestOnlyAWrongPasswordIsAnAuthenticationFailure(t *testing.T) {
 	validHeader := func(password string) []byte {
 		header, _ := wire.AppendRequest(nil, wire.Request{
@@ -404,8 +395,6 @@ func TestInfoIsConstantAcrossSettings(t *testing.T) {
 	}
 }
 
-// writeRecordingStream keeps each Write separately, so a test can tell one
-// segment carrying header and payload from two.
 type writeRecordingStream struct {
 	pipeStream
 	writes chan []byte
@@ -457,7 +446,6 @@ func TestConnectSendsTheRequestWithTheFirstPayload(t *testing.T) {
 	upstream.Close()
 }
 
-// A server-first protocol sends nothing, so the request cannot wait forever.
 func TestConnectSendsTheRequestAloneWhenNoPayloadComes(t *testing.T) {
 	underlyingStream := newWriteRecordingStream()
 	upstream, err := newClient(t, "p").RequestStream(context.Background(), underlyingStream, spec.Metadata{

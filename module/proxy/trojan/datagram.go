@@ -20,12 +20,8 @@ type streamDatagram struct {
 
 	writeMutex sync.Mutex
 
-	// Reused for every frame, since writes are serialised anyway. Guarded by
-	// writeMutex.
 	frameBuffer []byte
 
-	// Set on the client until the first WriteTo sends the request with it.
-	// Guarded by writeMutex.
 	unsentRequestPasswordHash *wire.PasswordHash
 }
 
@@ -43,9 +39,6 @@ func (d *streamDatagram) ReadFrom(payload []byte) (int, spec.Destination, error)
 	return wire.ReadUDPFrame(d.reader, payload)
 }
 
-// One Write per frame, under the lock, so frames from concurrent writers never
-// interleave. On the client the first one carries the request in front,
-// naming that datagram's destination.
 func (d *streamDatagram) WriteTo(payload []byte, destination spec.Destination) (int, error) {
 	d.writeMutex.Lock()
 	defer d.writeMutex.Unlock()

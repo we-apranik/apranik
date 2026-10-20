@@ -12,8 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// repeatingStream reads the same bytes over and over and discards writes, so
-// a benchmark measures only the framing.
 type repeatingStream struct{ reader io.Reader }
 
 func (s repeatingStream) Read(buffer []byte) (int, error) { return s.reader.Read(buffer) }

@@ -12,9 +12,6 @@ import (
 
 var _ spec.UserManager = (*server)(nil)
 
-// AddUser adds a user to the running server. The object is a user as the
-// config file writes it, with unknown keys refused. The change applies to the
-// next handshake.
 func (s *server) AddUser(raw json.RawMessage) (string, error) {
 	configured, err := decodeUser(raw)
 	if err != nil {
@@ -46,8 +43,6 @@ func (s *server) AddUser(raw json.RawMessage) (string, error) {
 	return added.name, nil
 }
 
-// RemoveUser removes a user from the running server. The inbound may be left
-// with no users, and then refuses every client until one is added.
 func (s *server) RemoveUser(name string) error {
 	s.changeUsers.Lock()
 	defer s.changeUsers.Unlock()

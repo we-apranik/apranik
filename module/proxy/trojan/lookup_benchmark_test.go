@@ -7,9 +7,6 @@ import (
 	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
 )
 
-// lookUp runs once per accepted connection and compares every user, so its
-// cost grows with the list. The last user is the one looked for: the scan is
-// the same length for a match and for a miss.
 func BenchmarkLookUp(b *testing.B) {
 	for _, count := range []int{1, 100, 10000} {
 		b.Run(fmt.Sprintf("%d users", count), func(b *testing.B) {

@@ -41,8 +41,6 @@ func newServer(users []user, handshakeTimeout time.Duration) *server {
 	return s
 }
 
-// The command byte sits at a fixed offset, so the kind of request is known
-// without reading, or judging, the rest.
 const commandOffset = wire.PasswordHashLength + 2
 
 func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec.PeekableStream) (bool, error) {
@@ -60,8 +58,6 @@ func (s *server) IsDatagramOverStream(ctx context.Context, underlyingStream spec
 	return prefix[commandOffset] == wire.CommandUDPAssociate, nil
 }
 
-// Nothing is written during the handshake, so every refusal may ask for the
-// fallback.
 func (s *server) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	metadata, err := s.accept(ctx, underlyingStream, wire.CommandConnect)
 	if err != nil {
@@ -102,8 +98,6 @@ func (s *server) accept(ctx context.Context, underlyingStream spec.Stream, wante
 	metadata := spec.Metadata{Transport: spec.TransportMetadata{SourceEndpoint: spec.NewEndpointFromNetAddr(underlyingStream.RemoteAddr())}, User: name}
 	switch {
 	case request.Command != wantedCommand:
-		// Core dispatched on IsDatagramOverStream, so this is a mismatch
-		// between the two calls, not a client error.
 		return spec.Metadata{}, fmt.Errorf("trojan: command X'%02X' reached the wrong accept: %w", request.Command, spec.ErrUnsupportedNetwork)
 	case request.Command == wire.CommandConnect:
 		metadata.Network = spec.NetworkTCP
@@ -130,8 +124,6 @@ func (s *server) lookUp(hash wire.PasswordHash) (string, bool) {
 	return users[matchedIndex].name, true
 }
 
-// Only bytes that are not a Trojan request go to the fallback. A closed,
-// reset or silent connection is closed.
 func isMalformedRequest(err error) bool {
 	return errors.Is(err, wire.ErrMalformedPasswordHash) || errors.Is(err, wire.ErrMissingCRLF) ||
 		errors.Is(err, wire.ErrUnknownCommand) || errors.Is(err, socksaddr.ErrUnsupportedAddressType) ||

@@ -42,8 +42,6 @@ func userJSON(name, password string) json.RawMessage {
 	return raw
 }
 
-// connectAs runs a CONNECT handshake as a client with the password and returns
-// what the server made of it.
 func connectAs(t *testing.T, server spec.StreamProxyServer, password types.Secret) (spec.Metadata, error) {
 	t.Helper()
 	clientSide, serverSide := pipe(t)
