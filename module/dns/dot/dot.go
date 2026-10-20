@@ -1,6 +1,3 @@
-// Package dot is the DNS server type dot: DNS over TLS (RFC 7858), one
-// connection reused and queries pipelined on it. The TLS layer is core's: the
-// registry's tls module, built from the server's tls field, under the stream.
 package dot
 
 import (
@@ -21,10 +18,8 @@ const (
 )
 
 type Settings struct {
-	// Where the DNS server is; the port defaults to DefaultPort.
 	Server types.ServerAddress `json:"server"`
 
-	// Bounds one query, the dial included. Absent means DefaultTimeout; a written zero is refused.
 	Timeout *types.Duration `json:"timeout"`
 }
 
