@@ -59,8 +59,6 @@ func module(t testing.TB, settingsJSON string) *Transport {
 	return transport
 }
 
-// wrap sends what a proxy would write to a server whose peer is at peer, and
-// returns the stream and metadata the overlay produced.
 func wrap(t testing.TB, transport *Transport, peer string, sent []byte, closeAfterSending bool) (spec.Stream, *spec.TransportMetadata, error) {
 	t.Helper()
 	overlayServer, err := transport.NewStreamOverlayServer()

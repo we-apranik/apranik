@@ -16,7 +16,6 @@ import (
 
 var errNoClientSide = errors.New("proxy_protocol has no client side; it only reads what a proxy in front of the server sends")
 
-// One value per configured component, so nothing has to narrow a config.
 type Transport struct{ Settings }
 
 func (*Transport) Info() spec.ModuleInfo {
@@ -31,14 +30,10 @@ func (t *Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	return newServer(&t.Settings), nil
 }
 
-// The return type is the kind declaration: registering this as anything else
-// will not compile.
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule {
 	return &Transport{Settings: Settings{Verification: Verification{TrustedProxyAddresses: loopbackOnly()}}}
 }
 
-// Only a proxy on this machine may send the header unless the operator says
-// more. A slice, so a config file replaces it instead of merging into it.
 func loopbackOnly() types.AddressRanges {
 	ranges, err := types.ParseAddressRanges("127.0.0.0/8", "::1")
 	if err != nil {

@@ -19,8 +19,6 @@ func newServer(settings *Settings) *server {
 	return &server{trusted: settings.Verification.TrustedProxyAddresses, timeout: settings.timeout()}
 }
 
-// The hint ends every refusal: a misplaced layer reads the wrong bytes and fails
-// every connection, and this is the line that says why.
 const placementHint = "this layer must come directly after the base transport"
 
 func (s *server) WrapServerStream(ctx context.Context, underlyingStream spec.Stream, transport *spec.TransportMetadata) (spec.Stream, error) {

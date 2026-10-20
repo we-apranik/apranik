@@ -33,9 +33,6 @@ var (
 	errMalformed = errors.New("the PROXY protocol header is malformed")
 )
 
-// header holds what the overlay uses. hasClient is false for a header that
-// names no client (LOCAL, UNKNOWN, UNSPEC, unix or datagram addresses): the
-// connection keeps its peer.
 type header struct {
 	version     int
 	hasClient   bool
@@ -43,8 +40,6 @@ type header struct {
 	destination spec.Endpoint
 }
 
-// readHeader reads exactly the header and not a byte more, so the stream it
-// came from can be handed on untouched.
 func readHeader(stream io.Reader) (header, error) {
 	signature := make([]byte, signatureLength)
 	if _, err := io.ReadFull(stream, signature); err != nil {
@@ -77,8 +72,6 @@ func readVersionOne(stream io.Reader, line []byte) (header, error) {
 	return parseVersionOne(strings.TrimSuffix(string(line), "\r\n"))
 }
 
-// "PROXY TCP4 192.0.2.1 198.51.100.1 56324 443", or "PROXY UNKNOWN" followed by
-// anything.
 func parseVersionOne(line string) (header, error) {
 	fields := strings.Split(line, " ")
 	if len(fields) >= 2 && fields[1] == "UNKNOWN" {
