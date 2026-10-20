@@ -17,8 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ---------- fan-out, with servers that record what they are asked ----------
-
 type managedFake struct {
 	mu        sync.Mutex
 	names     []string
@@ -222,8 +220,6 @@ func TestMixedChangesOneUserAtATime(t *testing.T) {
 	}
 }
 
-// ---------- the real protocols behind a real inbound ----------
-
 func userManagerOf(t *testing.T, in component.Inbound) spec.UserManager {
 	t.Helper()
 	managing, ok := in.(component.UserManagingInbound)
@@ -237,7 +233,6 @@ func userManagerOf(t *testing.T, in component.Inbound) spec.UserManager {
 	return manager
 }
 
-// socks5Login logs in over SOCKS5 and, when accepted, asks to CONNECT.
 func socks5Login(t *testing.T, address net.Addr, username, password string) bool {
 	t.Helper()
 	connection := dialMixed(t, address)
@@ -255,7 +250,6 @@ func socks5Login(t *testing.T, address net.Addr, username, password string) bool
 	return true
 }
 
-// httpLogin sends a CONNECT with the credentials and reports the status code.
 func httpLogin(t *testing.T, address net.Addr, username, password string) bool {
 	t.Helper()
 	connection := dialMixed(t, address)
@@ -324,8 +318,6 @@ func TestARemovedUserIsRefusedOverBothProtocols(t *testing.T) {
 	}
 }
 
-// A colon is legal for SOCKS5 and not for Basic authentication, and a user is
-// valid only if both protocols take it.
 func TestAUserHTTPCannotCarryIsRefusedAndLeftInNeitherProtocol(t *testing.T) {
 	address, _, in := startMixedInboundReturningIt(t, mixedInboundOptions{users: []json.RawMessage{json.RawMessage(`{"name": "alice", "password": "secret"}`)}})
 	manager := userManagerOf(t, in)

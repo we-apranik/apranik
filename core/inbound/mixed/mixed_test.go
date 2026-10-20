@@ -27,7 +27,6 @@ type handled struct {
 	metadata spec.Metadata
 }
 
-// recordingHandler reports what core dispatched and holds nothing open.
 type recordingHandler struct{ calls chan handled }
 
 func (h recordingHandler) HandleStream(_ context.Context, c spec.Stream, m spec.Metadata) error {
@@ -53,12 +52,9 @@ type mixedInboundOptions struct {
 	httpSettings     proxyhttp.Settings
 	firstByteTimeout time.Duration
 
-	// Added to both protocols before the inbound listens, as the builder does.
 	users []json.RawMessage
 }
 
-// startMixedInbound runs a real inbound on loopback TCP with the real socks5
-// and http modules behind the mixed server, as the builder does.
 func startMixedInbound(t *testing.T, options mixedInboundOptions) (net.Addr, recordingHandler) {
 	t.Helper()
 	address, handler, _ := startMixedInboundReturningIt(t, options)
@@ -193,10 +189,6 @@ func TestMixedServesHTTPAbsoluteForm(t *testing.T) {
 	}
 }
 
-// Core hands Associate its own carrier, not the mixed server's wrapper, so any
-// byte the mixed server read ahead would corrupt the address read there. The
-// greeting and request go in one write, as a pipelining client sends them, so
-// a read-ahead has something to take.
 func TestMixedServesSOCKS5UDPAssociate(t *testing.T) {
 	address, handler := startMixedInbound(t, mixedInboundOptions{socks5Settings: socks5.Settings{UDPRelay: true}})
 	connection := dialMixed(t, address)
@@ -217,7 +209,6 @@ func TestMixedServesSOCKS5UDPAssociate(t *testing.T) {
 	}
 }
 
-// mixed has one list of users, and both protocols ask for a login when it has any.
 func TestMixedUsersApplyToBothProtocols(t *testing.T) {
 	address, handler := startMixedInbound(t, mixedInboundOptions{users: []json.RawMessage{json.RawMessage(`{"name": "alice", "password": "secret"}`)}})
 
