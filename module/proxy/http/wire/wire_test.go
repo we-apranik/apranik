@@ -15,7 +15,6 @@ type pipeStream struct{ net.Conn }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// streamSending returns a stream that reads sent, then EOF.
 func streamSending(t *testing.T, sent string) spec.Stream {
 	t.Helper()
 	readEnd, writeEnd := net.Pipe()

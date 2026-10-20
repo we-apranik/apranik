@@ -19,17 +19,13 @@ const (
 	maxHeaderLines       = 128
 )
 
-// Pooled so a connection's handshake does not allocate a buffer of its own.
 var headReaderPool = sync.Pool{New: func() any { return bufio.NewReaderSize(nil, headReaderBufferSize) }}
 
-// Head is the start line and header lines of a request or response, without
-// the blank line that ends it.
 type Head struct {
 	StartLine   string
 	HeaderLines []string
 }
 
-// HeaderValue returns the value of the first header named headerName, or "".
 func (h Head) HeaderValue(headerName string) string {
 	for _, headerLine := range h.HeaderLines {
 		if strings.EqualFold(HeaderLineName(headerLine), headerName) {
@@ -40,18 +36,11 @@ func (h Head) HeaderValue(headerName string) string {
 	return ""
 }
 
-// HeaderLineName returns "Host" for "Host: example.com".
 func HeaderLineName(headerLine string) string {
 	name, _, _ := strings.Cut(headerLine, ":")
 	return strings.TrimSpace(name)
 }
 
-// ReadHead reads the head off underlyingStream and returns it with the stream
-// that carries everything after it.
-//
-// The head is read through a buffer, which can read past the end of the head:
-// a client may send payload right after CONNECT without waiting for the reply.
-// Those bytes are put back in front of the returned stream.
 func ReadHead(underlyingStream spec.Stream) (Head, spec.Stream, error) {
 	headReader := headReaderPool.Get().(*bufio.Reader)
 	headReader.Reset(underlyingStream)

@@ -11,8 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ParseHostPort keeps a domain unresolved: only the base transport resolves.
-// A defaultPort of 0 means the port is required.
 func ParseHostPort(hostPort string, defaultPort uint16) (spec.Destination, error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
