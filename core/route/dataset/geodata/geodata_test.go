@@ -110,7 +110,6 @@ func TestBadRegexIsReported(t *testing.T) {
 	}
 }
 
-// Set APRANIK_GEOSITE to a real geosite.dat to check the decoder against it.
 func TestRealGeositeFile(t *testing.T) {
 	path := os.Getenv("APRANIK_GEOSITE")
 	if path == "" {
@@ -150,7 +149,6 @@ func largeSiteFile(categories, domainsPerCategory int) []byte {
 	return geodatatest.Site(all)
 }
 
-// A real geosite.dat has about 1,500 categories; routing loads a few.
 func BenchmarkReadOneCategoryOfMany(b *testing.B) {
 	file := largeSiteFile(1500, 200)
 	b.SetBytes(int64(len(file)))

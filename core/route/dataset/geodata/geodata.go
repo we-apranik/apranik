@@ -1,18 +1,4 @@
-// Package geodata reads V2Ray's geosite.dat and geoip.dat: protobuf files
-// holding many named categories ("ir", "category-ads-all"), each a list of
-// domains or of IP ranges. It decodes the protobuf by hand with the standard
-// library, and only the category asked for: the rest of the file is skipped
-// without being decoded.
-//
-// The messages, from v2fly's and Xray's common/geodata/geodat.proto:
-//
-//	GeoSiteList { repeated GeoSite entry = 1; }
-//	GeoSite     { string code = 1; repeated Domain domain = 2; }
-//	Domain      { Type type = 1; string value = 2; repeated Attribute attribute = 3; }
-//	Attribute   { string key = 1; ... }
-//	GeoIPList   { repeated GeoIP entry = 1; }
-//	GeoIP       { string code = 1; repeated CIDR cidr = 2; bool reverse_match = 3; }
-//	CIDR        { bytes ip = 1; uint32 prefix = 2; }
+// Package geodata reads V2Ray's geosite.dat and geoip.dat: protobuf files holding many named categories ("ir", "category-ads-all"), each a list of domains or of IP ranges.
 package geodata
 
 import (
@@ -25,7 +11,6 @@ import (
 	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
-// Domain.Type in the protobuf.
 const (
 	domainTypeSubstring = 0
 	domainTypeRegex     = 1
@@ -39,8 +24,6 @@ var (
 	errMalformed        = errors.New("geodata: malformed file")
 )
 
-// ReadDomains returns the category's domains, keeping only entries carrying
-// attribute when it is not empty. Categories are compared case-insensitively.
 func ReadDomains(file []byte, category, attribute string) (match.DomainList, error) {
 	entry, err := findCategory(file, category)
 	if err != nil {
@@ -67,7 +50,6 @@ func ReadDomains(file []byte, category, attribute string) (match.DomainList, err
 	return list, err
 }
 
-// ReadPrefixes returns the category's IP ranges.
 func ReadPrefixes(file []byte, category string) ([]netip.Prefix, error) {
 	entry, err := findCategory(file, category)
 	if err != nil {
@@ -92,9 +74,6 @@ func ReadPrefixes(file []byte, category string) ([]netip.Prefix, error) {
 	return prefixes, err
 }
 
-// Returns the bytes of the GeoSite or GeoIP whose code is category. Both list
-// messages share the shape (entries at field 1, code at field 1 of each), so
-// this does not know which it read; the caller finds out from the entries.
 func findCategory(file []byte, category string) ([]byte, error) {
 	var found []byte
 	err := forEachField(file, func(number int, wireType int, entry []byte, _ uint64) error {
@@ -139,9 +118,6 @@ type domain struct {
 	attributes [][]byte
 }
 
-// A GeoIP's CIDR has bytes at field 1 and a varint at field 2; a Domain has
-// the reverse. Either one seen the other way means an IP list was read as a
-// domain list.
 func decodeDomain(message []byte) (domain, error) {
 	var decoded domain
 	err := forEachField(message, func(number int, wireType int, value []byte, varint uint64) error {

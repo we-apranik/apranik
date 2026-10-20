@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-// Protobuf wire types. geodata messages use only these two; fixed-width
-// fields are skipped if a newer file ever has them.
 const (
 	wireTypeVarint  = 0
 	wireTypeFixed64 = 1
@@ -14,8 +12,7 @@ const (
 	wireTypeFixed32 = 5
 )
 
-// forEachField walks one message's fields in order. value is set for bytes
-// fields and varint for varint fields; it slices the message, never copying.
+// value is set for bytes fields and varint for varint fields; it slices the message, never copying.
 func forEachField(message []byte, visit func(number int, wireType int, value []byte, varint uint64) error) error {
 	for len(message) > 0 {
 		key, keyLength := binary.Uvarint(message)
