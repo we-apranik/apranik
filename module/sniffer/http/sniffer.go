@@ -1,7 +1,3 @@
-// Package http is a sniffer: it recognises a plain HTTP/1 request in the
-// first bytes of a stream and reports the host from its Host header, so
-// routing can see a domain where the client only gave an IP, and the
-// request's headers with ":method" and ":path".
 package http
 
 import (
@@ -34,7 +30,6 @@ func (*Sniffer) Info() spec.ModuleInfo {
 	return spec.ModuleInfo{Name: "http", Description: "sniff host and request headers from an HTTP/1 request"}
 }
 
-// Nothing to prepare: the sniffer reads only the bytes it is given.
 func (*Sniffer) NewSniffer() (spec.Sniffer, error) { return hostHeaderSniffer{}, nil }
 
 func NewSnifferModule() spec.SnifferModule { return &Sniffer{} }
@@ -54,7 +49,6 @@ func (hostHeaderSniffer) Sniff(payloadPrefix []byte) (spec.SniffResult, error) {
 		return spec.SniffResult{}, spec.ErrSniffNeedMoreData
 	}
 
-	// One conversion; every name and value below is a slice of it.
 	header := string(payloadPrefix[:headerEnd])
 	requestLine, headerLines, _ := strings.Cut(header, "\r\n")
 	method, rest, _ := strings.Cut(requestLine, " ")
@@ -108,7 +102,6 @@ func startsWithKnownMethod(payloadPrefix []byte) error {
 	return errNotHTTP
 }
 
-// A Host without a port, or with one that does not parse, reports port zero.
 func hostAndPort(hostHeader string) (string, uint16) {
 	host, portText, err := net.SplitHostPort(hostHeader)
 	if err != nil {
