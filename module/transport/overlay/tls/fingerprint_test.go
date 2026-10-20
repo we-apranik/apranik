@@ -13,7 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Every name the tls page lists, so a uTLS upgrade that drops one fails here.
 var everyFingerprint = []string{
 	"", "none", "chrome", "firefox", "safari", "ios", "android", "edge", "360", "qq", "random", "randomized",
 	"hellochrome_58", "hellochrome_62", "hellochrome_70", "hellochrome_72", "hellochrome_83", "hellochrome_87",
@@ -32,15 +31,10 @@ func serverConfig(t testing.TB, authority *testAuthority, alpn []string) *crypto
 		t.Fatal(err)
 	}
 	config := &cryptotls.Config{Certificates: []cryptotls.Certificate{certificate}, NextProtos: alpn}
-	// Fixed, so the clone each connection gets still accepts earlier tickets.
 	config.SetSessionTicketKeys([][32]byte{{1}})
 	return config
 }
 
-// serveOne runs one connection from client to a crypto/tls server built from
-// config, and returns the ClientHello the server received and the state it
-// ended in. The server writes one byte, which the client reads, so a session
-// ticket sent after the handshake reaches the client.
 func serveOne(t testing.TB, config *cryptotls.Config, overlayClient spec.StreamOverlayClient) (*cryptotls.ClientHelloInfo, cryptotls.ConnectionState, error) {
 	t.Helper()
 	clientSide, serverSide := tcpPair(t)
@@ -144,8 +138,6 @@ func TestWithoutAlpnAFingerprintOffersTheBrowsersList(t *testing.T) {
 	}
 }
 
-// With alpn set, exactly that list goes out, whatever the preset built:
-// under ws the other end must never be able to choose h2.
 func TestAlpnReplacesEveryPresetsList(t *testing.T) {
 	authority := newTestAuthority(t)
 	want := []string{"http/1.1"}
@@ -196,7 +188,6 @@ func TestADefaultFingerprintClientRefusesVersionsButAServerAcceptsThem(t *testin
 	if err := client.Validate(); err == nil {
 		t.Error("Validate accepted min_version on client settings with the default fingerprint")
 	}
-	// Certificates a client ignores hide its role from Validate; building catches it.
 	certificatePEM, keyPEM := authority.issue(t, []string{"example.com"}, nil)
 	client.Certificates = []tls.Certificate{{Certificate: certificatePEM, Key: types.Secret(keyPEM)}}
 	if err := client.Validate(); err != nil {

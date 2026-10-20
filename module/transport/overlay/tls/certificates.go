@@ -10,8 +10,6 @@ import (
 
 var errNoCertificateInPEM = errors.New("no PEM certificate found")
 
-// Starts from the system's roots, so an extra authority adds trust rather than
-// replacing it. Nil means the system's roots alone.
 func certificateAuthorityPool(authorities []CertificateAuthority) (*x509.CertPool, error) {
 	if len(authorities) == 0 {
 		return nil, nil
@@ -53,7 +51,6 @@ func loadCertificates(certificates []Certificate) ([]cryptotls.Certificate, erro
 	return loaded, nil
 }
 
-// Validate has already made sure exactly one of the two is set.
 func readPEM(path, inline string) (pemBytes []byte, source string, err error) {
 	if path == "" {
 		return []byte(inline), "inline", nil

@@ -10,41 +10,22 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// One settings type for both roles: an outbound reads the client fields, an
-// inbound the server ones, and each ignores the other's.
 type Settings struct {
-	// Client: the name sent as SNI and checked against the server's
-	// certificate. Empty means the server's domain; for a server given as an
-	// IP, no SNI is sent and the certificate must carry that IP.
 	ServerName string `json:"server_name"`
 
-	// Client: accept any certificate. Anyone on the path can then read and
-	// change the traffic.
 	Insecure bool `json:"insecure"`
 
-	// Client: trusted in addition to the system's roots.
 	CertificateAuthorities []CertificateAuthority `json:"certificate_authorities"`
 
-	// Server: at least one is required. With several, the one matching the
-	// client's SNI is used.
 	Certificates []Certificate `json:"certificates"`
 
-	// Both: application protocols offered (client) or accepted (server), in
-	// preference order. A server with a list refuses a client whose offer
-	// shares nothing with it.
 	ALPN []string `json:"alpn"`
 
-	// Both. Empty means Go's defaults: 1.2 and 1.3. A client may set them
-	// only with fingerprint "none": a browser's ClientHello fixes its own.
 	MinVersion string `json:"min_version"`
 	MaxVersion string `json:"max_version"`
 
-	// Client: whose ClientHello to imitate, through uTLS. Empty means
-	// "chrome"; "none" means Go's own.
 	Fingerprint string `json:"fingerprint"`
 
-	// Both: how long the TLS handshake may take. Absent means
-	// defaultHandshakeTimeout; a written zero is refused.
 	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
@@ -55,13 +36,11 @@ func (s *Settings) handshakeTimeout() time.Duration {
 	return time.Duration(types.ValueOrDefault(s.HandshakeTimeout, types.Duration(defaultHandshakeTimeout)))
 }
 
-// A PEM certificate, from a file or inline: exactly one of the two.
 type CertificateAuthority struct {
 	CertificateFile string `json:"certificate_file"`
 	Certificate     string `json:"certificate"`
 }
 
-// A PEM certificate chain and its private key, each from a file or inline.
 type Certificate struct {
 	CertificateFile string       `json:"certificate_file"`
 	Certificate     string       `json:"certificate"`
@@ -165,8 +144,6 @@ func (s *Settings) looksLikeAClient() bool {
 	return len(s.Certificates) == 0
 }
 
-// Whether a client built from these settings sends a browser's ClientHello:
-// named explicitly, or the default for settings that look like a client's.
 func (s *Settings) usesFingerprint() bool {
 	if s.Fingerprint == "" {
 		return s.looksLikeAClient()
@@ -174,8 +151,6 @@ func (s *Settings) usesFingerprint() bool {
 	return s.Fingerprint != fingerprintNone
 }
 
-// A client offers its alpn setting, or its fingerprint's list when alpn is
-// unset; a server offers its alpn setting.
 func (s *Settings) TransportInfo() spec.TransportInfo {
 	if len(s.ALPN) > 0 {
 		return spec.TransportInfo{ApplicationProtocols: s.ALPN}

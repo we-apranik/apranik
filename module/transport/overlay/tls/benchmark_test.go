@@ -6,8 +6,6 @@ import (
 	"github.com/we-apranik/apranik/module/transport/overlay/tls"
 )
 
-// One full client handshake against a crypto/tls server over loopback TCP,
-// with Go's own ClientHello and with each kind of fingerprint.
 func BenchmarkClientHandshake(b *testing.B) {
 	authority := newTestAuthority(b)
 	config := serverConfig(b, authority, nil)

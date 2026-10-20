@@ -17,8 +17,6 @@ type server struct {
 	handshakeTimeout time.Duration
 }
 
-// Reads every certificate now, so a missing file or a key that does not
-// match stops startup instead of failing each connection.
 func newServer(settings *Settings) (*server, error) {
 	if len(settings.Certificates) == 0 {
 		return nil, errServerNeedsCertificate

@@ -13,20 +13,16 @@ const (
 	// Unset means this, as Xray has since 2024-12: Go's own ClientHello is
 	// shared by every Go program and easy to single out.
 	defaultFingerprint = "chrome"
-	// Go's crypto/tls, as before fingerprints existed.
-	fingerprintNone = "none"
+	fingerprintNone    = "none"
 	// Chosen once per client from the modern presets, as sing-box does.
-	fingerprintRandom = "random"
-	// A made-up ClientHello, seeded once per client.
+	fingerprintRandom     = "random"
 	fingerprintRandomized = "randomized"
 )
 
 type fingerprint struct {
 	helloID  utls.ClientHelloID
 	imitates string
-	// Older than the browser's newest preset in uTLS: rarely seen today, so
-	// it may stand out rather than blend in.
-	stale bool
+	stale    bool
 }
 
 // The short names are the ones Xray and sing-box share; the versioned ones
@@ -77,8 +73,6 @@ var fingerprintsByName = map[string]fingerprint{
 // sing-box's list for "random".
 var modernFingerprintNames = []string{"chrome", "firefox", "edge", "safari", "ios"}
 
-// What a random or randomized ClientHello may offer, so the config check
-// assumes the worst: its list is not known until the client is built.
 var randomApplicationProtocols = []string{"h2", "http/1.1"}
 
 func isKnownFingerprint(name string) bool {
@@ -90,7 +84,6 @@ func isKnownFingerprint(name string) bool {
 	return known
 }
 
-// effectiveFingerprint is the name a client uses: unset means the default.
 func effectiveFingerprint(name string) string {
 	if name == "" {
 		return defaultFingerprint
@@ -127,8 +120,6 @@ func resolveClientHelloID(name string) (utls.ClientHelloID, error) {
 	return fingerprintsByName[name].helloID, nil
 }
 
-// presetApplicationProtocols is the ALPN list a fingerprint offers when alpn
-// is unset, read from the uTLS preset without making a connection.
 func presetApplicationProtocols(name string) []string {
 	switch name {
 	case fingerprintNone:
@@ -148,10 +139,6 @@ func presetApplicationProtocols(name string) []string {
 	return nil
 }
 
-// replaceApplicationProtocols puts protocols in place of the preset's ALPN
-// list, leaving every other extension as the preset built it. A preset with
-// no ALPN extension gets one, before its padding if it has any, since padding
-// is sized to the extensions ahead of it.
 func replaceApplicationProtocols(connection *utls.UConn, protocols []string) {
 	for _, extension := range connection.Extensions {
 		if alpn, isALPN := extension.(*utls.ALPNExtension); isALPN {

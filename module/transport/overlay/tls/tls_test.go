@@ -24,8 +24,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// testAuthority is a certificate authority made in memory, so no key material
-// lives in the repository.
 type testAuthority struct {
 	certificate *x509.Certificate
 	key         *ecdsa.PrivateKey
@@ -55,7 +53,6 @@ func newTestAuthority(t testing.TB) *testAuthority {
 	return &testAuthority{certificate: certificate, key: key, pem: encodePEM("CERTIFICATE", der)}
 }
 
-// issue returns a leaf certificate and key, both PEM, for the given names.
 func (a *testAuthority) issue(t testing.TB, domains []string, ips []netip.Addr) (certificatePEM, keyPEM string) {
 	t.Helper()
 	key := newKey(t)
@@ -95,7 +92,6 @@ func encodePEM(blockType string, der []byte) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: blockType, Bytes: der}))
 }
 
-// newModule is what the config would decode: defaults, then the test's edits.
 func newModule(t testing.TB, edit func(*tls.Settings)) *tls.Transport {
 	t.Helper()
 	transport := tls.NewOverlayStreamTransportModule().(*tls.Transport)
@@ -106,7 +102,6 @@ func newModule(t testing.TB, edit func(*tls.Settings)) *tls.Transport {
 	return transport
 }
 
-// tcpPair is a connected loopback TCP pair: real half-close, real deadlines.
 func tcpPair(t testing.TB) (clientSide, serverSide *net.TCPConn) {
 	t.Helper()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -153,7 +148,6 @@ type handshakeResult struct {
 	err    error
 }
 
-// handshake runs both sides at once and returns each side's outcome.
 func handshake(t *testing.T, clientModule, serverModule *tls.Transport, server spec.Destination) (clientResult, serverResult handshakeResult) {
 	t.Helper()
 	overlayClient, err := clientModule.NewStreamOverlayClient()
@@ -326,8 +320,6 @@ func TestVersionsOutsideTheRangeAreRefused(t *testing.T) {
 	}
 }
 
-// Half-closing ends one direction only: the peer reads the end, then can
-// still answer.
 func TestCloseWriteEndsOneDirection(t *testing.T) {
 	authority := newTestAuthority(t)
 	clientResult, serverResult := handshake(t,
@@ -354,8 +346,6 @@ func TestCloseWriteEndsOneDirection(t *testing.T) {
 	}
 }
 
-// Core bounds the server's handshake with its context; a client that sends
-// nothing must not hold it past that.
 func TestACancelledContextEndsAHandshakeWithASilentClient(t *testing.T) {
 	authority := newTestAuthority(t)
 	overlayServer, err := serverFor(t, authority, []string{"example.com"}, nil).NewStreamOverlayServer()

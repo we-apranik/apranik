@@ -19,18 +19,15 @@ const sessionCacheCapacity = 64
 var errVersionsNeedNoFingerprint = errors.New("tls: min_version and max_version cannot be used with fingerprint \"chrome\" (the default), whose ClientHello fixes the versions; set fingerprint to \"none\" to use them")
 
 type client struct {
-	serverName       string
-	handshakeTimeout time.Duration
-	// Exactly one is set: Go's own ClientHello, or a browser's through uTLS.
+	serverName        string
+	handshakeTimeout  time.Duration
 	goClient          *cryptotls.Config
 	fingerprintClient *fingerprintClient
 }
 
-// Everything but the server name, which differs per call.
 type fingerprintClient struct {
-	sharedConfig *utls.Config
-	helloID      utls.ClientHelloID
-	// Nil keeps the preset's own list.
+	sharedConfig         *utls.Config
+	helloID              utls.ClientHelloID
 	applicationProtocols []string
 }
 
@@ -54,8 +51,6 @@ func newClient(settings *Settings) (*client, error) {
 		return built, nil
 	}
 
-	// Validate catches this unless the settings also carry certificates,
-	// which a client ignores.
 	if settings.MinVersion != "" || settings.MaxVersion != "" {
 		return nil, errVersionsNeedNoFingerprint
 	}
@@ -75,10 +70,6 @@ func newClient(settings *Settings) (*client, error) {
 	return built, nil
 }
 
-// Handshakes before returning, so a certificate problem is reported as a
-// failure to reach the server rather than surfacing later inside the proxy
-// protocol. No SNI is sent for an IP; the certificate's IP entries are
-// checked instead.
 func (c *client) WrapClientStream(ctx context.Context, underlyingStream spec.Stream, server spec.Destination) (spec.Stream, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.handshakeTimeout)
 	defer cancel()
