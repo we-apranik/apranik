@@ -24,8 +24,6 @@ type association struct {
 	socket     spec.Datagram
 	readBuffer []byte
 
-	// Reused for every reply; the mutex also keeps two replies from
-	// interleaving in it.
 	replyBufferMutex sync.Mutex
 	replyBuffer      []byte
 
@@ -34,12 +32,6 @@ type association struct {
 	clientAddressKnown bool
 }
 
-// declaredClientAddress is the address the client said it would send from.
-// Most clients send 0.0.0.0:0, in which case the first datagram teaches us
-// instead, and everything after it is filtered against that.
-//
-// maxPayload is the largest datagram it takes from the client, header aside; a
-// bigger one is dropped.
 func newAssociation(socket spec.Datagram, declaredClientAddress spec.Destination, maxPayload int) *association {
 	created := &association{socket: socket, readBuffer: make([]byte, maxPayload+largestUDPHeader)}
 	if ip, isIP := declaredClientAddress.IP(); isIP && !ip.IsUnspecified() && declaredClientAddress.Port() != 0 {

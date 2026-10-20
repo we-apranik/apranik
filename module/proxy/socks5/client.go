@@ -18,16 +18,11 @@ type streamClient struct {
 	handshakeTimeout time.Duration
 }
 
-// RequestStream speaks the client half of the handshake over a stream that
-// already reaches the server. SOCKS5 round-trips, so an auth failure or a
-// refused destination surfaces here rather than on the first read.
 func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("socks5: %w: this client speaks CONNECT only", spec.ErrUnsupportedNetwork)
 	}
 
-	// Encoded first so a destination this protocol cannot express fails before
-	// anything reaches the wire.
 	request, err := socksaddr.AppendAddress([]byte{wire.Version5, wire.CommandConnect, 0x00}, metadata.Destination)
 	if err != nil {
 		return nil, err

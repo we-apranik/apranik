@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// No server address here: a proxy protocol never dials, so that belongs to the
-// outbound stack.
 type Settings struct {
 	// What a client sends (RFC 1929), set together or not at all; an inbound
 	// refuses them, it takes users.
@@ -28,15 +26,8 @@ type Settings struct {
 	// without one the command is refused with X'07' whatever this says.
 	UDPRelay bool `json:"udp_relay"`
 
-	// The largest UDP datagram the server takes from a client through UDP
-	// ASSOCIATE; a bigger one is dropped. Absent means defaultMaxDatagramSize; a
-	// written zero is refused.
-	// Match the inbound's udp_max_datagram_size, which bounds what core
-	// relays. Server only.
 	UDPMaxDatagramSize *int `json:"udp_max_datagram_size"`
 
-	// Both: how long the handshake may take; on a server, UDP ASSOCIATE's
-	// reply too. Absent means defaultHandshakeTimeout; a written zero is refused.
 	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
@@ -48,7 +39,6 @@ const defaultHandshakeTimeout = 10 * time.Second
 // 8 KB, not 64. PROVISIONAL; core's own default is the same.
 const defaultMaxDatagramSize = 8192
 
-// The most a datagram can hold over IPv4.
 const largestDatagramSize = 65507
 
 func (s *Settings) maxDatagramSize() int {
@@ -94,9 +84,6 @@ type User struct {
 	Password types.Secret `json:"password"`
 }
 
-// checkUser says what is wrong with one user on its own, without saying where
-// the user is and without ever naming a password. The name is the RFC 1929
-// username, so both are limited to what a length byte can hold.
 func checkUser(user User) error {
 	switch {
 	case user.Name == "":
@@ -129,8 +116,6 @@ func (s *Settings) checkAsClient() error {
 
 func (s *Settings) Warnings() []string { return nil }
 
-// An inbound with no users is open to whoever can reach its port: only a
-// listen address on this machine makes that safe.
 func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
 	if len(s.Users) == 0 && !listen.Addr().IsLoopback() {
 		return []string{"socks5: no users, so any client that can reach this inbound may use it"}

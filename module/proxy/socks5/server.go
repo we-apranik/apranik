@@ -43,7 +43,6 @@ type streamServer struct {
 
 	handshakeTimeout time.Duration
 
-	// The largest payload an association takes from a client.
 	maxDatagramSize int
 
 	socket spec.UDPAssociateSocketFunc
@@ -97,7 +96,6 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 
 	case command == wire.CommandUDPAssociate && s.udpRelay && s.socket != nil:
 		metadata.Network = spec.NetworkUDP
-		// Inform core that we need an UDP association
 		return nil, metadata, spec.ErrUDPAssociationRequested
 
 	default:
@@ -108,8 +106,6 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	}
 }
 
-// Reads the declared address AcceptStream left unread, opens the socket, and
-// replies. Does not wait for the session: core owns the relay from here.
 func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream, metadata spec.Metadata) (spec.Datagram, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
@@ -141,8 +137,6 @@ func (s *streamServer) Associate(ctx context.Context, controlStream spec.Stream,
 	return newAssociation(socket, declaredClient, s.maxDatagramSize), nil
 }
 
-// A wildcard bind is useless to the client, so the control stream supplies the
-// host and the bound socket the port.
 func reachableAddress(bound, control net.Addr) (spec.Endpoint, error) {
 	boundEndpoint := spec.NewEndpointFromNetAddr(bound)
 	if !boundEndpoint.IsValid() {
@@ -160,8 +154,6 @@ func reachableAddress(bound, control net.Addr) (spec.Endpoint, error) {
 	return spec.NewEndpoint(controlEndpoint.Addr(), boundEndpoint.Port())
 }
 
-// authenticate returns the name of the user who logged in, empty when the
-// server has no users and so asks for no login.
 func (s *streamServer) authenticate(underlyingStream spec.Stream) (string, error) {
 	users := *s.users.Load()
 
@@ -220,9 +212,6 @@ func (s *streamServer) checkCredentials(underlyingStream spec.Stream, users []us
 		return "", err
 	}
 
-	// Every user is compared, with both fields, before deciding, so the time
-	// taken says nothing about which user matched, how many there are before
-	// it, or whether the username or the password was the wrong part.
 	matchedIndex, found := 0, 0
 	for index, candidate := range users {
 		match := subtle.ConstantTimeCompare(username, candidate.nameBytes) & subtle.ConstantTimeCompare(password, candidate.passwordBytes)

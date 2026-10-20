@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// endlessDatagram hands out the same datagram from the same sender forever and
-// discards writes, so a benchmark measures only the layer above it.
 type endlessDatagram struct {
 	datagram []byte
 	from     spec.Destination

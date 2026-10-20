@@ -41,9 +41,6 @@ func userJSON(name, password string) json.RawMessage {
 	return raw
 }
 
-// login runs a CONNECT handshake against the server as a client with the
-// credentials (none when the username is empty) and returns what the server
-// made of it.
 func login(t *testing.T, server spec.StreamProxyServer, username string, password types.Secret) (spec.Metadata, error) {
 	t.Helper()
 	clientSide, serverSide := pipe(t)
@@ -130,7 +127,6 @@ func TestARemovedUserIsRefusedAndTheOthersStay(t *testing.T) {
 	requireLogin(t, server, "bob", "bob-password", "bob")
 }
 
-// With no users a server asks for no login; the first user changes that.
 func TestTheFirstUserMakesAnOpenServerAskForALogin(t *testing.T) {
 	server := newManagedServer(t)
 	requireLogin(t, server, "", "", "")
@@ -143,7 +139,6 @@ func TestTheFirstUserMakesAnOpenServerAskForALogin(t *testing.T) {
 	requireLogin(t, server, "alice", "alice-password", "alice")
 }
 
-// The other direction is the documented cost of "no users, no login".
 func TestRemovingTheLastUserLeavesTheServerOpen(t *testing.T) {
 	server := newManagedServer(t, socks5.User{Name: "alice", Password: "alice-password"})
 	requireRefused(t, server, "", "")

@@ -23,19 +23,12 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// pipeStream adapts net.Pipe to spec.Stream.
-//
-// CloseWrite reports spec.ErrNoHalfClose, because net.Pipe genuinely cannot
-// half-close. That is exactly the case the sentinel exists for, and it means
-// these tests run over a stream that is weaker than TCP -- if the protocol
-// quietly depended on half-close, it would fail here.
 type pipeStream struct {
 	net.Conn
 }
 
 func (pipeStream) CloseWrite() error { return spec.ErrNoHalfClose }
 
-// pipe returns the two ends of a connected pair as spec.Streams.
 func pipe(t *testing.T) (a, b spec.Stream) {
 	t.Helper()
 
@@ -50,7 +43,6 @@ type accepted struct {
 	err     error
 }
 
-// serverOn runs AcceptStream against one end of a pipe and reports the result.
 func serverOn(t *testing.T, cfg *socks5.Settings, c spec.Stream) <-chan accepted {
 	t.Helper()
 
@@ -83,8 +75,6 @@ func ipDst(ip string, port uint16) spec.Destination {
 	return destination
 }
 
-// TestClientAndServerAgreeOnTheDestination is the round trip that matters: what
-// the client encodes is what the server reports, and the payload flows after.
 func TestClientAndServerAgreeOnTheDestination(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -126,7 +116,6 @@ func TestClientAndServerAgreeOnTheDestination(t *testing.T) {
 				t.Errorf("User = %q, want empty: no-auth authenticates nobody", got.meta.User)
 			}
 
-			// The framing is consumed: whatever goes in next is payload.
 			go up.Write([]byte("payload"))
 			buf := make([]byte, len("payload"))
 			if _, err := io.ReadFull(got.payload, buf); err != nil {
@@ -154,10 +143,8 @@ func TestUDPAssociateIsRefusedWithX07(t *testing.T) {
 			clientSide, serverSide := pipe(t)
 			results := serverOn(t, &socks5.Settings{UDPRelay: true}, serverSide)
 
-			// Greeting: version 5, one method, no-auth.
 			go func() {
 				clientSide.Write([]byte{0x05, 0x01, 0x00})
-				// Request: version 5, cmd, reserved, IPv4 127.0.0.1:80.
 				clientSide.Write([]byte{0x05, tc.cmd, 0x00, 0x01, 127, 0, 0, 1, 0x00, 0x50})
 			}()
 
@@ -191,8 +178,6 @@ func TestUDPAssociateIsRefusedWithX07(t *testing.T) {
 	}
 }
 
-// TestClientRefusesUDPMetadata: the refusal is also visible to core, before
-// anything reaches the wire, and it is spec's sentinel rather than a new one.
 func TestClientRefusesUDPMetadata(t *testing.T) {
 	clientSide, _ := pipe(t)
 
@@ -281,9 +266,6 @@ func TestUsernamePasswordAuthentication(t *testing.T) {
 	})
 }
 
-// TestModuleFillsOneShapeOnly is the structural claim: registering socks5 and
-// asking it for a datagram path fails a type assertion in the registry, at
-// build time, rather than on the first packet.
 func TestModuleFillsOneShapeOnly(t *testing.T) {
 	var m any = (&socks5.Proxy{})
 
@@ -303,7 +285,6 @@ func TestModuleFillsOneShapeOnly(t *testing.T) {
 	}
 }
 
-// Validate is what refuses a bad settings block, before anything is built.
 func TestValidateRefusesHalfCredentials(t *testing.T) {
 	if err := (&socks5.Settings{Username: "u"}).Validate(); err == nil {
 		t.Error("a username with no password was accepted, want an error")
@@ -331,8 +312,6 @@ func TestSettingsDoNotPrintTheirPassword(t *testing.T) {
 	}
 }
 
-// An unauthenticated inbound is usable by anyone who can reach it, so it is
-// warned about unless it listens on this machine only.
 func TestNoAuthIsWarnedAboutOnlyWhereOthersCanReachIt(t *testing.T) {
 	listenAt := func(address string) spec.Endpoint {
 		endpoint, err := spec.NewEndpoint(netip.MustParseAddr(address), 1080)
@@ -377,7 +356,6 @@ func TestDecodeFillsPromotedFields(t *testing.T) {
 	if proxy.Password.Reveal() != "hunter2" {
 		t.Error("Password did not decode")
 	}
-	// Absent from the config file, so the constructor's default survives.
 	if !proxy.UDPRelay {
 		t.Error("udp_relay was overwritten by a config file that never mentioned it")
 	}
@@ -392,12 +370,6 @@ func TestInfoIsConstantAcrossSettings(t *testing.T) {
 	}
 }
 
-// TestDomainTooLongForTheWire: the wire format allows 255 bytes and the module
-// refuses rather than truncating into a different destination.
-//
-// A real server sits on the far end so the handshake gets far enough to reach
-// the request; it is left blocked on a read that never comes, and the pipe
-// cleanup releases it.
 func TestDomainTooLongForTheWire(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	serverOn(t, &socks5.Settings{UDPRelay: true}, serverSide)
@@ -419,8 +391,6 @@ func TestDomainTooLongForTheWire(t *testing.T) {
 	}
 }
 
-// udpDatagram is a spec.Datagram over a real socket, so the associate tests
-// exercise the wire format rather than a mock of it.
 type udpDatagram struct {
 	c *net.UDPConn
 }
@@ -446,8 +416,6 @@ func (d udpDatagram) Close() error { return d.c.Close() }
 
 func (d udpDatagram) LocalAddr() net.Addr { return d.c.LocalAddr() }
 
-// localAssociateSocket stands in for core: the module never opens a socket
-// itself.
 func localAssociateSocket(t *testing.T) spec.UDPAssociateSocketFunc {
 	return func(ctx context.Context) (spec.Datagram, error) {
 		c, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
@@ -459,11 +427,6 @@ func localAssociateSocket(t *testing.T) spec.UDPAssociateSocketFunc {
 	}
 }
 
-// TestUDPAssociate drives both calls of the UDPAssociateHandler handoff
-// itself, the way core does: AcceptStream only confirms the command, then
-// Associate opens the socket and replies. There is no Handler here -- core
-// owns calling HandleDatagram, not the module, so the test asserts directly
-// on the returned Datagram instead of simulating core.
 func TestUDPAssociate(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 
@@ -489,7 +452,6 @@ func TestUDPAssociate(t *testing.T) {
 
 	go func() {
 		clientSide.Write([]byte{0x05, 0x01, 0x00})
-		// ASSOCIATE, declaring 0.0.0.0:0 as most clients do.
 		clientSide.Write([]byte{0x05, 0x03, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 	}()
 

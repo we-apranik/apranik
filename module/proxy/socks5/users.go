@@ -12,10 +12,6 @@ import (
 
 var _ spec.UserManager = (*streamServer)(nil)
 
-// AddUser adds a user to the running server. The object is a user as the
-// config file writes it, with unknown keys refused. The change applies to the
-// next handshake. The first user turns a server that asked for no login into
-// one that asks for it.
 func (s *streamServer) AddUser(raw json.RawMessage) (string, error) {
 	configured, err := decodeUser(raw)
 	if err != nil {
@@ -40,8 +36,6 @@ func (s *streamServer) AddUser(raw json.RawMessage) (string, error) {
 	return configured.Name, nil
 }
 
-// RemoveUser removes a user from the running server. Removing the last one
-// leaves a server with no users, which asks for no login: it accepts everyone.
 func (s *streamServer) RemoveUser(name string) error {
 	s.changeUsers.Lock()
 	defer s.changeUsers.Unlock()
