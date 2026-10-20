@@ -39,52 +39,18 @@ A name unique among DNS servers, used by rules, `default_server`, `resolve` and
 
 | Type | Protocol | Default port |
 | --- | --- | --- |
-| `udp` | DNS over UDP | `53` |
-| `tcp` | DNS over TCP | `53` |
-| `dot` | DNS over TLS | `853` |
-| `doh` | DNS over HTTPS, HTTP/1.1 | `443` |
-| `system` | the operating system's resolver | – |
+| [`udp`](udp.md) | DNS over UDP | `53` |
+| [`tcp`](tcp.md) | DNS over TCP | `53` |
+| [`dot`](dot.md) | DNS over TLS | `853` |
+| [`doh`](doh.md) | DNS over HTTPS, HTTP/1.1 | `443` |
+| [`system`](system.md) | the operating system's resolver | – |
 
-`system` takes only `tag`, `type` and `settings.timeout`.
-
-### `settings.server`
-
-<span class="cfg cfg-type">string</span>
-<span class="cfg cfg-req">Required</span>
-
-An IP or hostname with an optional port: `"8.8.8.8"`, `"dns.google:853"`,
-`"[2001:4860:4860::8888]"`. Give `udp` an IP.
-
-### `settings.timeout`
-
-<span class="cfg cfg-type">duration</span>
-<span class="cfg cfg-def">Default: <code>5s</code></span>
-
-How long one query may take, including reaching the server.
-
-### `settings.path`
-
-<span class="cfg cfg-type">string</span>
-<span class="cfg cfg-def">Default: <code>/dns-query</code></span>
-<span class="cfg cfg-note">doh</span>
-
-The request path.
-
-### `settings.host`
-
-<span class="cfg cfg-type">string</span>
-<span class="cfg cfg-def">Default: the server's host</span>
-<span class="cfg cfg-note">doh</span>
-
-The `Host` header. Set it when `server` is an IP.
-
-### `tls`
+### `settings`
 
 <span class="cfg cfg-type">object</span>
-<span class="cfg cfg-note">dot, doh</span>
 
-[`tls` transport settings](../transport/tls.md) for the TLS to the DNS server.
-`doh` gets `"alpn": ["http/1.1"]` unless you write one.
+The type's own settings: `server` and `timeout` for every type, `path` and `host`
+for `doh`. See the page of each type.
 
 ### `outbound`
 
