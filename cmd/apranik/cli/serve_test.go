@@ -62,8 +62,6 @@ func (e *coreEvents) waitFor(t *testing.T, want ...string) {
 	t.Fatalf("events = %v, want %v", e.snapshot(), want)
 }
 
-// A starter that records which configuration started and closed, named by its
-// first outbound's tag; one named in failToStart refuses to start, once each.
 func recordingStarter(events *coreEvents, failToStart ...string) coreStarter {
 	var mu sync.Mutex
 	failures := slices.Clone(failToStart)
@@ -206,7 +204,6 @@ func TestAConfigurationThatDoesNotStartIsReplacedByTheOneBefore(t *testing.T) {
 	}
 	serving.events.waitFor(t, "start first", "close first", "refuse second", "start first")
 
-	// It still reloads afterwards.
 	if err := serving.reloads.Request(); err != nil {
 		t.Fatalf("Request after the restore = %v", err)
 	}
@@ -258,7 +255,6 @@ func TestAHangupWithAConfigWithErrorsKeepsTheRunningCore(t *testing.T) {
 
 	serving.rewriteConfig(t, `{"version": 1, "outbounds": []`)
 	serving.hangups <- syscall.SIGHUP
-	// A second signal is read only after the first was handled.
 	serving.hangups <- syscall.SIGHUP
 	serving.events.waitFor(t, "start first")
 	serving.stopAndWait(t)

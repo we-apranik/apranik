@@ -18,8 +18,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// serve runs the core until interrupted, and starts it again from the config
-// source whenever a reload is asked for, by SIGHUP or by an API.
 func serve(source string, fetchTimeout time.Duration, coreBlueprint *blueprint.Blueprint) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -33,11 +31,6 @@ func serve(source string, fetchTimeout time.Duration, coreBlueprint *blueprint.B
 
 type coreStarter func(ctx context.Context, coreBlueprint *blueprint.Blueprint, requestReload func() error) (*runningCore, error)
 
-// serveReloadable keeps one running core, and replaces it when a configuration
-// arrives from the reloader. The replacement is already checked, so the old core
-// is closed only for a configuration that is expected to start; if it still
-// does not start (a port taken in between, say), the previous one is started
-// again and only a failure of that ends the process.
 func serveReloadable(ctx context.Context, first *blueprint.Blueprint, reloads *reloader, hangups <-chan os.Signal, start coreStarter) error {
 	current := first
 	running, err := start(ctx, current, reloads.Request)
@@ -77,8 +70,6 @@ func serveReloadable(ctx context.Context, first *blueprint.Blueprint, reloads *r
 	}
 }
 
-// reloader checks the config source and hands a valid configuration to the
-// serving loop. At most one configuration waits there.
 type reloader struct {
 	source       string
 	fetchTimeout time.Duration
@@ -90,8 +81,6 @@ func newReloader(source string, fetchTimeout time.Duration) *reloader {
 	return &reloader{source: source, fetchTimeout: fetchTimeout, pending: make(chan *blueprint.Blueprint, 1)}
 }
 
-// Request returns once the configuration is checked and queued, not once it is
-// running. Every problem of a refused configuration is in the error.
 func (r *reloader) Request() error {
 	next, err := r.checkedConfiguration()
 	if err != nil {
@@ -124,8 +113,6 @@ func (r *reloader) checkedConfiguration() (*blueprint.Blueprint, error) {
 	return next, nil
 }
 
-// runningCore is everything one configuration started, closed in the reverse of
-// the order it was started: the APIs first, so none reads what is going away.
 type runningCore struct {
 	logger  *logging.Logger
 	closers []func()

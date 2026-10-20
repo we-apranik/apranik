@@ -63,8 +63,6 @@ func runRun(args []string) error {
 	return nil
 }
 
-// Both run and check go through it. Only http and https name a URL, so a
-// Windows path is not mistaken for a scheme.
 func load(source string, fetchTimeout time.Duration) (*blueprint.Blueprint, config.Diagnostics, error) {
 	modules, err := registry.Default()
 	if err != nil {
@@ -81,9 +79,6 @@ func load(source string, fetchTimeout time.Duration) (*blueprint.Blueprint, conf
 	return coreBlueprint, diagnostics, nil
 }
 
-// newBootstrapLogger logs until the configured logger exists: always to
-// stderr, since the config may be unreadable or silence the log, and in the
-// format of the config's stderr output when it has a valid one.
 func newBootstrapLogger(coreBlueprint *blueprint.Blueprint) *logging.Logger {
 	var stderr sink.StderrOutput
 	if coreBlueprint != nil {
@@ -103,8 +98,6 @@ func newBootstrapLogger(coreBlueprint *blueprint.Blueprint) *logging.Logger {
 	return system.Logger()
 }
 
-// ErrReported means the command has already logged why it failed, so main
-// only sets the exit status.
 var ErrReported = errors.New("failure already reported")
 
 func logFailure(logger *logging.Logger, message string, attributes ...any) error {
@@ -133,8 +126,6 @@ func diagnosticAttributes(diagnostic config.Diagnostic) []any {
 	return []any{"location", diagnostic.Location, "problem", diagnostic.Message}
 }
 
-// valueOrZero reads a setting that was left absent as zero, which the handler
-// reads as its default.
 func valueOrZero[T any](setting *T) T {
 	var zero T
 	if setting == nil {

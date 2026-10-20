@@ -41,8 +41,6 @@ func echoServerPort(t *testing.T) int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-// socksConnect opens a SOCKS5 CONNECT to 127.0.0.1:port through the proxy and
-// returns the open stream, or an error when the proxy refused it.
 func socksConnect(proxyPort, port int) (net.Conn, error) {
 	connection, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", proxyPort), 2*time.Second)
 	if err != nil {
@@ -119,8 +117,6 @@ func clashConfig(socksPort, apiPort, deadPort int, extraOutbound string) string 
 }`, socksPort, deadPort, extraOutbound, apiPort, clashSecret)
 }
 
-// The whole path: a config with a Clash API, the real core, a SOCKS5
-// connection, and the API reading and driving it.
 func TestTheClashAPIReadsAndDrivesARunningCore(t *testing.T) {
 	echoPort := echoServerPort(t)
 	socksPort, apiPort, deadPort := freePort(t), freePort(t), freePort(t)
@@ -142,7 +138,6 @@ func TestTheClashAPIReadsAndDrivesARunningCore(t *testing.T) {
 	api := clashClient{t: t, base: fmt.Sprintf("http://127.0.0.1:%d", apiPort)}
 	api.waitFor("the API answering", func() bool { status, _ := api.call("GET", "/version", ""); return status == http.StatusOK })
 
-	// Statistics and live tracking are on because an API is configured.
 	status, body := api.call("GET", "/proxies", "")
 	if status != http.StatusOK || !strings.Contains(body, `"choose":{"type":"Selector"`) || !strings.Contains(body, `"now":"direct"`) || !strings.Contains(body, `"GLOBAL"`) {
 		t.Fatalf("/proxies = %d %s", status, body)
@@ -184,7 +179,6 @@ func TestTheClashAPIReadsAndDrivesARunningCore(t *testing.T) {
 	}
 	api.waitFor("the closed connection ending", func() bool { return !echoes(connection, "again") })
 
-	// A selector switch moves new connections to the member that was chosen.
 	if status, body := api.call("PUT", "/proxies/choose", `{"name":"dead"}`); status != http.StatusNoContent {
 		t.Fatalf("PUT = %d %s", status, body)
 	}
@@ -216,7 +210,6 @@ func TestTheClashAPIReadsAndDrivesARunningCore(t *testing.T) {
 		t.Errorf("/group/choose/delay = %d %s", status, body)
 	}
 
-	// A reload with errors changes nothing and says what is wrong.
 	if err := os.WriteFile(path, []byte(`{"version": 1, "outbounds": [{"tag": "x", "protocol": {"type": "no-such"}}]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +221,6 @@ func TestTheClashAPIReadsAndDrivesARunningCore(t *testing.T) {
 		t.Error("the API stopped after a refused reload")
 	}
 
-	// A good reload swaps the configuration: the API restarts with an extra outbound.
 	extra := `, {"tag": "extra", "protocol": {"type": "freedom"}}`
 	if err := os.WriteFile(path, []byte(clashConfig(socksPort, apiPort, deadPort, extra)), 0o600); err != nil {
 		t.Fatal(err)

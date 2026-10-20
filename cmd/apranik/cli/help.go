@@ -7,8 +7,7 @@ import (
 	"text/tabwriter"
 )
 
-// A function, not a var: a var would make cmdHelp -> runHelp -> Lookup ->
-// All -> cmdHelp an initialization cycle, which the compiler rejects.
+// A function, not a var
 func helpCommand() *Command {
 	return &Command{
 		Name:  "help",

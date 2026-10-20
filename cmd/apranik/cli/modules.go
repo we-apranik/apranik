@@ -37,8 +37,7 @@ func runModules(args []string) error {
 		return fmt.Errorf("building the module registry: %w", err)
 	}
 
-	// Padded by hand, not with tabwriter: the headings and blank lines
-	// between groups would end its columns, and each group would align alone.
+	// Padded by hand, not with tabwriter
 	groups := modulesByKind(modules)
 	nameWidth := 0
 	for _, group := range groups {
@@ -58,14 +57,11 @@ func runModules(args []string) error {
 	return nil
 }
 
-// kindGroup is every registered module of one kind. A module filling several
-// kinds (trojan) appears under each.
 type kindGroup struct {
 	kind     registry.Kind
 	listings []registry.Listing
 }
 
-// Plural and capitalised: "Overlay stream transports", "Stream proxies".
 func (g kindGroup) heading() string {
 	name := g.kind.String()
 	if plural, isProxy := strings.CutSuffix(name, "proxy"); isProxy {
@@ -76,9 +72,6 @@ func (g kindGroup) heading() string {
 	return strings.ToUpper(name[:1]) + name[1:]
 }
 
-// In the order of registry.Kind: transports base before overlay, stream
-// before datagram, then proxies, then sniffers, then DNS servers. Kinds with no module are
-// left out; names stay sorted within a kind.
 func modulesByKind(modules *registry.Registry) []kindGroup {
 	var all []registry.Listing
 	all = append(all, modules.Transports().Modules()...)

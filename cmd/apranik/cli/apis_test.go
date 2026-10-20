@@ -12,7 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Records, in order, what each fake API server was told.
 type apiEvents struct {
 	mu     sync.Mutex
 	events []string

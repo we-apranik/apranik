@@ -12,7 +12,6 @@ import (
 	"github.com/we-apranik/apranik/core/registry"
 )
 
-// Overridable with -ldflags "-X github.com/we-apranik/apranik/cmd/cli.version=1.2.3".
 var version = "dev"
 
 var cmdVersion = &Command{
@@ -42,7 +41,6 @@ func runVersion(args []string) error {
 		fmt.Fprintf(writer, "  revision\t%s\n", revision)
 	}
 
-	// Two builds at the same version can accept different configurations.
 	modules, err := registry.Default()
 	if err != nil {
 		return fmt.Errorf("building the module registry: %w", err)

@@ -8,10 +8,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// startAPIs builds and starts each API in order, last of everything, so what
-// they read is running. A server that cannot start, a taken port for one, stops
-// the ones already started and ends run with its error, as an inbound that
-// cannot bind does: nobody gets a core that is half up.
 func startAPIs(ctx context.Context, apis []spec.APIModule, coreProvider spec.APICoreProvider, logger *logging.Logger) ([]spec.APIServer, error) {
 	var started []spec.APIServer
 	for index, module := range apis {
@@ -30,8 +26,6 @@ func startAPIs(ctx context.Context, apis []spec.APIModule, coreProvider spec.API
 	return started, nil
 }
 
-// closeAPIs closes in the reverse of the order they started, and each one ends
-// its open requests before it returns.
 func closeAPIs(servers []spec.APIServer, logger *logging.Logger) {
 	for index := len(servers) - 1; index >= 0; index-- {
 		if err := servers[index].Close(); err != nil {

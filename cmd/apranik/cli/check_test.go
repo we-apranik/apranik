@@ -125,8 +125,6 @@ func plainInboundsConfig(ports ...int) string {
   "outbounds": [{"tag": "direct", "protocol": {"type": "freedom"}}]}`
 }
 
-// proxy_protocol only reads what a proxy in front of a server sends, so an
-// outbound with it fails when built, which check now does.
 func TestCheckRefusesProxyProtocolOnAnOutbound(t *testing.T) {
 	path := writeConfigFile(t, `{
   "version": 1,

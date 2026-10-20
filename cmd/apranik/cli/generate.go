@@ -45,9 +45,7 @@ func runGenerate(args []string) error {
 	}
 }
 
-// RFC 4122 version 4: 122 random bits, with the version and variant fields
-// pinned. crypto/rand, never math/rand -- a predictable identifier is a
-// credential an observer can guess.
+// RFC 4122 version 4
 func newUUID() (string, error) {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
