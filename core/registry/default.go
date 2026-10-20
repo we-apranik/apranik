@@ -24,8 +24,6 @@ import (
 	"github.com/we-apranik/apranik/module/transport/overlay/websocket"
 )
 
-// Default is the only place in the project that names a module. Adding one is
-// a new folder plus one line here.
 func Default() (*Registry, error) {
 	moduleRegistry := New()
 

@@ -2,7 +2,6 @@ package registry
 
 import "github.com/we-apranik/apranik/spec"
 
-// TransportRegistry is the transport namespace, independent of the proxy one.
 type TransportRegistry struct {
 	baseStream      table[spec.BaseStreamTransportModule]
 	overlayStream   table[spec.OverlayStreamTransportModule]
@@ -44,8 +43,6 @@ func (r *TransportRegistry) LookupOverlayDatagram(name string) (func() spec.Over
 	return lookup(r.overlayDatagram, name, KindOverlayDatagram, r.registered.kinds(name))
 }
 
-// claim holds the whole keyspace rule, so the four Register methods stay
-// identical in shape.
 func (r *TransportRegistry) claim(info spec.ModuleInfo, kind Kind) error {
 	for _, existing := range r.registered.kinds(info.Name) {
 		if existing == kind {

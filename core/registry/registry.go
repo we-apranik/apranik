@@ -4,8 +4,6 @@
 // its own modules.
 package registry
 
-// A value, not a global: no init(), no blank imports. The zero value is
-// usable. Not safe for concurrent registration.
 type Registry struct {
 	transports     TransportRegistry
 	proxyProtocols ProxyProtocolRegistry

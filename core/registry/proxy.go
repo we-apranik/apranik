@@ -6,9 +6,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ProxyModules is one constructed proxy protocol. Config is the value a config
-// file's settings are decoded into, once. The same value is each kind field the
-// protocol fills, and the kinds it does not fill are nil.
 type ProxyModules struct {
 	Config             spec.Config
 	Stream             spec.StreamProxyModule
@@ -16,9 +13,6 @@ type ProxyModules struct {
 	Datagram           spec.DatagramProxyModule
 }
 
-// ProxyProtocolRegistry is the proxy namespace: a transport and a proxy
-// protocol may share a name without colliding. A protocol has one entry under
-// its name, whatever kinds it fills, so it is built and decoded once.
 type ProxyProtocolRegistry struct {
 	protocols map[string]func() ProxyModules
 
@@ -60,9 +54,6 @@ func (r *ProxyProtocolRegistry) RegisterStreamDatagramOverStreamAndDatagram(newM
 	})
 }
 
-// Lookup returns the constructor of the protocol called name, which must fill
-// the wanted kind: a protocol that does not is the same error as one that is
-// not registered, with the kinds it does fill listed.
 func (r *ProxyProtocolRegistry) Lookup(name string, wanted Kind) (func() ProxyModules, error) {
 	newModules, found := r.protocols[name]
 	registered := r.registered.kinds(name)
@@ -72,7 +63,6 @@ func (r *ProxyProtocolRegistry) Lookup(name string, wanted Kind) (func() ProxyMo
 	return newModules, nil
 }
 
-// Kinds reports which kinds a name fills.
 func (r *ProxyProtocolRegistry) Kinds(name string) []Kind { return r.registered.kinds(name) }
 
 // A method cannot take a type parameter, so the typed Register methods above

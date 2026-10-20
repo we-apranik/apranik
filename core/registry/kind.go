@@ -21,7 +21,6 @@ const (
 	KindAPI
 )
 
-// Everything about a Kind in one place, so adding a kind is one row.
 var kindDescriptions = [...]struct {
 	name    string
 	carrier carrier
@@ -48,9 +47,6 @@ func (k Kind) String() string {
 	return kindDescriptions[k].name
 }
 
-// Two transport kinds may share a name only when their carriers differ. Both
-// of the same shape would make position in a stack ambiguous; one base-stream
-// and one base-datagram is how QUIC expresses carrying both.
 type carrier int
 
 const (

@@ -6,13 +6,10 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Info is all ten kind interfaces have in common. The tables stay typed;
-// this only lets one register function serve them all.
 type module interface {
 	Info() spec.ModuleInfo
 }
 
-// table holds one kind's constructors by name. The zero value is usable.
 type table[Module module] struct{ constructors map[string]func() Module }
 
 func (t *table[Module]) add(name string, newModule func() Module) {
@@ -27,8 +24,6 @@ func (t table[Module]) get(name string) (func() Module, bool) {
 	return newModule, found
 }
 
-// Stores a constructor, not a module: its return type is the kind, so a module
-// registered under the wrong one fails to compile at the call site.
 func register[Module module](
 	kindTable *table[Module],
 	newModule func() Module,
@@ -60,8 +55,6 @@ func lookup[Module module](
 	return newModule, nil
 }
 
-// A key appears verbatim in a config file, so it stays to what a user can type
-// without quoting surprises.
 func checkName(name string) error {
 	if name == "" {
 		return errEmptyName

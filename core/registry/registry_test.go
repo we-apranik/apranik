@@ -10,10 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ---------- fakes ----------
-// Each fills exactly one kind, so a wrong-kind registration is a compile error
-// at the call site rather than something this file can even express.
-
 type settings struct{ name string }
 
 func (settings) Validate() error    { return nil }
@@ -117,8 +113,6 @@ func newStreamProxy(name string) func() spec.StreamProxyModule {
 	return func() spec.StreamProxyModule { return streamProxy{settings{name}} }
 }
 
-// ---------- registration checks, in the order register runs them ----------
-
 func TestNilConstructorIsRefused(t *testing.T) {
 	transports := &registry.TransportRegistry{}
 
@@ -151,8 +145,6 @@ func TestNameMustBeWellFormed(t *testing.T) {
 	}
 }
 
-// Info identifies the module, so a module whose Info depends on a setting
-// would register under one name and be looked up under another.
 func TestInfoMustBeConstant(t *testing.T) {
 	var calls int
 	varying := func() spec.BaseStreamTransportModule {
@@ -186,10 +178,7 @@ func TestDuplicateSameKindIsRefused(t *testing.T) {
 	}
 }
 
-// ---------- the transport keyspace rule ----------
-
 func TestOneNameMayHoldTwoKindsOfDifferentCarrierShape(t *testing.T) {
-	// A transport that carries both, the way QUIC would.
 	transports := &registry.TransportRegistry{}
 
 	if err := transports.RegisterBaseStream(newBaseStream("quic")); err != nil {
@@ -208,8 +197,6 @@ func TestOneNameMayHoldTwoKindsOfDifferentCarrierShape(t *testing.T) {
 	}
 }
 
-// Base and overlay of the same shape would make a name's position in a stack
-// ambiguous.
 func TestOneNameMayNotBeBothBaseAndOverlayOfTheSameShape(t *testing.T) {
 	t.Run("stream", func(t *testing.T) {
 		transports := &registry.TransportRegistry{}
@@ -238,9 +225,6 @@ func TestOneNameMayNotBeBothBaseAndOverlayOfTheSameShape(t *testing.T) {
 	})
 }
 
-// Unlike transports, nothing about position makes a proxy combination
-// ambiguous, so Shadowsocks 2022 fills all three. It is registered once, and
-// one value is all three kinds.
 func TestAProxyFillingEveryKindIsRegisteredOnce(t *testing.T) {
 	protocols := &registry.ProxyProtocolRegistry{}
 	newProxy := func() spec.StreamDatagramOverStreamAndDatagramProxyModule {
@@ -318,8 +302,6 @@ func TestTransportsAndProxiesHaveSeparateNamespaces(t *testing.T) {
 	}
 }
 
-// ---------- lookup ----------
-
 func TestLookupRoundTrip(t *testing.T) {
 	modules := registry.New()
 	if err := modules.Transports().RegisterBaseStream(newBaseStream("tcp")); err != nil {
@@ -363,8 +345,6 @@ func TestUnknownModuleErrorNamesTheKindsTheNameReallyHolds(t *testing.T) {
 		t.Errorf("Registered = %v, want empty for a name nothing holds", unknown.Registered)
 	}
 }
-
-// ---------- the default registry ----------
 
 func TestDefaultRegisters(t *testing.T) {
 	modules, err := registry.Default()
@@ -440,9 +420,6 @@ func TestListingsAreSorted(t *testing.T) {
 	}
 }
 
-// encoding/json MERGES into an existing map rather than replacing it, so a
-// default map entry survives decoding and the user has no way to remove it.
-// Slices are safe. This walks every module the default registry holds.
 func TestNoRegisteredModuleDefaultsAMapField(t *testing.T) {
 	modules, err := registry.Default()
 	if err != nil {

@@ -2,8 +2,6 @@ package registry
 
 import "testing"
 
-// A Kind added to the list without a row in kindDescriptions would print as an
-// empty name, so each one is checked here.
 func TestEveryKindHasADescription(t *testing.T) {
 	if len(kindDescriptions) != int(KindAPI)+1 {
 		t.Errorf("kindDescriptions has %d rows for %d kinds; KindAPI must stay the last kind", len(kindDescriptions), int(KindAPI)+1)

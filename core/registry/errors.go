@@ -27,7 +27,6 @@ const (
 	BlockProtocolName   = "block"
 	MixedProtocolName   = "mixed"
 
-	// The outbound groups: protocols that choose among other outbounds.
 	URLTestProtocolName  = "urltest"
 	FallbackProtocolName = "fallback"
 	SelectorProtocolName = "selector"
@@ -42,8 +41,6 @@ func (e *ReservedNameError) Error() string {
 	return fmt.Sprintf("registry: %s name %q is reserved for the special protocol built by core", e.Kind, e.Name)
 }
 
-// KindConflictError is the transport keyspace rule: one name may be a base and
-// an overlay only when their carrier shapes differ.
 type KindConflictError struct {
 	Name     string
 	Existing Kind
@@ -65,8 +62,6 @@ func (e *InconsistentInfoError) Error() string {
 		e.Kind, e.First.Name, e.Second.Name)
 }
 
-// UnknownModuleError carries the kinds the name really holds, so a caller can
-// tell "no such module" apart from "right module, wrong position".
 type UnknownModuleError struct {
 	Name       string
 	Want       Kind

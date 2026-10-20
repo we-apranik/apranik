@@ -35,8 +35,6 @@ func (i *index) record(info spec.ModuleInfo, kind Kind) {
 	})
 }
 
-// Sorted: registration order is a property of default.go, not something a user
-// should see.
 func (i *index) listings() []Listing {
 	sorted := slices.Clone(i.entries)
 	slices.SortFunc(sorted, func(first, second Listing) int {
