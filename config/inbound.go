@@ -65,8 +65,7 @@ func (b *configBuilder) buildInbound(raw rawInbound, loc string) blueprint.Inbou
 	return inbound
 }
 
-// Never inferred from the base transport: inference breaks the moment one
-// module registers as both base-stream and base-datagram, as QUIC would.
+// Never inferred from the base transport
 func (b *configBuilder) parseNetwork(name, loc string) spec.Network {
 	switch name {
 	case "", string(spec.NetworkTCP):

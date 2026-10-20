@@ -7,7 +7,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// An outbound's proxy_request_timing key.
 func checkProxyRequestTiming(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
 	timing := outbound.ProxyRequestTiming
 	if timing == nil {

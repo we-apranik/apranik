@@ -1,7 +1,3 @@
-// Package config turns a JSON config file into a blueprint.Blueprint. A user on a
-// censored network needs every mistake reported before anything runs, so it
-// decodes and checks the whole config file and reports each problem with its
-// location instead of stopping at the first.
 package config
 
 import (
@@ -12,9 +8,6 @@ import (
 	"github.com/we-apranik/apranik/core/registry"
 )
 
-// Parse turns one config file into a *blueprint.Blueprint without checking it. The
-// config is partial when diagnostics.HasErrors is true. LoadFile and LoadURL
-// are Parse plus Check; use Parse alone only to run Check yourself.
 func Parse(data []byte, modules *registry.Registry, options ...ParseOption) (*blueprint.Blueprint, Diagnostics) {
 	builder := &configBuilder{modules: modules, strict: true}
 	for _, option := range options {
@@ -25,17 +18,10 @@ func Parse(data []byte, modules *registry.Registry, options ...ParseOption) (*bl
 
 type ParseOption func(*configBuilder)
 
-// WithBaseDirectory is what relative paths in the config file, such as a
-// dataset's file, are relative to. Without it they stay relative, and are
-// read from the working directory.
 func WithBaseDirectory(directory string) ParseOption {
 	return func(b *configBuilder) { b.baseDirectory = directory }
 }
 
-// configBuilder reports what cannot be read: syntax, unknown names, values
-// that do not parse. What can be read but cannot be run -- a missing field, a
-// conflicting pair, an unsafe value -- is Check's, so it holds for a
-// blueprint.Blueprint however it was made.
 type configBuilder struct {
 	modules       *registry.Registry
 	strict        bool
@@ -44,8 +30,6 @@ type configBuilder struct {
 }
 
 func (b *configBuilder) build(data []byte) (*blueprint.Blueprint, Diagnostics) {
-	// The envelope alone, tolerantly, so version and min_core are answered
-	// before any field this core may not recognise is parsed.
 	var envelope envelope
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		b.diagnostics.report("", err)

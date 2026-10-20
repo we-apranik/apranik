@@ -6,17 +6,12 @@ import (
 	"github.com/we-apranik/apranik/config/types"
 )
 
-// The raw types mirror the JSON config file, not what core runs on. Settings stay
-// as bytes because their Go type is known only after the lookup. Not any or
-// map[string]any: those lose DisallowUnknownFields, turn every number into a
-// float64, and stop types.Duration from firing.
+// The raw types mirror the JSON config file, not what core runs on.
 type rawModule struct {
 	Type     string          `json:"type"`
 	Settings json.RawMessage `json:"settings"`
 }
 
-// Read first, tolerantly, so an old core says "this config needs a newer
-// Apranik" rather than complaining about a field it has never heard of.
 type envelope struct {
 	Version *int   `json:"version"`
 	MinCore string `json:"min_core"`
@@ -37,8 +32,7 @@ type rawConfig struct {
 	APIs      []rawModule   `json:"apis"`
 }
 
-// Counting is on unless enabled is false. A list narrows counting to the
-// tags in it; absent or empty means all.
+// Counting is on unless enabled is false.
 type rawStats struct {
 	Enabled   *bool    `json:"enabled"`
 	Inbounds  []string `json:"inbounds"`
@@ -46,13 +40,10 @@ type rawStats struct {
 
 	Tracking *rawStatsTracking `json:"tracking"`
 
-	// Off when absent: it reads the clock on every dial.
 	DialHealth bool `json:"dial_health"`
 }
 
-// Every field absent means its default; a written zero is refused, never
-// read as the default. Tracking is on exactly when an API is configured,
-// unless enabled says otherwise.
+// Every field absent means its default; a written zero is refused, never read as the default.
 type rawStatsTracking struct {
 	Enabled                 *bool           `json:"enabled"`
 	UDPEntryIdleTimeout     *types.Duration `json:"udp_entry_idle_timeout"`
@@ -62,12 +53,9 @@ type rawStatsTracking struct {
 type rawInbound struct {
 	Tag string `json:"tag"`
 
-	// Required, with no default: binding every interface because a field was
-	// omitted is a real exposure.
 	Listen string `json:"listen"`
 	Port   uint16 `json:"port"`
 
-	// "tcp" or "udp", default "tcp". Selects which registry the lookups use.
 	Network string `json:"network"`
 
 	TCPIdleTimeout        *types.Duration `json:"tcp_idle_timeout"`
@@ -75,26 +63,20 @@ type rawInbound struct {
 
 	UDPMaxDatagramSize *int `json:"udp_max_datagram_size"`
 
-	// Absent means the default; a written zero is refused.
 	UDPRoutingCacheEntryIdleTimeout     *types.Duration `json:"udp_routing_cache_entry_idle_timeout"`
 	UDPRoutingCacheMaxEntriesPerSession *int            `json:"udp_routing_cache_max_entries_per_session"`
 
-	// Absent means no limit; a written zero is refused.
 	MaxTCPConnections *int `json:"max_tcp_connections"`
 	MaxUDPSessions    *int `json:"max_udp_sessions"`
 
 	Transport []rawModule `json:"transport"`
 	Protocol  rawModule   `json:"protocol"`
 
-	// Absent means a request the proxy refuses is closed.
 	Fallback *rawFallback `json:"fallback"`
 
-	// What the inbound's server accepts of Mux.Cool.
 	MuxCool *rawMuxCool `json:"muxcool"`
 }
 
-// Where refused streams go, dialed straight over TCP: typically a local web
-// server, so a probe sees an ordinary site.
 type rawFallback struct {
 	Server     string `json:"server"`
 	ServerPort uint16 `json:"server_port"`
@@ -106,19 +88,14 @@ type rawOutbound struct {
 	Server     string `json:"server"`
 	ServerPort uint16 `json:"server_port"`
 
-	// A proxy protocol's way to its server, or freedom's to each destination.
 	Transport []rawModule `json:"transport"`
 
-	// A proxy protocol, or the special protocol freedom.
 	Protocol rawModule `json:"protocol"`
 
-	// The DNS server that resolves server when it is a domain.
 	DNSServer string `json:"dns_server"`
 
-	// How a proxy outbound uses Mux.Cool.
 	MuxCool *rawMuxCool `json:"muxcool"`
 
-	// When a proxy outbound's client sends its request.
 	ProxyRequestTiming *rawProxyRequestTiming `json:"proxy_request_timing"`
 }
 
@@ -159,8 +136,6 @@ type rawMuxCoolGlobalID struct {
 	HoldTime *types.Duration `json:"hold_time"`
 }
 
-// A group's members and the probe that tests them. Tolerance is the urltest
-// type's; Check refuses it on fallback.
 type rawGroupSettings struct {
 	Members   []string        `json:"members"`
 	Probe     *rawProbe       `json:"probe"`
@@ -174,20 +149,16 @@ type rawProbe struct {
 	ExpectedStatus types.HTTPStatusRanges `json:"expected_status"`
 }
 
-// Freedom's TCP is its outbound's transport stack; its UDP is always plain
-// udp, so only those settings are given, beside the NAT behaviour.
 type rawFreedomSettings struct {
 	NAT *rawNAT         `json:"nat"`
 	UDP json.RawMessage `json:"udp"`
 }
 
-// Mixed's halves are always the socks5 and http modules, so only their
-// settings are given.
+// Mixed's halves are always the socks5 and http modules, so only their settings are given.
 type rawMixedSettings struct {
 	SOCKS5 json.RawMessage `json:"socks5"`
 	HTTP   json.RawMessage `json:"http"`
 
-	// One list of users for both protocols.
 	Users []json.RawMessage `json:"users"`
 
 	FirstByteTimeout *types.Duration `json:"first_byte_timeout"`
@@ -206,17 +177,13 @@ type rawNAT struct {
 type rawLog struct {
 	Level string `json:"level"`
 
-	// An array, not one output: the logging system fans out to any number of
-	// sinks, and a single "output" string would narrow it for no reason.
-	// Empty means silent, which is the default on purpose.
+	// An array, not one output
 	Outputs []rawOutput `json:"outputs"`
 }
 
 type rawOutput struct {
 	Type string `json:"type"`
 
-	// Per type: stderr may take a format and color, file wants a path and may
-	// take a format, memory a capacity, syslog a destination.
 	Format   string `json:"format"`
 	Color    bool   `json:"color"`
 	Path     string `json:"path"`

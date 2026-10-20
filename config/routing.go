@@ -17,7 +17,6 @@ import (
 	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
-// The routing section. Datasets are top-level.
 type rawRouting struct {
 	Rules         []rawRule  `json:"rules"`
 	DefaultAction *rawModule `json:"default_action"`
@@ -98,7 +97,6 @@ type rawSniffSettings struct {
 	Timeout  *types.Duration `json:"timeout"`
 }
 
-// Action types, as the config file names them.
 const (
 	actionRoute   = "route"
 	actionBlock   = "block"
@@ -240,7 +238,6 @@ func lowercase(values []string) []string {
 	return lowered
 }
 
-// An address or a CIDR: "1.2.3.4" is 1.2.3.4/32.
 func (b *configBuilder) parseAddressesOrRanges(values []string, loc string) []netip.Prefix {
 	var prefixes []netip.Prefix
 	for index, value := range values {
@@ -259,7 +256,6 @@ func (b *configBuilder) parseAddressesOrRanges(values []string, loc string) []ne
 	return prefixes
 }
 
-// Single ports and "first-last" ranges, merged into one list.
 func (b *configBuilder) parsePortsAndRanges(ports []uint16, rangeTexts []string, rangesLoc string) []blueprint.PortRange {
 	var portRanges []blueprint.PortRange
 	for _, port := range ports {
@@ -276,7 +272,6 @@ func (b *configBuilder) parsePortsAndRanges(ports []uint16, rangeTexts []string,
 	return portRanges
 }
 
-// "1000-2000", inclusive.
 func parsePortRange(text string) (blueprint.PortRange, error) {
 	firstText, lastText, found := strings.Cut(text, "-")
 	if !found {
@@ -349,7 +344,6 @@ func (b *configBuilder) buildSniffAction(settings rawSniffSettings, loc string) 
 	return sniff
 }
 
-// Like decodeSettings, for core's own settings types, which have no Validate.
 func (b *configBuilder) decodeStrict(raw json.RawMessage, target any, loc string) bool {
 	if len(raw) == 0 {
 		return true

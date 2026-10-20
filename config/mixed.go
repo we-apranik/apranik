@@ -17,8 +17,6 @@ const (
 	mixedHTTPModule   = "http"
 )
 
-// Nil when either half fails, so Check reports the inbound as having no
-// protocol only after the real cause was reported here.
 func (b *configBuilder) buildMixed(raw json.RawMessage, loc string) *blueprint.Mixed {
 	var settings rawMixedSettings
 	if len(raw) > 0 {
@@ -43,7 +41,6 @@ func (b *configBuilder) buildMixed(raw json.RawMessage, loc string) *blueprint.M
 	return &blueprint.Mixed{SOCKS5: socks5, HTTP: http, Users: settings.Users, FirstByteTimeout: durationOrNil(settings.FirstByteTimeout)}
 }
 
-// An absent key leaves the module's own defaults, as for freedom's halves.
 func (b *configBuilder) buildMixedHalf(moduleName string, raw json.RawMessage, loc string) spec.StreamProxyModule {
 	newModules, err := b.modules.ProxyProtocols().Lookup(moduleName, registry.KindStreamProxy)
 	if err != nil {

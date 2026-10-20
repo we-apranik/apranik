@@ -14,14 +14,10 @@ import (
 	"github.com/we-apranik/apranik/core/registry"
 )
 
-// A config file is small. The cap stops a wrong URL from streaming a video into
-// memory; it is not a schema limit.
 const maxDocumentSize = 4 << 20
 
-// Used when the caller's context carries no deadline of its own.
 const DefaultFetchTimeout = 30 * time.Second
 
-// LoadFile reads, parses and checks a config file on disk.
 func LoadFile(path string, modules *registry.Registry) (*blueprint.Blueprint, Diagnostics) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -32,9 +28,6 @@ func LoadFile(path string, modules *registry.Registry) (*blueprint.Blueprint, Di
 	return load(data, modules, nil, filepath.Dir(path))
 }
 
-// LoadURL fetches, parses and checks a config file over http or https. A plain
-// http fetch succeeds with a warning: anyone on the path could have altered a
-// config file that crossed the wire in the clear.
 func LoadURL(ctx context.Context, url string, modules *registry.Registry) (*blueprint.Blueprint, Diagnostics) {
 	var diagnostics Diagnostics
 	if strings.HasPrefix(url, "http://") {
@@ -49,9 +42,6 @@ func LoadURL(ctx context.Context, url string, modules *registry.Registry) (*blue
 	return load(data, modules, diagnostics, executableDirectory())
 }
 
-// A config fetched from a URL has no directory of its own, so its relative
-// paths are relative to the apranik binary, where Xray also looks for its geo
-// files. Empty, meaning the working directory, if that cannot be found.
 func executableDirectory() string {
 	executable, err := os.Executable()
 	if err != nil {

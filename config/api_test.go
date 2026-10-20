@@ -10,7 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A module that only reads its settings: no server, no listener.
 type fakeAPI struct {
 	Port     int    `json:"port"`
 	Secret   string `json:"secret"`

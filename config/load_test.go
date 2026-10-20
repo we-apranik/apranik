@@ -39,8 +39,6 @@ func TestLoadFetchesAURL(t *testing.T) {
 		t.Errorf("got %d inbounds, want 1", len(configuration.Inbounds))
 	}
 
-	// httptest serves plain http, and a config file that crossed the wire in the
-	// clear could have been altered by anyone on the path.
 	if !find(diagnostics, "", "plain HTTP") {
 		t.Errorf("no warning about plain HTTP: %v", diagnostics)
 	}
@@ -87,8 +85,7 @@ func TestLoadChecks(t *testing.T) {
 	}
 }
 
-// Loading and checking must not touch the machine: a file output is described,
-// not opened, until the logging system is built.
+// Loading and checking must not touch the machine
 func TestLoadOpensNothing(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "apranik.log")
 	document := strings.Replace(goodDocument, `{"type": "stderr"}`, `{"type": "file", "path": "`+logPath+`"}`, 1)

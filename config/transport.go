@@ -5,10 +5,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A stack is read by position: index 0 is the base, the rest are overlays
-// outward from the wire. Each position runs its own typed lookup, so a module
-// is never widened and then narrowed back. A miss is reported and skipped
-// rather than aborting the config file.
 func (b *configBuilder) buildStreamTransportStack(stack []rawModule, loc string) blueprint.StreamTransportStack {
 	if len(stack) == 0 {
 		return blueprint.StreamTransportStack{}

@@ -33,9 +33,6 @@ func (b *configBuilder) buildLog(raw rawLog, loc string) blueprint.Log {
 	return log
 }
 
-// A switch over a closed set the logging system owns -- four outputs -- not
-// dispatch over an open set, which is what the registry is for. Nothing is
-// opened here; New does that.
 func buildOutput(raw rawOutput) (logging.Output, error) {
 	switch raw.Type {
 	case "stderr":

@@ -5,9 +5,7 @@ import (
 	"github.com/we-apranik/apranik/core/net/udp"
 )
 
-// A tag a list names must exist, or the user would count nothing and never
-// know why. User names cannot be checked: core learns them only when a
-// protocol authenticates one.
+// A tag a list names must exist, or the user would count nothing and never know why.
 func checkStats(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	section := coreBlueprint.Stats
 	warnAboutTrackingSettingsThatDoNothing(diagnostics, coreBlueprint)
@@ -63,9 +61,7 @@ func checkStatsNames(diagnostics *Diagnostics, names []string, existing map[stri
 	}
 }
 
-// The UDP settings of stats.tracking are read only while live conversations are
-// tracked: when stats.tracking.enabled is true, or absent with an API
-// configured.
+// The UDP settings of stats.tracking are read only while live conversations are tracked
 func warnAboutTrackingSettingsThatDoNothing(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	if coreBlueprint.Stats == nil || coreBlueprint.IsLiveTrackingEnabled() {
 		return

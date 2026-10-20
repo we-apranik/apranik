@@ -9,9 +9,6 @@ import (
 	"github.com/we-apranik/apranik/core/blueprint"
 )
 
-// withDNS adds a dns section, and routing when given, to a document with the
-// outbounds freedom, direct, fragmented (freedom with fragment) and proxy (a
-// socks5 proxy at example.com).
 func withDNS(dns, routing string) string {
 	document := strings.Replace(goodDocument, `"outbounds": [{
     "tag": "freedom",
@@ -140,8 +137,6 @@ func TestDOHGetsItsApplicationProtocolsWhenTheUserWritesNone(t *testing.T) {
 }
 
 func TestDNSLoopIsRefusedAndNamed(t *testing.T) {
-	// google goes through proxy, and proxy's own name example.com is resolved
-	// by the default server, google.
 	dns := `{"servers": [{"tag": "google", "type": "doh", "settings": {"server": "8.8.8.8"}, "tls": {"alpn": ["http/1.1"]}, "outbound": "proxy"}], "default_server": "google"}`
 	diagnostics, failed := loadAndCheck(t, withDNS(dns, ""))
 	want := `dns server "google" → outbound "proxy" → dns server "google"`

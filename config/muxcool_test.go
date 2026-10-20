@@ -8,7 +8,6 @@ import (
 	"github.com/we-apranik/apranik/config"
 )
 
-// An outbound with a proxy and a muxcool member; protocol is a JSON object.
 func outboundWithMuxCool(protocol, muxCool string) string {
 	member := ""
 	if muxCool != "" {
@@ -118,7 +117,6 @@ func TestMuxCoolIsParsedIntoTheBlueprint(t *testing.T) {
 	}
 }
 
-// xudp was a bool before it held the Global ID; the bool is a wrong type now.
 func TestXUDPIsAnObjectNotABool(t *testing.T) {
 	for _, muxCool := range []string{`{"udp": {"xudp": true}}`, `{"udp": {"xudp": false}}`, `{"udp": {"xudp": {"global_id": true}}}`} {
 		if _, failed := loadAndCheck(t, outboundWithMuxCool(vlessProtocol, muxCool)); !failed {
@@ -152,8 +150,6 @@ func TestMuxCoolIsParsedIntoTheBlueprintWithTheGlobalIDSettings(t *testing.T) {
 		t.Error("global_id.enabled false was not read")
 	}
 }
-
-// An inbound's muxcool key: what its server accepts.
 
 func inboundWithMuxCool(protocol, muxCool string) string {
 	member := ""

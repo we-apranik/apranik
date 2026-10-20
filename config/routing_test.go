@@ -15,9 +15,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// goodDocument with two outbounds and the given routing section.
-// withRouting adds routing to a good document. A "datasets" key written in
-// routing, where it used to live, is moved to the top level, where it lives now.
 func withRouting(routing string) string {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(routing), &fields); err != nil {
@@ -265,8 +262,6 @@ const datasetRouting = `{
   "default_action": {"type": "route", "settings": {"outbound": "freedom"}}
 }`
 
-// LoadFile resolves a dataset's file against the config file's directory and
-// reads it, so a missing category is reported before run.
 func TestLoadFileResolvesAndReadsDatasets(t *testing.T) {
 	directory := t.TempDir()
 	writeDatasetFixtures(t, directory)

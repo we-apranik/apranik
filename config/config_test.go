@@ -25,8 +25,6 @@ func modules(t *testing.T) *registry.Registry {
 	return registered
 }
 
-// A config file that should load and check cleanly, used as the base for the
-// failure cases below.
 const goodDocument = `{
   "version": 1,
   "log": {"level": "info", "outputs": [{"type": "stderr"}]},
@@ -62,8 +60,6 @@ func requireNoErrors(t *testing.T, diagnostics config.Diagnostics) {
 	}
 }
 
-// Finds a diagnostic whose path and message both match, so a test cannot pass
-// on an unrelated failure that happens to be present.
 func find(diagnostics config.Diagnostics, path, substring string) bool {
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Location == path && strings.Contains(diagnostic.Message, substring) {
@@ -92,7 +88,6 @@ func TestGoodDocumentLoads(t *testing.T) {
 	if inbound.Network != spec.NetworkTCP {
 		t.Errorf("network = %q, want tcp by default", inbound.Network)
 	}
-	// The settings really reached the module, through the embedded struct.
 	proxy, ok := inbound.StreamProxy.(*socks5.Proxy)
 	if !ok {
 		t.Fatalf("proxy is %T, want *socks5.Proxy", inbound.StreamProxy)
@@ -104,8 +99,6 @@ func TestGoodDocumentLoads(t *testing.T) {
 		t.Error("udp_relay lost its default; absent keys must not overwrite the constructor")
 	}
 }
-
-// ---------- the envelope ----------
 
 func TestVersionIsRequired(t *testing.T) {
 	diagnostics, failed := loadAndCheck(t, `{"inbounds": []}`)
@@ -127,8 +120,6 @@ func TestUnsupportedVersionIsNamed(t *testing.T) {
 	}
 }
 
-// An old core reading a new config file should say exactly that, rather than
-// complaining about a field it has never heard of.
 func TestMinCoreIsCheckedBeforeAnyField(t *testing.T) {
 	document := `{"version": 1, "min_core": "99.0.0", "inbounds": [{"a_field_from_the_future": true}]}`
 
@@ -155,10 +146,7 @@ func TestSatisfiedMinCorePasses(t *testing.T) {
 	}
 }
 
-// ---------- strictness ----------
-
-// A silently ignored field ships behaviour the user never asked for: someone
-// who writes "fingerprnt" believes they configured a fingerprint.
+// A silently ignored field ships behaviour the user never asked for
 func TestUnknownSettingIsRefusedByDefault(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"settings": {"users": [{"name": "u", "password": "p"}]}`,
@@ -184,8 +172,6 @@ func TestStrictFalseAcceptsUnknownSettings(t *testing.T) {
 		t.Fatalf("strict:false still refused an unknown field: %v", diagnostics.Err())
 	}
 }
-
-// ---------- kind comes from position ----------
 
 func TestABaseInAnOverlaySlotSaysWhatItActuallyIs(t *testing.T) {
 	document := strings.Replace(goodDocument,
@@ -237,8 +223,6 @@ func TestDecodingContinuesPastAFailure(t *testing.T) {
 	}
 }
 
-// ---------- listen and server ----------
-
 func TestListenIsRequiredWithNoDefault(t *testing.T) {
 	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, "", 1)
 
@@ -263,9 +247,6 @@ func TestPortInsideListenIsRefused(t *testing.T) {
 	}
 }
 
-// Separate fields are most of why a bare IPv6 literal needs no brackets.
-// Resolving is I/O, which this package does not do, and a domain that answers
-// with several addresses leaves "which one did it bind?" unanswerable.
 func TestADomainListenAddressIsRefused(t *testing.T) {
 	document := strings.Replace(goodDocument, `"listen": "127.0.0.1",`, `"listen": "localhost",`, 1)
 
@@ -278,8 +259,6 @@ func TestADomainListenAddressIsRefused(t *testing.T) {
 	}
 }
 
-// A proxy server, unlike a listen address, may be a domain: it is dialled, not
-// bound, and the transport resolves it.
 func TestADomainServerAddressIsAccepted(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"tag": "freedom",
@@ -400,9 +379,6 @@ func TestATransportWithNoServerSideIsRefusedOnAnInbound(t *testing.T) {
 	}
 }
 
-// noServerSideTransport stands for a program's own technique: the list of
-// transports that work with freedom must come from the registry, not a list
-// in core.
 type noServerSideTransport struct{}
 
 func (noServerSideTransport) Validate() error    { return nil }
@@ -501,9 +477,6 @@ func TestUnknownNetworkIsRefused(t *testing.T) {
 	}
 }
 
-// ---------- warnings ----------
-
-// Each component's advisory findings, prefixed with where it sits.
 func TestComponentWarningsCarryTheirPath(t *testing.T) {
 	document := strings.Replace(strings.Replace(goodDocument,
 		`"settings": {"users": [{"name": "u", "password": "p"}]}`, `"settings": {}`, 1),
@@ -530,8 +503,6 @@ func TestSilentLoggingIsWarnedAbout(t *testing.T) {
 	}
 }
 
-// ---------- nat ----------
-
 func TestUDPPolicyDecodes(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"protocol": {"type": "freedom"}`,
@@ -556,7 +527,6 @@ func TestUDPPolicyDecodes(t *testing.T) {
 	}
 }
 
-// The least secure filtering mode lets an off-path attacker inject packets.
 func TestEndpointIndependentFilteringIsWarnedAbout(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"protocol": {"type": "freedom"}`,
@@ -584,8 +554,6 @@ func TestUnknownUDPBehaviourIsRefused(t *testing.T) {
 		t.Errorf("diagnostics do not name the bad behaviour: %v", diagnostics)
 	}
 }
-
-// ---------- log ----------
 
 func TestLogOutputsBecomeSinks(t *testing.T) {
 	document := strings.Replace(goodDocument,
@@ -625,10 +593,6 @@ func TestFileOutputNeedsAPath(t *testing.T) {
 	}
 }
 
-// ---------- removed fields ----------
-
-// Keys that once lived elsewhere have no pointer: the project has no users, so
-// each is an unknown key like any other, refused in strict mode.
 func TestKeysThatOnceLivedElsewhereAreUnknownNow(t *testing.T) {
 	for name, replacement := range map[string][2]string{
 		"inbound sniffing":           {`"protocol": {"type": "socks5",`, `"sniffing": {"sniffers": [{"type": "tls"}]}, "protocol": {"type": "socks5",`},
@@ -648,8 +612,6 @@ func TestKeysThatOnceLivedElsewhereAreUnknownNow(t *testing.T) {
 		})
 	}
 }
-
-// ---------- timeouts ----------
 
 func TestTimeoutsDecodeBesideTheirComponents(t *testing.T) {
 	document := strings.Replace(goodDocument,
@@ -753,8 +715,6 @@ func TestATimeoutInsideALayersSettingsIsAccepted(t *testing.T) {
 	}
 }
 
-// Trojan is registered once and fills a stream kind and a datagram-over-stream
-// kind; one protocol block fills both, on either side, with one value.
 func TestTrojanFillsBothKindsAndTakesAFallback(t *testing.T) {
 	registered := modules(t)
 	configuration, diagnostics := config.Parse([]byte(`{
@@ -843,8 +803,6 @@ func TestAFallbackNeedsAPort(t *testing.T) {
 	}
 }
 
-// ---------- the special inbound protocol mixed ----------
-
 const mixedProtocol = `"protocol": {"type": "mixed", "settings": {"users": [{"name": "u", "password": "p"}], "socks5": {"handshake_timeout": "5s"}, "http": {"handshake_timeout": "5s"}}}`
 
 func mixedDocument(protocol string) string {
@@ -872,8 +830,6 @@ func TestAMixedInboundDecodesBothHalves(t *testing.T) {
 	}
 }
 
-// mixed is one inbound with one list of users, so the halves are not warned
-// about having none, and the password that crosses the wire is.
 func TestMixedUsersReplaceTheHalvesOpenProxyWarnings(t *testing.T) {
 	document := strings.Replace(mixedDocument(mixedProtocol), `"listen": "127.0.0.1"`, `"listen": "0.0.0.0"`, 1)
 	configuration, diagnostics := config.Parse([]byte(document), modules(t))
@@ -963,8 +919,6 @@ func TestAnOutboundCannotBeMixed(t *testing.T) {
 	}
 }
 
-// ---------- max_tcp_connections ----------
-
 func TestMaxTCPConnectionsIsDecoded(t *testing.T) {
 	document := strings.Replace(goodDocument, `"port": 1080,`, `"port": 1080, "max_tcp_connections": 500,`, 1)
 
@@ -1016,10 +970,6 @@ func TestNoLimitIsSetUnlessTheConfigAsksForOne(t *testing.T) {
 	}
 }
 
-// ---------- application protocols across a stack ----------
-
-// withOutboundStack replaces the freedom outbound with a Trojan outbound over
-// the given transport stack.
 func withOutboundStack(stack string) string {
 	return strings.Replace(goodDocument,
 		`"tag": "freedom",
@@ -1065,7 +1015,6 @@ func TestTLSMayOfferOnlyWhatTheTransportAboveSpeaks(t *testing.T) {
 	}
 }
 
-// A server's offer is its alpn alone: the default fingerprint is a client's.
 func TestAnInboundTLSServerWithoutAlpnPassesUnderWS(t *testing.T) {
 	document := strings.Replace(goodDocument,
 		`"transport": [{"type": "tcp"}],

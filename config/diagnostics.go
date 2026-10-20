@@ -20,7 +20,6 @@ func (s Severity) String() string {
 	return "error"
 }
 
-// Diagnostic is one finding, anchored to where in the config file it came from.
 type Diagnostic struct {
 	Location string // "outbounds[0].transport[1].settings"
 	Severity Severity
@@ -45,8 +44,6 @@ func (d Diagnostics) HasErrors() bool {
 	return false
 }
 
-// Err folds every error-severity diagnostic into one value. Warnings are never
-// part of it.
 func (d Diagnostics) Err() error {
 	var failures []string
 	for _, diagnostic := range d {
@@ -60,15 +57,13 @@ func (d Diagnostics) Err() error {
 	return errors.New(strings.Join(failures, "\n"))
 }
 
-// Pointer receiver so a helper can append: decoding keeps going after a
-// failure, so one run surfaces every problem rather than one per round trip.
+// Pointer receiver so a helper can append
 func (d *Diagnostics) errorf(loc, format string, args ...any) {
 	*d = append(*d, Diagnostic{
 		Location: loc, Severity: SeverityError, Message: fmt.Sprintf(format, args...),
 	})
 }
 
-// report is errorf for an error value, which is most of them.
 func (d *Diagnostics) report(loc string, err error) {
 	d.errorf(loc, "%v", err)
 }

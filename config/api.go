@@ -4,8 +4,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Each entry is a registered API module with its settings decoded into it, like
-// a sniffer. An entry that cannot be read is left out and reported.
 func (b *configBuilder) buildAPIs(raw []rawModule, loc string) []spec.APIModule {
 	var apis []spec.APIModule
 	for index, rawAPI := range raw {

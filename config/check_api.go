@@ -4,8 +4,6 @@ import (
 	"github.com/we-apranik/apranik/core/blueprint"
 )
 
-// What an API's own settings can say is its module's: Validate and Warnings.
-// Nothing here listens, so a port that is taken shows when the API starts.
 func checkAPIs(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	for index, api := range coreBlueprint.APIs {
 		settingsLoc := fieldLocation(indexLocation("apis", index), "settings")

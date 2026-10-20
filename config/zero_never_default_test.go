@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// A setting left out has its default. A written zero is refused wherever the
-// default is not what zero means, and never stands for the default.
 func TestAWrittenZeroIsRefusedNotTakenAsTheDefault(t *testing.T) {
 	const socks5Settings = `"settings": {"users": [{"name": "u", "password": "p"}]}`
 	for _, tc := range []struct {

@@ -18,7 +18,6 @@ const (
 	fallbackProtocol = registry.FallbackProtocolName
 	selectorProtocol = registry.SelectorProtocolName
 
-	// Named here as freedom's udp is: the base that reaches destinations.
 	freedomBaseTransport = "tcp"
 )
 
@@ -59,8 +58,6 @@ func (b *configBuilder) buildOutbound(raw rawOutbound, loc string) blueprint.Out
 	return outbound
 }
 
-// Whether a field makes sense is Check's; this reads what is written. Nil when
-// the settings cannot be decoded.
 func (b *configBuilder) buildGroup(protocol rawModule, loc string) *blueprint.Group {
 	var settings rawGroupSettings
 	if len(protocol.Settings) > 0 {
@@ -163,9 +160,6 @@ func (b *configBuilder) buildFreedom(raw json.RawMessage, loc string, transport 
 	return freedom
 }
 
-// Freedom connects straight to each destination, which runs none of our
-// layers: its stack is tcp, then only overlays that need no server side. A
-// refused layer is reported and left out, so Check does not report it again.
 func (b *configBuilder) buildFreedomStreamTransport(stack []rawModule, loc string) blueprint.StreamTransportStack {
 	transports := b.modules.Transports()
 	if len(stack) == 0 {
@@ -224,9 +218,7 @@ func (b *configBuilder) transportsThatWorkWithFreedom() []string {
 
 func isRegistered[Constructor any](_ Constructor, err error) bool { return err == nil }
 
-// Starts from nat's own default so an unset field keeps that package's
-// choice; outbound decides nothing here. Each field is checked separately so a
-// bad config file gets a diagnostic pointing at the field, not at the block.
+// Starts from nat's own default so an unset field keeps that package's choice; outbound decides nothing here.
 func (b *configBuilder) buildNATPolicy(raw rawNAT, loc string) *nat.Policy {
 	defaults := nat.NewDefaultPolicy()
 	mapping, filtering, idleTimeout := defaults.Mapping(), defaults.Filtering(), defaults.IdleTimeout()

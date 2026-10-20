@@ -14,11 +14,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Check reports what a Blueprint has but cannot run on: a missing field, a
-// conflicting pair, an unsafe value. It takes no registry and constructs,
-// opens and binds nothing, so it holds for a Blueprint however it was made
-// and "apranik check" can verify a config file on a machine that could never
-// run it.
 func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	var diagnostics Diagnostics
 	if coreBlueprint == nil {
@@ -52,8 +47,7 @@ func Check(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	return diagnostics
 }
 
-// Silence is the default, not an oversight: a log naming what a user reached
-// is evidence on a seized device. It is still worth one warning.
+// Silence is the default, not an oversight
 func checkLog(diagnostics *Diagnostics, log logging.Config, loc string) {
 	if len(log.Outputs) == 0 {
 		diagnostics.warnf(loc, "no log outputs configured, so nothing will be logged")
@@ -65,7 +59,6 @@ func checkLog(diagnostics *Diagnostics, log logging.Config, loc string) {
 	}
 }
 
-// Inbounds and outbounds are separate namespaces.
 func checkTags(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	seen := make(map[string]int, len(coreBlueprint.Inbounds))
 	for index, inbound := range coreBlueprint.Inbounds {
@@ -107,8 +100,6 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		diagnostics.errorf(fieldLocation(loc, "port"), "an inbound must say which port to listen on")
 	}
 
-	// The typed stacks already make a stream overlay over a datagram base
-	// unrepresentable, so what is left is that the right one was filled.
 	switch inbound.Network {
 	case spec.NetworkUDP:
 		if inbound.DatagramTransport.IsZero() {
@@ -163,8 +154,7 @@ func checkInbound(diagnostics *Diagnostics, inbound blueprint.Inbound, loc strin
 		}
 		collectListenAddressWarnings(diagnostics, inbound.StreamProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
 		collectListenAddressWarnings(diagnostics, inbound.DatagramProxy, inbound.Bind, fieldLocation(loc, "protocol", "settings"))
-		// With users the halves have none of their own, and warning that they
-		// have no users would be wrong.
+		// With users the halves have none of their own, and warning that they have no users would be wrong.
 		if inbound.Mixed != nil && len(inbound.Mixed.Users) == 0 {
 			collectListenAddressWarnings(diagnostics, inbound.Mixed.SOCKS5, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedSOCKS5Module))
 			collectListenAddressWarnings(diagnostics, inbound.Mixed.HTTP, inbound.Bind, fieldLocation(loc, "protocol", "settings", mixedHTTPModule))
@@ -286,8 +276,6 @@ func checkUDPPolicy(diagnostics *Diagnostics, policy nat.Policy, loc string) {
 	}
 }
 
-// The same overlay twice is legal and occasionally deliberate -- TLS inside
-// TLS is a real technique -- so this is a warning, not an error.
 func checkStreamTransportStack(diagnostics *Diagnostics, stack blueprint.StreamTransportStack, loc string) {
 	if stack.Base == nil {
 		return
@@ -309,10 +297,6 @@ func checkStreamTransportStack(diagnostics *Diagnostics, stack blueprint.StreamT
 	checkApplicationProtocols(diagnostics, stack.Overlays, loc)
 }
 
-// A transport that negotiates ALPN (TLS) must offer only protocols the
-// transport directly above it can speak (WebSocket: http/1.1). Otherwise the
-// other end, often a CDN, may choose h2, and the connection fails after the
-// handshake with an error that does not point here.
 func checkApplicationProtocols(diagnostics *Diagnostics, overlays []spec.OverlayStreamTransportModule, loc string) {
 	for index := 0; index+1 < len(overlays); index++ {
 		lower, upper := overlays[index], overlays[index+1]
@@ -373,8 +357,7 @@ func checkDatagramTransportStack(diagnostics *Diagnostics, stack blueprint.Datag
 	}
 }
 
-// The module knows what is worth warning about; only the caller knows where
-// in the config file it came from.
+// The module knows what is worth warning about; only the caller knows where in the config file it came from.
 func collectWarnings(diagnostics *Diagnostics, component spec.Config, loc string) {
 	if component == nil {
 		return
@@ -384,8 +367,7 @@ func collectWarnings(diagnostics *Diagnostics, component spec.Config, loc string
 	}
 }
 
-// Only what depends on where the inbound listens: a module that implements
-// spec.ListenAddressWarner moves that warning out of Warnings.
+// Only what depends on where the inbound listens
 func collectListenAddressWarnings(diagnostics *Diagnostics, component any, listen spec.Endpoint, loc string) {
 	warner, implements := component.(spec.ListenAddressWarner)
 	if !implements || warner == nil {
@@ -396,10 +378,6 @@ func collectListenAddressWarnings(diagnostics *Diagnostics, component any, liste
 	}
 }
 
-// A UDP session's per-destination timeout must not be negative, and a value
-// written beyond the session's own idle time is pointless: the session ends first.
-// A setting that was left out has its default, and a written value must be
-// positive: zero never stands for the default.
 func checkUDPEntryIdleTimeout(diagnostics *Diagnostics, location string, configured *time.Duration, defaultValue, sessionIdle time.Duration, whyItMustBePositive string) {
 	if configured == nil {
 		return
@@ -420,8 +398,7 @@ func checkUDPMaxEntriesPerSession(diagnostics *Diagnostics, location string, con
 	}
 }
 
-// One beyond the largest UDP payload could never fill, and would only waste
-// memory.
+// One beyond the largest UDP payload could never fill, and would only waste memory.
 func checkUDPMaxDatagramSize(diagnostics *Diagnostics, location string, configured *int) {
 	if configured == nil {
 		return

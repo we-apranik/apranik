@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Beyond this a sniff delays every connection whose client does not speak
-// first, such as SSH, for longer than anyone would choose.
 const longSniffTimeout = 5 * time.Second
 
 var knownBrowserFamilies = []string{spec.BrowserFamilyChromium, spec.BrowserFamilyFirefox, spec.BrowserFamilySafari}
@@ -98,8 +96,6 @@ type routingChecker struct {
 	dnsServers   map[string]bool
 }
 
-// checkDatasets checks the declarations and returns the kind of each it could
-// read, for the rules that name them.
 func checkDatasets(diagnostics *Diagnostics, datasets []blueprint.Dataset) map[string]blueprint.DatasetKind {
 	kinds := make(map[string]blueprint.DatasetKind, len(datasets))
 	seen := make(map[string]int, len(datasets))
@@ -228,9 +224,6 @@ func (c routingChecker) checkAction(action blueprint.Action, loc string, fields 
 	}
 }
 
-// Freedom carries UDP; a proxy outbound only when its protocol frames
-// datagrams in its stream; a group only when every member does, as the group
-// outbound itself reports.
 func carriesUDP(outbound blueprint.Outbound, outbounds map[string]blueprint.Outbound) bool {
 	return carriesUDPWithout(outbound, outbounds, map[string]bool{})
 }
@@ -276,14 +269,12 @@ func readsSniffResultField(fields blueprint.Match) bool {
 	return len(fields.SniffedProtocols) > 0 || len(fields.SniffedRequestHeaders) > 0 || len(fields.SniffedBrowserFamilies) > 0
 }
 
-// The fields a resolve action's addresses feed.
 func readsDestinationIP(fields blueprint.Match) bool {
 	return anyNestedMatch(fields, func(each blueprint.Match) bool {
 		return len(each.IPs) > 0 || each.IPIsPrivate != nil || len(each.IPVersions) > 0 || len(each.IPDatasets) > 0
 	})
 }
 
-// Domain fields read the sniffed name when there is one.
 func readsSniffedData(fields blueprint.Match) bool {
 	return anyNestedMatch(fields, func(each blueprint.Match) bool {
 		return readsSniffResultField(each) || len(each.Domains) > 0 || len(each.DomainSuffixes) > 0 ||
@@ -307,10 +298,6 @@ func anyNestedMatch(fields blueprint.Match, test func(blueprint.Match) bool) boo
 	return false
 }
 
-// CheckDatasets reads every dataset the config declares, so a
-// missing file, a missing category or a file of the other kind is reported
-// before anything runs. It reads files, which Check never does, so the
-// loaders call it after Check; a program building its own blueprint may too.
 func CheckDatasets(coreBlueprint *blueprint.Blueprint) Diagnostics {
 	var diagnostics Diagnostics
 	if coreBlueprint == nil {

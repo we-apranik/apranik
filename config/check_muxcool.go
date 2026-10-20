@@ -5,8 +5,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// muxCoolRole says whose muxcool key is checked: an outbound's client uses
-// Mux.Cool, an inbound's server accepts it. The shape is the same for both.
 type muxCoolRole int
 
 const (
@@ -14,7 +12,6 @@ const (
 	muxCoolServer
 )
 
-// An outbound's muxcool key.
 func checkMuxCool(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
 	if outbound.MuxCool == nil {
 		return
@@ -27,7 +24,6 @@ func checkMuxCool(diagnostics *Diagnostics, outbound blueprint.Outbound, loc str
 	checkMuxCoolOfProxy(diagnostics, outbound.MuxCool, outbound.Proxy, muxCoolClient, muxCoolLoc)
 }
 
-// An inbound's muxcool key.
 func checkInboundMuxCool(diagnostics *Diagnostics, inbound blueprint.Inbound, loc string) {
 	if inbound.MuxCool == nil {
 		return
@@ -40,8 +36,6 @@ func checkInboundMuxCool(diagnostics *Diagnostics, inbound blueprint.Inbound, lo
 	checkMuxCoolOfProxy(diagnostics, inbound.MuxCool, inbound.StreamProxy, muxCoolServer, muxCoolLoc)
 }
 
-// The whole shape is known; what is not built is refused when it is written, so
-// a setting is never silently ignored.
 func checkMuxCoolOfProxy(diagnostics *Diagnostics, muxCool *blueprint.MuxCool, proxy spec.StreamProxyModule, role muxCoolRole, muxCoolLoc string) {
 	if _, ok := proxy.(spec.MuxCoolConfigurable); !ok {
 		diagnostics.errorf(muxCoolLoc, "proxy %q cannot carry muxcool", proxy.Info().Name)

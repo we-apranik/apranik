@@ -10,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// dnsServerTags are the servers a resolve action or a dns_server may name;
-// with no dns section, only the implicit system server.
 func dnsServerTags(section *blueprint.DNS) map[string]bool {
 	if section == nil {
 		return map[string]bool{dns.SystemServerTag: true}
@@ -122,7 +120,6 @@ func checkDNSServer(diagnostics *Diagnostics, server blueprint.DNSServer, outbou
 		}
 	}
 	if kinds != 1 {
-		// The type was missing or refused when parsed, and reported there.
 		if kinds > 1 {
 			diagnostics.errorf(fieldLocation(loc, "type"), "a dns server is exactly one type")
 		}
@@ -178,8 +175,6 @@ func checkDNSServer(diagnostics *Diagnostics, server blueprint.DNSServer, outbou
 	}
 }
 
-// A dns server's TLS layer offers ALPN to the server; the module above it
-// must speak whatever the server may choose (doh: http/1.1 only).
 func checkDNSServerApplicationProtocols(diagnostics *Diagnostics, server blueprint.DNSServer, loc string) {
 	offered := transportApplicationProtocols(server.TLS)
 	provider, provides := server.Stream.(spec.TransportInfoProvider)
@@ -213,12 +208,6 @@ func checkDNSRuleDatasets(diagnostics *Diagnostics, datasetKinds map[string]blue
 	}
 }
 
-// checkDNSLoops finds the loops check can see: a DNS server goes through its
-// outbound; a proxy outbound whose server is a domain needs its dns_server,
-// or the default server; a DNS server that names a dns_server needs it for
-// its own hostname. What only a lookup reveals -- a server's own address
-// inside its settings, the rules a name meets -- the resolver catches at run
-// time.
 func checkDNSLoops(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	section := coreBlueprint.DNS
 	type node struct{ kind, tag string }
@@ -310,7 +299,6 @@ func checkDNSLoops(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint)
 	}
 }
 
-// loopKey names a loop the same whichever node it was entered from.
 func loopKey[Node any](loop []Node) string {
 	names := make([]string, len(loop))
 	for index, step := range loop {
@@ -320,8 +308,6 @@ func loopKey[Node any](loop []Node) string {
 	return strings.Join(names, "|")
 }
 
-// A server with no outbound goes out directly. When everything else goes
-// through a proxy, that is probably a leak the user did not mean.
 func warnAboutDirectServersBesideAProxy(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint, outbounds map[string]blueprint.Outbound) {
 	var defaultOutbound blueprint.Outbound
 	switch {

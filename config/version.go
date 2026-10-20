@@ -8,8 +8,6 @@ import (
 	"github.com/we-apranik/apranik/core/blueprint"
 )
 
-// min_core before version, so an old core reading a new config file says so
-// plainly rather than emitting a confusing unknown-field error.
 func (b *configBuilder) checkVersions(envelope envelope) bool {
 	if envelope.MinCore != "" {
 		required, err := parseVersion(envelope.MinCore)
@@ -41,9 +39,6 @@ func (b *configBuilder) checkVersions(envelope envelope) bool {
 	return true
 }
 
-// Three fields, enough for min_core and no more. Prerelease and build metadata
-// have no meaning for "is this core new enough", so they are refused rather
-// than silently ignored.
 type version [3]int
 
 func parseVersion(text string) (version, error) {

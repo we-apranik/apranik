@@ -8,7 +8,6 @@ import (
 	"github.com/we-apranik/apranik/core/blueprint"
 )
 
-// A group reaches no server and has no transport of its own: its members do.
 func checkGroupOutboundFields(diagnostics *Diagnostics, outbound blueprint.Outbound, loc string) {
 	groupType := outbound.Group.Type
 	if outbound.Server.IsValid() {
@@ -23,8 +22,6 @@ func checkGroupOutboundFields(diagnostics *Diagnostics, outbound blueprint.Outbo
 	}
 }
 
-// checkGroups checks what only the whole list of outbounds can answer: whether
-// each member exists, whether groups wait on each other, and each group's probe.
 func checkGroups(diagnostics *Diagnostics, coreBlueprint *blueprint.Blueprint) {
 	outbounds := make(map[string]blueprint.Outbound, len(coreBlueprint.Outbounds))
 	for _, outbound := range coreBlueprint.Outbounds {
@@ -74,8 +71,6 @@ func hasOutbound(outbounds map[string]blueprint.Outbound, tag string) bool {
 	return found
 }
 
-// Every field of a probe is optional: a field left out takes the group's own
-// default. What is written must be usable.
 func checkGroupProbe(diagnostics *Diagnostics, probe blueprint.Probe, loc string) {
 	if probe.URL != "" {
 		parsed, err := url.Parse(probe.URL)

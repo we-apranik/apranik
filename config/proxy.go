@@ -2,11 +2,6 @@ package config
 
 import "github.com/we-apranik/apranik/core/registry"
 
-// A protocol is looked up by name, built and decoded once, whatever kinds it
-// fills. The wanted kind is the one this position needs, so a protocol that
-// lacks it is told apart from an unknown name. The zero value on any failure:
-// an inbound with no usable proxy is caught by Check, which is where "this
-// inbound has no proxy protocol" belongs.
 func (b *configBuilder) buildProxyModules(proxy rawModule, loc string, wanted registry.Kind) registry.ProxyModules {
 	if proxy.Type == "" {
 		b.diagnostics.report(loc, errMissingField("type", "protocol"))

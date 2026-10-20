@@ -12,9 +12,6 @@ import (
 	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
-// documentWithOutbounds is a good document with the given outbounds, which
-// are JSON objects separated by commas, and the given routing section (empty
-// for none).
 func documentWithOutbounds(outbounds, routing string) string {
 	document := strings.Replace(goodDocument, `"outbounds": [{
     "tag": "freedom",
@@ -162,8 +159,6 @@ func TestAGroupCarriesUDPOnlyWhenEveryMemberDoes(t *testing.T) {
 	validProbe := `"probe": {"url": "http://example.com/"}`
 	routing := `{"rules": [{"match": {"network": "udp"}, "action": {"type": "route", "settings": {"outbound": "g"}}}],
 		"default_action": {"type": "route", "settings": {"outbound": "direct"}}}`
-	// socks5 frames UDP in its own streams only through a datagram-over-stream
-	// kind, which a SOCKS5 outbound does not have.
 	diagnostics, failed := loadAndCheck(t, documentWithOutbounds(strings.Join([]string{
 		directOutbound, proxyOutbound,
 		groupOutbound("g", "fallback", `{"members": ["direct", "proxy"], `+validProbe+`}`),
@@ -190,8 +185,6 @@ func TestAGroupTakesNoTransport(t *testing.T) {
 	}
 }
 
-// A dns server that goes through a group goes through each member, so a member
-// that needs the same server for its own name is a loop.
 func TestDNSLoopThroughAGroupIsRefusedAndNamed(t *testing.T) {
 	dns := `{"servers": [{"tag": "google", "type": "doh", "settings": {"server": "8.8.8.8"}, "tls": {"alpn": ["http/1.1"]}, "outbound": "auto"}], "default_server": "google"}`
 	group := groupOutbound("auto", "fallback", `{"members": ["proxy", "direct"], "probe": {"url": "http://example.com/"}}`)
