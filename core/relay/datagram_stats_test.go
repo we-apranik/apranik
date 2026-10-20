@@ -27,7 +27,6 @@ type relayUnderTest struct {
 	replies    chan int
 }
 
-// Runs the relay with counting on and observes what it tells the handler.
 func runCountingRelay(t *testing.T, registry *stats.Registry, pick func(spec.Destination) (component.Outbound, error)) *relayUnderTest {
 	t.Helper()
 

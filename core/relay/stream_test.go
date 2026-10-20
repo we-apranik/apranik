@@ -79,8 +79,6 @@ func TestNoIdleTimeoutMeansNoIdleBound(t *testing.T) {
 	}
 }
 
-// One short request and response per connection, the shape that makes a
-// per-connection copy buffer matter.
 func BenchmarkStreamRelayOneShortExchange(b *testing.B) {
 	request, response := make([]byte, 512), make([]byte, 4096)
 	b.ReportAllocs()
@@ -190,8 +188,6 @@ func BenchmarkStreamRelayOneShortExchangeCounted(b *testing.B) {
 	}
 }
 
-// Bulk transfer over a real loopback connection, where reads are large and
-// the cost of counting each one is what matters.
 func benchmarkStreamRelayBulk(b *testing.B, counters []*stats.Counters) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

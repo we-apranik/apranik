@@ -12,17 +12,11 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ErrDestinationBlocked from OutboundForDestination drops the datagram without
-// a log line: routing logged the block once for the destination, and a blocked
-// destination such as QUIC's UDP 443 can send many packets.
 var ErrDestinationBlocked = errors.New("relay: destination blocked by routing")
 
-// RoutedDestination is where one packet goes: the outbound that carries it,
-// and what the caller wants told once the outbound accepted it.
 type RoutedDestination struct {
 	Outbound component.Outbound
 
-	// Called with the packet's size after the outbound accepted it. Nil is allowed.
 	UplinkAccepted func(size int)
 }
 
@@ -30,30 +24,18 @@ type DatagramRelayConfig struct {
 	ClientSide    spec.Datagram
 	ClientSession *session.Session
 
-	// Asked for every packet: UDP has no connection to pin a decision to.
 	OutboundForDestination func(ctx context.Context, destination spec.Destination) (RoutedDestination, error)
 
-	// Called with the sender and size of each reply taken from the session,
-	// before it is written to the client. Nil is allowed.
 	ReplyReceived func(from spec.Destination, size int)
 
-	// The largest datagram the client may send; a bigger one is dropped and
-	// counted. Zero means udp.DefaultMaxDatagramSize.
 	MaxDatagramSize int
 
-	// Where datagrams lost on the inbound's side are counted, under
-	// InboundTag, and a reply that could not be written to the client under the
-	// outbound it came from. Nil counts nothing.
 	Stats      *stats.Registry
 	InboundTag string
 
-	// Nil is allowed: Datagrams substitutes a silent logger.
 	Logger *logging.Logger
 }
 
-// Datagrams is the UDP half of the relay: client packets go to the session
-// through whichever outbound OutboundForDestination names, and the session's
-// replies go back to the client. It decides nothing itself.
 func Datagrams(ctx context.Context, config DatagramRelayConfig) error {
 	if config.Logger == nil {
 		config.Logger = logging.Discard()
@@ -72,8 +54,6 @@ func Datagrams(ctx context.Context, config DatagramRelayConfig) error {
 	go func() { directionEnded <- forwardClientDatagramsToSession(ctx, config) }()
 	go func() { directionEnded <- forwardSessionRepliesToClient(config) }()
 
-	// The first direction to end ends the pair: closing both is what unblocks
-	// the other loop.
 	firstError := <-directionEnded
 	config.ClientSide.Close()
 	config.ClientSession.Close()
@@ -85,8 +65,7 @@ func Datagrams(ctx context.Context, config DatagramRelayConfig) error {
 	return firstError
 }
 
-// A destination that cannot be routed, or a send that fails, loses that packet
-// only. Neither ends the session.
+// A destination that cannot be routed, or a send that fails, loses that packet only.
 func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayConfig) error {
 	maxDatagramSize := config.MaxDatagramSize
 	if maxDatagramSize <= 0 {
@@ -130,8 +109,6 @@ func forwardClientDatagramsToSession(ctx context.Context, config DatagramRelayCo
 	}
 }
 
-// The session counts a failure to open or to write on the outbound itself, so
-// those are not an inbound drop: the datagram is counted once, where it was lost.
 func inboundDropReasonOfSendFailure(err error) (reason stats.InboundDatagramDropReason, lostOnInboundSide bool) {
 	switch {
 	case errors.Is(err, session.ErrOpeningOutbound), errors.Is(err, session.ErrSendingToOutbound):

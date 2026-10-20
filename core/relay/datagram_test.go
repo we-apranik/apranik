@@ -1,5 +1,4 @@
-// Package relay_test drives the UDP relay loop with a fake client datagram and
-// fake outbounds, so what was routed and what was sent are both observable.
+// Package relay_test drives the UDP relay loop with a fake client datagram and fake outbounds, so what was routed and what was sent are both observable.
 package relay_test
 
 import (
@@ -28,15 +27,11 @@ func destinationOf(t *testing.T, host string, port uint16) spec.Destination {
 	return made
 }
 
-// clientDatagram stands in for the inbound's side: tests push packets in and
-// read back whatever the loop writes towards the client.
 type clientDatagram struct {
 	outgoing chan spec.Destination
 	returned chan spec.Destination
 
-	// A read fails with each error sent here, in order.
 	readFailures chan error
-	// What WriteTo fails with when set.
 	writeFailure atomic.Pointer[error]
 
 	mu     sync.Mutex
@@ -141,9 +136,7 @@ func (o *outboundDatagram) writes() []spec.Destination {
 type fakeOutbound struct {
 	tag string
 
-	// When set, CreateDatagram fails with it.
-	dialErr error
-	// When set, the outbound carries only these networks; default UDP.
+	dialErr  error
 	networks []spec.Network
 
 	mu        sync.Mutex

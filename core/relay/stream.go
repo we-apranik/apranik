@@ -1,7 +1,4 @@
-// Package relay moves payload between a client and its outbounds, so no module
-// has to. Streams are copied both ways with half-close carried across.
-// Datagrams go to the client's UDP session through the outbound the caller
-// names for each packet, and the session's replies come back.
+// Package relay moves payload between a client and its outbounds, so no module has to.
 package relay
 
 import (
@@ -21,14 +18,6 @@ const DefaultStreamIdleTimeout = 5 * time.Minute
 
 var ErrStreamIdle = errors.New("relay: stream idle timeout")
 
-// Cancelling ctx closes both streams, the only thing that unblocks a blocked
-// Read. So does silence in both directions for idleTimeout; zero or negative
-// means no idle bound.
-//
-// Every counters entry, and the connection's own bytes, get the bytes read
-// from the client as uplink and the bytes read from the remote side as
-// downlink, as they pass. Nil entries are skipped; nothing to count means
-// nothing is counted and nothing is wrapped.
 func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout time.Duration, counters []*stats.Counters, connectionBytes *stats.ConversationBytes) error {
 	defer clientSide.Close()
 	defer remoteSide.Close()
@@ -87,7 +76,6 @@ func Stream(ctx context.Context, clientSide, remoteSide spec.Stream, idleTimeout
 
 // A CloseWrite failure never fails the relay: ErrNoHalfClose means the Close in
 // Stream ends the connection instead, and any other failure means the carrier
-// is already gone.
 func forwardStream(destination spec.Stream, source io.Reader) error {
 	copyBuffer := streamCopyBuffers.Get().(*[]byte)
 	defer streamCopyBuffers.Put(copyBuffer)
@@ -97,9 +85,8 @@ func forwardStream(destination spec.Stream, source io.Reader) error {
 	return err
 }
 
-// Every connection copies in both directions, and io.Copy would allocate a
-// fresh buffer for each; reusing them keeps short connections off the heap.
-// The size is io.Copy's own. Pointers, so Put does not allocate.
+// Every connection copies in both directions, and io.Copy would allocate a fresh buffer for each;
+// reusing them keeps short connections off the heap.
 const streamCopyBufferSize = 32 << 10
 
 var streamCopyBuffers = sync.Pool{New: func() any {
@@ -141,14 +128,11 @@ func observe(source io.Reader, activity *streamActivity, counters []*stats.Count
 	return observedReader{source: source, activity: activity, counters: counters, connectionBytes: connectionBytes, direction: direction}
 }
 
-// Marks activity for the idle timeout and adds the bytes read to each
-// counters entry as uplink or downlink. Both are optional.
 type observedReader struct {
 	source   io.Reader
 	activity *streamActivity
 	counters []*stats.Counters
 
-	// Nil when the connection is not tracked.
 	connectionBytes *stats.ConversationBytes
 	direction       byteDirection
 }
