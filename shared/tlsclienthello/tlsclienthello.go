@@ -31,8 +31,6 @@ var (
 	ErrMalformed      = errors.New("tlsclienthello: malformed ClientHello")
 )
 
-// IsHandshakeRecordHeader reports whether header, at least RecordHeaderSize
-// bytes, starts a TLS handshake record of a plausible size.
 func IsHandshakeRecordHeader(header []byte) bool {
 	if len(header) < RecordHeaderSize {
 		return false
@@ -42,15 +40,10 @@ func IsHandshakeRecordHeader(header []byte) bool {
 		bodySize > 0 && bodySize <= MaxRecordBodySize
 }
 
-// RecordBodySize reads the length field of a record header.
 func RecordBodySize(header []byte) int {
 	return int(header[3])<<8 | int(header[4])
 }
 
-// Reassemble joins the handshake bytes of the records at the start of data
-// until the whole ClientHello is present, and returns its body: the message
-// without its 4-byte handshake header. spec.ErrSniffNeedMoreData means data
-// is a valid start that ends too soon.
 func Reassemble(data []byte) ([]byte, error) {
 	var handshake []byte
 	for {
@@ -86,17 +79,12 @@ func Reassemble(data []byte) ([]byte, error) {
 	}
 }
 
-// ServerName is the host name a ClientHello asks for, and where it sits.
 type ServerName struct {
 	Name string
 
-	// Byte offset of the name within the ClientHello body given to
-	// FindServerName.
 	Offset int
 }
 
-// FindServerName returns the zero ServerName, and no error, for a
-// ClientHello that names no server. body is what Reassemble returns.
 func FindServerName(body []byte) (ServerName, error) {
 	var serverName ServerName
 	var nameErr error
@@ -110,8 +98,6 @@ func FindServerName(body []byte) (ServerName, error) {
 			nameType := names.uint8()
 			name := names.variable(2)
 			if nameType == serverNameTypeHostName && !names.failed {
-				// Every slice shares body's backing array, so the capacity
-				// left after name's start gives its offset.
 				serverName = ServerName{Name: string(name), Offset: cap(body) - cap(name)}
 				return false
 			}
@@ -131,8 +117,6 @@ func FindServerName(body []byte) (ServerName, error) {
 	return serverName, nil
 }
 
-// ExtensionTypes lists the ClientHello's extension types in the order sent.
-// body is what Reassemble returns.
 func ExtensionTypes(body []byte) ([]uint16, error) {
 	var extensionTypes []uint16
 	err := forEachExtension(body, func(extensionType int, _ []byte) bool {
@@ -147,18 +131,16 @@ func ExtensionTypes(body []byte) ([]uint16, error) {
 
 // IsGREASE reports whether value is one of RFC 8701's reserved GREASE values
 // (0x0a0a, 0x1a1a, ... 0xfafa), which Chromium and Apple clients scatter in
-// their ClientHellos.
 func IsGREASE(value uint16) bool {
 	return value&0x0f0f == 0x0a0a && value>>8 == value&0xff
 }
 
-// forEachExtension stops early when visit returns false.
 func forEachExtension(body []byte, visit func(extensionType int, extensionData []byte) bool) error {
 	reader := byteReader{remaining: body}
-	reader.skip(2 + 32)    // legacy_version, random
-	reader.skipVariable(1) // legacy_session_id
-	reader.skipVariable(2) // cipher_suites
-	reader.skipVariable(1) // legacy_compression_methods
+	reader.skip(2 + 32)
+	reader.skipVariable(1)
+	reader.skipVariable(2)
+	reader.skipVariable(1)
 	if reader.failed {
 		return ErrMalformed
 	}
