@@ -37,12 +37,8 @@ const (
 	ReplyAddressNotSupported = 0x08
 )
 
-// UDPHeaderStart opens every UDP request header: two reserved bytes, then
-// FRAG, which is zero for a datagram that is not a fragment.
 var UDPHeaderStart = [3]byte{0x00, 0x00, 0x00}
 
-// ReplyError is a SOCKS5 reply the server refused with, kept distinct so a
-// caller can tell "command not supported" from "host unreachable".
 type ReplyError struct {
 	Code byte
 }
@@ -89,9 +85,6 @@ func CommandText(command byte) string {
 	}
 }
 
-// WriteReply sends a reply carrying a bound address. A zero one becomes
-// 0.0.0.0:0, which is what CONNECT wants: the field only means something for
-// BIND and ASSOCIATE.
 func WriteReply(writer io.Writer, code byte, bound spec.Endpoint) error {
 	reply := []byte{Version5, code, 0x00}
 
