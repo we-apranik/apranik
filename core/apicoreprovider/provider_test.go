@@ -23,7 +23,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// An outbound that reaches one address whatever it is asked for.
 type fixedAddressOutbound struct {
 	tag      string
 	address  string
@@ -54,8 +53,6 @@ type fakeProxyModule struct{ spec.StreamProxyModule }
 
 func (fakeProxyModule) Info() spec.ModuleInfo { return spec.ModuleInfo{Name: "trojan"} }
 
-// The configuration and the built outbounds of a small setup: a proxy, freedom
-// and a selector over both.
 type setup struct {
 	provider      *apicoreprovider.Provider
 	registry      *stats.Registry
@@ -328,7 +325,6 @@ func TestMeasureDelayTimesOneRequestThroughTheOutbound(t *testing.T) {
 	}
 }
 
-// The outbounds of a setup with a new proxy, which knows where to dial.
 func rebuildWith(t *testing.T, s *setup, proxy fixedAddressOutbound) *apicoreprovider.Provider {
 	t.Helper()
 	described := &blueprint.Blueprint{Outbounds: []blueprint.Outbound{{Tag: "proxy", Proxy: fakeProxyModule{}}}}

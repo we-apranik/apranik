@@ -14,7 +14,6 @@ import (
 
 var errNoResolver = errors.New("apicoreprovider: no resolver was given")
 
-// QueryDNS is one lookup through the resolver, by its rules and cache.
 func (p *Provider) QueryDNS(ctx context.Context, name, recordType string) (spec.APIDNSAnswer, error) {
 	if p.resolver == nil {
 		return spec.APIDNSAnswer{}, errNoResolver

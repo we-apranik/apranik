@@ -12,9 +12,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// RoutingRules lists the routing section's rules in the order they are tried,
-// then the default action. Hits come from the statistics and are marked as not
-// counted when there are none.
 func (p *Provider) RoutingRules() ([]spec.APIRoutingRule, error) {
 	var hits map[string]uint64
 	if p.stats != nil {
@@ -69,10 +66,6 @@ func describeAction(action blueprint.Action) spec.APIRoutingRule {
 	}
 }
 
-// describeMatch writes a match as the fields of the configuration file with
-// their values: "domain_suffix=a.com,b.com port=443". Fields all hold and a
-// field's values are alternatives; any(...) and all(...) hold nested matches
-// separated by " | ", not(...) holds one. A match with no condition is "*".
 func describeMatch(match blueprint.Match) string {
 	var fields []string
 	add := func(name string, values ...string) {

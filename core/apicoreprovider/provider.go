@@ -17,8 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// SubscribeToLog starts a live view of the log; the builder's method and the
-// logging system's Subscribe both have this shape.
 type SubscribeToLog func(minimumLevel logging.Level, bufferedRecords int) (*logging.Subscription, error)
 
 // RunningCore is the running core the provider speaks for: everything it reads
@@ -28,27 +26,19 @@ type SubscribeToLog func(minimumLevel logging.Level, bufferedRecords int) (*logg
 type RunningCore struct {
 	Version string
 
-	// Nil when the configuration counts nothing.
 	Stats *stats.Registry
 
 	Logs   SubscribeToLog
 	Logger *logging.Logger
 
-	// The configuration, for kinds, protocol names, the log outputs and the
-	// default action.
 	Blueprint *blueprint.Blueprint
 
-	// The built inbounds, in the blueprint's order.
 	Inbounds []component.Inbound
 
-	// The built outbounds, in the blueprint's order.
 	Outbounds []component.Outbound
 
-	// Answers QueryDNS and FlushDNSCache. Nil when there is none.
 	Resolver *dns.Resolver
 
-	// Checks the configuration source and queues it to replace the running one;
-	// see RequestReload. Nil when reloading is not offered.
 	RequestReload func() error
 }
 

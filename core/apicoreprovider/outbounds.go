@@ -15,8 +15,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// OutboundTags is a read-only slice made once: the outbounds do not change
-// while core runs.
 func (p *Provider) OutboundTags() []string { return p.outboundTags }
 
 func (p *Provider) OutboundState(outboundTag string) (spec.APIOutboundState, error) {
@@ -58,8 +56,6 @@ func groupKind(groupType blueprint.GroupType) spec.APIOutboundKind {
 	}
 }
 
-// DefaultOutboundTag is where a request goes when no rule decides: the default
-// action's outbound, or the first outbound when there is no routing section.
 func (p *Provider) DefaultOutboundTag() string {
 	routing := p.blueprint.Routing
 	switch {
@@ -72,7 +68,6 @@ func (p *Provider) DefaultOutboundTag() string {
 	}
 }
 
-// MeasureDelay checks the request and has no defaults: the caller passes every value.
 func (p *Provider) MeasureDelay(ctx context.Context, outboundTag, rawURL string, timeout time.Duration, expectedStatus string) (time.Duration, error) {
 	target, found := p.outboundsByTag[outboundTag]
 	if !found {
@@ -92,11 +87,6 @@ func (p *Provider) MeasureDelay(ctx context.Context, outboundTag, rawURL string,
 	return tester.MeasureDelay(ctx, target, timeout)
 }
 
-// SelectMember switches the selector, then ends the live conversations that went
-// through the member it replaced, so a switch takes hold for connections that
-// are already open, and for UDP sessions, which choose their member once. A
-// connection dialled through the old member that is not listed yet when the
-// connections are closed keeps its member: a known limit, not guarded.
 func (p *Provider) SelectMember(selectorTag, memberTag string) error {
 	built, found := p.outboundsByTag[selectorTag]
 	if !found {
@@ -131,10 +121,6 @@ func (p *Provider) describeKind(outboundTag string) string {
 	return "outbound"
 }
 
-// A connection went through a member of a selector when the selector's tag is
-// followed by the member's in the list of outbounds that carried it. A
-// connection to the same member by another route, or through the new member,
-// does not match.
 func wentThrough(carryingTags []string, selectorTag, memberTag string) bool {
 	for index := 0; index+1 < len(carryingTags); index++ {
 		if carryingTags[index] == selectorTag && carryingTags[index+1] == memberTag {

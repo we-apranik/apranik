@@ -53,7 +53,6 @@ func (p *Provider) CloseAllLiveConversations() error {
 	return translateClosingError(p.stats.CloseLiveMatchingConversations(func(stats.ConversationInfo) bool { return true }))
 }
 
-// Core's errors become the contract's, with the original kept in the message.
 func translateClosingError(err error) error {
 	switch {
 	case err == nil:

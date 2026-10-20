@@ -16,9 +16,6 @@ func (p *Provider) SubscribeToLog(minimumLevel slog.Level, bufferedRecords int) 
 	return subscription, nil
 }
 
-// LogFilePath is the n-th file output in the configuration, made absolute the
-// way the log system opens it: a relative path is relative to the working
-// directory.
 func (p *Provider) LogFilePath(outputIndex int) (string, error) {
 	index := 0
 	for _, output := range p.blueprint.Log.Outputs {

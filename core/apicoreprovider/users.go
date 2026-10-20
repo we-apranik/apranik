@@ -33,8 +33,6 @@ func (p *Provider) ListInboundUsers(inboundTag string) ([]string, error) {
 	return manager.ListUsers(), nil
 }
 
-// The protocol's own errors (spec.ErrInvalidUser, spec.ErrUserExists) are
-// returned as they are: they are already in the contract.
 func (p *Provider) AddInboundUser(inboundTag string, user json.RawMessage) (string, error) {
 	manager, err := p.userManagerOf(inboundTag)
 	if err != nil {
@@ -48,8 +46,6 @@ func (p *Provider) AddInboundUser(inboundTag string, user json.RawMessage) (stri
 	return name, nil
 }
 
-// Only the removed user's conversations on this inbound end; the same name on
-// another inbound is another inbound's user and keeps working.
 func (p *Provider) RemoveInboundUser(inboundTag, name string) error {
 	manager, err := p.userManagerOf(inboundTag)
 	if err != nil {
