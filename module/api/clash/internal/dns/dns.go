@@ -1,5 +1,3 @@
-// Package dns serves the DNS endpoints: /dns/query, one lookup through the
-// resolver, and /cache/dns/flush.
 package dns
 
 import (
@@ -20,10 +18,9 @@ func Register(router *web.Router, provider spec.APICoreProvider) {
 type handler struct{ provider spec.APICoreProvider }
 
 type questionBody struct {
-	Name  string `json:"Name"`
-	Qtype int    `json:"Qtype"`
-	// Always 1, the internet class.
-	Qclass int `json:"Qclass"`
+	Name   string `json:"Name"`
+	Qtype  int    `json:"Qtype"`
+	Qclass int    `json:"Qclass"`
 }
 
 type recordBody struct {
@@ -40,13 +37,8 @@ type answerBody struct {
 	Answer   []recordBody   `json:"Answer,omitempty"`
 }
 
-// The numbers in a DNS message for the two record types a query may name.
 var typeNumbers = map[string]int{"A": 1, "AAAA": 28}
 
-// query answers like Mihomo's /dns/query for what Apranik looks up: Status 0 with
-// the records found, and no Answer when the name has none of that type. Apranik's
-// resolver does not report the DNS response code, so a name that does not exist
-// looks like a name without that record type.
 func (h handler) query(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	recordType := strings.ToUpper(r.URL.Query().Get("type"))
