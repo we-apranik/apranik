@@ -8,8 +8,6 @@ import (
 	"github.com/we-apranik/apranik/module/proxy/trojan/wire"
 )
 
-// Anything ReadRequest accepts re-encodes to the bytes it consumed, and
-// RequestLength agrees on where the header ends. Never panics.
 func FuzzReadRequest(f *testing.F) {
 	f.Add(validHeader())
 	f.Add([]byte{})

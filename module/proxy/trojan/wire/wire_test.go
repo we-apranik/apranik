@@ -34,8 +34,6 @@ func ipDestination(t testing.TB, ip string, port uint16) spec.Destination {
 	return destination
 }
 
-// The published SHA-224 test vector for the empty string, so the hash is
-// checked against something this package did not compute.
 func TestHashPasswordMatchesTheKnownVector(t *testing.T) {
 	const sha224OfEmpty = "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f"
 	hash := wire.HashPassword("")
@@ -44,8 +42,6 @@ func TestHashPasswordMatchesTheKnownVector(t *testing.T) {
 	}
 }
 
-// A request written by hand from the Trojan description, byte by byte, so a
-// mistake shared by encoder and decoder still shows up here.
 func TestRequestMatchesHandWrittenBytes(t *testing.T) {
 	hash := wire.HashPassword("")
 	want := append([]byte{}, hash[:]...)
@@ -100,8 +96,6 @@ func TestRequestRoundTrip(t *testing.T) {
 	}
 }
 
-// One byte per Read: the parser must never assume a Read returns a whole
-// field, and must leave the early payload that follows unread.
 func TestRequestSplitAcrossReadsKeepsEarlyPayload(t *testing.T) {
 	encoded, err := wire.AppendRequest(nil, wire.Request{
 		PasswordHash: wire.HashPassword("secret"),
@@ -215,8 +209,6 @@ func TestUDPFrameRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Two frames back to back, one byte per Read: the second must
-			// start exactly where the first ended.
 			stream := bufio.NewReader(iotest.OneByteReader(bytes.NewReader(append(frame, frame...))))
 
 			buffer := make([]byte, wire.MaxUDPPayload)
@@ -240,8 +232,6 @@ func TestUDPFrameTooLargeToEncode(t *testing.T) {
 	}
 }
 
-// A frame bigger than the caller's buffer is dropped whole, so the next
-// frame still parses.
 func TestUDPFrameTooLargeForTheBufferKeepsTheStreamAligned(t *testing.T) {
 	destination := ipDestination(t, "8.8.8.8", 53)
 	big, _ := wire.AppendUDPFrame(nil, destination, make([]byte, 100))

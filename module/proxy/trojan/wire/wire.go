@@ -28,7 +28,6 @@ const (
 
 const PasswordHashLength = sha256.Size224 * 2
 
-// MaxUDPPayload is what the two-byte length field can express.
 const MaxUDPPayload = 0xFFFF
 
 // PasswordHash is the lowercase hex SHA-224 of a password, exactly as it
@@ -42,8 +41,6 @@ func HashPassword(password string) PasswordHash {
 	return hash
 }
 
-// Format keeps a hash out of logs and error text under every verb, as
-// types.Secret does for passwords.
 func (PasswordHash) Format(state fmt.State, verb rune) {
 	if verb == 'q' {
 		fmt.Fprintf(state, "%q", "[redacted]")
@@ -66,8 +63,6 @@ type Request struct {
 	Destination  spec.Destination
 }
 
-// AppendRequest encodes the header, refusing a destination the address format
-// cannot carry before anything reaches the wire.
 func AppendRequest(destination []byte, request Request) ([]byte, error) {
 	if request.Command != CommandConnect && request.Command != CommandUDPAssociate {
 		return nil, fmt.Errorf("%w: X'%02X'", ErrUnknownCommand, request.Command)
@@ -82,8 +77,6 @@ func AppendRequest(destination []byte, request Request) ([]byte, error) {
 	return append(destination, crlf[:]...), nil
 }
 
-// ReadRequest reads exactly one header and nothing after it, so the payload
-// that follows in the same segment stays in the reader.
 func ReadRequest(reader io.Reader) (Request, error) {
 	var request Request
 	if _, err := io.ReadFull(reader, request.PasswordHash[:]); err != nil {
@@ -117,9 +110,6 @@ func ReadRequest(reader io.Reader) (Request, error) {
 	return request, nil
 }
 
-// RequestLength reports how long the header beginning at prefix is, reading
-// only as far as it must. io.ErrUnexpectedEOF means prefix is too short to
-// tell yet. A caller peeking a stream grows the prefix until this succeeds.
 func RequestLength(prefix []byte) (int, error) {
 	const fixed = PasswordHashLength + len(crlf) + 1
 	if len(prefix) < fixed+1 {
@@ -132,8 +122,6 @@ func RequestLength(prefix []byte) (int, error) {
 	return fixed + addressLength + len(crlf), nil
 }
 
-// AppendUDPFrame encodes one datagram. A payload longer than the length field
-// can express is spec.ErrMessageTooLong, not a truncation.
 func AppendUDPFrame(destination []byte, address spec.Destination, payload []byte) ([]byte, error) {
 	if len(payload) > MaxUDPPayload {
 		return nil, fmt.Errorf("trojan: %d byte datagram: %w", len(payload), spec.ErrMessageTooLong)
@@ -189,8 +177,6 @@ func ReadUDPFrame(reader *bufio.Reader, payload []byte) (int, spec.Destination, 
 	return size, address, nil
 }
 
-// A stream that ends before a frame starts ends cleanly with io.EOF; one that
-// ends inside a header is io.ErrUnexpectedEOF.
 func peekFrameHeader(reader *bufio.Reader, size int) ([]byte, error) {
 	header, err := reader.Peek(size)
 	if err == nil {
