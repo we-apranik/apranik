@@ -37,8 +37,6 @@ func FuzzReadAndParseAddress(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// An IPv4-mapped IPv6 address is written back as IPv4, so only the
-		// destination, not the bytes, must survive.
 		reparsed, _, err := vmessaddr.ParseAddress(again)
 		if err != nil || reparsed != parsed {
 			t.Fatalf("round trip of %s gave %s, %v", parsed, reparsed, err)

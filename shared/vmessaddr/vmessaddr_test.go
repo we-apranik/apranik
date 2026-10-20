@@ -30,8 +30,6 @@ func domainDestination(t testing.TB, domain string, port uint16) spec.Destinatio
 	return destination
 }
 
-// The bytes are written by hand from the VMess specification: port first, then
-// the type, then the address.
 func TestAppendAddressWritesThePortFirst(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
@@ -118,7 +116,7 @@ func TestMalformedInputIsRefusedByBothReaders(t *testing.T) {
 		}
 		want := tc.want
 		if len(tc.encoded) == 0 {
-			want = io.EOF // nothing at all is the clean end of a reader
+			want = io.EOF
 		}
 		if _, err := vmessaddr.ReadAddress(bytes.NewReader(tc.encoded)); !errors.Is(err, want) {
 			t.Errorf("ReadAddress(%s): error = %v, want %v", tc.name, err, want)
@@ -128,7 +126,6 @@ func TestMalformedInputIsRefusedByBothReaders(t *testing.T) {
 
 // An address in the SOCKS5 layout (type first, IPv6 as 4) is not read as one of
 // this package: it is refused or read as something else, never mistaken
-// silently for the same destination.
 func TestTheSocks5LayoutIsNotMistakenForThisOne(t *testing.T) {
 	socks5IPv6 := append([]byte{0x04}, make([]byte, 16)...)
 	socks5IPv6 = append(socks5IPv6, 0x01, 0xBB)

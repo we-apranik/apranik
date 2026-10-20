@@ -1,21 +1,5 @@
 // Package vmessaddr is the destination layout of the V2Ray family: the port
 // first, then a type byte, then the address.
-//
-//	PORT(2)  TYPE(1)  ADDRESS
-//
-//	TYPE 0x01  ADDRESS = 4 bytes, IPv4
-//	TYPE 0x02  ADDRESS = LENGTH(1) + LENGTH bytes of domain name
-//	TYPE 0x03  ADDRESS = 16 bytes, IPv6
-//
-// The port is big endian. VMess, VLESS and Mux.Cool all put destinations on the
-// wire this way. The layout is VMess's: V2Ray's first commit (4c03bf0d,
-// 2015-09-05, spec/vmess.md) already reads "target port, target type 1 IPv4 /
-// 2 domain / 3 IPv6, target address". Xray calls it PortThenAddress.
-//
-// It is not RFC 1928: SOCKS5, Trojan and Shadowsocks put the type first with
-// IPv6 as 0x04 and the domain as 0x03, then the address, then the port, and
-// that is shared/socksaddr. The two share nothing but the idea, and a byte
-// string that is a valid address in one is usually not in the other.
 package vmessaddr
 
 import (
@@ -45,8 +29,6 @@ var (
 
 // ReadAddress reads one port and address. Reads are exact, never buffered, so
 // whatever follows stays unread for the caller. A reader that ends before the
-// first byte gives io.EOF; one that ends inside an address gives
-// io.ErrUnexpectedEOF.
 func ReadAddress(reader io.Reader) (spec.Destination, error) {
 	var portAndType [3]byte
 	if _, err := io.ReadFull(reader, portAndType[:]); err != nil {
@@ -86,9 +68,6 @@ func ReadAddress(reader io.Reader) (spec.Destination, error) {
 	}
 }
 
-// ParseAddress decodes one port and address from the start of encoded and
-// reports how many bytes that took. It copies nothing for an IP, so a caller
-// holding a whole frame parses it without allocating.
 func ParseAddress(encoded []byte) (spec.Destination, int, error) {
 	if len(encoded) < 3 {
 		return spec.Destination{}, 0, fmt.Errorf("vmessaddr: reading port and address type: %w", io.ErrUnexpectedEOF)
@@ -129,8 +108,6 @@ func ParseAddress(encoded []byte) (spec.Destination, int, error) {
 	}
 }
 
-// AppendAddress appends the port and address of destination to buffer. A
-// domain longer than 255 bytes is refused before anything is written.
 func AppendAddress(buffer []byte, destination spec.Destination) ([]byte, error) {
 	if ip, isIP := destination.IP(); isIP {
 		buffer = binary.BigEndian.AppendUint16(buffer, destination.Port())
