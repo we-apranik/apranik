@@ -56,8 +56,12 @@ export const sidebar: DefaultTheme.Sidebar = {
       collapsed: true,
       items: [
         { text: "What is an inbound", link: "/configuration/inbound/" },
-        { text: "Mixed", link: "/configuration/inbound/mixed" },
         { text: "Users", link: "/configuration/inbound/users" },
+        {
+          text: "Built-in",
+          collapsed: true,
+          items: [{ text: "Mixed", link: "/configuration/inbound/mixed" }],
+        },
       ],
     },
     {
@@ -65,10 +69,23 @@ export const sidebar: DefaultTheme.Sidebar = {
       collapsed: true,
       items: [
         { text: "What is an outbound", link: "/configuration/outbound/" },
-        { text: "Freedom", link: "/configuration/outbound/freedom" },
-        { text: "URLTest", link: "/configuration/outbound/urltest" },
-        { text: "Fallback", link: "/configuration/outbound/fallback" },
-        { text: "Selector", link: "/configuration/outbound/selector" },
+        {
+          text: "Built-in",
+          collapsed: true,
+          items: [
+            { text: "Freedom", link: "/configuration/outbound/freedom" },
+            {
+              text: "Groups",
+              collapsed: true,
+              items: [
+                { text: "What is a group", link: "/configuration/outbound/groups" },
+                { text: "URLTest", link: "/configuration/outbound/urltest" },
+                { text: "Fallback", link: "/configuration/outbound/fallback" },
+                { text: "Selector", link: "/configuration/outbound/selector" },
+              ],
+            },
+          ],
+        },
       ],
     },
     {
