@@ -2,10 +2,8 @@
 // or logs in with. HTTP Basic forbids them in a user name and a password
 // (RFC 7617), and a name is written to logs and API answers, where a newline
 // would forge a line. Every other character is allowed, whatever the language:
-// what a protocol cannot carry is that protocol's own refusal.
 package controlcharacter
 
-// Contains reports whether text has a character below U+0020 or U+007F.
 func Contains(text string) bool {
 	for _, character := range text {
 		if character < 0x20 || character == 0x7f {
