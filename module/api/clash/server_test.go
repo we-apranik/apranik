@@ -33,7 +33,6 @@ func freePort(t *testing.T) int {
 	return listener.Addr().(*net.TCPAddr).Port
 }
 
-// A running server, closed when the test ends.
 type running struct {
 	t       *testing.T
 	server  *server
@@ -54,7 +53,6 @@ func start(t *testing.T, provider spec.APICoreProvider, configure ...func(*Setti
 	return &running{t: t, server: server, address: "127.0.0.1:" + strconv.Itoa(settings.Port)}
 }
 
-// request sends a request, with the secret unless headers say otherwise.
 func (r *running) request(method, path, body string, headers ...string) (int, string, http.Header) {
 	r.t.Helper()
 	request, err := http.NewRequest(method, "http://"+r.address+path, strings.NewReader(body))
@@ -86,8 +84,6 @@ func (r *running) request(method, path, body string, headers ...string) (int, st
 	return response.StatusCode, data.String(), response.Header
 }
 
-// dialWebSocket opens a WebSocket as a page of the given origin would; an empty
-// origin is the server's own.
 func (r *running) dialWebSocket(path, origin string) (*websocket.Conn, error) {
 	r.t.Helper()
 	if origin == "" {
@@ -100,7 +96,6 @@ func (r *running) dialWebSocket(path, origin string) (*websocket.Conn, error) {
 	return connection, err
 }
 
-// upgradeStatus sends a WebSocket handshake and returns the status of the answer.
 func (r *running) upgradeStatus(path string, headers ...string) int {
 	r.t.Helper()
 	request, _ := http.NewRequest("GET", "http://"+r.address+path, nil)
@@ -230,7 +225,6 @@ func TestCORSAndTheWebSocketOriginFollowAllowOrigins(t *testing.T) {
 	}
 }
 
-// What the handlers asked the provider for, safe to read from the test.
 type asked struct {
 	mu                     sync.Mutex
 	buffer                 int

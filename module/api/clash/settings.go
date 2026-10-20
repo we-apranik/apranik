@@ -12,11 +12,7 @@ import (
 	"github.com/we-apranik/apranik/shared/httpstatusranges"
 )
 
-// Settings are the module's configuration: the entry of the config's apis list
-// is {"type": "clash", "settings": {...}}.
 type Settings struct {
-	// The IP address to listen on and the port; both are required, since an API
-	// that silently listened on every interface would be a real exposure.
 	Listen string `json:"listen"`
 	Port   int    `json:"port"`
 
@@ -24,24 +20,15 @@ type Settings struct {
 	// loopback address is reachable by every app on a phone.
 	Secret types.Secret `json:"secret"`
 
-	// The web pages (scheme://host[:port], or "*") whose scripts may call this
-	// API from a browser. Absent: none may.
 	AllowOrigins []string `json:"allow_origins"`
 
-	// How many log records one /logs client may fall behind before records are
-	// dropped. Absent means defaultLogBufferRecords; a written zero is refused.
 	LogBufferRecords *int `json:"log_buffer_records"`
 
-	// An absolute path to a directory of a dashboard's files (MetaCubeXD, yacd,
-	// zashboard...), served at /ui/ without the secret. Absent: no /ui.
 	ExternalUI string `json:"external_ui"`
 
-	// What a delay test uses for the values its request leaves out.
 	DelayTest *DelayTestSettings `json:"delay_test"`
 }
 
-// DelayTestSettings are this module's own defaults for a delay request; core
-// has none. Each is optional.
 type DelayTestSettings struct {
 	URL            string                 `json:"url"`
 	Timeout        *types.Duration        `json:"timeout"`
@@ -140,8 +127,6 @@ func (s *Settings) logBufferRecords() int {
 	return types.ValueOrDefault(s.LogBufferRecords, defaultLogBufferRecords)
 }
 
-// The defaults for a delay request, then the settings', then the request's own
-// values over them; the three are what MeasureDelay requires.
 func (s *Settings) delayTestDefaults() (rawURL string, timeout time.Duration, expectedStatus string) {
 	rawURL, timeout, expectedStatus = defaultDelayTestURL, defaultDelayTestTimeout, defaultDelayTestExpectedStatus
 	if s.DelayTest == nil {

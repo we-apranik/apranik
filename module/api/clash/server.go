@@ -30,11 +30,8 @@ import (
 )
 
 const (
-	// How long a client may take to send its request headers.
 	readHeaderTimeout = 10 * time.Second
 
-	// How long Close lets requests that are not streams finish before it stops
-	// waiting for them.
 	shutdownGracePeriod = 5 * time.Second
 )
 
@@ -49,7 +46,6 @@ type server struct {
 	started bool
 	closed  bool
 
-	// Closed when Close begins, to stop watching the context Start was given.
 	closing chan struct{}
 
 	serving   chan struct{}
@@ -57,8 +53,6 @@ type server struct {
 	closeErr  error
 }
 
-// newServer builds a server that has not bound anything; tick is how often
-// /traffic and /memory report.
 func newServer(settings Settings, tick time.Duration) *server {
 	return &server{
 		settings: settings,
@@ -70,8 +64,6 @@ func newServer(settings Settings, tick time.Duration) *server {
 
 var _ spec.APIServer = (*server)(nil)
 
-// Start binds the listener and returns; serving goes on in goroutines that Close
-// ends.
 func (s *server) Start(ctx context.Context, coreProvider spec.APICoreProvider) error {
 	if coreProvider == nil {
 		return errors.New("clash: no core provider was given")
@@ -114,8 +106,6 @@ func (s *server) Start(ctx context.Context, coreProvider spec.APICoreProvider) e
 	return nil
 }
 
-// handler puts every family of endpoints on one router, behind CORS and the
-// secret.
 func (s *server) handler(provider spec.APICoreProvider) http.Handler {
 	router := web.NewRouter()
 	delayURL, delayTimeout, delayExpectedStatus := s.settings.delayTestDefaults()
@@ -152,8 +142,6 @@ func (s *server) closeDashboard() {
 	}
 }
 
-// Close stops accepting, ends every stream, lets a request that is being answered
-// finish, and waits.
 func (s *server) Close() error {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
