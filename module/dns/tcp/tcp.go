@@ -1,5 +1,3 @@
-// Package tcp is the DNS server type tcp: DNS over TCP (RFC 7766), one
-// connection reused and queries pipelined on it.
 package tcp
 
 import (
@@ -20,10 +18,8 @@ const (
 )
 
 type Settings struct {
-	// Where the DNS server is; the port defaults to DefaultPort.
 	Server types.ServerAddress `json:"server"`
 
-	// Bounds one query, the dial included. Absent means DefaultTimeout; a written zero is refused.
 	Timeout *types.Duration `json:"timeout"`
 }
 

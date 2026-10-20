@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// A setting left out has its default; a written zero or negative duration is
-// refused, never taken as the default.
 func TestAWrittenZeroOrNegativeTimeoutIsRefused(t *testing.T) {
 	for _, written := range []string{"0s", "-1s"} {
 		var settings Settings
