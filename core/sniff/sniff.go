@@ -1,6 +1,4 @@
-// Package sniff recognises the protocol at the start of a client's stream, so
-// routing can see a domain the client never named. It only peeks: every byte
-// stays in the stream for the outbound.
+// Package sniff recognises the protocol at the start of a client's stream, so routing can see a domain the client never named.
 package sniff
 
 import (
@@ -11,14 +9,11 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Server-first protocols such as SSH and SMTP send nothing until the server
-// speaks, so every connection of theirs waits this long. PROVISIONAL.
+// PROVISIONAL.
 const DefaultTimeout = 300 * time.Millisecond
 
-// Recognise shows the sniffers every byte the client has sent, and waits for
-// more only while one of them still needs it, for at most timeout. Nil when no
-// sniffer recognised the bytes, or when the stream takes no read deadline,
-// since nothing would then bound the wait.
+// Nil when no sniffer recognised the bytes, or when the stream takes no read deadline, since nothing
+// would then bound the wait.
 func Recognise(clientStream *peekable.Stream, sniffers []spec.Sniffer, timeout time.Duration) *spec.SniffResult {
 	if len(sniffers) == 0 {
 		return nil
@@ -48,9 +43,6 @@ func Recognise(clientStream *peekable.Stream, sniffers []spec.Sniffer, timeout t
 	}
 }
 
-// Returns every buffered byte once there are more than seenBytes, waiting for
-// the client only when there are not. An error means nothing new arrived: the
-// deadline passed, the client closed, or the buffer is full.
 func peekBeyond(clientStream *peekable.Stream, seenBytes int) ([]byte, error) {
 	if clientStream.Buffered() <= seenBytes {
 		if _, err := clientStream.Peek(seenBytes + 1); err != nil {
@@ -60,8 +52,6 @@ func peekBeyond(clientStream *peekable.Stream, seenBytes int) ([]byte, error) {
 	return clientStream.Peek(clientStream.Buffered())
 }
 
-// Returns the first sniffer's result, or else the sniffers that asked for more
-// data. Any other error means the prefix is not that sniffer's protocol.
 func firstRecognised(prefix []byte, sniffers []spec.Sniffer) (*spec.SniffResult, []spec.Sniffer) {
 	var needMoreData []spec.Sniffer
 	for _, sniffer := range sniffers {

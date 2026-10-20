@@ -97,10 +97,9 @@ func TestNoSniffersReadsNothing(t *testing.T) {
 	}
 }
 
-// A client that sends its first message in pieces and then waits for the
-// server, as every TLS and HTTP client does, must be recognised as soon as the
-// last piece arrives, not when the timeout gives up waiting for a byte that
-// will never come.
+// A client that sends its first message in pieces and then waits for the server, as every TLS and HTTP
+// client does, must be recognised as soon as the last piece arrives, not when the timeout gives up
+// waiting for a byte that will never come.
 func TestAMessageInPiecesIsRecognisedWithoutWaitingForTheTimeout(t *testing.T) {
 	clientSide, inboundSide := newPipe(t)
 	request := "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: test\r\n\r\n"
@@ -120,8 +119,6 @@ func TestAMessageInPiecesIsRecognisedWithoutWaitingForTheTimeout(t *testing.T) {
 	}
 }
 
-// Bytes the stream already holds, such as a handshake's leftovers, are shown
-// to the sniffers before anything is read or waited for.
 func TestBytesAlreadyBufferedAreSniffedWithoutWaiting(t *testing.T) {
 	clientSide, inboundSide := newPipe(t)
 	go clientSide.Write([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
@@ -139,7 +136,6 @@ func TestBytesAlreadyBufferedAreSniffedWithoutWaiting(t *testing.T) {
 	}
 }
 
-// A client that hangs up mid-message ends sniffing at once, not at the timeout.
 func TestAClientThatClosesMidMessageEndsSniffingAtOnce(t *testing.T) {
 	clientSide, inboundSide := newPipe(t)
 	go func() {
@@ -156,7 +152,6 @@ func TestAClientThatClosesMidMessageEndsSniffingAtOnce(t *testing.T) {
 	}
 }
 
-// A real ClientHello, captured once from crypto/tls.
 func clientHello(b *testing.B) []byte {
 	b.Helper()
 	clientSide, serverSide := net.Pipe()
