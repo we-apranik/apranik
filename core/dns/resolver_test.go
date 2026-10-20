@@ -401,8 +401,6 @@ func TestResolverRefusesNamesAQueryCannotCarry(t *testing.T) {
 	}
 }
 
-// loopingZone resolves through the resolver itself, as a DNS server reached
-// through a proxy whose own name needs that server would.
 type loopingZone struct {
 	resolver *Resolver
 	inner    *fakeZone

@@ -12,7 +12,6 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 )
 
-// fakeZone answers like a recursive resolver from a fixed table.
 type fakeZone struct {
 	addresses map[string][]netip.Addr // name with trailing dot → addresses
 	aliases   map[string]string       // name → CNAME target
@@ -21,7 +20,6 @@ type fakeZone struct {
 
 	queries atomic.Int64
 
-	// Holds every query until it is closed, when set.
 	release chan struct{}
 
 	mu        sync.Mutex
@@ -125,7 +123,6 @@ func mustName(text string) dnsmessage.Name {
 	return dnsmessage.MustNewName(text)
 }
 
-// newTestResolver attaches one wire server tagged "fake" as the default.
 func newTestResolver(t testing.TB, config Config, zone *fakeZone) *Resolver {
 	t.Helper()
 	resolver := NewResolver(config)

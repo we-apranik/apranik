@@ -16,13 +16,10 @@ const (
 
 var errEmptyDomain = errors.New("dns: empty domain")
 
-// lookupName is a domain ready to look up: lowercase, without a trailing dot,
-// and checked to be a hostname a DNS query can carry.
 type lookupName struct {
 	text string
 }
 
-// qualifiedName is built only for a query, so a cache hit does not pay for it.
 func (n lookupName) qualifiedName() (dnsmessage.Name, error) {
 	return dnsmessage.NewName(n.text + ".")
 }
@@ -65,12 +62,8 @@ func isHostnameByte(character byte) bool {
 		character == '-' || character == '_'
 }
 
-// literalAddress reports a domain that is an IP written as text, which some
-// clients send as a domain. It needs no lookup.
 func literalAddress(domain string) (netip.Addr, bool) {
 	domain = strings.TrimSuffix(strings.TrimPrefix(domain, "["), "]")
-	// No top-level domain is all digits, so a hostname ends in a letter (or a
-	// dot); checking first keeps ParseAddr's error off the common path.
 	if domain == "" || !strings.Contains(domain, ":") && !isDigit(domain[len(domain)-1]) {
 		return netip.Addr{}, false
 	}

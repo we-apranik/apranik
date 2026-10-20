@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	// The EDNS(0) UDP payload size the 2020 DNS flag day settled on: large
-	// enough for nearly every answer, small enough to avoid IP fragmentation.
 	advertisedUDPPayloadSize = 1232
 
 	// RFC 8467's recommended block for query padding (RFC 7830), so the size
@@ -24,7 +22,6 @@ const (
 	queryPaddingBlockSize = 128
 	ednsPaddingOptionCode = 12
 
-	// A longer CNAME chain is a misconfiguration or an attack.
 	maxCNAMEChainLength = 16
 
 	// RFC 2308 lets a negative answer be cached for its SOA minimum. Capped
@@ -43,8 +40,6 @@ var (
 	errCNAMEChainTooLong        = errors.New("dns: CNAME chain too long")
 )
 
-// ServerFailureError is an answer that says the server could not answer:
-// SERVFAIL, REFUSED and the like. It is not cached.
 type ServerFailureError struct {
 	ResponseCode dnsmessage.RCode
 }
@@ -53,14 +48,11 @@ func (e *ServerFailureError) Error() string {
 	return fmt.Sprintf("dns: server answered %s", e.ResponseCode)
 }
 
-// answer is what one query learned about one name and one record type.
 type answer struct {
 	addresses []netip.Addr
 
-	// The name exists without records of this type, or does not exist.
 	negative bool
 
-	// How long the answer may be reused; zero means not at all.
 	ttl time.Duration
 }
 
@@ -70,14 +62,11 @@ func newQueryID() uint16 {
 	return binary.BigEndian.Uint16(random[:])
 }
 
-// newQueryMessage builds a recursive query for one name and record type, with
-// EDNS(0) and padding. name is fully qualified.
 func newQueryMessage(id uint16, name dnsmessage.Name, recordType dnsmessage.Type) ([]byte, error) {
 	unpadded, err := buildQueryMessage(id, name, recordType, 0)
 	if err != nil {
 		return nil, err
 	}
-	// The padding option adds a 4-byte header before its data.
 	paddedLength := (len(unpadded) + 4 + queryPaddingBlockSize - 1) / queryPaddingBlockSize * queryPaddingBlockSize
 	return buildQueryMessage(id, name, recordType, paddedLength-len(unpadded)-4)
 }

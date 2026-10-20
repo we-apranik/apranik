@@ -21,9 +21,6 @@ type cacheKey struct {
 	name       string
 	recordType dnsmessage.Type
 
-	// Empty for a lookup the rules routed, so every server shares the entry;
-	// the server's tag for a lookup that named its server, or with per-server
-	// caches.
 	server string
 }
 
@@ -40,8 +37,6 @@ const (
 	cacheStale
 )
 
-// answerCache is a least-recently-used cache of answers bounded by entry
-// count. Every method is safe for concurrent use.
 type answerCache struct {
 	maxStaleAge time.Duration // zero: expired entries are never served
 
@@ -56,9 +51,6 @@ func newAnswerCache(maxEntries int, maxStaleAge time.Duration) *answerCache {
 	}
 }
 
-// lookup returns the answer for key. A stale answer is returned only while
-// serving stale answers is on and it is within maxStaleAge of its expiry; any
-// older one is dropped. The answer's addresses are shared: do not modify.
 func (c *answerCache) lookup(key cacheKey, now time.Time) (answer, cacheFreshness) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -77,8 +69,6 @@ func (c *answerCache) lookup(key cacheKey, now time.Time) (answer, cacheFreshnes
 	return answer{}, cacheMissing
 }
 
-// store keeps an answer for its TTL. An answer with no TTL is not kept, and a
-// stored one replaces whatever was there.
 func (c *answerCache) store(key cacheKey, stored answer, now time.Time) {
 	if stored.ttl <= 0 {
 		return
@@ -101,7 +91,6 @@ func (c *answerCache) len() int {
 	return c.entries.Len()
 }
 
-// cacheSet is the resolver's caches: none, one shared, or one per server.
 type cacheSet struct {
 	disabled    bool
 	perServer   bool
@@ -142,8 +131,6 @@ func (s *cacheSet) flush() {
 	}
 }
 
-// forServer returns the cache that holds the server's answers, or nil when
-// caching is off.
 func (s *cacheSet) forServer(serverTag string) *answerCache {
 	if s.disabled {
 		return nil

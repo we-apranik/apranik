@@ -22,21 +22,16 @@ const DefaultSystemTimeout = 5 * time.Second
 // cache time the udp transport used before the resolver. PROVISIONAL.
 const systemAnswerTTL = 30 * time.Second
 
-// Server is one DNS server the resolver may ask. Exactly one of Wire and
-// System is set.
 type Server struct {
 	Tag string
 
-	// Zero means the resolver's.
 	IPVersions blueprint.IPVersions
 
-	// A module's server: wire-format queries. The resolver closes it.
 	Wire spec.DNSServer
 
 	System *SystemServer
 }
 
-// SystemServer asks the operating system's resolver.
 type SystemServer struct {
 	timeout time.Duration
 
@@ -44,7 +39,6 @@ type SystemServer struct {
 	lookupNetIP func(ctx context.Context, network, host string) ([]netip.Addr, error)
 }
 
-// NewSystemServer: zero timeout means DefaultSystemTimeout.
 func NewSystemServer(timeout time.Duration) *SystemServer {
 	if timeout <= 0 {
 		timeout = DefaultSystemTimeout
@@ -52,7 +46,6 @@ func NewSystemServer(timeout time.Duration) *SystemServer {
 	return &SystemServer{timeout: timeout, lookupNetIP: net.DefaultResolver.LookupNetIP}
 }
 
-// exchanger asks one server about one name and record type.
 type exchanger interface {
 	exchange(ctx context.Context, name lookupName, recordType dnsmessage.Type) (answer, error)
 	close() error

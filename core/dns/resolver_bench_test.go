@@ -12,7 +12,6 @@ import (
 	"github.com/we-apranik/apranik/core/stats"
 )
 
-// A cache hit is what nearly every dial of a domain costs.
 func BenchmarkResolveCachedOneRecordType(b *testing.B) {
 	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only}, dualStackZone())
 	ctx := context.Background()
@@ -25,8 +24,6 @@ func BenchmarkResolveCachedOneRecordType(b *testing.B) {
 	}
 }
 
-// The same cache hit with the resolver counting into statistics: what DNS
-// counters add to the path nearly every dial takes.
 func BenchmarkResolveCachedOneRecordTypeCounting(b *testing.B) {
 	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only}, dualStackZone())
 	resolver.SetStats(stats.NewDNSCounters([]string{"fake"}))
@@ -79,7 +76,6 @@ func BenchmarkResolveUncachedCounting(b *testing.B) {
 	}
 }
 
-// A miss: query built, answered by an in-memory server, read and cached.
 func BenchmarkResolveUncached(b *testing.B) {
 	zone := dualStackZone()
 	resolver := newTestResolver(b, Config{IPVersions: blueprint.IPVersionsIPv4Only, Cache: blueprint.DNSCache{Disable: true}}, zone)

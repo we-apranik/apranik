@@ -9,9 +9,6 @@ import (
 	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
-// nameCondition is one compiled DNS rule condition over a lookup's name. The
-// combinators mirror the router's; a lookup knows only its name, so the
-// router's conditions, which read a whole request, do not fit.
 type nameCondition interface {
 	matches(name string) bool
 }
@@ -149,5 +146,4 @@ func hasNonDomainField(fields blueprint.Match) bool {
 		len(fields.InboundLocalPorts) > 0 || len(fields.IPDatasets) > 0 || len(fields.SourceIPDatasets) > 0
 }
 
-// HasNonDomainField is for config.Check, which reports the field's location.
 func HasNonDomainField(fields blueprint.Match) bool { return hasNonDomainField(fields) }

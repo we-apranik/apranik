@@ -6,12 +6,6 @@ import (
 	"strings"
 )
 
-// A lookup can need itself: DNS server "google" goes through outbound
-// "proxy", whose own server name has to be resolved, possibly by "google".
-// Each lookup's context carries the DNS servers and outbounds it is waiting
-// on, so a lookup that would wait on itself fails at once instead of hanging.
-// Only core reads it; modules pass the context along without knowing.
-
 type lookupPathKey struct{}
 
 type lookupPathStep struct {
@@ -20,8 +14,6 @@ type lookupPathStep struct {
 	previous *lookupPathStep
 }
 
-// ContextWithOutboundInLookupPath records that the work under ctx goes through
-// the outbound tagged tag, so a loop through it can be named.
 func ContextWithOutboundInLookupPath(ctx context.Context, outboundTag string) context.Context {
 	return contextWithLookupPathStep(ctx, "outbound", outboundTag)
 }
@@ -35,12 +27,9 @@ func contextWithLookupPathStep(ctx context.Context, kind, tag string) context.Co
 	return context.WithValue(ctx, lookupPathKey{}, &lookupPathStep{kind: kind, tag: tag, previous: previous})
 }
 
-// LoopError is a lookup that needs a DNS server already waiting on it.
 type LoopError struct {
 	Name string
 
-	// The DNS servers and outbounds on the loop, from the first to the one
-	// that needs the server again, then that server.
 	Path []string
 }
 
@@ -49,7 +38,6 @@ func (e *LoopError) Error() string {
 		e.Name, strings.Join(e.Path, " → "))
 }
 
-// loopThrough returns a LoopError when serverTag is already in ctx's path.
 func loopThrough(ctx context.Context, name, serverTag string) error {
 	step, _ := ctx.Value(lookupPathKey{}).(*lookupPathStep)
 	var reversed []string

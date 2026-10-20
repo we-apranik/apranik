@@ -24,8 +24,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ErrNoAddresses: the name does not exist, or has no address of the versions
-// asked for.
 var ErrNoAddresses = errors.New("dns: no addresses")
 
 // ErrLookupFailed matches, through errors.Is, every error the resolver returns
@@ -34,8 +32,6 @@ var ErrNoAddresses = errors.New("dns: no addresses")
 // on the network. Misuse, such as an unknown server tag, does not match.
 var ErrLookupFailed = errors.New("dns: lookup failed")
 
-// lookupError keeps the cause's message and only adds that it was a failed
-// lookup, so an error's text is the same with or without it.
 type lookupError struct{ cause error }
 
 func (e lookupError) Error() string        { return e.cause.Error() }
@@ -52,9 +48,7 @@ var (
 // this only keeps a module that never returns from wedging a name forever.
 const exchangeSafetyLimit = 2 * time.Minute
 
-// Config is what the resolver needs before its servers exist.
 type Config struct {
-	// Zero means blueprint.DefaultIPVersions.
 	IPVersions blueprint.IPVersions
 
 	Cache blueprint.DNSCache
@@ -64,23 +58,16 @@ type Config struct {
 	Logger *logging.Logger
 }
 
-// Resolver implements spec.Resolver. Construction is two-phase: outbounds
-// need the resolver before DNS servers, which go through outbounds, can be
-// built, so servers are attached afterwards with AttachServers. Every method
-// is safe for concurrent use.
 type Resolver struct {
 	ipVersions blueprint.IPVersions
 	caches     *cacheSet
 	logger     *logging.Logger
 	now        func() time.Time
 
-	// Where lookups are counted; nil counts nothing. Set by SetStats before
-	// the resolver serves any lookup, then only read.
 	stats *stats.DNSCounters
 
 	servers atomic.Pointer[serverSet]
 
-	// One query in flight per cache key; later lookups wait for it.
 	flightsMu sync.Mutex
 	flights   map[cacheKey]*flight
 	closed    bool
@@ -104,9 +91,6 @@ type flight struct {
 	err    error
 }
 
-// SetStats says where to count lookups, cache hits and queries. Call it before
-// the resolver serves its first lookup; nil counts nothing. The counters need
-// an entry for each server tag, or that server's queries go uncounted.
 func (r *Resolver) SetStats(counters *stats.DNSCounters) { r.stats = counters }
 
 func NewResolver(config Config) *Resolver {
@@ -135,8 +119,6 @@ func NewResolver(config Config) *Resolver {
 	}
 }
 
-// AttachServers completes construction. On success the resolver owns the
-// servers and closes them in Close; on an error the caller still does.
 func (r *Resolver) AttachServers(servers []Server, rules []blueprint.DNSRule, defaultServerTag string, datasets map[string]*dataset.Dataset) error {
 	if r.servers.Load() != nil {
 		return errServersAttached
@@ -193,13 +175,10 @@ func newServer(configured Server) (*server, error) {
 	return built, nil
 }
 
-// ResolveDomain is spec.Resolver: the server the rules pick, else the default.
 func (r *Resolver) ResolveDomain(ctx context.Context, domain string) ([]netip.Addr, error) {
 	return r.resolve(ctx, domain, "")
 }
 
-// ResolveDomainWithServer asks the server tagged serverTag, bypassing the
-// rules. Its answers are cached apart from the ones the rules chose.
 func (r *Resolver) ResolveDomainWithServer(ctx context.Context, domain, serverTag string) ([]netip.Addr, error) {
 	if serverTag == "" {
 		return nil, errors.New("dns: no server named")
@@ -311,10 +290,7 @@ func loopbackAddresses(ipVersions blueprint.IPVersions) []netip.Addr {
 	return addresses
 }
 
-// lookupRecordTypes returns the addresses in the order of recordTypes, a new
-// slice the caller owns. Two record types not in the cache are asked at once.
 func (r *Resolver) lookupRecordTypes(ctx context.Context, name lookupName, chosen *server, namedByCaller bool, recordTypes []dnsmessage.Type) ([]netip.Addr, error) {
-	// At most two record types; arrays keep a cache hit off the heap.
 	var results [2]answer
 	var errs [2]error
 	var missing [2]bool
@@ -454,7 +430,6 @@ func (r *Resolver) joinFlight(ctx context.Context, key cacheKey, cache *answerCa
 	return pending, nil
 }
 
-// Close stops every query in flight, waits for them, and closes the servers.
 func (r *Resolver) Close() error {
 	r.closeOnce.Do(func() {
 		r.flightsMu.Lock()
@@ -477,23 +452,16 @@ func (r *Resolver) Close() error {
 	return r.closeErr
 }
 
-// SystemServerTag is the tag of the server NewSystemResolver attaches.
 const SystemServerTag = "system"
 
-// NewSystemResolver is the resolver of a config with no dns section: the
-// operating system's resolver, with every default, as before DNS existed.
 func NewSystemResolver(logger *logging.Logger) *Resolver {
 	resolver := NewResolver(Config{Logger: logger})
-	// Cannot fail: one valid server, no rules.
 	if err := resolver.AttachServers([]Server{{Tag: SystemServerTag, System: NewSystemServer(0)}}, nil, SystemServerTag, nil); err != nil {
 		panic(err)
 	}
 	return resolver
 }
 
-// Why a lookup ended with no address, from what the servers said. A timeout is
-// read first: a lookup that asked two servers' worth of record types and timed
-// out on one is slow, whatever else it heard.
 func lookupFailureReason(err error) stats.DNSFailureReason {
 	var timeoutError interface{ Timeout() bool }
 	var serverFailure *ServerFailureError
