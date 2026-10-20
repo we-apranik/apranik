@@ -1,6 +1,3 @@
-// Package logfile serves /logs/file: the log file as the core wrote it, for a
-// person or a script. This is Apranik's own endpoint, not Clash's. The path comes
-// only from the configuration (the provider), never from the request.
 package logfile
 
 import (
@@ -32,7 +29,6 @@ type handler struct {
 }
 
 const (
-	// PROVISIONAL limits.
 	maxTail          = 100000
 	blockBytes       = 64 << 10
 	followChunkBytes = 1 << 20
@@ -108,7 +104,6 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
 	}
 	if request.tail == 0 && len(request.contains) == 0 && !request.follow {
-		// Range, If-Modified-Since and Last-Modified come with it.
 		http.ServeContent(w, r, filepath.Base(path), info.ModTime(), file)
 		return
 	}
@@ -128,8 +123,6 @@ func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	write(ctx, w, path, file, info, request)
 }
 
-// deadlineWriter bounds each write, so a client that stopped reading does not
-// hold the handler.
 type deadlineWriter struct {
 	controller *http.ResponseController
 	writer     http.ResponseWriter
@@ -159,7 +152,6 @@ func write(ctx context.Context, w http.ResponseWriter, path string, file *os.Fil
 
 	end := info.Size()
 	if request.follow {
-		// A line still being written is not sent until it is complete.
 		completeEnd, err := endOfLastCompleteLine(file, end)
 		if err != nil {
 			return
@@ -181,8 +173,6 @@ func write(ctx context.Context, w http.ResponseWriter, path string, file *os.Fil
 			}
 		}
 	} else {
-		// The region ends at a newline when following, so only a plain read can
-		// end in an unfinished line, which is a line of the file as it is now.
 		_, unfinished, err := forwardMatchingLines(io.NewSectionReader(file, 0, end), request, emit)
 		if err != nil {
 			return
@@ -197,8 +187,6 @@ func write(ctx context.Context, w http.ResponseWriter, path string, file *os.Fil
 	followAppended(ctx, path, file, info, end, anchor, request, emit, flush)
 }
 
-// endOfLastCompleteLine is the position just after the last newline before end,
-// or 0 when there is none.
 func endOfLastCompleteLine(file *os.File, end int64) (int64, error) {
 	block := make([]byte, blockBytes)
 	for position := end; position > 0; {
@@ -214,9 +202,6 @@ func endOfLastCompleteLine(file *os.File, end int64) (int64, error) {
 	return 0, nil
 }
 
-// lastMatchingLines returns up to limit of the matching lines before end, oldest
-// first, reading backwards in blocks so a big file is never read whole. A last
-// line without a newline counts as a line.
 func lastMatchingLines(file *os.File, end int64, limit int, matches func([]byte) bool) ([][]byte, error) {
 	if end > 0 {
 		last := make([]byte, 1)
@@ -272,8 +257,6 @@ func lastMatchingLines(file *os.File, end int64, limit int, matches func([]byte)
 	return lines, nil
 }
 
-// forwardMatchingLines sends every matching complete line of the reader and
-// returns where the last complete line ended and the unfinished line after it.
 func forwardMatchingLines(source io.Reader, request parameters, emit func([]byte) error) (offset int64, pending []byte, err error) {
 	reader := bufio.NewReaderSize(source, blockBytes)
 	for {
@@ -294,11 +277,6 @@ func forwardMatchingLines(source io.Reader, request parameters, emit func([]byte
 	}
 }
 
-// followAppended sends what is appended to the file until the request ends. If
-// the file shrinks, is rewritten or is replaced (truncation, rotation) it starts
-// again from the beginning of the new one. A file that was truncated and grew
-// past the old offset again between two polls is told by the bytes just before
-// the offset, which are no longer what was read.
 func followAppended(ctx context.Context, path string, file *os.File, info os.FileInfo, offset int64, anchor []byte, request parameters, emit func([]byte) error, flush func() error) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -370,12 +348,8 @@ func followAppended(ctx context.Context, path string, file *os.File, info os.Fil
 	}
 }
 
-// followAnchorBytes is how much of the file just before the offset is kept to
-// notice that the file was rewritten.
 const followAnchorBytes = 64
 
-// bytesBefore is the last bytes of the file before offset, nil when there are
-// none or they cannot be read.
 func bytesBefore(file *os.File, offset int64) []byte {
 	size := min(offset, followAnchorBytes)
 	if size <= 0 {
