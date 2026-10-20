@@ -11,8 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// recordingStream keeps each Write separately, so a test can tell one write
-// carrying request and payload from two.
 type recordingStream struct {
 	net.Conn
 	writes       chan []byte
