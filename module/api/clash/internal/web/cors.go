@@ -5,11 +5,6 @@ import (
 	"strings"
 )
 
-// CORS lets a browser page from an allowed origin call the API. An origin not
-// listed gets no CORS headers, which makes the browser refuse the answer; a
-// request without an Origin header is not a browser's and is untouched. A
-// preflight is answered before authentication, since a browser sends it without
-// the Authorization header. No origins listed: no headers at all.
 func CORS(allowedOrigins []string, next http.Handler) http.Handler {
 	if len(allowedOrigins) == 0 {
 		return next
@@ -35,7 +30,6 @@ func CORS(allowedOrigins []string, next http.Handler) http.Handler {
 			header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 			header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			header.Set("Access-Control-Max-Age", "300")
-			// A page on the internet calling a loopback address needs this.
 			if r.Header.Get("Access-Control-Request-Private-Network") == "true" {
 				header.Set("Access-Control-Allow-Private-Network", "true")
 			}

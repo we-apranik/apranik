@@ -15,15 +15,12 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 	json.NewEncoder(w).Encode(body)
 }
 
-// WriteError answers {"message": "..."} with the status, as Clash does.
 func WriteError(w http.ResponseWriter, status int, format string, arguments ...any) {
 	WriteJSON(w, status, map[string]string{"message": fmt.Sprintf(format, arguments...)})
 }
 
 func WriteNoContent(w http.ResponseWriter) { w.WriteHeader(http.StatusNoContent) }
 
-// WriteProviderError answers for an error an APICoreProvider method returned;
-// one this does not know is a server error.
 func WriteProviderError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, spec.ErrAPIStatisticsDisabled):
@@ -39,8 +36,6 @@ func WriteProviderError(w http.ResponseWriter, err error) {
 	}
 }
 
-// BadParameterError is what a handler reports for a query value or body it
-// cannot use; its message says what was wrong, and the handler answers 400.
 type BadParameterError struct{ message string }
 
 func (e BadParameterError) Error() string { return e.message }

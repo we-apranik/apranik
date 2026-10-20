@@ -1,6 +1,3 @@
-// Package web is the HTTP plumbing every Clash endpoint shares: a router that
-// answers a missing path or method in JSON, the JSON answers themselves, and
-// the authentication and CORS middleware.
 package web
 
 import (
@@ -9,12 +6,8 @@ import (
 	"strings"
 )
 
-// Methods maps an HTTP method to the handler that serves it on one path.
 type Methods map[string]http.HandlerFunc
 
-// Router sends a request to the handler for its path and method. A path nobody
-// registered is a JSON 404, and a registered path used with another method a
-// JSON 405 naming the methods it takes.
 type Router struct {
 	mux *http.ServeMux
 }
@@ -27,8 +20,6 @@ func NewRouter() *Router {
 	return router
 }
 
-// Handle registers the handlers for a pattern in net/http's syntax, such as
-// "/proxies/{name}/delay".
 func (r *Router) Handle(pattern string, methods Methods) {
 	allowed := make([]string, 0, len(methods))
 	for method := range methods {
