@@ -11,9 +11,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Nothing is open until ListenDatagram: binding is the caller's moment to
-// choose, not this type's. A caller that wants a port conflict reported at
-// startup calls it then; the SOCKS5 associate path calls it per association.
 type datagramListener struct {
 	bind     spec.Endpoint
 	resolver spec.Resolver
@@ -31,9 +28,6 @@ func newDatagramListener(bind spec.Endpoint, resolver spec.Resolver) (*datagramL
 	return &datagramListener{bind: bind, resolver: resolver}, nil
 }
 
-// Port 0 in the bind address means "any free port". One datagram per listener:
-// they would share the one connection, so the second caller's Close would take
-// the first caller's datagram down with it.
 func (l *datagramListener) ListenDatagram(ctx context.Context) (spec.Datagram, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -63,7 +57,6 @@ func (l *datagramListener) ListenDatagram(ctx context.Context) (spec.Datagram, e
 	return l.socket, nil
 }
 
-// Zero until ListenDatagram has bound, since there is no address before that.
 func (l *datagramListener) LocalAddr() net.Addr {
 	l.mu.Lock()
 	defer l.mu.Unlock()

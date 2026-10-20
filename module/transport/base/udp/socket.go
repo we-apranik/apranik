@@ -13,14 +13,8 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Domains only appear here when a proxy layer passed one through unresolved,
-// so the working set is small; this bounds it so a long session can't grow it
-// without limit.
 const resolveMemoLimit = 256
 
-// A write to a domain asks the resolver, which caches by TTL. This memo only
-// keeps a stream of datagrams to one domain from asking per datagram, so it is
-// short: an answer outlives its TTL by at most this. Not a setting.
 const resolveMemoLifetime = 5 * time.Second
 
 // WriteTo has no context, and a lookup must not stall the write path forever.
@@ -33,12 +27,9 @@ type resolvedAddress struct {
 	expires time.Time
 }
 
-// Safe for one reader and many writers, which is what a relay needs.
 type socket struct {
 	connection *net.UDPConn
 
-	// "udp", "udp4" or "udp6": which of a domain's addresses this socket can
-	// actually reach.
 	network string
 
 	resolver spec.Resolver
@@ -84,8 +75,6 @@ func (s *socket) WriteTo(payload []byte, to spec.Destination) (int, error) {
 	return size, err
 }
 
-// WriteToResolved is spec.ResolvedWriter: this is the layer that resolves, so
-// it is the only one that can say which address a domain actually went to.
 func (s *socket) WriteToResolved(payload []byte, to spec.Destination) (int, spec.Endpoint, error) {
 	target, err := s.resolve(to)
 	if err != nil {
@@ -108,10 +97,6 @@ func (s *socket) Close() error { return s.connection.Close() }
 
 func (s *socket) LocalAddr() net.Addr { return s.connection.LocalAddr() }
 
-// An IP needs no lookup at all; only a domain reaches the resolver, and its
-// result is remembered briefly because a session usually revisits the same few.
-// A netip.AddrPort, unlike a *net.UDPAddr, is a value, so sending to one
-// allocates nothing.
 func (s *socket) resolve(to spec.Destination) (netip.AddrPort, error) {
 	if !to.IsValid() {
 		return netip.AddrPort{}, errors.New("udp: address has neither domain nor IP")
@@ -186,9 +171,6 @@ func (s *socket) cache(domain string, target netip.AddrPort) {
 	s.resolved[domain] = resolvedAddress{address: target, expires: time.Now().Add(resolveMemoLifetime)}
 }
 
-// A socket bound to one family cannot reach the other: sending there is not
-// an error, the datagram simply vanishes. So the first address, in the
-// resolver's order (its ip_versions), that this socket can reach is chosen.
 func reachable(addresses []netip.Addr, network string) (netip.Addr, error) {
 	for _, address := range addresses {
 		unmapped := address.Unmap()

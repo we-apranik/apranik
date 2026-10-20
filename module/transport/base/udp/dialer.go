@@ -11,9 +11,6 @@ import (
 
 type datagramDialer struct{ resolver spec.Resolver }
 
-// One socket per call: every caller needs its own ephemeral port.
-// A zero localAddr, which is most of the time, takes any address and any free
-// port, and leaves the socket dual-stack.
 func (d datagramDialer) CreateDatagram(ctx context.Context, localAddr spec.Endpoint) (spec.Datagram, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("udp: open socket: %w", err)
@@ -35,7 +32,6 @@ func (d datagramDialer) CreateDatagram(ctx context.Context, localAddr spec.Endpo
 	return newSocket(udpConnection, network, d.resolver), nil
 }
 
-// Holds nothing of its own: each Datagram owns the socket it was given.
 func (datagramDialer) Close() error { return nil }
 
 // Unlike a listener's bind address, a zero one here is not refused: an

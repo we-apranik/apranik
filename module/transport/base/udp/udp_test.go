@@ -94,7 +94,6 @@ func TestDatagramsTravelBothWays(t *testing.T) {
 	}
 }
 
-// A domain reaches the base transport unresolved and is resolved only here.
 func TestWriteToADomain(t *testing.T) {
 	server, serverAddr := bindLocal(t)
 
@@ -108,7 +107,6 @@ func TestWriteToADomain(t *testing.T) {
 	}
 	defer client.Close()
 
-	// Twice, so the second write goes through the resolve cache.
 	for i := range 2 {
 		if _, err := client.WriteTo([]byte("hello"), domainDst("localhost", serverAddr.Port())); err != nil {
 			t.Fatalf("write %d to a domain: %v", i, err)
@@ -132,8 +130,6 @@ func TestWriteToRejectsMalformedAddresses(t *testing.T) {
 		to   spec.Destination
 		want string
 	}{
-		// "both domain and IP" is gone from this table: spec.Destination's
-		// constructors make it unrepresentable.
 		{"neither domain nor IP", spec.Destination{}, "neither domain nor IP"},
 		{"no port", domainDst("localhost", 0), "no port"},
 	} {
@@ -147,9 +143,6 @@ func TestWriteToRejectsMalformedAddresses(t *testing.T) {
 	}
 }
 
-// One datagram, both address families. Picking a family from a destination
-// used to pin the socket to whichever peer came first, so a session that sent
-// to IPv4 could never afterwards reach IPv6 -- DNS then QUIC, in practice.
 func TestOneDatagramReachesBothAddressFamilies(t *testing.T) {
 	v4, v4Addr := bindLocal(t)
 	v6, v6Addr := bindLocalOn(t, netip.MustParseAddr("::1"))
@@ -188,8 +181,6 @@ func TestOneDatagramReachesBothAddressFamilies(t *testing.T) {
 	}
 }
 
-// A caller that cares which interface traffic leaves by passes a local
-// address; the usual caller passes a zero one and gets an ephemeral port.
 func TestCreateDatagramBindsWhereTheCallerAsks(t *testing.T) {
 	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
@@ -240,8 +231,6 @@ func TestBadBindAddressIsRefusedWhileBuilding(t *testing.T) {
 	}
 }
 
-// Port 0 is what a SOCKS5 associate socket asks for. Nothing is bound until
-// ListenDatagram, so there is no address to report before it.
 func TestBindAcceptsAnEphemeralPort(t *testing.T) {
 	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0), testResolver)
 	if err != nil {
@@ -266,8 +255,6 @@ func TestBindAcceptsAnEphemeralPort(t *testing.T) {
 	}
 }
 
-// Two datagrams would share one connection, so either one's Close would take
-// the other down with it.
 func TestListenDatagramHandsOutOneDatagram(t *testing.T) {
 	listener, err := (&udp.Transport{}).NewDatagramListener(endpoint("127.0.0.1", 0), testResolver)
 	if err != nil {
@@ -283,7 +270,6 @@ func TestListenDatagramHandsOutOneDatagram(t *testing.T) {
 	}
 }
 
-// A cancelled context must not leave a socket open behind it.
 func TestCreateDatagramHonoursACancelledContext(t *testing.T) {
 	d, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
@@ -322,9 +308,6 @@ func TestReadFromReportsATruncatedDatagram(t *testing.T) {
 	}
 }
 
-// The dialer's socket is the layer that resolves, so it must be able to say
-// what it resolved to: that is the only way a NAT above it can match a reply,
-// which always arrives from an IP, against a domain destination.
 func TestSocketReportsWhatItResolvedTo(t *testing.T) {
 	dialer, err := (&udp.Transport{}).NewDatagramDialer(testResolver)
 	if err != nil {
@@ -403,8 +386,6 @@ func BenchmarkSocketWriteToIP(b *testing.B) {
 	}
 }
 
-// A domain the socket has already resolved: the cached path every packet
-// after the first takes.
 func BenchmarkSocketWriteToCachedDomain(b *testing.B) {
 	socket, peer := benchmarkSocketAndPeer(b)
 	go drain(peer)
@@ -440,8 +421,6 @@ func BenchmarkSocketReadFrom(b *testing.B) {
 	}
 }
 
-// countingResolver answers from a table and counts lookups, so these tests
-// reach no DNS server.
 type countingResolver struct {
 	addresses map[string][]netip.Addr
 	lookups   atomic.Int64
@@ -469,8 +448,6 @@ func TestNewDialerAndListenerRefuseNoResolver(t *testing.T) {
 	}
 }
 
-// The resolver's order decides, and a stream of datagrams to one domain asks
-// the resolver once, not per datagram.
 func TestSocketResolvesThroughTheResolverInItsOrder(t *testing.T) {
 	peer, err := net.ListenUDP("udp6", &net.UDPAddr{IP: net.IPv6loopback})
 	if err != nil {
@@ -503,9 +480,6 @@ func TestSocketResolvesThroughTheResolverInItsOrder(t *testing.T) {
 	}
 }
 
-// A datagram exactly the size of the buffer is whole, and one a byte over is
-// cut: telling them apart needs the kernel's flags, not the size read. The
-// datagram after a cut one is read as usual.
 func TestADatagramTheSizeOfTheBufferIsWholeAndOneByteOverIsReported(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("without message flags, a datagram that fills the buffer is treated as cut")
