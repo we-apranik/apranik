@@ -1,8 +1,3 @@
-// Package users serves the users of an inbound: list them, ask about one, add
-// one, remove one, and add or remove many in one request. It is an Apranik
-// extension; Mihomo has no such endpoints. The batch routes are custom methods
-// on the collection (`users:batchCreate`, `users:batchDelete`, after Google's
-// API design guide) so that no user name can ever be the path of one of them.
 package users
 
 import (
@@ -17,10 +12,8 @@ import (
 )
 
 const (
-	// One user is a few hundred bytes at most.
 	singleUserBodyLimit = 16 << 10
 
-	// Tens of thousands of users.
 	batchBodyLimit = 8 << 20
 )
 
@@ -46,8 +39,6 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 	web.WriteJSON(w, http.StatusOK, map[string][]string{"users": names})
 }
 
-// get answers whether one user exists, from the list: the protocols keep their
-// users in order and hold no index by name, so this is a scan.
 func (h handler) get(w http.ResponseWriter, r *http.Request) {
 	tag, name := r.PathValue("tag"), r.PathValue("name")
 	names, err := h.provider.ListInboundUsers(tag)
@@ -88,8 +79,6 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request) {
 	web.WriteNoContent(w)
 }
 
-// readBody reads at most limit bytes; a body over it is answered with 413, and
-// one that cannot be read with 400. False means the answer was written.
 func readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, bool) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	var tooLarge *http.MaxBytesError
@@ -104,8 +93,6 @@ func readBody(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, bool
 	return body, true
 }
 
-// The module's own errors come through core unchanged, so this knows the
-// contract's vocabulary and nothing about a protocol.
 func writeUserError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, spec.ErrAPINoSuchInbound), errors.Is(err, spec.ErrNoSuchUser):

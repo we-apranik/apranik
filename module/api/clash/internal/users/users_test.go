@@ -17,8 +17,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// inbound is a provider over one inbound, "socks-in", that keeps its users in
-// a list as a protocol would, and refuses a tag it does not have.
 type inbound struct {
 	mu    sync.Mutex
 	names []string
@@ -99,8 +97,6 @@ type results struct {
 		Error string `json:"error"`
 	} `json:"results"`
 }
-
-// ---------- one user ----------
 
 func TestListAnswersTheNamesAndAnEmptyListIsNotNull(t *testing.T) {
 	server, _ := mount(t, "alice", "bob")
@@ -207,8 +203,6 @@ func TestRemovingAUserAnswers204AndAnUnknownOneIs404(t *testing.T) {
 	}
 }
 
-// A name travels as one escaped path segment, whatever it holds, and a user
-// can be called like a batch route without ever reaching one.
 func TestAnyNameIsOnePathSegment(t *testing.T) {
 	names := []string{"a/b", "سارا", "100%", "a b", "a:b", "users:batchCreate", "users:batchDelete", "..", ".", "a?b#c"}
 	server, fake := mount(t, names...)
@@ -258,8 +252,6 @@ func TestAMethodAPathDoesNotTakeIsAnsweredWithWhatItDoes(t *testing.T) {
 		}
 	}
 }
-
-// ---------- many users ----------
 
 func TestBatchCreateReportsEachUserInOrderAndKeepsGoingAfterAFailure(t *testing.T) {
 	server, fake := mount(t, "alice")
