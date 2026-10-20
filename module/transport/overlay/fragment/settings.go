@@ -30,20 +30,12 @@ type Settings struct {
 	// each. Beats DPI that inspects each packet alone.
 	TCPPackets bool `json:"tcp_packets"`
 
-	// Piece sizes in bytes: the n-th entry for the n-th piece, the last
-	// repeating.
 	PieceSizes []Range `json:"piece_sizes"`
 
-	// The wait after each piece, by the same rule. Only with tcp_packets:
-	// records sent together leave in one write, so there is nothing to wait
-	// between.
 	PieceDelays []DurationRange `json:"piece_delays"`
 
-	// The most pieces; the last takes the rest. At least 2; there is no way to
-	// ask for no limit, only a large one.
 	MaxPieces Range `json:"max_pieces"`
 
-	// Guarantee one cut inside the server name, so no piece holds it whole.
 	SplitSNI bool `json:"split_sni"`
 }
 

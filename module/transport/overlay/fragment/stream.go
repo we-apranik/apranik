@@ -87,8 +87,6 @@ func (s *fragmentingStream) releaseHeldBackUncut() error {
 	return err
 }
 
-// A half-close ends the chance of a whole record, so whatever was held back
-// goes out as it is.
 func (s *fragmentingStream) CloseWrite() error {
 	s.writeMutex.Lock()
 	if !s.passingThrough.Load() && len(s.heldBack) > 0 {
@@ -128,8 +126,6 @@ func (s *fragmentingStream) rememberWriteDeadline(deadline time.Time) {
 func (s *fragmentingStream) sendCut(record []byte) error {
 	header, body := record[:tlsclienthello.RecordHeaderSize], record[tlsclienthello.RecordHeaderSize:]
 
-	// With records, the pieces are the body's, each given a header of its
-	// own; without, they are slices of the record as it is.
 	region, regionStartInRecord := record, 0
 	if s.settings.TLSRecords {
 		region, regionStartInRecord = body, tlsclienthello.RecordHeaderSize
@@ -172,9 +168,6 @@ func (s *fragmentingStream) sendCut(record []byte) error {
 	return nil
 }
 
-// Returns the server name's offset and length within record, when record
-// holds a whole ClientHello that names one. A ClientHello spanning several
-// records is not searched: only the first record is cut.
 func serverNameInRecord(record []byte) (start, length int, found bool) {
 	clientHello, err := tlsclienthello.Reassemble(record)
 	if err != nil {
@@ -187,9 +180,6 @@ func serverNameInRecord(record []byte) (start, length int, found bool) {
 	return tlsclienthello.RecordHeaderSize + tlsclienthello.HandshakeHeaderSize + serverName.Offset, len(serverName.Name), true
 }
 
-// cutPositions returns where to cut a region of regionSize bytes, ascending:
-// sizes from piece_sizes, at most max_pieces pieces, and one cut strictly
-// inside the server name when serverNameStart is not -1.
 func cutPositions(regionSize int, settings *Settings, serverNameStart, serverNameLength int) []int {
 	mustSplitServerName := serverNameStart >= 0 && serverNameLength >= 2 &&
 		serverNameStart+serverNameLength <= regionSize

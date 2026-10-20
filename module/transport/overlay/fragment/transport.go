@@ -36,8 +36,6 @@ func (*Transport) NewStreamOverlayServer() (spec.StreamOverlayServer, error) {
 	return nil, errNoServerSide
 }
 
-// The return type is the kind declaration: registering this as anything else
-// will not compile.
 func NewOverlayStreamTransportModule() spec.OverlayStreamTransportModule {
 	return &Transport{Settings: defaultSettings()}
 }
@@ -46,8 +44,6 @@ type client struct {
 	settings Settings
 }
 
-// Nothing is sent here: the ClientHello is the first thing written through
-// the returned stream, by the layer above or, under freedom, by the user.
 func (c *client) WrapClientStream(_ context.Context, underlyingStream spec.Stream, _ spec.Destination) (spec.Stream, error) {
 	return newFragmentingStream(underlyingStream, &c.settings), nil
 }

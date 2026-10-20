@@ -55,8 +55,6 @@ func wrap(t testing.TB, transport *Transport, underlyingStream spec.Stream) spec
 
 func noDelays(settings *Settings) { settings.PieceDelays = []DurationRange{{}} }
 
-// recordingStream keeps each Write apart, so a test sees the pieces as the
-// stream below received them.
 type recordingStream struct {
 	spec.Stream
 	mutex  sync.Mutex
@@ -102,7 +100,6 @@ func clientHelloRecord(t testing.TB, serverName string) []byte {
 	return append(header, body...)
 }
 
-// Splits what was sent back into records; fails the test on a bad header.
 func parseRecords(t *testing.T, sent []byte) (bodies [][]byte) {
 	t.Helper()
 	for len(sent) > 0 {
@@ -188,9 +185,6 @@ func TestNoPieceHoldsTheWholeServerName(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, write := range below.recorded() {
-				// A piece given a record header of its own starts with five bytes
-				// that are not part of the hello: its length can end in the
-				// name's first letter ('b' is 98 bytes), so only the body is searched.
 				pieceBytes := write
 				if recordsOn {
 					pieceBytes = parseRecords(t, write)[0]
@@ -394,7 +388,6 @@ func tcpPair(t testing.TB) (clientSide, serverSide *net.TCPConn) {
 	return clientSide, serverSide
 }
 
-// streamConn lets a TLS client run over a spec.Stream.
 type streamConn struct{ spec.Stream }
 
 func (streamConn) LocalAddr() net.Addr  { return &net.TCPAddr{} }
@@ -547,8 +540,6 @@ type discardStream struct{ spec.Stream }
 
 func (discardStream) Write(payload []byte) (int, error) { return len(payload), nil }
 
-// After the ClientHello every write passes through; this is its cost against
-// writing to the stream below directly.
 func BenchmarkWriteAfterTheClientHello(b *testing.B) {
 	payload := make([]byte, 32<<10)
 	b.Run("direct", func(b *testing.B) {

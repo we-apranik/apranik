@@ -10,9 +10,6 @@ import (
 	"unicode"
 )
 
-// Range is a whole number or an inclusive range of them, written "5" or
-// "3-5" (a bare JSON number also works); one value is picked at random each
-// time it is used.
 type Range struct {
 	Min, Max int
 }
@@ -59,8 +56,6 @@ func (r Range) pick() int {
 	return r.Min + rand.IntN(r.Max-r.Min+1)
 }
 
-// DurationRange is a duration or an inclusive range of them: "10ms",
-// "10-20ms" (the unit applies to both ends), "10ms-1s", or "0".
 type DurationRange struct {
 	Min, Max time.Duration
 }
@@ -124,7 +119,6 @@ func (r DurationRange) pick() time.Duration {
 	return r.Min + rand.N(r.Max-r.Min+1)
 }
 
-// The n-th entry is for the n-th piece; the last repeats.
 func entryFor[Entry any](entries []Entry, pieceIndex int) Entry {
 	return entries[min(pieceIndex, len(entries)-1)]
 }
