@@ -456,6 +456,8 @@ body:has(.ap-home) .VPNavBarSearch{display:none}
 .ap-home .loop b{color:var(--ap-ink2);transition:color .2s}
 .ap-home .loop li.sel b{color:var(--ap-ink)}
 .ap-home .loop:has(.sel) li.st:not(.sel){opacity:1}
+.ap-home .loop li.sel::before{font-size:28px}
+.ap-home .loop li.sel b{font-size:17px}
 
 /* the ring's numbers sit in a plain circle; only the current one is coloured */
 .ap-home .lnode circle,.ap-home .lnode.ppl circle,.ap-home .lnode.ap circle,.ap-home .lnode.cen circle{fill:var(--ap-bg);stroke:var(--ap-line);stroke-width:2}
