@@ -37,7 +37,7 @@ sum of their timeouts.
 
 | What | Key | Default |
 | --- | --- | --- |
-| One DNS query | [DNS server](../dns/server.md#settingstimeout) `settings.timeout` | `5s` |
+| One DNS query | [DNS server](../dns/udp.md#settingstimeout) `settings.timeout` | `5s` |
 | One group probe | [probe](probe.md#timeout) `timeout` | `10s` |
 | Between probe rounds | [probe](probe.md#interval) `interval` | `5m` |
 | Held UDP session (XUDP) | [Mux.Cool](muxcool.md#udpxudpglobal_idhold_time) `hold_time` | `60s` |

@@ -43,6 +43,11 @@ export const sidebar: DefaultTheme.Sidebar = {
       items: [
         { text: "How DNS works", link: "/configuration/dns/" },
         { text: "DNS server", link: "/configuration/dns/server" },
+        { text: "UDP", link: "/configuration/dns/udp" },
+        { text: "TCP", link: "/configuration/dns/tcp" },
+        { text: "DoT", link: "/configuration/dns/dot" },
+        { text: "DoH", link: "/configuration/dns/doh" },
+        { text: "System", link: "/configuration/dns/system" },
         { text: "DNS rule", link: "/configuration/dns/rule" },
       ],
     },
