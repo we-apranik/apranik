@@ -1,5 +1,3 @@
-// Package connections serves /connections: the live conversations, as a
-// snapshot or pushed over a WebSocket, and closing them.
 package connections
 
 import (
@@ -63,8 +61,6 @@ type metadataBody struct {
 	ProcessPath     string `json:"processPath"`
 }
 
-// list answers once for a plain request and every interval milliseconds for a
-// WebSocket.
 func (h handler) list(w http.ResponseWriter, r *http.Request) {
 	snapshot, err := h.snapshot()
 	if err != nil {
@@ -154,8 +150,6 @@ func connectionOf(conversation spec.APILiveConversation) connectionBody {
 		metadata.Host = conversation.SniffedDomain
 	}
 
-	// Clash lists the proxy that carried it first and the group last; core lists
-	// the group first.
 	chains := make([]string, len(conversation.OutboundTags))
 	for index, tag := range conversation.OutboundTags {
 		chains[len(chains)-1-index] = tag
@@ -171,8 +165,6 @@ func connectionOf(conversation spec.APILiveConversation) connectionBody {
 	}
 }
 
-// The protocol names Clash shows for the inbounds it knows; any other is shown as
-// the registry names it.
 func inboundType(protocolName string) string {
 	switch protocolName {
 	case "socks5":
