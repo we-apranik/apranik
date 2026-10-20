@@ -13,8 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// ConnectRefusedError is a CONNECT the upstream proxy answered with a status
-// other than 2xx.
 type ConnectRefusedError struct {
 	StatusCode int
 	StatusLine string
@@ -30,9 +28,6 @@ type streamClient struct {
 	handshakeTimeout time.Duration
 }
 
-// RequestStream issues CONNECT and nothing else. Forwarding an absolute-form
-// request would mean parsing and rewriting the payload, which an outbound that
-// is handed an opaque stream has no business doing.
 func (c *streamClient) RequestStream(ctx context.Context, underlyingStream spec.Stream, metadata spec.Metadata) (spec.Stream, error) {
 	if metadata.Network == spec.NetworkUDP {
 		return nil, fmt.Errorf("http: %w: CONNECT carries TCP only", spec.ErrUnsupportedNetwork)

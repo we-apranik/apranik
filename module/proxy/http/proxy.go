@@ -2,8 +2,6 @@ package http
 
 import "github.com/we-apranik/apranik/spec"
 
-// Proxy fills StreamProxyModule only: HTTP proxying carries TCP and has no
-// datagram form.
 type Proxy struct{ Settings }
 
 func (*Proxy) Info() spec.ModuleInfo {

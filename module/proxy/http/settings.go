@@ -17,14 +17,8 @@ type Settings struct {
 	Username string       `json:"username"`
 	Password types.Secret `json:"password"`
 
-	// Who an inbound accepts, by Basic proxy authentication; the matched name
-	// lands in Metadata.User. An inbound with none accepts everyone, with no
-	// authentication. An outbound refuses them. Users can be added and removed
-	// while the inbound runs (UserManager).
 	Users []User `json:"users"`
 
-	// Both: how long the request and its answer may take. Absent means
-	// defaultHandshakeTimeout; a written zero is refused.
 	HandshakeTimeout *types.Duration `json:"handshake_timeout"`
 }
 
@@ -64,8 +58,6 @@ type User struct {
 	Password types.Secret `json:"password"`
 }
 
-// checkUser says what is wrong with one user on its own, without saying where
-// the user is and without ever naming a password.
 func checkUser(user User) error {
 	switch {
 	case user.Name == "":
@@ -100,13 +92,9 @@ func (s *Settings) Warnings() []string {
 	if s.Username == "" && len(s.Users) == 0 {
 		return nil
 	}
-	// Basic auth is base64, not encryption. Over a bare TCP carrier the
-	// credential crosses the wire recoverable by anyone on the path.
 	return []string{"http: Basic authentication sends the password in a recoverable form unless the carrier below it is encrypted"}
 }
 
-// An inbound with no users is open to whoever can reach its port: only a
-// listen address on this machine makes that safe.
 func (s *Settings) WarningsForListenAddress(listen spec.Endpoint) []string {
 	if len(s.Users) == 0 && !listen.Addr().IsLoopback() {
 		return []string{"http: no users, so any client that can reach this inbound may use it"}

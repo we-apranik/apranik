@@ -34,8 +34,6 @@ func ipDst(ip string, port uint16) spec.Destination {
 	return destination
 }
 
-// pipeStream adapts net.Pipe to spec.Stream. CloseWrite reports
-// spec.ErrNoHalfClose, so these tests run over a stream weaker than TCP.
 type pipeStream struct {
 	net.Conn
 }
@@ -118,9 +116,6 @@ func TestConnectRoundTrip(t *testing.T) {
 	}
 }
 
-// A client that pipelines its first payload straight after CONNECT is normal:
-// curl sends the TLS ClientHello without waiting. The bytes must survive the
-// reader used to parse the head.
 func TestPipelinedPayloadSurvivesTheHandshake(t *testing.T) {
 	clientSide, serverSide := pipe(t)
 	results := serverOn(t, &proxyhttp.Settings{}, serverSide)
@@ -349,8 +344,6 @@ func TestSettingsDoNotPrintTheirPassword(t *testing.T) {
 	}
 }
 
-// Basic auth is base64, not encryption: over a bare TCP carrier the credential
-// is recoverable by anyone on the path.
 func TestBasicAuthIsWarnedAbout(t *testing.T) {
 	warnings := (&proxyhttp.Settings{Username: "u", Password: "p"}).Warnings()
 	if len(warnings) == 0 {

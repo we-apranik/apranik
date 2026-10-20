@@ -7,10 +7,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Answers 200 and returns the stream as a tunnel; the payload is never read.
-//
-// As with SOCKS5, the 200 goes out before core has dialled, so a dial failure
-// reaches the client as an EOF rather than a 502.
 func acceptConnectTunnel(streamAfterHead spec.Stream, metadata spec.Metadata, httpVersion, hostAndPort string) (spec.Stream, spec.Metadata, error) {
 	destination, err := wire.ParseHostPort(hostAndPort, 0)
 	if err != nil {

@@ -41,9 +41,6 @@ func userJSON(name, password string) json.RawMessage {
 	return raw
 }
 
-// login sends a CONNECT as a client with the credentials (none when the
-// username is empty) and returns what the server made of it, and the status
-// line it answered with when it refused.
 func login(t *testing.T, server spec.StreamProxyServer, username string, password types.Secret) (spec.Metadata, error) {
 	t.Helper()
 	clientSide, serverSide := pipe(t)
@@ -141,7 +138,6 @@ func TestTheFirstUserMakesAnOpenServerAskForALogin(t *testing.T) {
 	requireLogin(t, server, "alice", "alice-password", "alice")
 }
 
-// The documented cost of "no users, no login".
 func TestRemovingTheLastUserLeavesTheServerOpen(t *testing.T) {
 	server := newManagedServer(t, proxyhttp.User{Name: "alice", Password: "alice-password"})
 	requireRefused(t, server, "", "")

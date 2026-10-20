@@ -12,10 +12,6 @@ import (
 
 const defaultHTTPPort = 80
 
-// Reads a plain `GET http://host/path` request: the destination comes from the
-// URL, and the request is rewritten for the origin and placed ahead of the
-// rest of the stream. Nothing is answered here; the origin's response is what
-// the client waits for.
 func acceptAbsoluteFormRequest(streamAfterHead spec.Stream, metadata spec.Metadata, httpVersion, requestMethod, requestTarget string, headerLines []string) (spec.Stream, spec.Metadata, error) {
 	absoluteURL, err := url.Parse(requestTarget)
 	if err != nil || absoluteURL.Scheme == "" || absoluteURL.Host == "" {
@@ -38,10 +34,6 @@ func acceptAbsoluteFormRequest(streamAfterHead spec.Stream, metadata spec.Metada
 	return wire.NewStreamAfterHead(streamAfterHead, originRequestHead), metadata, nil
 }
 
-// Rewrites the request line for the origin and drops the hop-by-hop headers a
-// proxy must not forward. Connection: close is forced because the underlying
-// stream becomes a tunnel to one origin, and a keep-alive request naming a
-// different host would be delivered to the wrong one.
 func rewriteHeadForOrigin(requestMethod string, absoluteURL *url.URL, httpVersion string, headerLines []string) []byte {
 	var originRequestHead bytes.Buffer
 	fmt.Fprintf(&originRequestHead, "%s %s %s\r\n", requestMethod, absoluteURL.RequestURI(), httpVersion)

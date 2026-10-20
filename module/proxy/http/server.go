@@ -44,8 +44,6 @@ type streamServer struct {
 	handshakeTimeout time.Duration
 }
 
-// A CONNECT request becomes a tunnel (server_connect.go); an absolute-form
-// request is rewritten for the origin (server_absolute_form.go).
 func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	ctx, cancel := context.WithTimeout(ctx, s.handshakeTimeout)
 	defer cancel()
@@ -75,8 +73,6 @@ func (s *streamServer) AcceptStream(ctx context.Context, underlyingStream spec.S
 	return acceptAbsoluteFormRequest(streamAfterHead, metadata, httpVersion, requestMethod, requestTarget, head.HeaderLines)
 }
 
-// requireProxyCredentials returns the name of the user who logged in, empty
-// when the server has no users and so asks for no login.
 func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, httpVersion string, head wire.Head) (string, error) {
 	users := *s.users.Load()
 	if len(users) == 0 {
@@ -85,9 +81,6 @@ func (s *streamServer) requireProxyCredentials(underlyingStream spec.Stream, htt
 
 	username, password, ok := wire.BasicCredentials(head.HeaderValue("Proxy-Authorization"))
 
-	// Every user is compared, with both fields, before deciding, so the time
-	// taken says nothing about which user matched, how many there are before
-	// it, or whether the username or the password was the wrong part.
 	matchedIndex, found := 0, 0
 	for index, candidate := range users {
 		match := subtle.ConstantTimeCompare(username, candidate.nameBytes) & subtle.ConstantTimeCompare(password, candidate.passwordBytes)
