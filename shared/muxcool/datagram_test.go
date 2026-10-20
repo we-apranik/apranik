@@ -16,8 +16,6 @@ func openDatagramAndAccept(t testing.TB, client *muxcool.Client, server *muxcool
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Nothing is on the wire until the first datagram, so the server has
-	// nothing to accept before it.
 	if _, err := opened.WriteTo(first, destination); err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +50,6 @@ func TestDatagramsKeepTheirBoundariesAndSayWhereTheyAreFrom(t *testing.T) {
 		}
 	}
 
-	// A reply names no source in plain Mux.Cool, so the client reads it as
-	// coming from the destination it is bound to.
 	if _, err := accepted.WriteTo([]byte("answer"), ipDestination(t, "8.8.8.8", 53)); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +67,7 @@ func TestTheFirstDatagramIsCarriedByTheNewFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	peer.expectNothing(150 * time.Millisecond) // opening sends nothing
+	peer.expectNothing(150 * time.Millisecond)
 
 	if _, err := opened.WriteTo([]byte("query"), destination); err != nil {
 		t.Fatal(err)

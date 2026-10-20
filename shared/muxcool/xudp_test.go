@@ -42,8 +42,6 @@ func TestOneXUDPSubConnectionCarriesManyDestinationsBothWays(t *testing.T) {
 		}
 	}
 
-	// The server has seen addresses, so its replies name their source and the
-	// client can tell the peers apart.
 	replies := []struct {
 		message string
 		from    spec.Destination
@@ -121,8 +119,6 @@ func TestAServerNamesTheSourceOnlyOncePeerHasNamedAnAddress(t *testing.T) {
 		t.Fatalf("read %q, %v", got, err)
 	}
 
-	// A peer that has named no address gets a Keep without one, as the
-	// specification says, whatever source the caller gives.
 	if _, err := accepted.Datagram.WriteTo([]byte("r1"), source); err != nil {
 		t.Fatal(err)
 	}
@@ -148,8 +144,6 @@ func TestAServerNamesTheSourceOnlyOncePeerHasNamedAnAddress(t *testing.T) {
 
 // The bytes below are written by hand from the layout other cores read: a Keep
 // frame of a UDP sub-connection is ID(2) 02 01 then NETWORK(1) PORT(2) TYPE(1)
-// ADDRESS, then DATA-LENGTH(2) and the data; sing-box's XUDP reader and Xray's
-// both take the source from there.
 func TestAServersReplyToAnXUDPPeerIsTheBytesOtherCoresRead(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
 	peer.send(muxcool.Header{SubConnectionID: 1, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "8.8.8.8", 53)}, []byte("q"))
@@ -186,7 +180,6 @@ func TestAServersReplyToAnXUDPPeerIsTheBytesOtherCoresRead(t *testing.T) {
 }
 
 func TestAnXUDPNewIsRefusedLikeAnyUDPNewWhenUDPIsNotAccepted(t *testing.T) {
-	// A server with only TCP accepted refuses an XUDP New like any UDP one.
 	server, peer := rawClientOf(t, muxcool.ServerOptions{AcceptedNetworks: muxcool.NetworksTCP})
 	_ = server
 	peer.send(muxcool.Header{SubConnectionID: 3, Status: muxcool.StatusNew, Options: muxcool.OptionDataFollows, Network: muxcool.NetworkUDP, Destination: ipDestination(t, "1.2.3.4", 5)}, []byte("x"))

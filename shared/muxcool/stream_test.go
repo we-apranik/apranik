@@ -60,7 +60,6 @@ func TestAStreamCarriesBytesBothWays(t *testing.T) {
 	}
 }
 
-// A read smaller than a frame takes part of it, and the next read takes the rest.
 func TestAReadSmallerThanTheFrameTakesItInParts(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
@@ -229,8 +228,6 @@ func TestAReadDeadlinePassesWithoutLosingTheFrame(t *testing.T) {
 	}
 }
 
-// A passed deadline fails the read even when data is waiting, as on a net.Conn,
-// and the rest of a frame that was read in parts is still there afterwards.
 func TestADeadlineBetweenTwoReadsOfOneFrameLosesNothing(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{})
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
@@ -302,8 +299,6 @@ func TestAWriteDeadlineBoundsTheWaitForTheCarrier(t *testing.T) {
 	}
 }
 
-// A sub-connection that nobody reads holds up the others on its main
-// connection: the format has no flow control.
 func TestASubConnectionNobodyReadsHoldsUpTheOthersUntilItEnds(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{})
 	slowOpened, slowAccepted := openAndAccept(t, client, server, domainDestination(t, "slow.example", 80))
@@ -325,8 +320,6 @@ func TestASubConnectionNobodyReadsHoldsUpTheOthersUntilItEnds(t *testing.T) {
 	}
 }
 
-// Ending a sub-connection in the middle of a frame must drop the rest of that
-// frame, or the next frame would be read from the wrong place.
 func TestClosingInTheMiddleOfAFrameKeepsTheCarrierInStep(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{})
 	firstOpened, firstAccepted := openAndAccept(t, client, server, domainDestination(t, "one.example", 80))

@@ -30,8 +30,6 @@ func (s *stream) Read(p []byte) (int, error) {
 	return read, nil
 }
 
-// Write cuts p into frames of at most 8 KiB, so no sub-connection holds the
-// carrier for long and the others interleave.
 func (s *stream) Write(p []byte) (int, error) {
 	if err := s.writable(); err != nil {
 		return 0, err
@@ -49,7 +47,6 @@ func (s *stream) Write(p []byte) (int, error) {
 
 func (s *stream) Close() error { return s.close() }
 
-// CloseWrite is not possible: End ends a sub-connection in both directions.
 func (s *stream) CloseWrite() error { return spec.ErrNoHalfClose }
 
 func (s *stream) LocalAddr() net.Addr  { return subConnectionAddress(s.id) }
@@ -66,8 +63,6 @@ func (s *stream) SetReadDeadline(at time.Time) error {
 	return nil
 }
 
-// A write deadline bounds the wait for the carrier's turn. A frame whose write
-// has begun is not interrupted.
 func (s *stream) SetWriteDeadline(at time.Time) error {
 	s.writeDeadline.set(at)
 	return nil

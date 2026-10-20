@@ -9,9 +9,6 @@ import (
 	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
-// The frames below are sent by hand, one by one, to the engine: what the format
-// says to do with each, and what the two cores do, is what is checked.
-
 func newTCP(id uint16, options muxcool.FrameOptions, destination string) muxcool.Header {
 	return muxcool.Header{SubConnectionID: id, Status: muxcool.StatusNew, Options: options, Network: muxcool.NetworkTCP, Destination: domainDestinationNoT(destination, 80)}
 }
@@ -73,7 +70,6 @@ func TestAKeepWithDataForAnUnknownIDIsAnsweredWithAnEndAndTheDataDropped(t *test
 		t.Errorf("answer = %+v, want a plain End for ID 9", header)
 	}
 
-	// The data was consumed from the carrier, so the next frame is read right.
 	peer.send(newTCP(1, muxcool.OptionDataFollows, "example.com"), []byte("after"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	buffer := make([]byte, 5)
@@ -153,7 +149,6 @@ func TestAnEndedIDMayBeOpenedAgain(t *testing.T) {
 
 func TestMetadataPaddingIsSkippedAndAGlobalIDIsRead(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
-	// New UDP to 8.8.8.8:53 with data, a Global ID after the address, then data.
 	peer.sendBytes(bytesOf(0x00, 0x14, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 1, 2, 3, 4, 5, 6, 7, 8, 0x00, 0x02, "hi"))
 	accepted := acceptWithin(t, server, 2*time.Second)
 	if accepted.Datagram == nil {
@@ -166,7 +161,6 @@ func TestMetadataPaddingIsSkippedAndAGlobalIDIsRead(t *testing.T) {
 		t.Errorf("read %q, %v", got, err)
 	}
 
-	// Padding after an End.
 	peer.sendBytes(bytesOf(0x00, 0x08, 0x00, 0x03, 0x03, 0x00, 0, 0, 0, 0))
 	if _, _, err := readDatagram(t, accepted.Datagram, 10); err != io.EOF {
 		t.Errorf("after the End: %v", err)
@@ -192,7 +186,7 @@ func TestAServerRefusesANewOverTheLimitWithAnErrorEndAndKeepsTheMainConnection(t
 
 	first.Stream.Close()
 	waitFor(t, "the slot to free", func() bool { return server.ActiveSubConnectionsCount() == 0 })
-	peer.receive(2 * time.Second) // the End for ID 1
+	peer.receive(2 * time.Second)
 	peer.send(newTCP(3, 0, "three.example"), nil)
 	acceptWithin(t, server, 2*time.Second)
 }
@@ -282,7 +276,7 @@ func TestAClientNumbersItsSubConnectionsFromOneAndNeverReusesAnID(t *testing.T) 
 		header, _ := peer.receive(2 * time.Second)
 		ids = append(ids, header.SubConnectionID)
 		opened.Close()
-		peer.receive(2 * time.Second) // its End
+		peer.receive(2 * time.Second)
 	}
 	for index, id := range ids {
 		if id != uint16(index+1) {

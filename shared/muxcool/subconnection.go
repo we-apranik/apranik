@@ -20,8 +20,6 @@ const (
 	stateAborted
 )
 
-// subConnection holds no buffer: the main connection's reader waits for a Read, then
-// copies the payload into the caller's slice. A sub-connection nobody reads holds up the others.
 type subConnection struct {
 	conn        *mainConnection
 	id          uint16
@@ -29,7 +27,6 @@ type subConnection struct {
 	destination spec.Destination
 	accepted    bool // this end is the server end: it never sends New
 
-	// globalID is sent with the New frame (client end) or was read from it (server end); set before the sub-connection is used.
 	globalID [8]byte
 
 	// addressInEveryDatagram is XUDP: set at open (client) or when the peer first names an address (server).
@@ -38,11 +35,10 @@ type subConnection struct {
 	readDeadline  deadline
 	writeDeadline deadline
 
-	closedCh     chan struct{} // closed when the sub-connection reaches any end state
-	ready        chan struct{} // a delivery is waiting for a reader; a hint, may be stale
-	deliveryDone chan struct{} // the reader finished a delivery, or the sub-connection ended while one was claimed
+	closedCh     chan struct{}
+	ready        chan struct{}
+	deliveryDone chan struct{}
 
-	// Whether the peer has heard of it, so Close knows if an End is owed.
 	peerKnows atomic.Bool
 
 	// Guarded by conn.writeLock.
@@ -80,7 +76,6 @@ func newSubConnection(conn *mainConnection, id uint16, network Network, destinat
 
 // passDataToReader blocks until length bytes of data, which are next in the carrier,
 // have been read by this sub-connection's reader, or dropped because it ended.
-// The returned error is only for the carrier failing.
 func (s *subConnection) passDataToReader(length int, header Header) error {
 	var source spec.Destination
 	if header.Network == NetworkUDP {
@@ -127,7 +122,7 @@ func (s *subConnection) passDataToReader(length int, header Header) error {
 			s.mutex.Unlock()
 			return s.conn.discard(remaining)
 		}
-		s.mutex.Unlock() // a partial read; the rest is still waiting for a reader
+		s.mutex.Unlock()
 	}
 }
 
@@ -265,7 +260,6 @@ func (s *subConnection) writeKeep(data []byte) error {
 	return nil
 }
 
-// writeDatagram: the first datagram a client writes is carried by the New frame.
 func (s *subConnection) writeDatagram(data []byte, to spec.Destination) error {
 	cancel, deadline := s.closedCh, s.writeDeadline.wait()
 	if err := s.conn.acquireWriteSlot(cancel, deadline); err != nil {

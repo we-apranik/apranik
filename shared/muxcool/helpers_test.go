@@ -13,7 +13,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// connected returns the two ends of a real TCP connection on the loopback.
 func connected(t testing.TB) (clientSide, serverSide net.Conn) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -41,8 +40,6 @@ func connected(t testing.TB) (clientSide, serverSide net.Conn) {
 	return clientSide, serverSide
 }
 
-// pair is a Client and a Server on the two ends of a loopback TCP connection,
-// closed when the test ends.
 func pair(t testing.TB, serverOptions muxcool.ServerOptions) (*muxcool.Client, *muxcool.Server) {
 	t.Helper()
 	clientSide, serverSide := connected(t)
@@ -55,7 +52,6 @@ func pair(t testing.TB, serverOptions muxcool.ServerOptions) (*muxcool.Client, *
 	return client, server
 }
 
-// acceptWithin fails the test rather than hang when no sub-connection comes.
 func acceptWithin(t testing.TB, server *muxcool.Server, within time.Duration) muxcool.AcceptedSubConnection {
 	t.Helper()
 	type result struct {
@@ -97,8 +93,6 @@ func waitDone(t testing.TB, done <-chan struct{}, within time.Duration, what str
 	}
 }
 
-// rawPeer is the other end of a main connection written by hand: it sends the
-// frames a test chooses, byte for byte, and reads back what the engine sends.
 type rawPeer struct {
 	t      testing.TB
 	conn   net.Conn
@@ -112,7 +106,6 @@ func newRawPeer(t testing.TB, conn net.Conn) *rawPeer {
 	return peer
 }
 
-// rawClientOf is a Server whose peer is a raw peer.
 func rawClientOf(t testing.TB, options muxcool.ServerOptions) (*muxcool.Server, *rawPeer) {
 	t.Helper()
 	rawSide, serverSide := connected(t)
@@ -121,7 +114,6 @@ func rawClientOf(t testing.TB, options muxcool.ServerOptions) (*muxcool.Server, 
 	return server, newRawPeer(t, rawSide)
 }
 
-// rawServerOf is a Client whose peer is a raw peer.
 func rawServerOf(t testing.TB) (*muxcool.Client, *rawPeer) {
 	t.Helper()
 	clientSide, rawSide := connected(t)
@@ -152,7 +144,6 @@ func (p *rawPeer) sendBytes(bytes []byte) {
 	}
 }
 
-// receive reads the next frame the engine sent.
 func (p *rawPeer) receive(within time.Duration) (muxcool.Header, []byte) {
 	p.t.Helper()
 	p.conn.SetReadDeadline(time.Now().Add(within))
@@ -175,7 +166,6 @@ func (p *rawPeer) receive(within time.Duration) (muxcool.Header, []byte) {
 	return header, data
 }
 
-// expectNothing fails if the engine sends anything within the time.
 func (p *rawPeer) expectNothing(within time.Duration) {
 	p.t.Helper()
 	p.conn.SetReadDeadline(time.Now().Add(within))
@@ -185,7 +175,6 @@ func (p *rawPeer) expectNothing(within time.Duration) {
 	}
 }
 
-// expectClosed waits for the engine to close its end.
 func (p *rawPeer) expectClosed(within time.Duration) {
 	p.t.Helper()
 	p.conn.SetReadDeadline(time.Now().Add(within))
@@ -206,8 +195,6 @@ func waitFor(t testing.TB, what string, condition func() bool) {
 	}
 }
 
-// gatedConn is a carrier whose writes can be held, to make a write sit inside
-// the carrier while a test does something else.
 type gatedConn struct {
 	net.Conn
 	mutex   sync.Mutex

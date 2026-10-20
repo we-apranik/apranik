@@ -8,27 +8,21 @@ import (
 )
 
 type ServerOptions struct {
-	// A New past it is refused with an End carrying the error bit. Zero means no limit.
 	MaxConcurrentSubConnections int
 
-	// Over the life of the main connection. Zero means no limit.
 	MaxTotalSubConnections int
 
 	// Zero is 60 seconds; a negative value never closes.
 	IdleTimeout time.Duration
 
-	// A New for another network is refused like a limit. Zero accepts TCP and UDP.
 	AcceptedNetworks Networks
 }
 
-// AcceptedSubConnection is a sub-connection the peer opened: Stream for TCP, Datagram for UDP.
 type AcceptedSubConnection struct {
 	Destination spec.Destination
 	Stream      spec.Stream
 	Datagram    spec.Datagram
 
-	// GlobalID is the XUDP session ID the peer sent in the New frame of a UDP
-	// sub-connection, only when that frame carried data; zero means none.
 	GlobalID [8]byte
 }
 
@@ -37,10 +31,6 @@ type Server struct {
 	connection *mainConnection
 }
 
-// NewServer takes ownership of carrier, which Close closes.
-//
-// The reader waits for a sub-connection's first data to be read, so AcceptSubConnection and a
-// Read must follow promptly.
 func NewServer(carrier io.ReadWriteCloser, options ServerOptions) *Server {
 	return &Server{connection: newMainConnection(carrier, true, options.MaxConcurrentSubConnections, options.MaxTotalSubConnections, options.IdleTimeout, options.AcceptedNetworks)}
 }

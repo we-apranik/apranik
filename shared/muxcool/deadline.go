@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// deadline is net.Pipe's shape: wait returns a channel closed once it has passed.
 type deadline struct {
 	mutex  sync.Mutex
 	timer  *time.Timer
@@ -21,7 +20,7 @@ func (d *deadline) set(at time.Time) {
 	defer d.mutex.Unlock()
 
 	if d.timer != nil && !d.timer.Stop() {
-		<-d.cancel // the timer already fired; wait for it to finish closing
+		<-d.cancel
 	}
 	d.timer = nil
 

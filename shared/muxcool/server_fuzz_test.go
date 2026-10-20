@@ -10,9 +10,6 @@ import (
 	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
-// Whatever a peer sends, a server whose sub-connections are all being read must
-// neither panic nor hang: it ends the main connection or reads on, and once the
-// peer closes it is done.
 func FuzzServerReadsArbitraryBytes(f *testing.F) {
 	f.Add(bytesOf(0x00, 0x14, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x50, 0x02, 0x0B, "example.com", 0x00, 0x03, "abc"))
 	f.Add(bytesOf(0x00, 0x0C, 0x00, 0x03, 0x01, 0x01, 0x02, 0x00, 0x35, 0x01, 8, 8, 8, 8, 0x00, 0x01, "q", 0x00, 0x04, 0x00, 0x03, 0x03, 0x00))
@@ -48,7 +45,7 @@ func FuzzServerReadsArbitraryBytes(f *testing.F) {
 		}()
 
 		peerSide.SetWriteDeadline(time.Now().Add(2 * time.Second))
-		go io.Copy(io.Discard, peerSide) // the server's answers
+		go io.Copy(io.Discard, peerSide)
 		peerSide.Write(wire)
 		peerSide.Close()
 

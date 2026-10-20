@@ -69,15 +69,11 @@ const (
 	// writes is 264 bytes (a 255-byte domain).
 	MaxMetadataLength = 512
 
-	// MaxDataLength is what the two-byte data length can express.
 	MaxDataLength = 0xFFFF
 
-	minMetadataLength = 4 // ID, status, options
+	minMetadataLength = 4
 )
 
-// Network and Destination are set on New, and on a Keep that names an address.
-// GlobalID is the XUDP session ID, which only a New frame of a UDP
-// sub-connection with data can carry; zero means none.
 type Header struct {
 	SubConnectionID uint16
 	Status          Status
@@ -93,7 +89,7 @@ func AppendHeader(buffer []byte, header Header) ([]byte, error) {
 	}
 
 	start := len(buffer)
-	buffer = append(buffer, 0, 0) // the length, filled in below
+	buffer = append(buffer, 0, 0)
 	buffer = binary.BigEndian.AppendUint16(buffer, header.SubConnectionID)
 	buffer = append(buffer, byte(header.Status), byte(header.Options))
 
@@ -149,18 +145,6 @@ func carriesGlobalID(status Status, network Network, options FrameOptions) bool 
 	return status == StatusNew && network == NetworkUDP && options.Has(OptionDataFollows)
 }
 
-// ReadHeader reads one frame's length and metadata and nothing after it, so
-// the data that may follow stays in reader. A reader that ends before the first
-// byte gives io.EOF, the clean end of a main connection; one that ends inside
-// the metadata gives io.ErrUnexpectedEOF. Everything the format does not allow
-// is an error that wraps ErrProtocol, including an unknown status.
-//
-// A New frame of a UDP sub-connection with data has its Global ID read from the
-// eight bytes after the address, when they are there. Other bytes after the
-// fields the status defines are skipped: they are padding.
-//
-// A *bufio.Reader of at least 514 bytes is read in place, with no allocation
-// for a frame without a domain; the engine reads its carrier through one.
 func ReadHeader(reader io.Reader) (Header, error) {
 	if buffered, ok := reader.(*bufio.Reader); ok && buffered.Size() >= 2+MaxMetadataLength {
 		return readHeaderInPlace(buffered)

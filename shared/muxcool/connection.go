@@ -19,14 +19,11 @@ const (
 	// A stream's Write is cut into frames of this size, Xray's.
 	maxStreamFrameData = 8 << 10
 
-	// A write buffer grown for one big datagram is dropped, not kept.
 	maxRetainedWriteBuffer = 16 << 10
 
 	idCount = 1 << 16
 )
 
-// mainConnection is the engine of Client and Server. One goroutine reads the
-// carrier and hands each frame's data to the sub-connection that reads it.
 type mainConnection struct {
 	carrier  io.ReadWriteCloser
 	reader   *bufio.Reader
@@ -37,7 +34,6 @@ type mainConnection struct {
 	idleTimeout      time.Duration
 	acceptedNetworks Networks
 
-	// A channel, not a mutex, so a waiter can give up on a deadline or close.
 	writeLock   chan struct{}
 	writeBuffer []byte // guarded by writeLock
 
@@ -98,8 +94,6 @@ func (c *mainConnection) closeBecause(cause error) {
 }
 
 // closeAndUnlock: the caller holds c.mutex, released here, so a decision under
-//
-//	the lock cannot be separated from the closing by an open.
 func (c *mainConnection) closeAndUnlock(cause error) {
 	if c.closed {
 		c.mutex.Unlock()
@@ -129,7 +123,6 @@ func (c *mainConnection) closeAndUnlock(cause error) {
 
 // A sub-connection still open when the main connection ends never got an End
 // from the peer, so its end is not a graceful one: io.EOF is for a graceful end
-// only, and a reader that tells a loss from a deliberate close relies on that.
 func endWithoutEnd(cause error) error {
 	if errors.Is(cause, io.EOF) {
 		return fmt.Errorf("muxcool: the main connection ended before this sub-connection's End: %w", io.ErrUnexpectedEOF)
@@ -192,7 +185,6 @@ func (c *mainConnection) subConnectionByID(id uint16) *subConnection {
 	return c.subs[id]
 }
 
-// forgetSubConnection starts the idle clock when it removes the last one.
 func (c *mainConnection) forgetSubConnection(sub *subConnection) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -313,7 +305,6 @@ func (c *mainConnection) routeKeepFrame(header Header, dataLength int) error {
 	return sub.passDataToReader(dataLength, header)
 }
 
-// An End may carry data, which is delivered first.
 func (c *mainConnection) endSubConnectionFromPeer(header Header, dataLength int) error {
 	sub := c.subConnectionByID(header.SubConnectionID)
 	if sub == nil {
@@ -355,7 +346,6 @@ func (c *mainConnection) cause() error {
 
 func (c *mainConnection) releaseWriteSlot() { <-c.writeLock }
 
-// writeFrame: one Write of the carrier; a failure closes the main connection (half a frame).
 func (c *mainConnection) writeFrame(header Header, data []byte, cancel, deadline <-chan struct{}) error {
 	if err := c.acquireWriteSlot(cancel, deadline); err != nil {
 		return err

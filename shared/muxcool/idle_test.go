@@ -93,7 +93,7 @@ func TestOpeningAtTheMomentTheServersIdleClockRunsOutNeverKillsTheNewSubConnecti
 		select {
 		case err := <-accepting:
 			if err != nil {
-				continue // the server had already closed, before the New frame arrived
+				continue
 			}
 		case <-time.After(2 * time.Second):
 			t.Fatalf("attempt %d: AcceptSubConnection did not return", attempt)

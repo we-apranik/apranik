@@ -51,7 +51,6 @@ func bytesOf(parts ...any) []byte {
 
 // Each case is a frame written by hand from the Mux.Cool specification (the
 // Xray page), not produced by this package, so the encoder and the decoder are
-// checked against the format and not only against each other.
 func headerCases(t *testing.T) []struct {
 	name   string
 	header muxcool.Header
@@ -129,8 +128,6 @@ func TestAppendHeaderWritesTheFramesTheSpecificationShows(t *testing.T) {
 	}
 }
 
-// readers gives each test the two ways a header is read: from any reader, and in
-// place from the bufio.Reader the engine uses. Both must behave the same.
 func readers(wire []byte) map[string]io.Reader {
 	return map[string]io.Reader{
 		"plain reader":    bytes.NewReader(wire),
@@ -161,8 +158,6 @@ func TestAppendHeaderKeepsWhatIsAlreadyInTheBuffer(t *testing.T) {
 
 // Both cores skip what they do not know after the fields of a frame: sing-box
 // discards the rest of the metadata, Xray treats it as padding. Xray reads the
-// eight bytes after a New frame's address as the XUDP Global ID only for a UDP
-// New with data, and only when eight bytes are there.
 func TestReadHeaderSkipsBytesAfterTheDefinedFields(t *testing.T) {
 	for _, tc := range []struct {
 		name string

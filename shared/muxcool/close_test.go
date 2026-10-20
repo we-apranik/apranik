@@ -18,7 +18,7 @@ func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.
 	opened, accepted := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	datagramDestination := ipDestination(t, "8.8.8.8", 53)
 	datagram, serverDatagram := openDatagramAndAccept(t, client, server, datagramDestination, []byte("q"))
-	readDatagram(t, serverDatagram, 10) // a datagram nobody reads would hold the server's reader
+	readDatagram(t, serverDatagram, 10)
 
 	if err := client.Close(); err != nil {
 		t.Fatal(err)
@@ -51,7 +51,6 @@ func TestClosingTheMainConnectionEndsEverySubConnectionAndTheCarrier(t *testing.
 
 // io.EOF is for a graceful end only: a peer that closes its carrier with a
 // sub-connection still open never sent that sub-connection's End, so the
-// reader sees a loss, which a caller that holds on to a lost session depends on.
 func TestACarrierThatClosesWithoutAnEndIsALossNotAGracefulEnd(t *testing.T) {
 	server, peer := rawClientOf(t, muxcool.ServerOptions{})
 	peer.send(newTCP(1, muxcool.OptionDataFollows, "example.com"), []byte("hello"))
@@ -106,7 +105,6 @@ func TestAPeerThatVanishesInTheMiddleOfAFrameClosesTheMainConnection(t *testing.
 	peer.send(newTCP(1, 0, "example.com"), nil)
 	accepted := acceptWithin(t, server, 2*time.Second)
 
-	// Half of a Keep frame: it promises 100 bytes and gives 10.
 	peer.sendBytes(append(bytesOf(0x00, 0x04, 0x00, 0x01, 0x02, 0x01, 0x00, 100), make([]byte, 10)...))
 	buffer := make([]byte, 10)
 	if _, err := io.ReadFull(accepted.Stream, buffer); err != nil {
@@ -126,7 +124,7 @@ func TestClosingTheMainConnectionWhileTheReaderWaitsForAConsumerReturns(t *testi
 	client, server := pair(t, muxcool.ServerOptions{})
 	opened, _ := openAndAccept(t, client, server, domainDestination(t, "example.com", 80))
 	opened.Write([]byte("nobody reads"))
-	time.Sleep(50 * time.Millisecond) // the server's reader is now waiting for a consumer
+	time.Sleep(50 * time.Millisecond)
 
 	closed := make(chan struct{})
 	go func() { server.Close(); close(closed) }()
@@ -159,7 +157,6 @@ func TestNoGoroutineIsLeftAfterClose(t *testing.T) {
 
 // Many goroutines open, use and close sub-connections at once, and some end
 // them in the middle of a transfer. Everything that is not cut short must
-// arrive exactly, and nothing may deadlock. Run under -race.
 func TestConcurrentOpensTransfersAndClosesStayCorrect(t *testing.T) {
 	client, server := pair(t, muxcool.ServerOptions{})
 

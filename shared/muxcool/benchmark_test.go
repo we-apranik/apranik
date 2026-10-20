@@ -8,9 +8,6 @@ import (
 	"github.com/we-apranik/apranik/shared/muxcool"
 )
 
-// The baseline is the same bytes over the same loopback TCP connection with no
-// framing at all, so the cost of the format and of handing data over without a
-// buffer (design A) is the difference.
 func BenchmarkRawTCPThroughput(b *testing.B) {
 	for _, size := range []int{1 << 10, 8 << 10, 32 << 10} {
 		b.Run(byteSize(size), func(b *testing.B) {
@@ -49,8 +46,6 @@ func BenchmarkStreamThroughput(b *testing.B) {
 	}
 }
 
-// Several sub-connections sending at once over one main connection, each read
-// by its own goroutine: the case where waiting for a reader could cost.
 func BenchmarkStreamsInParallelThroughput(b *testing.B) {
 	for _, streams := range []int{1, 4, 16} {
 		b.Run(byteSize(streams), func(b *testing.B) {

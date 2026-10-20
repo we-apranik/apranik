@@ -1,7 +1,5 @@
 package muxcool
 
-// Networks says which kinds of sub-connection a server accepts. The zero value
-// accepts both.
 type Networks uint8
 
 const (

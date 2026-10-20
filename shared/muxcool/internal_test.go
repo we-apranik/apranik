@@ -8,8 +8,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// The 65535 IDs of one main connection cannot be opened in a test one by one, so
-// the counter is moved close to the end.
 func TestTheIDSpaceOfAMainConnectionRunsOut(t *testing.T) {
 	clientSide, serverSide := net.Pipe()
 	defer serverSide.Close()

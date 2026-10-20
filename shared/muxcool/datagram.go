@@ -16,7 +16,6 @@ type datagram struct {
 
 var _ spec.Datagram = (*datagram)(nil)
 
-// ReadFrom drops a datagram larger than p as ErrDatagramTooLarge and skips an empty one.
 func (d *datagram) ReadFrom(p []byte) (int, spec.Destination, error) {
 	remaining, source, err := d.claimDelivery(d.readDeadline.wait())
 	if err != nil {
@@ -40,7 +39,6 @@ func (d *datagram) ReadFrom(p []byte) (int, spec.Destination, error) {
 	return remaining, source, nil
 }
 
-// WriteTo: to is the destination (client end; the bound one unless XUDP) or the reply's source (server end).
 func (d *datagram) WriteTo(p []byte, to spec.Destination) (int, error) {
 	if d.addressInEveryDatagram.Load() {
 		if !to.IsValid() {
