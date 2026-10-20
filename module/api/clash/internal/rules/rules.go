@@ -1,4 +1,3 @@
-// Package rules serves /rules: Apranik's routing rules in Clash's envelope.
 package rules
 
 import (
@@ -21,15 +20,9 @@ type ruleBody struct {
 	Payload string `json:"payload"`
 	Proxy   string `json:"proxy"`
 
-	// Not Clash's: how many routing decisions the rule made. Absent when
-	// statistics are off.
 	HitCount *uint64 `json:"hitCount,omitempty"`
 }
 
-// list answers Clash's envelope with Apranik's content. A Clash rule is one
-// condition; an Apranik rule is several, so type is the rule's action (route,
-// block, sniff, resolve; "default" for the default action), payload is its
-// conditions as text, and proxy is the outbound it routes to.
 func (h handler) list(w http.ResponseWriter, r *http.Request) {
 	rules, err := h.provider.RoutingRules()
 	if err != nil {
