@@ -48,6 +48,11 @@ An inbound accepts connections: it listens on an address, runs a
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP, and UDP framed in the stream |
 | `vless` | [VLESS](../protocol/vless.md) | TCP, and UDP framed in the stream |
+
+Built in, made by core rather than a module:
+
+| Type | Format | Carries |
+| --- | --- | --- |
 | `mixed` | [Mixed](mixed.md) | SOCKS5 and HTTP on one port |
 
 <div class="cfg-fields">
