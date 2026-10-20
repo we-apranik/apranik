@@ -16,7 +16,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// loopbackDialer dials the test server whatever the destination says.
 type loopbackDialer struct {
 	address string
 	dials   atomic.Int64
@@ -34,12 +33,10 @@ func (d *loopbackDialer) DialStream(ctx context.Context, _ spec.Destination) (sp
 
 func (d *loopbackDialer) Close() error { return nil }
 
-// server answers each framed query with the query itself, marked as a
-// response, after handle decides when (and whether) to.
 type server struct {
 	listener    net.Listener
 	connections atomic.Int64
-	handle      func(connection net.Conn, query []byte) // nil: answer at once
+	handle      func(connection net.Conn, query []byte)
 }
 
 func newServer(t *testing.T) *server {
@@ -143,8 +140,6 @@ func TestQueriesShareOneConnection(t *testing.T) {
 	}
 }
 
-// Two callers that chose the same ID, answered out of order, each get their
-// own answer.
 func TestPipelinedQueriesWithTheSameIDGetTheirOwnAnswers(t *testing.T) {
 	s := newServer(t)
 	var mu sync.Mutex
@@ -184,7 +179,7 @@ func TestAConnectionTheServerClosedIsReplaced(t *testing.T) {
 	s.handle = func(c net.Conn, q []byte) {
 		writeFrame(c, asResponse(q))
 		if answered.Add(1) == 1 {
-			c.Close() // as a server closing an idle connection would
+			c.Close()
 		}
 	}
 	client, dialer := newClient(t, s, 2*time.Second)

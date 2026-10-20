@@ -2,7 +2,6 @@
 // 7766) and DNS over TLS (RFC 7858) do: each message behind a two-byte length,
 // one connection reused for many queries, queries pipelined on it and matched
 // to their responses by message ID. The dns server modules tcp and dot share
-// it; the stream, encrypted or not, comes from the dialer they are given.
 package dnsstream
 
 import (
@@ -43,19 +42,14 @@ type Client struct {
 
 	mu         sync.Mutex
 	connection *connection
-	dialing    chan struct{} // closed when the dial in progress ends; nil when none is
+	dialing    chan struct{}
 	closed     bool
 }
 
-// NewClient queries server through dialer, each query bounded by timeout,
-// dial included.
 func NewClient(dialer spec.StreamDialer, server spec.Destination, timeout time.Duration) *Client {
 	return &Client{dialer: dialer, server: server, timeout: timeout}
 }
 
-// Query sends one message and returns its response, with the caller's
-// message ID. A connection the server closed while it sat idle is replaced
-// once, transparently, since servers may close idle connections at any time.
 func (c *Client) Query(ctx context.Context, queryMessage []byte) ([]byte, error) {
 	if len(queryMessage) < headerLength {
 		return nil, errMessageTooShort
@@ -79,8 +73,6 @@ func (c *Client) Query(ctx context.Context, queryMessage []byte) ([]byte, error)
 	}
 }
 
-// activeConnection returns the open connection, dialing one when there is
-// none. One dial at a time; others wait for it or their context.
 func (c *Client) activeConnection(ctx context.Context) (*connection, bool, error) {
 	for {
 		c.mu.Lock()
@@ -128,7 +120,6 @@ func (c *Client) activeConnection(ctx context.Context) (*connection, bool, error
 	}
 }
 
-// Close closes the connection; queries waiting on it fail.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -142,7 +133,6 @@ func (c *Client) Close() error {
 
 // connection is one stream and the queries pipelined on it. Its own message
 // IDs replace the callers' on the wire, so two callers that picked the same ID
-// never collide; the caller's is put back in the response.
 type connection struct {
 	stream spec.Stream
 
@@ -229,7 +219,6 @@ func (c *connection) unregister(wireID uint16) {
 	delete(c.pending, wireID)
 }
 
-// fail ends the connection once; every query waiting on it learns at once.
 func (c *connection) fail(reason error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -269,7 +258,6 @@ func (c *connection) readResponses() {
 			delete(c.pending, wireID)
 		}
 		c.mu.Unlock()
-		// A response nobody waits for any more (its query timed out) is dropped.
 		if waiting {
 			responses <- response
 		}
