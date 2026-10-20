@@ -8,7 +8,6 @@ import (
 	"github.com/we-apranik/apranik/core/logging"
 )
 
-// DefaultMemoryCapacity is the ring size a MemoryOutput gets when it names none.
 const DefaultMemoryCapacity = 256
 
 // Each output below describes where records go, without opening anything: the
@@ -17,11 +16,8 @@ const DefaultMemoryCapacity = 256
 // logging.Output.
 
 type StderrOutput struct {
-	// Empty means FormatLogfmt: programs that run Apranik capture and parse
-	// its stderr more often than a person reads it.
 	Format Format
 
-	// Only with FormatHuman.
 	Color bool
 }
 
@@ -49,7 +45,6 @@ func (o StderrOutput) Open(level logging.Level) (slog.Handler, error) {
 type FileOutput struct {
 	Path string
 
-	// Empty means FormatJSON.
 	Format Format
 }
 
@@ -72,7 +67,6 @@ func (o FileOutput) Open(level logging.Level) (slog.Handler, error) {
 }
 
 type MemoryOutput struct {
-	// Zero means DefaultMemoryCapacity.
 	Capacity int
 }
 
@@ -92,7 +86,6 @@ func (o MemoryOutput) Open(level logging.Level) (slog.Handler, error) {
 }
 
 type SyslogOutput struct {
-	// Passed to syslog.Dial; both empty means the local daemon.
 	Network string
 	Address string
 	Tag     string

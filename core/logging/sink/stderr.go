@@ -11,8 +11,6 @@ import (
 	"github.com/we-apranik/apranik/core/logging"
 )
 
-// NewStderr writes to stderr in format. NO_COLOR, when set, turns color
-// off whatever the config says (https://no-color.org).
 func NewStderr(level slog.Level, format Format, color bool) slog.Handler {
 	color = color && os.Getenv("NO_COLOR") == ""
 	return newFormatHandler(os.Stderr, format, level, color)
@@ -29,7 +27,6 @@ const (
 	ansiGray           = "\x1b[90m"
 	terminalTimeFormat = "2006-01-02T15:04:05.000Z07:00"
 
-	// Wide enough for EMERGENCY, so messages line up.
 	levelColumnWidth = 9
 )
 
@@ -58,9 +55,6 @@ type terminalSinkOutput struct {
 	attributesLine bytes.Buffer
 }
 
-// terminalSink writes the time, level and message itself and lets a TextHandler
-// render the attributes, so groups and WithAttrs behave exactly as in the
-// plain sink.
 type terminalSink struct {
 	output            *terminalSinkOutput
 	level             slog.Level

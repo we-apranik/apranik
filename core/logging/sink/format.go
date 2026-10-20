@@ -8,14 +8,12 @@ import (
 	"github.com/we-apranik/apranik/core/logging"
 )
 
-// Format is how a sink writes records. Each output has its own default.
 type Format string
 
 const (
 	FormatLogfmt Format = "logfmt"
 	FormatJSON   Format = "json"
 
-	// FormatHuman is aligned, and may be colored, for a person at a terminal.
 	FormatHuman Format = "human"
 )
 

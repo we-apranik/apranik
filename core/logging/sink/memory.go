@@ -9,14 +9,11 @@ import (
 	"github.com/we-apranik/apranik/core/logging"
 )
 
-// Memory keeps the most recent records in a ring buffer, so a client can
-// show a log view without anything reaching disk.
 type Memory struct {
 	level  slog.Level
 	attrs  []slog.Attr
 	groups []string
 
-	// WithAttrs and WithGroup return a new sink, but all write into one ring.
 	ring *ring
 }
 
@@ -59,7 +56,6 @@ func (m *Memory) Handle(_ context.Context, record slog.Record) error {
 	return nil
 }
 
-// Records returns what the buffer holds, oldest first.
 func (m *Memory) Records() []slog.Record {
 	m.ring.mu.Lock()
 	defer m.ring.mu.Unlock()

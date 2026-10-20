@@ -20,8 +20,6 @@ func attrsOf(record slog.Record) map[string]string {
 	return found
 }
 
-// Close has to reach a sink holding an open file, and tolerate one holding
-// nothing.
 func TestCloseReleasesFileSinks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "apranik.log")
 	file, err := NewFile(path, logging.LevelDebug, FormatJSON)
