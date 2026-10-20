@@ -44,10 +44,15 @@ destination, or through a group that picks another outbound.
 | `http` | [HTTP](../protocol/http.md) | TCP |
 | `trojan` | [Trojan](../protocol/trojan.md) | TCP and UDP |
 | `vless` | [VLESS](../protocol/vless.md) | TCP and UDP |
+
+Built in, made by core rather than a module:
+
+| Type | Format | Carries |
+| --- | --- | --- |
 | `freedom` | [Freedom](freedom.md) | TCP and UDP, straight to each destination |
-| `urltest` | [URLTest](urltest.md) | what every member carries |
-| `fallback` | [Fallback](fallback.md) | what every member carries |
-| `selector` | [Selector](selector.md) | what every member carries |
+| `urltest` | [URLTest](urltest.md), see [groups](groups.md) | what every member carries |
+| `fallback` | [Fallback](fallback.md), see [groups](groups.md) | what every member carries |
+| `selector` | [Selector](selector.md), see [groups](groups.md) | what every member carries |
 
 `freedom` and the groups take only some of the keys below; their pages say which.
 
