@@ -1,6 +1,3 @@
-// Package testkit is what the tests of the Clash endpoint packages share: a fake
-// provider the test fills in, a server that mounts one family of endpoints, and
-// helpers to call it. Only tests import it.
 package testkit
 
 import (
@@ -13,8 +10,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// Provider answers from fields a test sets before it starts the server;
-// a method with no function behind it returns the zero value.
 type Provider struct {
 	Version  string
 	LogLevel slog.Level
@@ -154,8 +149,6 @@ func (f *Provider) RemoveInboundUser(inboundTag, name string) error {
 	return f.RemoveUserFunc(inboundTag, name)
 }
 
-// LogSubscription is a log subscription the test feeds through Feed; Cancelled
-// is closed when the code under test cancels it.
 type LogSubscription struct {
 	Feed      chan slog.Record
 	Cancelled chan struct{}
