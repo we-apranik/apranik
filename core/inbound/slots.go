@@ -9,13 +9,10 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A fixed number of places, taken without waiting: when none is free the caller
-// refuses instead of queueing. A nil *slots has no limit.
 type slots struct {
 	taken chan struct{}
 }
 
-// Zero or less means no limit.
 func newSlots(limit int) *slots {
 	if limit <= 0 {
 		return nil
@@ -50,9 +47,6 @@ func (s *slots) capacity() int {
 
 var errUDPSessionLimitReached = errors.New("max_udp_sessions reached")
 
-// A SOCKS5 association takes its slot when it is given its socket and gives it
-// back when that socket closes, which ends the session. The proxy sees an
-// ordinary failure to open a socket and answers its client accordingly.
 func (i *streamInbound) associateSocketWithinLimit(openSocket spec.UDPAssociateSocketFunc) spec.UDPAssociateSocketFunc {
 	if i.udpSessionSlots == nil {
 		return openSocket

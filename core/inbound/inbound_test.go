@@ -26,7 +26,6 @@ type handled struct {
 	metadata spec.Metadata
 }
 
-// recordingHandler reports what core dispatched and holds nothing open.
 type recordingHandler struct{ calls chan handled }
 
 func (h recordingHandler) HandleStream(_ context.Context, c spec.Stream, m spec.Metadata) error {
@@ -47,8 +46,6 @@ func loopback(t *testing.T) spec.Endpoint {
 	return endpoint
 }
 
-// startTrojanInbound runs a real inbound on loopback TCP, with the trojan
-// module registered for both of its kinds, as the builder does.
 func startTrojanInbound(t *testing.T, fallback *inbound.Fallback) (net.Addr, recordingHandler) {
 	return startCountingTrojanInbound(t, fallback, nil)
 }
@@ -126,8 +123,6 @@ func TestEachRequestReachesTheMatchingHandler(t *testing.T) {
 	}
 }
 
-// The fallback must see exactly what the client sent, from its first byte,
-// though the protocol had already read part of it before refusing.
 func TestARefusedStreamIsReplayedWholeToTheFallback(t *testing.T) {
 	fallbackListener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -195,14 +190,12 @@ func isTimeout(err error) bool {
 	return ok && netErr.Timeout()
 }
 
-// acceptingServer hands every stream straight through, with no handshake.
 type acceptingServer struct{}
 
 func (acceptingServer) AcceptStream(_ context.Context, underlyingStream spec.Stream) (spec.Stream, spec.Metadata, error) {
 	return underlyingStream, spec.Metadata{Network: spec.NetworkTCP}, nil
 }
 
-// holdingHandler keeps each stream open until the test lets it go.
 type holdingHandler struct {
 	started chan struct{}
 	release chan struct{}
@@ -457,7 +450,6 @@ func TestASilentClientIsRefusedAsATimedOutHandshake(t *testing.T) {
 	awaitCount(t, "refused as a timed out handshake", refusedFor(&counters, stats.RefusalHandshakeTimedOut), 1)
 }
 
-// failingOverlay stands in for a transport overlay whose handshake fails.
 type failingOverlay struct{ err error }
 
 func (o failingOverlay) WrapServerStream(context.Context, spec.Stream, *spec.TransportMetadata) (spec.Stream, error) {

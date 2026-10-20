@@ -18,7 +18,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// A datagram that holds until it is closed, as a UDP session's socket does.
 type silentDatagram struct {
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -37,7 +36,6 @@ func (d *silentDatagram) Close() error {
 	return nil
 }
 
-// Holds each UDP session until its datagram is closed.
 type sessionHoldingHandler struct{ started chan struct{} }
 
 func (sessionHoldingHandler) HandleStream(_ context.Context, c spec.Stream, _ spec.Metadata) error {
@@ -53,7 +51,6 @@ func (h sessionHoldingHandler) HandleDatagram(_ context.Context, c spec.Datagram
 	}
 }
 
-// A proxy server that asks for a UDP association on every connection, like SOCKS5.
 type associatingServer struct{ openSocket *spec.UDPAssociateSocketFunc }
 
 func (associatingServer) AcceptStream(context.Context, spec.Stream) (spec.Stream, spec.Metadata, error) {
@@ -200,7 +197,6 @@ func TestATrojanUDPSessionBeyondMaxUDPSessionsIsRefusedAndCounted(t *testing.T) 
 	awaitClosedByInbound(t, second)
 	awaitCount(t, "refusals for max_udp_sessions", refusedFor(&counters, stats.RefusalMaxUDPSessions), 1)
 
-	// A TCP connection is not a UDP session: it needs no UDP slot.
 	connect := dialLimited(t, listener.LocalAddr())
 	connect.Write(request(t, wire.CommandConnect))
 	awaitCount(t, "refusals for max_udp_sessions", refusedFor(&counters, stats.RefusalMaxUDPSessions), 1)

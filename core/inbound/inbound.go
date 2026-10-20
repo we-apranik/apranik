@@ -22,7 +22,6 @@ import (
 	"github.com/we-apranik/apranik/spec"
 )
 
-// EMFILE is not fatal; a hot loop on it would make a busy server worse.
 const acceptBackoff = 10 * time.Millisecond
 
 // PROVISIONAL: 10 seconds, as for an outbound's dial.
@@ -31,17 +30,13 @@ const fallbackDialTimeout = 10 * time.Second
 // PROVISIONAL: a flood of refused connections is one warning per 10 seconds.
 const refusedConnectionLogInterval = 10 * time.Second
 
-// Fallback is where a stream goes when the proxy refuses it with
-// spec.ErrFallbackRequested: every byte the handshake read is replayed there.
 type Fallback struct {
 	Dialer      spec.StreamDialer
 	Destination spec.Destination
 
-	// Zero means relay.DefaultStreamIdleTimeout; negative means no bound.
 	IdleTimeout time.Duration
 }
 
-// StreamOverlay is one overlay layer's server side, named for logs.
 type StreamOverlay struct {
 	Name   string
 	Server spec.StreamOverlayServer
@@ -50,42 +45,24 @@ type StreamOverlay struct {
 type StreamConfig struct {
 	Tag string
 
-	// The base transport's listener. Overlays are not folded into it: they
-	// run per connection, below, so none of them ever holds up the accept
-	// loop.
 	Listener spec.StreamListener
 
-	// Ordered outward from the wire, as in the config's transport stack.
 	Overlays []StreamOverlay
 
 	ProxyServer spec.StreamProxyServer
 
-	// Nil unless the protocol also frames datagrams in its streams. Then each
-	// request is identified first and sent to the matching accept.
 	DatagramOverStreamServer spec.DatagramOverStreamProxyServer
 
-	// Nil means a refused stream is closed.
 	Fallback *Fallback
 
-	// Nil means this inbound grants no UDP associate socket; a protocol
-	// needing one must refuse.
 	AssociateSocket spec.UDPAssociateSocketFunc
 
-	// Where this inbound counts connections it refused or handed to its
-	// fallback. Nil counts nothing.
 	Counters *stats.InboundCounters
 
-	// TCP connections held at once. One accepted beyond it is closed at once,
-	// before any handshake: refusing early is cheaper than queueing. Zero
-	// means no limit.
 	MaxTCPConnections int
 
-	// UDP sessions held at once: a SOCKS5 association and a datagram-over-stream
-	// session such as Trojan's. One requested beyond it is refused. Each such
-	// session also holds its TCP connection's slot. Zero means no limit.
 	MaxUDPSessions int
 
-	// Nil is allowed: NewStream substitutes a silent logger.
 	Logger *logging.Logger
 }
 
@@ -129,7 +106,6 @@ type streamInbound struct {
 	counters           *stats.InboundCounters
 	logger             *logging.Logger
 
-	// Nil means no limit. Full means the next one is refused.
 	tcpConnectionSlots *slots
 	udpSessionSlots    *slots
 
@@ -147,9 +123,6 @@ func (i *streamInbound) Tag() string { return i.tag }
 
 var _ component.UserManagingInbound = (*streamInbound)(nil)
 
-// The proxy server's, else the datagram-over-stream server's; nil when neither
-// can change its users. A protocol that serves both with one object (Trojan)
-// answers for both, so a change reaches the stream and the UDP path alike.
 func (i *streamInbound) UserManager() spec.UserManager {
 	if manager, ok := i.proxyServer.(spec.UserManager); ok {
 		return manager
@@ -202,9 +175,6 @@ func (i *streamInbound) Close() error {
 	return err
 }
 
-// A shutdown is told apart from a failure by ctx, not the error: Close cancels
-// before closing the listener. Matching net.ErrClosed would be wrong for a
-// gRPC or WebSocket listener.
 func (i *streamInbound) acceptLoop(ctx context.Context, handler component.TrafficHandler) {
 	defer close(i.acceptLoopDone)
 
@@ -243,12 +213,6 @@ func (i *streamInbound) acceptLoop(ctx context.Context, handler component.Traffi
 	}
 }
 
-// Internet scanners fail transport handshakes all the time, so a failure is
-// logged at Debug and the connection closed.
-//
-// The overlays get a copy of what core knows about the accepted socket. Core
-// keeps only what an overlay may write: SourceEndpoint, and the ProxyProtocol
-// section. InboundRemoteEndpoint and InboundLocalEndpoint stay the socket's.
 func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stream, accepted spec.TransportMetadata) (spec.Stream, spec.TransportMetadata, error) {
 	editableByOverlays := accepted
 	for _, overlay := range i.overlays {
@@ -268,8 +232,6 @@ func (i *streamInbound) wrapServerOverlays(ctx context.Context, stream spec.Stre
 	return stream, accepted, nil
 }
 
-// Recording only when something may need it: identifying peeks, and a
-// fallback replays the whole handshake.
 func (i *streamInbound) handleStream(ctx context.Context, handler component.TrafficHandler, stream spec.Stream) {
 	socketRemoteEndpoint := spec.NewEndpointFromNetAddr(stream.RemoteAddr())
 	acceptedSocket := spec.TransportMetadata{
@@ -278,8 +240,6 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 		InboundLocalEndpoint:  spec.NewEndpointFromNetAddr(stream.LocalAddr()),
 	}
 
-	// Recording starts above the overlays, so a fallback is handed what the
-	// client sent inside them, not TLS records.
 	stream, transport, err := i.wrapServerOverlays(ctx, stream, acceptedSocket)
 	if err != nil {
 		i.counters.ConnectionRefusedFor(refusalReasonFor(err, stats.RefusalTransportHandshakeFailed))
@@ -342,8 +302,6 @@ func (i *streamInbound) handleStream(ctx context.Context, handler component.Traf
 }
 
 func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler component.TrafficHandler, datagram spec.Datagram, metadata spec.Metadata) {
-	// The stream is the session: closing it, from either end, ends both, so
-	// its end of file is the normal way a session finishes.
 	metadata.InboundTag = i.tag
 	if err := handler.HandleDatagram(ctx, datagram, metadata); err != nil && !errors.Is(err, io.EOF) {
 		i.logger.Warn("Datagram session ended in error", "error", err)
@@ -351,8 +309,6 @@ func (i *streamInbound) handleDatagramOverStream(ctx context.Context, handler co
 	datagram.Close()
 }
 
-// A refusal goes to the fallback only when the protocol asked for it, one is
-// configured, and every byte read so far was kept. Anything else is closed.
 func (i *streamInbound) refuse(ctx context.Context, recording *peekable.Stream, stream spec.Stream, err error) {
 	if errors.Is(err, spec.ErrAuthenticationFailed) {
 		i.counters.AuthenticationFailed()
@@ -406,8 +362,6 @@ func (i *streamInbound) handleUDPAssociate(ctx context.Context, handler componen
 		return
 	}
 
-	// The control stream's lifetime bounds the session. spec has no way to say
-	// this, so it is this package's own default.
 	go func() {
 		io.Copy(io.Discard, controlStream)
 		session.Close()
