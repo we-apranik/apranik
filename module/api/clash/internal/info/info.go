@@ -1,5 +1,3 @@
-// Package info serves the endpoints that say what this API is: /, /version and
-// /configs.
 package info
 
 import (
@@ -23,8 +21,6 @@ func (h handlers) hello(w http.ResponseWriter, r *http.Request) {
 	web.WriteJSON(w, http.StatusOK, map[string]string{"hello": "clash"})
 }
 
-// "meta" says the extra endpoints of the Meta family (memory, group delay, rules,
-// DNS query) exist, which dashboards look for.
 func (h handlers) version(w http.ResponseWriter, r *http.Request) {
 	web.WriteJSON(w, http.StatusOK, map[string]any{"meta": true, "version": "Apranik " + h.provider.ApranikVersion()})
 }
