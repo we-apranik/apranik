@@ -1,7 +1,4 @@
-// Package dataset loads the named lists routing rules look up. A
-// dataset's source (where the bytes come from) is apart from its format (how
-// they are read), so a new format is one reader and a new source, such as a
-// URL, touches no format.
+// Package dataset loads the named lists routing rules look up.
 package dataset
 
 import (
@@ -14,14 +11,12 @@ import (
 	"github.com/we-apranik/apranik/core/route/router/match"
 )
 
-// Dataset is one loaded list: Domains for a domain dataset, IPs for an IP one.
 type Dataset struct {
 	Kind    blueprint.DatasetKind
 	Domains *match.DomainMatcher
 	IPs     *match.PrefixMatcher
 }
 
-// Len reports how many entries were loaded.
 func (d *Dataset) Len() int {
 	if d.Kind == blueprint.DatasetKindDomain {
 		return d.Domains.Len()
@@ -29,9 +24,8 @@ func (d *Dataset) Len() int {
 	return d.IPs.Len()
 }
 
-// LoadAll loads every declaration, reading each file once however many
-// datasets name it. errs has one entry per declaration, nil where it loaded,
-// so a caller can report each failure where it was declared.
+// errs has one entry per declaration, nil where it loaded, so a caller can report each failure where
+// it was declared.
 func LoadAll(declarations []blueprint.Dataset) (loaded map[string]*Dataset, errs []error) {
 	loaded = make(map[string]*Dataset, len(declarations))
 	errs = make([]error, len(declarations))
@@ -57,7 +51,6 @@ func LoadAll(declarations []blueprint.Dataset) (loaded map[string]*Dataset, errs
 	return loaded, errs
 }
 
-// Joined returns LoadAll's errors as one, naming each dataset, or nil.
 func Joined(declarations []blueprint.Dataset, errs []error) error {
 	var named []error
 	for index, err := range errs {
