@@ -22,8 +22,6 @@ func destinations(t *testing.T) []spec.Destination {
 	return []spec.Destination{ipv4, ipv6, domain}
 }
 
-// ParseAddress and ReadAddress must agree on every address, and ParseAddress
-// must report exactly the bytes it took.
 func TestParseAddressMatchesReadAddress(t *testing.T) {
 	for _, want := range destinations(t) {
 		encoded, err := socksaddr.AppendAddress(nil, want)
@@ -63,7 +61,6 @@ func TestParseAddressRefusesShortAndMalformedInput(t *testing.T) {
 	}
 }
 
-// An IPv4 address mapped into IPv6 is reported as IPv4, as ReadAddress does.
 func TestParseAddressUnmapsIPv4InIPv6(t *testing.T) {
 	mapped := netip.MustParseAddr("::ffff:1.2.3.4").As16()
 	encoded := append(append([]byte{socksaddr.AddressIPv6}, mapped[:]...), 0, 53)
