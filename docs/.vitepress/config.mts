@@ -1,6 +1,7 @@
 import { cpSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig } from "vitepress";
+import { withPwa } from "@vite-pwa/vitepress";
 import llmstxt from "vitepress-plugin-llms";
 import { groupIconMdPlugin, groupIconVitePlugin } from "vitepress-plugin-group-icons";
 import { tabsMarkdownPlugin } from "vitepress-plugin-tabs";
@@ -11,7 +12,7 @@ import { navigation, sidebar } from "./sidebar.mts";
 
 const repositoryUrl = "https://github.com/we-apranik/apranik";
 
-export default defineConfig({
+export default withPwa(defineConfig({
   title: "Apranik",
   description: "An embeddable, open-source proxy core for censorship circumvention.",
   lang: "en-US",
@@ -64,4 +65,15 @@ export default defineConfig({
     search: { provider: "local" },
     outline: { level: [2, 3] },
   },
-});
+  pwa: {
+    // The manifest is public/manifest.webmanifest, linked from the head.
+    manifest: false,
+    registerType: "autoUpdate",
+    workbox: {
+      globPatterns: ["**/*.{js,css,html,json,txt,webmanifest}", "**/*.svg", "**/*.woff2", "icon-*.png"],
+      // Large files stay online-only: the social image and the evidence PDF.
+      globIgnores: ["og-image.png", "Apranik-Evidence-Attachment.pdf"],
+      navigateFallbackDenylist: [/\.pdf$/],
+    },
+  },
+}));
